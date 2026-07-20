@@ -49,7 +49,7 @@ jobs:
 
       - name: Deploy Worker
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
-        run: corepack pnpm --filter @homemew/core deploy
+        run: corepack pnpm --filter @homemew/core run deploy
 
       - name: Report missing deployment secrets
         if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''

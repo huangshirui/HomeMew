@@ -35,7 +35,7 @@ corepack pnpm --filter @homemew/core exec wrangler d1 create homemew-core
 
 ```powershell
 corepack pnpm --filter @homemew/core db:migrate:remote
-corepack pnpm --filter @homemew/core deploy
+corepack pnpm --filter @homemew/core run deploy
 ```
 
 远程 migration 必须先于 Worker 部署。
