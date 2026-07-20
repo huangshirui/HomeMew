@@ -52,9 +52,9 @@ Expected after Task 2: the root and `@homemew/core` packages are listed.
 
 - [ ] **Step 1: Add package and runtime configuration**
 
-Use package name `@homemew/core`, ESM, Hono as the runtime dependency, and Wrangler, TypeScript, Vitest 4.1+, Workers types, and the Cloudflare Vitest pool as development dependencies. Add scripts for `dev`, `test`, `typecheck`, `build` (`wrangler deploy --dry-run --outdir dist`), local migration, remote migration, and deploy.
+Use package name `@homemew/core`, ESM, Hono as the runtime dependency, and Wrangler, TypeScript, Vitest 4.1+, Workers types, and the Cloudflare Vitest pool as development dependencies. Add scripts for `dev`, `test`, `typecheck`, `build` (`wrangler deploy --dry-run --outdir dist`), local migration, remote migration, and deploy. Migration scripts rely on Wrangler's automatic non-interactive CI behavior and do not pass the unsupported `--yes` option.
 
-Configure `wrangler.jsonc` with name `homemew-core`, entry `src/index.ts`, compatibility date `2026-07-20`, observability enabled, and D1 binding `DB` for database `homemew-core`. Use the explicit placeholder `REPLACE_WITH_D1_DATABASE_ID` and document that first-time setup must replace it before remote commands.
+Configure `wrangler.jsonc` with name `homemew-core`, entry `src/index.ts`, compatibility date `2026-07-02` (the newest date supported by the pinned local Workers runtime), observability enabled, and D1 binding `DB` for database `homemew-core`. Use the valid all-zero UUID as a local-only placeholder so Wrangler can parse and build the project, and document that first-time setup must replace it before remote commands.
 
 - [ ] **Step 2: Add the D1 migration and test runtime**
 
@@ -128,7 +128,7 @@ On pull requests and pushes to `main`, checkout, set up Node 24, enable Corepack
 
 - [ ] **Step 2: Add Core deployment**
 
-On pushes to `main` affecting the Core, root workspace files, lockfile, or deployment workflow, run checks and then `cloudflare/wrangler-action@v3` from `apps/core`. Supply `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; run remote D1 migrations before `wrangler deploy`. Do not run deployment on pull requests.
+On pushes to `main` affecting the Core, root workspace files, lockfile, or deployment workflow, run checks and then invoke the repository-pinned Wrangler CLI through pnpm. Supply `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; run remote D1 migrations before `wrangler deploy`. Serialize Core deployments with a concurrency group and do not run deployment on pull requests.
 
 - [ ] **Step 3: Document setup and contracts**
 

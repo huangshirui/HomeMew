@@ -1,0 +1,16 @@
+{
+  "name": "homemew",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @homemew/core dev",
+    "test": "pnpm --filter @homemew/core test",
+    "typecheck": "pnpm --filter @homemew/core typecheck",
+    "build": "pnpm --filter @homemew/core build",
+    "check": "pnpm test && pnpm typecheck && pnpm build"
+  }
+}
