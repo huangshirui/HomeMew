@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Bindings, Variables } from "./env";
+import { ApiError } from "./errors";
 import { failure, success } from "./http";
+import { registerBusinessRoutes } from "./business";
 
 type AppEnv = {
   Bindings: Bindings;
@@ -83,6 +85,8 @@ export function createApp(
     );
   });
 
+  registerBusinessRoutes(app);
+
   app.notFound((context) => {
     return context.json(
       failure(
@@ -96,6 +100,10 @@ export function createApp(
 
   app.onError((error, context) => {
     const requestId = context.get("requestId");
+
+    if (error instanceof ApiError) {
+      return context.json(failure(error.code, error.message, requestId), error.status);
+    }
 
     console.error("Unhandled Core API error", {
       requestId,

@@ -1,2 +1,6 @@
 # Comma-separated browser origins allowed to call Core during development.
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
+# Development-only HS256 key. Replace it locally and configure production with:
+# wrangler secret put JWT_SECRET
+JWT_SECRET=development-only-change-me-at-least-32-characters

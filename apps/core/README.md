@@ -13,6 +13,34 @@ GET /api/v1/status
 
 业务接口统一添加到 `/api/v1/*`。成功响应使用 `{ "data": ... }`，错误响应使用 `{ "error": { "code", "message", "requestId" } }`。所有响应都包含 `x-request-id`。
 
+## 认证与身份边界
+
+业务接口使用 HS256 Bearer JWT。普通用户 Token 的 `sub` 必须是 HomeMew 内部 `users.id`；内部用户创建接口还要求 `scope: internal`。Core 不接收或保存微信 `openid`、企业微信 `userid`，外部身份服务负责维护映射并签发 Token。
+
+本地将 `.dev.vars.example` 复制为 `.dev.vars` 并更换 `JWT_SECRET`。生产环境使用：
+
+```powershell
+corepack pnpm --filter @homemew/core exec wrangler secret put JWT_SECRET
+```
+
+示例 claims：
+
+```json
+{ "sub": "usr_01JXYZ", "exp": 4102444800 }
+{ "sub": "identity-service", "scope": "internal", "exp": 4102444800 }
+```
+
+## 第一版业务 API
+
+- `GET|PATCH /api/v1/me`、`GET /api/v1/me/families`
+- `POST|GET|PATCH /api/v1/families[/{familyId}]`
+- `GET|PATCH|DELETE /api/v1/families/{familyId}/members[/{userId}]`
+- `POST /api/v1/families/{familyId}/leave`
+- `POST|GET /api/v1/families/{familyId}/invites`
+- `POST /api/v1/families/{familyId}/invites/{inviteId}/revoke`
+- `GET /api/v1/family-invites/{code}`、`POST /api/v1/family-invites/{code}/join`
+- `POST /api/v1/internal/users`
+
 ## 本地 D1
 
 ```powershell
