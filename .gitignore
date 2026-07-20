@@ -10,3 +10,4 @@ coverage/
 !.dev.vars.example
 worker-configuration.d.ts
 *.log
+.pnpm-store/
