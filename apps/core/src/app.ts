@@ -4,6 +4,7 @@ import type { Bindings, Variables } from "./env";
 import { ApiError } from "./errors";
 import { failure, success } from "./http";
 import { registerBusinessRoutes } from "./business";
+import { registerEventRoutes } from "./events";
 
 type AppEnv = {
   Bindings: Bindings;
@@ -86,6 +87,7 @@ export function createApp(
   });
 
   registerBusinessRoutes(app);
+  registerEventRoutes(app);
 
   app.notFound((context) => {
     return context.json(

@@ -39,7 +39,7 @@ describe("event and task schema", () => {
       "SELECT value FROM schema_metadata WHERE key = 'schema_version'",
     ).first<{ value: string }>();
 
-    expect(tables.results.map((row) => row.name)).toEqual([
+    expect(tables.results.map((row: { name: string }) => row.name)).toEqual([
       "event_attendees", "events", "task_assignees", "tasks",
     ]);
     expect(version?.value).toBe("3");

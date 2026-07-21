@@ -33,3 +33,10 @@ export async function createUser(displayName: string): Promise<{ id: string; tok
   const body = await response.json<{ data: { id: string } }>();
   return { id: body.data.id, token: await makeToken(body.data.id) };
 }
+
+export async function createFamily(name = "Test Family"): Promise<{ id: string; admin: { id: string; token: string } }> {
+  const admin = await createUser(`${name} Admin`);
+  const response = await request("/api/v1/families", admin.token, { method: "POST", body: JSON.stringify({ name }) });
+  const payload = await response.json<{ data: { id: string } }>();
+  return { id: payload.data.id, admin };
+}
