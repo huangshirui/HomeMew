@@ -5,6 +5,7 @@ import { ApiError } from "./errors";
 import { createId, createInviteCode } from "./ids";
 import { success } from "./http";
 import { optionalUrl, positiveInteger, requireObject, requireString } from "./validation";
+import { requireActiveUser as activeUser, requireFamilyAdmin as admin, requireFamilyMember as membership } from "./family-access";
 
 type AppEnv = { Bindings: Bindings; Variables: Variables };
 type App = Hono<AppEnv>;
@@ -14,25 +15,6 @@ async function body(context: Context<AppEnv>): Promise<Record<string, unknown>> 
     if (error instanceof ApiError) throw error;
     throw new ApiError("INVALID_REQUEST", "Request body must be valid JSON", 400);
   }
-}
-
-async function activeUser(env: Bindings, id: string): Promise<any> {
-  const user = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<any>();
-  if (!user) throw new ApiError("USER_NOT_FOUND", "User not found", 404);
-  if (user.status !== "active") throw new ApiError("FORBIDDEN", "User is disabled", 403);
-  return user;
-}
-
-async function membership(env: Bindings, familyId: string, userId: string): Promise<any> {
-  const row = await env.DB.prepare("SELECT * FROM family_members WHERE family_id = ? AND user_id = ? AND status = 'active'").bind(familyId, userId).first<any>();
-  if (!row) throw new ApiError("FORBIDDEN", "Active family membership is required", 403);
-  return row;
-}
-
-async function admin(env: Bindings, familyId: string, userId: string): Promise<any> {
-  const row = await membership(env, familyId, userId);
-  if (row.role !== "admin") throw new ApiError("FORBIDDEN", "Family administrator access is required", 403);
-  return row;
 }
 
 async function hashCode(code: string): Promise<string> {
