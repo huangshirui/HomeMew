@@ -1,6 +1,6 @@
 # HomeMew
 
-HomeMew 是一个面向家庭场景的 monorepo。MVP Core 已实现内部用户、家庭、成员与邀请 API；网页大屏和微信小程序保留目录，待产品需求明确后再选择框架。
+HomeMew 是一个面向家庭场景的 monorepo。MVP Core 已实现内部用户、家庭、成员、邀请、日程与待办 API；网页大屏和微信小程序保留目录，待产品需求明确后再选择框架。
 
 ## 目录
 
@@ -40,6 +40,8 @@ corepack pnpm check
 - `GET /health`：不访问数据库的部署探活。
 - `GET /api/v1/status`：验证 API 与 D1，并返回当前 schema 版本。
 - `/api/v1/me`、`/api/v1/families`、成员与邀请接口：HomeMew 用户和家庭领域 API。
+- `/api/v1/families/{familyId}/events`：家庭日程 CRUD、范围筛选与分页。
+- `/api/v1/families/{familyId}/tasks`：家庭待办 CRUD、完成/重开、筛选与分页。
 - `POST /api/v1/internal/users`：仅供带 `internal` scope 的身份服务创建内部用户。
 
 Core 使用 HS256 Bearer JWT，普通 Token 的 `sub` 是 HomeMew 内部用户 ID。微信和企业微信身份映射始终位于 Core 之外。
