@@ -70,4 +70,19 @@ describe("family event API", () => {
     const second = await request(`/api/v1/families/${family.id}/events?start=2026-07-25&end=2026-07-26&attendeeId=me&limit=1&cursor=${encodeURIComponent(page1.data.nextCursor)}`, family.admin.token);
     expect((await second.json<any>()).data.items).toHaveLength(1);
   });
+
+  it("uses the Shanghai calendar date for the default range", async () => {
+    const family = await createFamily("Default Range");
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
+    const [year, month, day] = today.split("-").map(Number);
+    const futureDate = new Date(Date.UTC(year, month - 1, day + 29)).toISOString().slice(0, 10);
+    const start = new Date(`${futureDate}T12:00:00+08:00`);
+    const end = new Date(start.getTime() + 3_600_000);
+    await createEvent(family.id, family.admin.token, {
+      summary: "Near range end", start: start.toISOString(), end: end.toISOString(), isAllDay: false,
+      timezone: "Asia/Shanghai", attendeeIds: [],
+    });
+    const response = await request(`/api/v1/families/${family.id}/events`, family.admin.token);
+    expect((await response.json<any>()).data.items.map((item: any) => item.summary)).toContain("Near range end");
+  });
 });

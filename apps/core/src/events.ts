@@ -49,6 +49,11 @@ function formatInZone(value: string, zone: string): string {
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}${offset}`;
 }
 
+function shiftDate(value: string, days: number): string {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
 async function mapEvent(env: Bindings, row: EventRow): Promise<Record<string, unknown>> {
   const attendees = await env.DB.prepare(`SELECT u.id user_id, u.display_name, u.avatar_url FROM event_attendees ea JOIN family_members fm ON fm.family_id = ? AND fm.user_id = ea.user_id AND fm.status = 'active' JOIN users u ON u.id = ea.user_id WHERE ea.event_id = ? ORDER BY ea.created_at, u.id`).bind(row.family_id, row.id).all<any>();
   const people = await env.DB.prepare("SELECT id, display_name FROM users WHERE id IN (?, ?)").bind(row.created_by, row.updated_by).all<any>();
@@ -124,9 +129,8 @@ export function registerEventRoutes(app: App): void {
     const startQuery = c.req.query("start"), endQuery = c.req.query("end");
     if ((startQuery === undefined) !== (endQuery === undefined)) throw new ApiError("INVALID_REQUEST", "start and end must be supplied together", 400);
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
-    const base = new Date(`${today}T00:00:00+08:00`);
-    const start = startQuery ? exactDate(startQuery, "start") : new Date(base.getTime() - 7 * 86400000).toISOString().slice(0, 10);
-    const end = endQuery ? exactDate(endQuery, "end") : new Date(base.getTime() + 30 * 86400000).toISOString().slice(0, 10);
+    const start = startQuery ? exactDate(startQuery, "start") : shiftDate(today, -7);
+    const end = endQuery ? exactDate(endQuery, "end") : shiftDate(today, 30);
     if (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`) > 366 * 86400000 || end <= start) throw new ApiError("INVALID_REQUEST", "event range must be positive and at most 366 days", 400);
     const limit = parseLimit(c.req.query("limit")), sort = "start_asc";
     const status = c.req.query("status") ?? "active";
