@@ -1,0 +1,36 @@
+name: Patch avatar OpenAPI contract
+
+on:
+  push:
+    branches:
+      - feat/avatar-r2
+    paths:
+      - scripts/patch-avatar-contract.mjs
+      - .github/workflows/patch-avatar-contract.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/avatar-r2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/patch-avatar-contract.mjs
+      - name: Commit generated contract
+        run: |
+          if git diff --quiet -- apps/core/openapi.yaml; then
+            echo "No OpenAPI changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/core/openapi.yaml
+          git commit -m "docs(core): add R2 avatar upload contract"
+          git push origin HEAD:feat/avatar-r2
