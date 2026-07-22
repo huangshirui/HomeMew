@@ -40,9 +40,13 @@ export interface UserProfile {
 
 export interface CurrentUserResponse extends ApiEnvelope<UserProfile> {}
 
+/** 头像通过 PUT /api/v1/me/avatar 单独上传，资料更新只支持昵称。 */
 export interface UpdateCurrentUserRequest {
   displayName?: string;
-  avatarUrl?: string | null;
+}
+
+export interface AvatarUploadResult {
+  avatarUrl: string;
 }
 
 // ==================== 家庭相关 ====================
@@ -275,7 +279,6 @@ export interface VersionActionRequest {
 
 export interface CreateInternalUserRequest {
   displayName: string;
-  avatarUrl?: string | null;
   createdFrom: 'wechat_miniprogram' | 'wecom' | 'admin' | 'other';
 }
 

@@ -1,6 +1,6 @@
 # HomeMew Core
 
-Core 是部署到 Cloudflare Workers 的 Hono API，使用 D1 binding `DB`。
+Core 是部署到 Cloudflare Workers 的 Hono API，使用 D1 binding `DB` 和 R2 binding `AVATARS`。
 
 ## API 约定
 
@@ -32,7 +32,7 @@ corepack pnpm --filter @homemew/core exec wrangler secret put JWT_SECRET
 
 ## 第一版业务 API
 
-- `GET|PATCH /api/v1/me`、`GET /api/v1/me/families`
+- `GET|PATCH /api/v1/me`、`PUT /api/v1/me/avatar`、`GET /api/v1/me/families`
 - `POST|GET|PATCH /api/v1/families[/{familyId}]`
 - `GET|PATCH|DELETE /api/v1/families/{familyId}/members[/{userId}]`
 - `POST /api/v1/families/{familyId}/leave`
@@ -40,6 +40,28 @@ corepack pnpm --filter @homemew/core exec wrangler secret put JWT_SECRET
 - `POST /api/v1/families/{familyId}/invites/{inviteId}/revoke`
 - `GET /api/v1/family-invites/{code}`、`POST /api/v1/family-invites/{code}/join`
 - `POST /api/v1/internal/users`
+
+### 用户头像
+
+用户头像由 Core 统一写入 R2，客户端不能通过 `PATCH /api/v1/me` 提交任意头像 URL。
+
+```http
+PUT /api/v1/me/avatar
+Authorization: Bearer <user JWT>
+Content-Type: multipart/form-data
+
+file=<JPEG|PNG|WebP，最大 5 MB>
+```
+
+Core 使用对象路径：
+
+```text
+avatars/{userId}/{uuid}.{ext}
+```
+
+D1 的 `users` 表只保存 `avatar_key`。`GET /api/v1/me`、家庭成员、日程参与人和待办负责人等 API 仍向客户端返回完整的 `avatarUrl`，地址由 `ASSETS_PUBLIC_URL` 和 `avatar_key` 拼接。客户端不应依赖或保存 R2 object key。
+
+上传流程采用补偿顺序：先写入新 R2 对象，再更新 D1；D1 更新失败时删除新对象，成功后清理旧对象。
 
 ### 家庭日程
 
@@ -83,27 +105,54 @@ POST   /api/v1/families/{familyId}/tasks/{taskId}/reopen
 
 所有日程和待办接口都要求当前 JWT 用户是目标家庭的 active 成员。指定的参与人或负责人也必须是该家庭的 active 成员。PATCH、DELETE、complete 和 reopen 使用客户端读到的 `version`；版本过期返回对应的 `*_VERSION_CONFLICT`。DELETE 是软删除，普通读取不会返回已删除记录。
 
-## 本地 D1
+## 本地 D1 与 R2
 
 ```powershell
 corepack pnpm --filter @homemew/core db:migrate:local
 corepack pnpm --filter @homemew/core dev
 ```
 
-测试会在本地 Workers 运行时中自动应用 `migrations/`，不会访问 Cloudflare 线上资源。
+测试会在本地 Workers 运行时中自动应用 `migrations/`，并使用 Miniflare 提供的本地 D1/R2，不会访问 Cloudflare 线上资源。
 
-`0003_create_event_task_schema.sql` 创建日程、参与人、待办和负责人表。已有环境升级后必须在部署新版 Worker 前应用该 migration。
+- `0003_create_event_task_schema.sql` 创建日程、参与人、待办和负责人表。
+- `0004_user_avatar_key.sql` 删除用户任意头像 URL 字段并增加 `avatar_key`。
+
+已有环境升级后必须在部署新版 Worker 前应用 migration。
 
 ## 首次 Cloudflare 配置
 
-登录 Cloudflare 并创建 D1：
+登录 Cloudflare 并创建 D1 和 R2：
 
 ```powershell
 corepack pnpm --filter @homemew/core exec wrangler login
 corepack pnpm --filter @homemew/core exec wrangler d1 create homemew-core
+corepack pnpm --filter @homemew/core exec wrangler r2 bucket create homemew-assets
 ```
 
-将命令返回的 `database_id` 写入 `wrangler.jsonc`，替换全零的本地占位 UUID。随后执行：
+将 D1 命令返回的 `database_id` 写入 `wrangler.jsonc`。R2 bucket 通过以下 binding 提供给 Worker：
+
+```jsonc
+{
+  "r2_buckets": [
+    {
+      "binding": "AVATARS",
+      "bucket_name": "homemew-assets"
+    }
+  ]
+}
+```
+
+为 `homemew-assets` 绑定公开自定义域名，并将其写入：
+
+```jsonc
+{
+  "vars": {
+    "ASSETS_PUBLIC_URL": "https://assets.example.com"
+  }
+}
+```
+
+正式部署前必须把示例域名替换成真实 HTTPS 域名。随后执行：
 
 ```powershell
 corepack pnpm --filter @homemew/core db:migrate:remote

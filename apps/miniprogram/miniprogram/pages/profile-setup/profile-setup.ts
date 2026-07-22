@@ -1,12 +1,9 @@
 /**
- * 首次资料设置 / 编辑资料页
+ * 首次资料设置 / 编辑资料页。
  *
- * 用户可二选一地设置昵称与头像：
- * - 直接使用微信昵称与头像（input type=nickname / open-type=chooseAvatar）
- * - 手工录入昵称，或从相册/拍照选择头像
- *
- * 选择的头像会先上传到微信云存储，得到可长期访问的 cloud:// 文件 ID 再保存，
- * 避免把本地临时路径写入 Core 导致换设备后头像失效。
+ * 用户可以使用微信头像按钮或从相册/相机选择图片。临时文件会直接上传到
+ * HomeMew Core，由 Core 持久化到 R2 并返回正式 avatarUrl。资料保存接口只
+ * 更新昵称，不再提交头像路径或任意 URL。
  */
 
 import { updateCurrentUser } from '../../services/users';
@@ -27,7 +24,6 @@ Page({
     const isEditMode = options?.mode === 'edit';
     this.setData({ isEditMode });
 
-    // 编辑模式下，预填当前用户资料
     if (isEditMode) {
       const current = userStore.value;
       if (current) {
@@ -37,11 +33,11 @@ Page({
         });
       } else {
         loadCurrentUser()
-          .then((u) => {
-            if (u) {
+          .then((user) => {
+            if (user) {
               this.setData({
-                displayName: u.displayName || '',
-                avatarUrl: u.avatarUrl || '',
+                displayName: user.displayName || '',
+                avatarUrl: user.avatarUrl || '',
               });
             }
           })
@@ -52,19 +48,16 @@ Page({
     }
   },
 
-  /** 输入昵称（支持手工录入，也可点键盘上的「微信」直接填入微信昵称） */
   onDisplayNameInput(e: WechatMiniprogram.Input): void {
     this.setData({ displayName: e.detail.value });
   },
 
-  /** 选择微信头像（open-type=chooseAvatar） */
   async onChooseAvatar(e: WechatMiniprogram.CustomEvent): Promise<void> {
     const { avatarUrl } = e.detail;
     if (!avatarUrl) return;
     await this.uploadAndSet(avatarUrl);
   },
 
-  /** 从相册 / 拍照选择头像（手工选择） */
   async onChooseFromAlbum(): Promise<void> {
     try {
       const res = await new Promise<WechatMiniprogram.ChooseMediaSuccessCallbackResult>((resolve, reject) => {
@@ -78,11 +71,10 @@ Page({
         });
       });
       const tempFile = res.tempFiles && res.tempFiles[0];
-      if (tempFile && tempFile.tempFilePath) {
+      if (tempFile?.tempFilePath) {
         await this.uploadAndSet(tempFile.tempFilePath);
       }
     } catch (err) {
-      // 用户主动取消选择时不提示
       const errMsg = String((err as { errMsg?: string })?.errMsg || '');
       if (!errMsg.includes('cancel')) {
         showError('选择图片失败');
@@ -90,28 +82,26 @@ Page({
     }
   },
 
-  /** 上传本地头像文件并设置为当前头像 */
   async uploadAndSet(tempFilePath: string): Promise<void> {
     if (this.data.avatarUploading) return;
     this.setData({ avatarUploading: true });
     try {
-      const fileID = await uploadAvatar(tempFilePath);
-      this.setData({ avatarUrl: fileID });
+      const avatarUrl = await uploadAvatar(tempFilePath);
+      this.setData({ avatarUrl });
+      await loadCurrentUser().catch(() => undefined);
     } catch (err) {
       console.error('[ProfileSetup] Avatar upload failed:', err);
-      showError('头像上传失败，请重试');
+      showError((err as Error)?.message || '头像上传失败，请重试');
     } finally {
       this.setData({ avatarUploading: false });
     }
   },
 
-  /** 提交资料 */
   async onSubmit(): Promise<void> {
-    const { displayName, avatarUrl, submitting, isEditMode } = this.data;
+    const { displayName, submitting, isEditMode, avatarUploading } = this.data;
 
-    if (submitting) return;
+    if (submitting || avatarUploading) return;
 
-    // 校验
     if (!displayName.trim()) {
       showError('请输入昵称');
       return;
@@ -128,14 +118,9 @@ Page({
     try {
       await updateCurrentUser({
         displayName: displayName.trim(),
-        avatarUrl: avatarUrl || null,
       });
 
-      // 编辑模式下刷新全局用户状态，确保「我的」页面同步更新
-      if (isEditMode) {
-        await loadCurrentUser().catch(() => undefined);
-      }
-
+      await loadCurrentUser().catch(() => undefined);
       hideLoading();
       showSuccess('设置成功');
 
@@ -144,14 +129,12 @@ Page({
           wx.navigateBack();
         }, 1200);
       } else {
-        // 跳转到首页（TabBar 页面）
         setTimeout(() => {
           wx.switchTab({
             url: '/pages/home/home',
           });
         }, 1500);
       }
-
     } catch (error: unknown) {
       hideLoading();
       console.error('[ProfileSetup] Save failed:', error);

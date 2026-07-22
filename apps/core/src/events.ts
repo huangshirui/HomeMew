@@ -1,4 +1,5 @@
 import type { Context, Hono } from "hono";
+import { avatarUrl } from "./avatar";
 import type { Bindings, Variables } from "./env";
 import { ApiError } from "./errors";
 import { requireActiveUser, requireFamilyMember, requireRelatedMembers } from "./family-access";
@@ -55,15 +56,18 @@ function shiftDate(value: string, days: number): string {
 }
 
 async function mapEvent(env: Bindings, row: EventRow): Promise<Record<string, unknown>> {
-  const attendees = await env.DB.prepare(`SELECT u.id user_id, u.display_name, u.avatar_url FROM event_attendees ea JOIN family_members fm ON fm.family_id = ? AND fm.user_id = ea.user_id AND fm.status = 'active' JOIN users u ON u.id = ea.user_id WHERE ea.event_id = ? ORDER BY ea.created_at, u.id`).bind(row.family_id, row.id).all<any>();
-  const people = await env.DB.prepare("SELECT id, display_name FROM users WHERE id IN (?, ?)").bind(row.created_by, row.updated_by).all<any>();
-  const person = (id: string) => { const found = people.results.find((item) => item.id === id); return { userId: id, displayName: found?.display_name ?? "" }; };
+  const attendees = await env.DB.prepare(`SELECT u.id user_id, u.display_name, u.avatar_key FROM event_attendees ea JOIN family_members fm ON fm.family_id = ? AND fm.user_id = ea.user_id AND fm.status = 'active' JOIN users u ON u.id = ea.user_id WHERE ea.event_id = ? ORDER BY ea.created_at, u.id`).bind(row.family_id, row.id).all<any>();
+  const people = await env.DB.prepare("SELECT id, display_name, avatar_key FROM users WHERE id IN (?, ?)").bind(row.created_by, row.updated_by).all<any>();
+  const person = (id: string) => {
+    const found = people.results.find((item) => item.id === id);
+    return { userId: id, displayName: found?.display_name ?? "", avatarUrl: avatarUrl(env, found?.avatar_key) };
+  };
   return {
     id: row.id, familyId: row.family_id, summary: row.summary, description: row.description,
     start: row.is_all_day ? row.start_date : formatInZone(row.start_at, row.timezone),
     end: row.is_all_day ? row.end_date : formatInZone(row.end_at, row.timezone),
     isAllDay: Boolean(row.is_all_day), timezone: row.timezone, location: row.location, status: row.status,
-    attendees: attendees.results.map((item) => ({ userId: item.user_id, displayName: item.display_name, avatarUrl: item.avatar_url })),
+    attendees: attendees.results.map((item) => ({ userId: item.user_id, displayName: item.display_name, avatarUrl: avatarUrl(env, item.avatar_key) })),
     createdBy: person(row.created_by), updatedBy: person(row.updated_by), version: row.version,
     createdAt: row.created_at, updatedAt: row.updated_at,
   };

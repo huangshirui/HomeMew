@@ -1,4 +1,5 @@
 import type { Context, Hono } from "hono";
+import { avatarUrl } from "./avatar";
 import type { Bindings, Variables } from "./env";
 import { ApiError } from "./errors";
 import { requireActiveUser, requireFamilyMember, requireRelatedMembers } from "./family-access";
@@ -35,14 +36,18 @@ async function findTask(env: Bindings, familyId: string, taskId: string): Promis
 }
 
 async function mapTask(env: Bindings, row: TaskRow): Promise<Record<string, unknown>> {
-  const assignees = await env.DB.prepare(`SELECT u.id user_id, u.display_name, u.avatar_url FROM task_assignees ta JOIN family_members fm ON fm.family_id=? AND fm.user_id=ta.user_id AND fm.status='active' JOIN users u ON u.id=ta.user_id WHERE ta.task_id=? ORDER BY ta.created_at,u.id`).bind(row.family_id, row.id).all<any>();
+  const assignees = await env.DB.prepare(`SELECT u.id user_id, u.display_name, u.avatar_key FROM task_assignees ta JOIN family_members fm ON fm.family_id=? AND fm.user_id=ta.user_id AND fm.status='active' JOIN users u ON u.id=ta.user_id WHERE ta.task_id=? ORDER BY ta.created_at,u.id`).bind(row.family_id, row.id).all<any>();
   const ids = [row.created_by, row.updated_by, row.completed_by].filter(Boolean);
   const placeholders = ids.map(() => "?").join(",") || "NULL";
-  const users = ids.length ? await env.DB.prepare(`SELECT id,display_name FROM users WHERE id IN (${placeholders})`).bind(...ids).all<any>() : { results: [] as any[] };
-  const person = (id: string | null) => id ? { userId: id, displayName: users.results.find((item) => item.id === id)?.display_name ?? "" } : null;
+  const users = ids.length ? await env.DB.prepare(`SELECT id,display_name,avatar_key FROM users WHERE id IN (${placeholders})`).bind(...ids).all<any>() : { results: [] as any[] };
+  const person = (id: string | null) => {
+    if (!id) return null;
+    const found = users.results.find((item) => item.id === id);
+    return { userId: id, displayName: found?.display_name ?? "", avatarUrl: avatarUrl(env, found?.avatar_key) };
+  };
   return {
     id: row.id, familyId: row.family_id, name: row.name, description: row.description, due: row.due_date,
-    status: row.status, assignees: assignees.results.map((item) => ({ userId: item.user_id, displayName: item.display_name, avatarUrl: item.avatar_url })),
+    status: row.status, assignees: assignees.results.map((item) => ({ userId: item.user_id, displayName: item.display_name, avatarUrl: avatarUrl(env, item.avatar_key) })),
     completedAt: row.completed_at, completedBy: person(row.completed_by), createdBy: person(row.created_by), updatedBy: person(row.updated_by),
     version: row.version, createdAt: row.created_at, updatedAt: row.updated_at,
   };

@@ -2,7 +2,12 @@ import { env } from "cloudflare:workers";
 import type { Bindings } from "../src/env";
 
 export const jwtSecret = "test-secret-at-least-32-characters";
-export const bindings: Bindings = { DB: env.DB, JWT_SECRET: jwtSecret };
+export const bindings: Bindings = {
+  DB: env.DB,
+  AVATARS: env.AVATARS,
+  ASSETS_PUBLIC_URL: "https://assets.test.example",
+  JWT_SECRET: jwtSecret,
+};
 
 function encode(value: unknown): string {
   return btoa(JSON.stringify(value)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
@@ -19,7 +24,7 @@ export async function makeToken(sub: string, scope?: string): Promise<string> {
 export async function request(path: string, token: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${token}`);
-  if (init.body) headers.set("content-type", "application/json");
+  if (init.body && !(init.body instanceof FormData)) headers.set("content-type", "application/json");
   const app = (await import("../src/index")).default;
   return app.request(path, { ...init, headers }, bindings);
 }
@@ -28,7 +33,7 @@ export async function createUser(displayName: string): Promise<{ id: string; tok
   const internalToken = await makeToken("svc_test", "internal");
   const response = await request("/api/v1/internal/users", internalToken, {
     method: "POST",
-    body: JSON.stringify({ displayName, avatarUrl: null, createdFrom: "other" }),
+    body: JSON.stringify({ displayName, createdFrom: "other" }),
   });
   const body = await response.json<{ data: { id: string } }>();
   return { id: body.data.id, token: await makeToken(body.data.id) };

@@ -13,18 +13,49 @@ describe("user and family API", () => {
     const internal = await makeToken("svc", "internal");
     const created = await request("/api/v1/internal/users", internal, {
       method: "POST",
-      body: JSON.stringify({ displayName: "KK爸爸", avatarUrl: null, createdFrom: "wechat_miniprogram" }),
+      body: JSON.stringify({ displayName: "KK爸爸", createdFrom: "wechat_miniprogram" }),
     });
     expect(created.status).toBe(201);
-    const createdBody = await created.json<{ data: { id: string } }>();
+    const createdBody = await created.json<{ data: { id: string; avatarUrl: string | null } }>();
+    expect(createdBody.data.avatarUrl).toBeNull();
 
     const token = await makeToken(createdBody.data.id);
     const updated = await request("/api/v1/me", token, {
       method: "PATCH",
-      body: JSON.stringify({ displayName: "家事喵用户", avatarUrl: "https://example.com/avatar.jpg" }),
+      body: JSON.stringify({ displayName: "家事喵用户" }),
     });
     expect(updated.status).toBe(200);
     expect((await updated.json<{ data: { displayName: string } }>()).data.displayName).toBe("家事喵用户");
+  });
+
+  it("uploads an avatar to R2 and stores only its object key", async () => {
+    const user = await createUser("Avatar User");
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], "avatar.jpg", { type: "image/jpeg" }));
+
+    const uploaded = await request("/api/v1/me/avatar", user.token, {
+      method: "PUT",
+      body: form,
+    });
+    expect(uploaded.status).toBe(200);
+    const payload = await uploaded.json<{ data: { avatarUrl: string } }>();
+    expect(payload.data.avatarUrl).toMatch(/^https:\/\/assets\.test\.example\/avatars\//);
+
+    const stored = await bindings.DB.prepare("SELECT avatar_key FROM users WHERE id = ?").bind(user.id).first<{ avatar_key: string }>();
+    expect(stored?.avatar_key).toMatch(new RegExp(`^avatars/${user.id}/.+\\.jpg$`));
+    expect(await bindings.AVATARS.get(stored!.avatar_key)).not.toBeNull();
+
+    const profile = await request("/api/v1/me", user.token);
+    expect((await profile.json<{ data: { avatarUrl: string } }>()).data.avatarUrl).toBe(payload.data.avatarUrl);
+  });
+
+  it("rejects unsupported avatar types", async () => {
+    const user = await createUser("Invalid Avatar");
+    const form = new FormData();
+    form.set("file", new File(["not an image"], "avatar.txt", { type: "text/plain" }));
+    const response = await request("/api/v1/me/avatar", user.token, { method: "PUT", body: form });
+    expect(response.status).toBe(415);
+    expect((await response.json<{ error: { code: string } }>()).error.code).toBe("UNSUPPORTED_AVATAR_TYPE");
   });
 
   it("creates a family with its creator as admin and enforces the creation limit", async () => {
