@@ -6,14 +6,21 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "ASSETS_PUBLIC_URL": "https://assets.example.com"
+  },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "homemew-core",
-      // Local development uses local storage. Replace this value with the ID
-      // returned by `wrangler d1 create homemew-core` before remote deployment.
       "database_id": "3921d02d-8158-4706-a979-c18ff9f05ff8",
       "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AVATARS",
+      "bucket_name": "homemew-assets"
     }
   ]
 }
