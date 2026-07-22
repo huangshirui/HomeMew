@@ -1,52 +1,105 @@
 /**
- * 媒体上传服务
+ * 用户头像上传服务。
  *
- * 把用户选择的本地头像（来自微信 chooseAvatar 或相册）上传到微信云存储，
- * 返回可长期访问的 cloud:// 文件 ID。该 ID 可直接作为 <image> 的 src，
- * 同时作为用户的 avatarUrl 持久化到 HomeMew Core。
- *
- * 说明：
- * - chooseAvatar / chooseMedia 返回的是本地临时文件路径（wxfile:// 或 http://tmp/...），
- *   不能直接写入 Core，否则换设备/临时文件清理后头像无法显示。
- * - 微信云开发已在 app.ts 中初始化（wx.cloud.init），可直接使用 wx.cloud.uploadFile。
+ * 本地临时文件直接上传到 HomeMew Core；Core 负责鉴权、写入 R2、保存
+ * users.avatar_key，并返回可公开访问的 avatarUrl。小程序不接触 R2 密钥，
+ * 也不再使用微信云存储保存头像。
  */
 
-/**
- * 上传头像到微信云存储
- * @param tempFilePath 本地临时文件路径
- * @returns cloud:// 文件 ID
- */
-export function uploadAvatar(tempFilePath: string): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    if (!tempFilePath) {
-      reject(new Error('文件路径为空'));
-      return;
-    }
+import { AppError } from './api';
+import { getStoredToken, hasValidToken, loginAndSaveToken } from './auth';
+import type { ApiEnvelope, ErrorResponse } from '../types/index';
 
-    if (!wx.cloud) {
-      reject(new Error('当前环境不支持云存储'));
-      return;
-    }
+const CORE_BASE_URL_FALLBACK = 'https://homemew.aisr.online';
+const UPLOAD_TIMEOUT = 30000;
 
-    const extMatch = tempFilePath.split('?')[0].split('.');
-    const ext = (extMatch.length > 1 ? extMatch.pop()! : 'png').toLowerCase();
-    const safeExt = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext) ? ext : 'png';
-    const cloudPath = `avatars/${Date.now()}-${Math.floor(Math.random() * 1e6)}.${safeExt}`;
+interface AvatarUploadResult {
+  avatarUrl: string;
+}
 
-    wx.cloud.uploadFile({
-      cloudPath,
+function getCoreBaseUrl(): string {
+  return ((wx.getStorageSync('coreApiUrl') as string) || CORE_BASE_URL_FALLBACK).replace(/\/$/, '');
+}
+
+async function ensureToken(): Promise<string> {
+  if (!hasValidToken()) {
+    await loginAndSaveToken();
+  }
+  const token = getStoredToken();
+  if (!token) throw new AppError('AUTH_REQUIRED', '登录状态不可用');
+  return token;
+}
+
+function requestId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+}
+
+function parseUploadResponse(raw: string): unknown {
+  try {
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function uploadOnce(tempFilePath: string, token: string): Promise<WechatMiniprogram.UploadFileSuccessCallbackResult> {
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: `${getCoreBaseUrl()}/api/v1/me/avatar`,
       filePath: tempFilePath,
-      success(res) {
-        if (res.fileID) {
-          resolve(res.fileID);
-        } else {
-          reject(new Error('上传成功但未返回文件 ID'));
-        }
+      name: 'file',
+      header: {
+        Authorization: `Bearer ${token}`,
+        'x-request-id': requestId(),
       },
+      timeout: UPLOAD_TIMEOUT,
+      success: resolve,
       fail(err) {
-        console.error('[Media] Upload avatar failed:', err);
-        reject(new Error((err && err.errMsg) || '头像上传失败'));
+        const message = err.errMsg?.includes('timeout') ? '头像上传超时，请重试' : '网络请求失败，请检查网络连接';
+        reject(new AppError(err.errMsg?.includes('timeout') ? 'TIMEOUT' : 'NETWORK_ERROR', message));
       },
     });
   });
+}
+
+function uploadError(result: WechatMiniprogram.UploadFileSuccessCallbackResult): AppError {
+  const body = parseUploadResponse(result.data) as ErrorResponse | null;
+  if (body?.error) {
+    return new AppError(body.error.code, body.error.message, body.error.requestId);
+  }
+  const messages: Record<number, string> = {
+    400: '头像文件无效',
+    401: '登录状态已过期',
+    413: '头像文件不能超过 5 MB',
+    415: '仅支持 JPEG、PNG 或 WebP 图片',
+    500: '头像上传失败，请稍后重试',
+  };
+  return new AppError(`HTTP_${result.statusCode}`, messages[result.statusCode] || `头像上传失败 (${result.statusCode})`);
+}
+
+/**
+ * 上传本地头像文件到 Core/R2，并返回 Core 生成的正式 HTTPS 地址。
+ */
+export async function uploadAvatar(tempFilePath: string): Promise<string> {
+  if (!tempFilePath) throw new AppError('INVALID_AVATAR', '文件路径为空');
+
+  let token = await ensureToken();
+  let result = await uploadOnce(tempFilePath, token);
+
+  if (result.statusCode === 401) {
+    await loginAndSaveToken();
+    token = await ensureToken();
+    result = await uploadOnce(tempFilePath, token);
+  }
+
+  if (result.statusCode < 200 || result.statusCode >= 300) {
+    throw uploadError(result);
+  }
+
+  const body = parseUploadResponse(result.data) as ApiEnvelope<AvatarUploadResult> | null;
+  const avatarUrl = body?.data?.avatarUrl;
+  if (!avatarUrl || !avatarUrl.startsWith('https://')) {
+    throw new AppError('INVALID_RESPONSE', '头像上传成功但未返回有效地址');
+  }
+  return avatarUrl;
 }
