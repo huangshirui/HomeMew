@@ -1,0 +1,128 @@
+/* 首页样式 */
+
+/* 家庭头部 */
+.family-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.family-info {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+}
+
+.family-name {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333333;
+}
+
+.switch-hint {
+  font-size: 22rpx;
+  color: #4CAF50;
+}
+
+.member-count {
+  font-size: 24rpx;
+  color: #999999;
+}
+
+/* 区域标题 */
+.section-header {
+  margin-bottom: 20rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #333333;
+}
+
+/* 空状态提示 */
+.empty-hint {
+  padding: 32rpx 0;
+  text-align: center;
+}
+
+.empty-text {
+  font-size: 26rpx;
+  color: #999999;
+}
+
+/* 快速操作 */
+.quick-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 16rpx;
+}
+
+.action-item {
+  flex: 1;
+  height: 88rpx;
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  border: 2rpx dashed #cccccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-text {
+  font-size: 28rpx;
+  color: #666666;
+}
+
+/* 无家庭空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 120rpx;
+}
+
+.empty-image {
+  width: 240rpx;
+  height: 240rpx;
+  margin-bottom: 40rpx;
+  opacity: 0.6;
+}
+
+.empty-title {
+  font-size: 34rpx;
+  font-weight: 500;
+  color: #333333;
+  margin-bottom: 16rpx;
+}
+
+.empty-desc {
+  font-size: 26rpx;
+  color: #999999;
+  margin-bottom: 48rpx;
+  text-align: center;
+  padding: 0 48rpx;
+}
+
+.empty-actions {
+  width: 100%;
+  padding: 0 48rpx;
+  box-sizing: border-box;
+}
+
+.empty-actions .btn-primary,
+.empty-actions .btn-outline {
+  width: 100%;
+}
+
+/* 加载状态 */
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding-top: 120rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #999999;
+}

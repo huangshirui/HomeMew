@@ -1,0 +1,49 @@
+{
+  "pages": [
+    "pages/launch/launch",
+    "pages/profile-setup/profile-setup",
+    "pages/home/home",
+    "pages/events/events",
+    "pages/tasks/tasks",
+    "pages/profile/profile"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "家事喵",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f5f6f7"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#4CAF50",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/home",
+        "text": "首页",
+        "iconPath": "assets/icons/home.png",
+        "selectedIconPath": "assets/icons/home-active.png"
+      },
+      {
+        "pagePath": "pages/events/events",
+        "text": "日程",
+        "iconPath": "assets/icons/calendar.png",
+        "selectedIconPath": "assets/icons/calendar-active.png"
+      },
+      {
+        "pagePath": "pages/tasks/tasks",
+        "text": "待办",
+        "iconPath": "assets/icons/task.png",
+        "selectedIconPath": "assets/icons/task-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "assets/icons/profile.png",
+        "selectedIconPath": "assets/icons/profile-active.png"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

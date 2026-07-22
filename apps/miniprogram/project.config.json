@@ -11,15 +11,26 @@
       "disablePlugins": [],
       "outputPath": ""
     },
-    "useCompilerPlugins": false,
-    "minifyWXML": true
+    "useCompilerPlugins": [
+      "typescript"
+    ],
+    "minifyWXML": true,
+    "condition": false
   },
   "compileType": "miniprogram",
+  "libVersion": "3.5.2",
+  "projectname": "homemew-miniprogram",
   "simulatorPluginLibVersion": {},
   "packOptions": {
     "ignore": [],
     "include": []
   },
   "appid": "wxfd143b71ac6ace74",
-  "editorSetting": {}
+  "editorSetting": {},
+  "cloudfunctionTemplateRoot": "cloudfunctions/",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "cloudbaseRoot": "",
+  "miniprogramRoot": "miniprogram/",
+  "srcMiniprogramRoot": "miniprogram/",
+  "pluginRoot": ""
 }

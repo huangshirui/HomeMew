@@ -1,0 +1,7 @@
+<!-- 待办页（占位） -->
+<view class="container">
+  <view class="placeholder">
+    <text class="placeholder-title">待办</text>
+    <text class="placeholder-desc">待办功能即将上线，敬请期待</text>
+  </view>
+</view>

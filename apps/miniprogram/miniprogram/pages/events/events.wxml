@@ -1,0 +1,7 @@
+<!-- 日程页（占位） -->
+<view class="container">
+  <view class="placeholder">
+    <text class="placeholder-title">日程</text>
+    <text class="placeholder-desc">日程功能即将上线，敬请期待</text>
+  </view>
+</view>

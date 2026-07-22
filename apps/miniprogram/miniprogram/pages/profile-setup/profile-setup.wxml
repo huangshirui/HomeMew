@@ -1,0 +1,63 @@
+<!-- 首次资料设置 / 编辑资料页 -->
+<view class="container">
+  <view class="header">
+    <text class="title">{{isEditMode ? '编辑资料' : '欢迎加入家事喵'}}</text>
+    <text class="subtitle">{{isEditMode ? '修改你的昵称和头像' : '设置昵称和头像，方便家人认识你'}}</text>
+  </view>
+
+  <!-- 头像预览 -->
+  <view class="avatar-section">
+    <view class="avatar-wrapper">
+      <image
+        class="avatar-image"
+        src="{{avatarUrl || '/assets/images/default-avatar.png'}}"
+        mode="aspectFill"
+      />
+      <view wx:if="{{avatarUploading}}" class="avatar-mask">
+        <text class="avatar-mask-text">上传中...</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 头像来源：直接选微信头像 / 手工从相册选择 -->
+  <view class="avatar-actions">
+    <button
+      class="avatar-btn avatar-btn-wechat"
+      open-type="chooseAvatar"
+      bind:chooseavatar="onChooseAvatar"
+    >
+      {{avatarUrl ? '换微信头像' : '使用微信头像'}}
+    </button>
+    <button
+      class="avatar-btn avatar-btn-album"
+      bindtap="onChooseFromAlbum"
+    >
+      从相册选择
+    </button>
+  </view>
+
+  <!-- 昵称：手工录入，或点键盘上的「微信」直接填入微信昵称 -->
+  <view class="form-item">
+    <text class="label">昵称</text>
+    <input
+      class="input"
+      type="nickname"
+      placeholder="输入昵称，或点键盘上的「微信」"
+      value="{{displayName}}"
+      bindinput="onDisplayNameInput"
+      maxlength="20"
+      confirm-type="done"
+    />
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-wrapper">
+    <button
+      class="btn-primary {{submitting ? 'disabled' : ''}}"
+      disabled="{{submitting || avatarUploading}}"
+      bindtap="onSubmit"
+    >
+      {{submitting ? '保存中...' : (isEditMode ? '保存' : '开始使用')}}
+    </button>
+  </view>
+</view>

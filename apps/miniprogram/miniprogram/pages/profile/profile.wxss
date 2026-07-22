@@ -1,0 +1,150 @@
+/* 我的页面样式 */
+
+/* 用户卡片 */
+.user-card {
+  display: flex;
+  align-items: center;
+  padding: 32rpx 24rpx;
+}
+
+.avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+  margin-right: 24rpx;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.nickname {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 500;
+  color: #333333;
+  margin-bottom: 8rpx;
+}
+
+.user-id {
+  display: block;
+  font-size: 22rpx;
+  color: #999999;
+}
+
+.edit-btn {
+  padding: 12rpx 24rpx;
+  border: 2rpx solid #eeeeee;
+  border-radius: 24rpx;
+}
+
+.edit-text {
+  font-size: 24rpx;
+  color: #666666;
+}
+
+/* 区域 */
+.section {
+  padding: 0 8rpx;
+}
+
+.section-header {
+  padding: 20rpx 16rpx;
+  border-bottom: 2rpx solid #f5f5f5;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #333333;
+}
+
+/* 家庭项 */
+.family-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 16rpx;
+  border-bottom: 2rpx solid #f5f5f5;
+}
+
+.family-item:last-child {
+  border-bottom: none;
+}
+
+.family-item-info {
+  flex: 1;
+}
+
+.family-item-name {
+  display: block;
+  font-size: 30rpx;
+  color: #333333;
+  margin-bottom: 6rpx;
+}
+
+.family-item-role {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+}
+
+.no-family-text {
+  display: block;
+  padding: 32rpx 16rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #999999;
+}
+
+.family-actions {
+  display: flex;
+  gap: 24rpx;
+  padding: 20rpx 16rpx;
+  border-top: 2rpx solid #f5f5f5;
+}
+
+.action-link {
+  background: transparent;
+  font-size: 26rpx;
+  color: #4CAF50;
+  padding: 0;
+  line-height: normal;
+  border: none;
+}
+
+.action-link::after {
+  border: none;
+}
+
+/* 菜单项 */
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 16rpx;
+  border-bottom: 2rpx solid #f5f5f5;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-text {
+  flex: 1;
+  font-size: 30rpx;
+  color: #333333;
+}
+
+.menu-text-hint {
+  color: #999999;
+}
+
+.arrow {
+  font-size: 32rpx;
+  color: #cccccc;
+}
+
+.menu-item-danger {
+  margin-top: 16rpx;
+  border-top: 2rpx solid #f5f5f5;
+}

@@ -1,0 +1,14 @@
+<!-- 启动页 -->
+<view class="launch-container">
+  <view class="logo-wrapper">
+    <image class="logo" src="/assets/images/logo.png" mode="aspectFit" />
+  </view>
+  <text class="app-name">家事喵</text>
+  <text wx:if="{{statusText}}" class="status-text">{{statusText}}</text>
+
+  <!-- 重试耗尽后的手动重试入口 -->
+  <block wx:if="{{showRetry}}">
+    <text class="error-text">{{errorText}}</text>
+    <button class="btn-primary retry-btn" bindtap="onManualRetry">重新加载</button>
+  </block>
+</view>

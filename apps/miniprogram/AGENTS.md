@@ -2,6 +2,11 @@
 
 This file applies to all work under `apps/miniprogram/`.
 
+Mini Program tasks should normally modify only `apps/miniprogram/`.
+Changes outside this directory are allowed only when required to update
+the shared API contract, architecture, product rules, or the corresponding
+Core implementation. Do not make unrelated repository-wide changes.
+
 Before changing Mini Program code, read these files in order:
 
 1. `/AGENTS.md`

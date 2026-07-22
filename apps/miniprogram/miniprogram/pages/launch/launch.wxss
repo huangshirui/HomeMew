@@ -1,0 +1,44 @@
+/* 启动页样式 */
+.launch-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.logo-wrapper {
+  width: 200rpx;
+  height: 200rpx;
+  margin-bottom: 32rpx;
+}
+
+.logo {
+  width: 100%;
+  height: 100%;
+}
+
+.app-name {
+  font-size: 44rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 24rpx;
+}
+
+.status-text {
+  font-size: 28rpx;
+  color: #999999;
+}
+
+.error-text {
+  font-size: 28rpx;
+  color: #F44336;
+  margin-bottom: 32rpx;
+  text-align: center;
+}
+
+.retry-btn {
+  width: 320rpx;
+}
