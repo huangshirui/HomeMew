@@ -8,9 +8,23 @@ const CONTENT_TYPES: Record<string, string> = {
   'image/webp': 'webp',
 };
 
+type AvatarFile = {
+  type: string;
+  size: number;
+  stream(): ReadableStream<Uint8Array>;
+};
+
 export function avatarUrl(env: Bindings, key: string | null | undefined): string | null {
   if (!key) return null;
   return `${env.ASSETS_PUBLIC_URL.replace(/\/$/, '')}/${key}`;
+}
+
+function isAvatarFile(value: FormDataEntryValue | null): value is File {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<AvatarFile>;
+  return typeof candidate.type === 'string'
+    && typeof candidate.size === 'number'
+    && typeof candidate.stream === 'function';
 }
 
 export async function parseAvatarFile(request: Request): Promise<File> {
@@ -22,7 +36,7 @@ export async function parseAvatarFile(request: Request): Promise<File> {
   }
 
   const value = form.get('file');
-  if (!(value instanceof File)) {
+  if (!isAvatarFile(value)) {
     throw new ApiError('INVALID_AVATAR', 'Avatar file is required', 400);
   }
   if (!CONTENT_TYPES[value.type]) {

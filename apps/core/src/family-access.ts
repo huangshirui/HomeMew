@@ -1,7 +1,7 @@
 import type { Bindings } from "./env";
 import { ApiError } from "./errors";
 
-export type UserRow = { id: string; display_name: string; avatar_url: string | null; status: string };
+export type UserRow = { id: string; display_name: string; avatar_key: string | null; status: string };
 export type MemberRow = { id: string; family_id: string; user_id: string; role: "admin" | "member"; status: string };
 
 export async function requireActiveUser(env: Bindings, userId: string): Promise<UserRow> {
