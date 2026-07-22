@@ -179,7 +179,7 @@ export function registerBusinessRoutes(app: App): void {
     return c.json(success({ userId: target, role: input.role }));
   });
 
-  async function removeMember(c: any, familyId: string, actor: string, target: string, selfLeave: boolean): Promise<Response> {
+  async function removeMember(c: Context<AppEnv>, familyId: string, actor: string, target: string, selfLeave: boolean): Promise<Response> {
     await activeUser(c.env, actor);
     if (!selfLeave) {
       await admin(c.env, familyId, actor);
@@ -260,7 +260,6 @@ export function registerBusinessRoutes(app: App): void {
     const existing = await c.env.DB.prepare("SELECT * FROM family_members WHERE family_id = ? AND user_id = ?").bind(invite.family_id, userId).first<any>();
     if (existing?.status === "active") throw new ApiError("ALREADY_FAMILY_MEMBER", "User is already a family member", 409);
     if (invite.member_count >= 8) throw new ApiError("FAMILY_MEMBER_LIMIT_REACHED", "Family member limit reached", 409);
-
     const joinedAt = new Date().toISOString();
     const memberStatement = existing
       ? c.env.DB.prepare("UPDATE family_members SET role = 'member', status = 'active', joined_at = ?, removed_at = NULL, removed_by = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(joinedAt, existing.id)
