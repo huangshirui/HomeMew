@@ -1,0 +1,1507 @@
+openapi: 3.1.0
+info:
+  title: HomeMew Core API
+  version: 0.1.0
+  description: |
+    Authoritative contract for HomeMew Core. Endpoints marked
+    `x-homemew-status: implemented` exist in the current Core. Endpoints marked
+    `x-homemew-status: planned` are approved contracts but must not be called by
+    clients until implemented and deployed.
+servers:
+  - url: https://homemew.aisr.online
+    description: Production placeholder; verify the deployed Worker route before use
+  - url: http://localhost:8787
+    description: Local Wrangler development
+security:
+  - bearerAuth: []
+tags:
+  - name: System
+  - name: Users
+  - name: Families
+  - name: Members
+  - name: Invitations
+  - name: Events
+  - name: Tasks
+  - name: Internal
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Deployment health probe
+      operationId: getHealth
+      security: []
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Worker is running
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/v1/status:
+    get:
+      tags: [System]
+      summary: Core and D1 status
+      operationId: getStatus
+      security: []
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Core and database are available
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/me:
+    get:
+      tags: [Users]
+      summary: Get current user
+      operationId: getCurrentUser
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Users]
+      summary: Update current user profile
+      operationId: updateCurrentUser
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCurrentUserRequest'
+      responses:
+        '200':
+          description: Updated current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/me/families:
+    get:
+      tags: [Users, Families]
+      summary: List current user's active families
+      operationId: listMyFamilies
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Active family memberships
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyFamilyListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/families:
+    post:
+      tags: [Families]
+      summary: Create a family
+      operationId: createFamily
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFamilyRequest'
+      responses:
+        '201':
+          description: Family created; creator is administrator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateFamilyResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/families/{familyId}:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+    get:
+      tags: [Families]
+      summary: Get family details
+      operationId: getFamily
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Family details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Families]
+      summary: Update family profile
+      operationId: updateFamily
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFamilyRequest'
+      responses:
+        '200':
+          description: Updated family
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilySummaryResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/families/{familyId}/members:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+    get:
+      tags: [Members]
+      summary: List active family members
+      operationId: listFamilyMembers
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Family members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyMemberListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/families/{familyId}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/UserId'
+    patch:
+      tags: [Members]
+      summary: Change a member role
+      operationId: updateFamilyMemberRole
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRoleRequest'
+      responses:
+        '200':
+          description: Updated role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateMemberRoleResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Members]
+      summary: Remove a family member
+      operationId: removeFamilyMember
+      x-homemew-status: implemented
+      responses:
+        '204':
+          description: Member removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/families/{familyId}/leave:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+    post:
+      tags: [Members]
+      summary: Leave a family
+      operationId: leaveFamily
+      x-homemew-status: implemented
+      responses:
+        '204':
+          description: Current user left the family
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/families/{familyId}/invites:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+    get:
+      tags: [Invitations]
+      summary: List family invitations
+      operationId: listFamilyInvites
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Invitation list without plaintext codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Invitations]
+      summary: Create a family invitation
+      operationId: createFamilyInvite
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInviteRequest'
+      responses:
+        '201':
+          description: Invitation created; plaintext code is returned once
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateInviteResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/families/{familyId}/invites/{inviteId}/revoke:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/InviteId'
+    post:
+      tags: [Invitations]
+      summary: Revoke an invitation
+      operationId: revokeFamilyInvite
+      x-homemew-status: implemented
+      responses:
+        '204':
+          description: Invitation revoked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/family-invites/{code}:
+    parameters:
+      - $ref: '#/components/parameters/InviteCode'
+    get:
+      tags: [Invitations]
+      summary: Preview an invitation
+      operationId: previewFamilyInvite
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Limited family invitation preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitePreviewResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/family-invites/{code}/join:
+    parameters:
+      - $ref: '#/components/parameters/InviteCode'
+    post:
+      tags: [Invitations]
+      summary: Join a family using an invitation
+      operationId: joinFamilyByInvite
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Membership created or reactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinFamilyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/families/{familyId}/events:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+    get:
+      tags: [Events]
+      summary: List family events overlapping a time range
+      operationId: listFamilyEvents
+      x-homemew-status: planned
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: string
+          description: Date or RFC 3339 date-time. Must be paired with end.
+        - name: end
+          in: query
+          schema:
+            type: string
+          description: Exclusive date or date-time boundary. Must be paired with start.
+        - name: attendeeId
+          in: query
+          schema:
+            type: string
+          description: HomeMew user ID or `me`.
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/EventStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Event page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Events]
+      summary: Create an event
+      operationId: createEvent
+      x-homemew-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+      responses:
+        '201':
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/families/{familyId}/events/{eventId}:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/EventId'
+    get:
+      tags: [Events]
+      summary: Get an event
+      operationId: getEvent
+      x-homemew-status: planned
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Events]
+      summary: Update an event
+      operationId: updateEvent
+      x-homemew-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        '200':
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Events]
+      summary: Soft-delete an event
+      operationId: deleteEvent
+      x-homemew-status: planned
+      parameters:
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '204':
+          description: Event deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/families/{familyId}/tasks:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+    get:
+      tags: [Tasks]
+      summary: List family tasks
+      operationId: listFamilyTasks
+      x-homemew-status: planned
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: Comma-separated task statuses. Defaults to pending.
+        - name: assigneeId
+          in: query
+          schema:
+            type: string
+          description: HomeMew user ID or `me`.
+        - name: dueFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dueTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: includeNoDue
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [due_asc, due_desc, created_desc, updated_desc]
+            default: due_asc
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Task page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Tasks]
+      summary: Create a task
+      operationId: createTask
+      x-homemew-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/families/{familyId}/tasks/{taskId}:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Tasks]
+      summary: Get a task
+      operationId: getTask
+      x-homemew-status: planned
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Tasks]
+      summary: Update task content and assignees
+      operationId: updateTask
+      x-homemew-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Tasks]
+      summary: Soft-delete a task
+      operationId: deleteTask
+      x-homemew-status: planned
+      parameters:
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '204':
+          description: Task deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/families/{familyId}/tasks/{taskId}/complete:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [Tasks]
+      summary: Complete a task
+      operationId: completeTask
+      x-homemew-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionActionRequest'
+      responses:
+        '200':
+          description: Completed task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/families/{familyId}/tasks/{taskId}/reopen:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [Tasks]
+      summary: Reopen a completed or cancelled task
+      operationId: reopenTask
+      x-homemew-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionActionRequest'
+      responses:
+        '200':
+          description: Reopened task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/internal/users:
+    post:
+      tags: [Internal]
+      summary: Create a HomeMew internal user
+      operationId: createInternalUser
+      description: Requires a token whose space-delimited scope contains `internal`.
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInternalUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalUserResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Current implementation accepts HS256 JWT. Normal token `sub` is a
+        HomeMew internal user ID. Internal user creation also requires
+        `scope` containing `internal`.
+  headers:
+    RequestId:
+      description: Request correlation ID accepted or generated by Core.
+      schema:
+        type: string
+  parameters:
+    FamilyId:
+      name: familyId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^fam_'
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^usr_'
+    InviteId:
+      name: inviteId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^inv_'
+    InviteCode:
+      name: code
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 8
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^evt_'
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^tsk_'
+    Version:
+      name: version
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 100
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+  responses:
+    InvalidRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication is required or token is invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Caller lacks permission or user is disabled
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Business rule or optimistic concurrency conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code:
+              type: string
+              examples: [FORBIDDEN]
+            message:
+              type: string
+            requestId:
+              type: string
+    HealthResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [status]
+          properties:
+            status:
+              const: ok
+    StatusResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [status, database, schemaVersion]
+          properties:
+            status:
+              const: ok
+            database:
+              const: available
+            schemaVersion:
+              type: string
+    UserStatus:
+      type: string
+      enum: [active, disabled]
+    FamilyRole:
+      type: string
+      enum: [admin, member]
+    FamilyStatus:
+      type: string
+      enum: [active, archived]
+    UserProfile:
+      type: object
+      required: [id, displayName, avatarUrl, status]
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+        status:
+          $ref: '#/components/schemas/UserStatus'
+    CurrentUserResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/UserProfile'
+    UpdateCurrentUserRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+    FamilyListItem:
+      type: object
+      required: [id, name, avatarUrl, role, memberCount]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+        role:
+          $ref: '#/components/schemas/FamilyRole'
+        memberCount:
+          type: integer
+          minimum: 1
+          maximum: 8
+    MyFamilyListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/FamilyListItem'
+    CreateFamilyRequest:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+    UpdateFamilyRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+    CreateFamilyResult:
+      allOf:
+        - $ref: '#/components/schemas/FamilyListItem'
+        - type: object
+          required: [createdAt]
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+    CreateFamilyResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/CreateFamilyResult'
+    FamilyDetail:
+      type: object
+      required: [id, name, avatarUrl, status, createdBy, currentUserRole, memberCount, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+        status:
+          $ref: '#/components/schemas/FamilyStatus'
+        createdBy:
+          type: string
+        currentUserRole:
+          $ref: '#/components/schemas/FamilyRole'
+        memberCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    FamilyDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/FamilyDetail'
+    FamilySummaryResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [id, name, avatarUrl, status]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            avatarUrl:
+              type: [string, 'null']
+              format: uri
+            status:
+              $ref: '#/components/schemas/FamilyStatus'
+    FamilyMember:
+      type: object
+      required: [userId, displayName, avatarUrl, role, joinedAt]
+      properties:
+        userId:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+        role:
+          $ref: '#/components/schemas/FamilyRole'
+        joinedAt:
+          type: string
+          format: date-time
+    FamilyMemberListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/FamilyMember'
+    UpdateMemberRoleRequest:
+      type: object
+      required: [role]
+      additionalProperties: false
+      properties:
+        role:
+          $ref: '#/components/schemas/FamilyRole'
+    UpdateMemberRoleResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [userId, role]
+          properties:
+            userId:
+              type: string
+            role:
+              $ref: '#/components/schemas/FamilyRole'
+    InviteStatus:
+      type: string
+      enum: [active, expired, exhausted, revoked]
+    CreateInviteRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        expiresInMinutes:
+          type: integer
+          minimum: 1
+          maximum: 43200
+          default: 1440
+        maxUses:
+          type: integer
+          minimum: 1
+          maximum: 8
+          default: 8
+    InviteCreated:
+      type: object
+      required: [id, code, joinPath, expiresAt, maxUses, usedCount]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        joinPath:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        maxUses:
+          type: integer
+        usedCount:
+          type: integer
+    CreateInviteResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/InviteCreated'
+    InviteListItem:
+      type: object
+      required: [id, status, expiresAt, maxUses, usedCount, createdBy, createdAt]
+      properties:
+        id:
+          type: string
+        status:
+          $ref: '#/components/schemas/InviteStatus'
+        expiresAt:
+          type: string
+          format: date-time
+        maxUses:
+          type: integer
+        usedCount:
+          type: integer
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    InviteListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/InviteListItem'
+    InvitePreviewResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [family, expiresAt, canJoin]
+          properties:
+            family:
+              type: object
+              required: [id, name, avatarUrl, memberCount]
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                avatarUrl:
+                  type: [string, 'null']
+                  format: uri
+                memberCount:
+                  type: integer
+            expiresAt:
+              type: string
+              format: date-time
+            canJoin:
+              type: boolean
+    JoinFamilyResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [familyId, familyName, role, joinedAt]
+          properties:
+            familyId:
+              type: string
+            familyName:
+              type: string
+            role:
+              const: member
+            joinedAt:
+              type: string
+              format: date-time
+    PersonRef:
+      type: object
+      required: [userId, displayName]
+      properties:
+        userId:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+    EventStatus:
+      type: string
+      enum: [active, cancelled]
+    Event:
+      type: object
+      required: [id, familyId, summary, description, start, end, isAllDay, timezone, location, status, attendees, createdBy, updatedBy, version, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        familyId:
+          type: string
+        summary:
+          type: string
+        description:
+          type: [string, 'null']
+        start:
+          type: string
+          description: RFC 3339 date-time for timed events; YYYY-MM-DD for all-day events.
+        end:
+          type: string
+          description: Exclusive end for all-day events.
+        isAllDay:
+          type: boolean
+        timezone:
+          type: string
+          examples: [Asia/Shanghai]
+        location:
+          type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        attendees:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonRef'
+        createdBy:
+          $ref: '#/components/schemas/PersonRef'
+        updatedBy:
+          $ref: '#/components/schemas/PersonRef'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateEventRequest:
+      type: object
+      required: [summary, start, end, isAllDay, timezone]
+      additionalProperties: false
+      properties:
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        start:
+          type: string
+        end:
+          type: string
+        isAllDay:
+          type: boolean
+        timezone:
+          type: string
+        attendeeIds:
+          type: array
+          uniqueItems: true
+          maxItems: 8
+          items:
+            type: string
+        location:
+          type: [string, 'null']
+    UpdateEventRequest:
+      type: object
+      required: [version]
+      minProperties: 2
+      additionalProperties: false
+      properties:
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        start:
+          type: string
+        end:
+          type: string
+        isAllDay:
+          type: boolean
+        timezone:
+          type: string
+        attendeeIds:
+          type: array
+          uniqueItems: true
+          maxItems: 8
+          items:
+            type: string
+        location:
+          type: [string, 'null']
+        version:
+          type: integer
+          minimum: 1
+    EventResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Event'
+    EventListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items, nextCursor]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Event'
+            nextCursor:
+              type: [string, 'null']
+    TaskStatus:
+      type: string
+      enum: [pending, completed, cancelled]
+    Task:
+      type: object
+      required: [id, familyId, name, description, due, status, assignees, completedAt, completedBy, createdBy, updatedBy, version, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        familyId:
+          type: string
+        name:
+          type: string
+        description:
+          type: [string, 'null']
+        due:
+          type: [string, 'null']
+          format: date
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        assignees:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonRef'
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+        completedBy:
+          oneOf:
+            - $ref: '#/components/schemas/PersonRef'
+            - type: 'null'
+        createdBy:
+          $ref: '#/components/schemas/PersonRef'
+        updatedBy:
+          $ref: '#/components/schemas/PersonRef'
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateTaskRequest:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        due:
+          type: [string, 'null']
+          format: date
+        assigneeIds:
+          type: array
+          uniqueItems: true
+          maxItems: 8
+          items:
+            type: string
+    UpdateTaskRequest:
+      type: object
+      required: [version]
+      minProperties: 2
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        due:
+          type: [string, 'null']
+          format: date
+        assigneeIds:
+          type: array
+          uniqueItems: true
+          maxItems: 8
+          items:
+            type: string
+        version:
+          type: integer
+          minimum: 1
+    VersionActionRequest:
+      type: object
+      required: [version]
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 1
+    TaskResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Task'
+    TaskListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items, nextCursor]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Task'
+            nextCursor:
+              type: [string, 'null']
+    CreateInternalUserRequest:
+      type: object
+      required: [displayName, createdFrom]
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+        createdFrom:
+          type: string
+          enum: [wechat_miniprogram, wecom, admin, other]
+    InternalUser:
+      type: object
+      required: [id, displayName, avatarUrl, status, createdFrom, createdAt]
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+        status:
+          $ref: '#/components/schemas/UserStatus'
+        createdFrom:
+          type: string
+          enum: [wechat_miniprogram, wecom, admin, other]
+        createdAt:
+          type: string
+          format: date-time
+    InternalUserResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/InternalUser'
