@@ -103,6 +103,50 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/me/avatar:
+    put:
+      tags: [Users]
+      summary: Upload and replace the current user's avatar
+      operationId: uploadCurrentUserAvatar
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              additionalProperties: false
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: JPEG, PNG, or WebP image, at most 5 MB.
+      responses:
+        '200':
+          description: Avatar stored in R2 and assigned to the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarUploadResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          description: Avatar exceeds the 5 MB limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported avatar media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/me/families:
     get:
       tags: [Users, Families]
@@ -928,15 +972,24 @@ components:
           $ref: '#/components/schemas/UserProfile'
     UpdateCurrentUserRequest:
       type: object
-      minProperties: 1
+      required: [displayName]
       additionalProperties: false
       properties:
         displayName:
           type: string
           minLength: 1
-        avatarUrl:
-          type: [string, 'null']
-          format: uri
+    AvatarUploadResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [avatarUrl]
+          properties:
+            avatarUrl:
+              type: string
+              format: uri
+              description: Public HTTPS URL derived by Core from ASSETS_PUBLIC_URL and users.avatar_key.
     FamilyListItem:
       type: object
       required: [id, name, avatarUrl, role, memberCount]
@@ -1474,9 +1527,6 @@ components:
         displayName:
           type: string
           minLength: 1
-        avatarUrl:
-          type: [string, 'null']
-          format: uri
         createdFrom:
           type: string
           enum: [wechat_miniprogram, wecom, admin, other]
