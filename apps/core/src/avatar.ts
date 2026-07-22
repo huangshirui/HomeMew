@@ -19,7 +19,7 @@ export function avatarUrl(env: Bindings, key: string | null | undefined): string
   return `${env.ASSETS_PUBLIC_URL.replace(/\/$/, '')}/${key}`;
 }
 
-function isAvatarFile(value: FormDataEntryValue | null): value is File {
+function isAvatarFile(value: unknown): value is File {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<AvatarFile>;
   return typeof candidate.type === 'string'
