@@ -7,7 +7,7 @@
     "enabled": true
   },
   "vars": {
-    "ASSETS_PUBLIC_URL": "https://assets.example.com"
+    "ASSETS_PUBLIC_URL": "https://homemew-assets.aisr.online"
   },
   "d1_databases": [
     {
