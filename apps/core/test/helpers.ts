@@ -14,7 +14,17 @@ function encode(value: unknown): string {
 }
 
 export async function makeToken(sub: string, scope?: string): Promise<string> {
-  const body = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub, scope, exp: 4_102_444_800 })}`;
+  const now = Math.floor(Date.now() / 1000);
+  const service = scope !== undefined;
+  const body = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({
+    sub,
+    scope,
+    type: service ? "service" : "user",
+    iss: "homemew-identity",
+    aud: service ? "homemew-core-internal" : "homemew-core",
+    iat: now,
+    exp: now + 3600,
+  })}`;
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(jwtSecret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body)));
   const encoded = btoa(String.fromCharCode(...signature)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");

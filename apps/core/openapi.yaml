@@ -992,7 +992,7 @@ components:
               description: Public HTTPS URL derived by Core from ASSETS_PUBLIC_URL and users.avatar_key.
     FamilyListItem:
       type: object
-      required: [id, name, avatarUrl, role, memberCount]
+      required: [id, name, avatarUrl, timezone, role, memberCount]
       properties:
         id:
           type: string
@@ -1001,6 +1001,9 @@ components:
         avatarUrl:
           type: [string, 'null']
           format: uri
+        timezone:
+          type: string
+          description: IANA timezone used to interpret household calendar dates.
         role:
           $ref: '#/components/schemas/FamilyRole'
         memberCount:
@@ -1030,6 +1033,9 @@ components:
         avatarUrl:
           type: [string, 'null']
           format: uri
+        timezone:
+          type: string
+          default: Asia/Shanghai
     UpdateFamilyRequest:
       type: object
       minProperties: 1
@@ -1041,6 +1047,8 @@ components:
         avatarUrl:
           type: [string, 'null']
           format: uri
+        timezone:
+          type: string
     CreateFamilyResult:
       allOf:
         - $ref: '#/components/schemas/FamilyListItem'
@@ -1058,7 +1066,7 @@ components:
           $ref: '#/components/schemas/CreateFamilyResult'
     FamilyDetail:
       type: object
-      required: [id, name, avatarUrl, status, createdBy, currentUserRole, memberCount, createdAt]
+      required: [id, name, avatarUrl, timezone, status, createdBy, currentUserRole, memberCount, createdAt]
       properties:
         id:
           type: string
@@ -1067,6 +1075,8 @@ components:
         avatarUrl:
           type: [string, 'null']
           format: uri
+        timezone:
+          type: string
         status:
           $ref: '#/components/schemas/FamilyStatus'
         createdBy:
@@ -1090,7 +1100,7 @@ components:
       properties:
         data:
           type: object
-          required: [id, name, avatarUrl, status]
+          required: [id, name, avatarUrl, timezone, status]
           properties:
             id:
               type: string
@@ -1099,6 +1109,8 @@ components:
             avatarUrl:
               type: [string, 'null']
               format: uri
+            timezone:
+              type: string
             status:
               $ref: '#/components/schemas/FamilyStatus'
     FamilyMember:

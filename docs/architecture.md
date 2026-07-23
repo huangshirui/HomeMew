@@ -158,7 +158,7 @@ Target claims:
 }
 ```
 
-Current implementation validates HS256 signature, `sub`, optional `exp`, and space-delimited `scope`. `type`, `client_id`, `iss`, `aud`, `iat`, and `jti` are target hardening fields and must not be assumed implemented until Core is updated.
+Core validates the HS256 signature and requires `sub`, `type`, `iss`, `aud`, `iat`, and `exp`. Tokens may live for at most one hour. User tokens use `type: user` and `aud: homemew-core`; service tokens use `type: service` and `aud: homemew-core-internal`. Internal endpoints additionally require the `internal` scope.
 
 ### 4.4 Service token
 
@@ -264,7 +264,7 @@ Writes must not be blindly retried unless idempotency is supported.
 - Core may normalize instants to UTC internally.
 - All-day events use date-only half-open ranges: `[start, end)`.
 - Task `due` is date-only and follows household calendar semantics; it is not a timestamp.
-- A future family default timezone should be added before supporting households across different default timezones.
+- Every family has an IANA default timezone, initially `Asia/Shanghai` unless selected at creation. Date-only event query bounds are interpreted in that family timezone.
 
 ## 10. Concurrency and deletion
 

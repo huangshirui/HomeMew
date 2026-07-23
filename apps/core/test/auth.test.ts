@@ -17,16 +17,20 @@ async function token(payload: Record<string, unknown>, signingSecret = secret): 
 
 describe("HS256 JWT verification", () => {
   it("accepts a valid user subject", async () => {
-    await expect(verifyJwt(await token({ sub: "usr_valid", exp: 4_102_444_800 }), secret)).resolves.toEqual({
+    const now = Math.floor(Date.now() / 1000);
+    await expect(verifyJwt(await token({ sub: "usr_valid", type: "user", iss: "homemew-identity", aud: "homemew-core", iat: now, exp: now + 3600 }), secret)).resolves.toEqual({
       userId: "usr_valid",
       scopes: [],
+      type: "user",
     });
   });
 
   it("extracts internal scope", async () => {
-    await expect(verifyJwt(await token({ sub: "svc_identity", scope: "internal", exp: 4_102_444_800 }), secret)).resolves.toEqual({
+    const now = Math.floor(Date.now() / 1000);
+    await expect(verifyJwt(await token({ sub: "svc_identity", type: "service", scope: "internal", iss: "homemew-identity", aud: "homemew-core-internal", iat: now, exp: now + 3600 }), secret)).resolves.toEqual({
       userId: "svc_identity",
       scopes: ["internal"],
+      type: "service",
     });
   });
 
@@ -37,5 +41,21 @@ describe("HS256 JWT verification", () => {
   it("rejects expired or subjectless tokens", async () => {
     await expect(verifyJwt(await token({ sub: "usr_valid", exp: 1 }), secret)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(verifyJwt(await token({ exp: 4_102_444_800 }), secret)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("rejects missing or mismatched required claims and excessive lifetimes", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const valid = { sub: "usr_valid", type: "user", iss: "homemew-identity", aud: "homemew-core", iat: now, exp: now + 3600 };
+    for (const payload of [
+      { ...valid, exp: undefined },
+      { ...valid, iat: undefined },
+      { ...valid, iss: "other" },
+      { ...valid, aud: "homemew-core-internal" },
+      { ...valid, type: "service" },
+      { ...valid, iat: now + 60 },
+      { ...valid, exp: now + 3601 },
+    ]) {
+      await expect(verifyJwt(await token(payload), secret)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    }
   });
 });

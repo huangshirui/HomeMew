@@ -85,4 +85,15 @@ describe("family event API", () => {
     const response = await request(`/api/v1/families/${family.id}/events`, family.admin.token);
     expect((await response.json<any>()).data.items.map((item: any) => item.summary)).toContain("Near range end");
   });
+
+  it("interprets timed query boundaries in the family timezone", async () => {
+    const admin = await createUser("Tokyo Event Admin");
+    const family = (await (await request("/api/v1/families", admin.token, { method: "POST", body: JSON.stringify({ name: "Tokyo Events", timezone: "Asia/Tokyo" }) })).json<any>()).data;
+    await createEvent(family.id, admin.token, {
+      summary: "Tokyo midnight", start: "2026-07-25T00:30:00+09:00", end: "2026-07-25T01:00:00+09:00",
+      isAllDay: false, timezone: "Asia/Tokyo", attendeeIds: [],
+    });
+    const response = await request(`/api/v1/families/${family.id}/events?start=2026-07-25&end=2026-07-26`, admin.token);
+    expect((await response.json<any>()).data.items.map((item: any) => item.summary)).toContain("Tokyo midnight");
+  });
 });

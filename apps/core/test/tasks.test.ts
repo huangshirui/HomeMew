@@ -49,6 +49,7 @@ describe("family task API", () => {
       await createTask(family.id, family.admin.token, { name, due, assigneeIds: [family.admin.id] });
     }
     const first = await request(`/api/v1/families/${family.id}/tasks?status=pending&assigneeId=me&dueFrom=2026-07-01&dueTo=2026-07-31&includeNoDue=true&sort=due_asc&limit=2`, family.admin.token);
+    expect(first.status, await first.clone().text()).toBe(200);
     const page = await first.json<any>();
     expect(page.data.items.map((item: any) => item.name)).toEqual(["Soon", "Later"]);
     expect(page.data.nextCursor).toBeTypeOf("string");

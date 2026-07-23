@@ -10,4 +10,5 @@ export type Variables = {
   requestId: string;
   currentUserId: string;
   authScopes: string[];
+  authType: "user" | "service";
 };

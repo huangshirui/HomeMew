@@ -4,7 +4,7 @@ import { exactDate, offsetDateTime, stringIds, timezone } from "../src/validatio
 
 describe("pagination and domain validation", () => {
   it("round trips a cursor and rejects a mismatched context", () => {
-    const encoded = encodeCursor({ v: 1, resource: "events", sort: "start_asc", key: "2026-07-25", id: "evt_1" });
+    const encoded = encodeCursor({ v: 2, resource: "events", sort: "start_asc", key: "2026-07-25", id: "evt_1" });
     expect(decodeCursor(encoded, "events", "start_asc")).toMatchObject({ id: "evt_1" });
     expect(() => decodeCursor(encoded, "tasks", "due_asc")).toThrowError(/cursor/i);
     expect(() => decodeCursor("broken", "events", "start_asc")).toThrowError(/cursor/i);

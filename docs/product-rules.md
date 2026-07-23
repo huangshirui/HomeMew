@@ -15,6 +15,7 @@ This document defines product and business rules that clients and Core must foll
 - A family may contain at most eight active members.
 - The creator automatically becomes an administrator.
 - A family may have multiple administrators.
+- A family has an IANA default timezone; new families default to `Asia/Shanghai`.
 - A family must always retain at least one active administrator.
 - Archived families are read-only when family archival is implemented.
 - Physical deletion of a family is not part of the MVP.
@@ -99,6 +100,7 @@ An event contains:
 ### 5.6 Event list queries
 
 - Time range queries use half-open query ranges.
+- Date-only query boundaries are interpreted in the family's default timezone.
 - Return events that overlap the requested range, not only events whose start falls inside it.
 - Deleted events are excluded by default.
 - Default ordering is ascending by start.

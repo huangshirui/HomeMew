@@ -6,7 +6,7 @@ import { ApiError } from "./errors";
 import { requireActiveUser as activeUser, requireFamilyAdmin as admin, requireFamilyMember as membership } from "./family-access";
 import { success } from "./http";
 import { createId, createInviteCode } from "./ids";
-import { optionalUrl, positiveInteger, requireObject, requireString } from "./validation";
+import { optionalUrl, positiveInteger, requireObject, requireString, timezone } from "./validation";
 
 type AppEnv = { Bindings: Bindings; Variables: Variables };
 type App = Hono<AppEnv>;
@@ -105,8 +105,8 @@ export function registerBusinessRoutes(app: App): void {
   app.get("/api/v1/me/families", async (c) => {
     const id = c.get("currentUserId");
     await activeUser(c.env, id);
-    const rows = await c.env.DB.prepare(`SELECT f.id, f.name, f.avatar_url, fm.role, COUNT(active.id) member_count FROM family_members fm JOIN families f ON f.id = fm.family_id LEFT JOIN family_members active ON active.family_id = f.id AND active.status = 'active' WHERE fm.user_id = ? AND fm.status = 'active' AND f.status = 'active' GROUP BY f.id, fm.role ORDER BY fm.joined_at`).bind(id).all<any>();
-    return c.json(success({ items: rows.results.map((row) => ({ id: row.id, name: row.name, avatarUrl: row.avatar_url, role: row.role, memberCount: row.member_count })) }));
+    const rows = await c.env.DB.prepare(`SELECT f.id, f.name, f.avatar_url, f.timezone, fm.role, COUNT(active.id) member_count FROM family_members fm JOIN families f ON f.id = fm.family_id LEFT JOIN family_members active ON active.family_id = f.id AND active.status = 'active' WHERE fm.user_id = ? AND fm.status = 'active' AND f.status = 'active' GROUP BY f.id, fm.role ORDER BY fm.joined_at`).bind(id).all<any>();
+    return c.json(success({ items: rows.results.map((row) => ({ id: row.id, name: row.name, avatarUrl: row.avatar_url, timezone: row.timezone, role: row.role, memberCount: row.member_count })) }));
   });
 
   app.post("/api/v1/families", async (c) => {
@@ -115,17 +115,18 @@ export function registerBusinessRoutes(app: App): void {
     const input = await body(c);
     const name = requireString(input.name, "name");
     const familyAvatarUrl = optionalUrl(input.avatarUrl, "avatarUrl") ?? null;
+    const familyTimezone = input.timezone === undefined ? "Asia/Shanghai" : timezone(input.timezone);
     const count = await c.env.DB.prepare("SELECT COUNT(*) count FROM families WHERE created_by = ? AND status = 'active'").bind(userId).first<{ count: number }>();
     if ((count?.count ?? 0) >= 3) throw new ApiError("FAMILY_CREATE_LIMIT_REACHED", "Active family creation limit reached", 409);
 
     const id = createId("fam");
     const memberId = createId("fmem");
     await c.env.DB.batch([
-      c.env.DB.prepare("INSERT INTO families (id, name, avatar_url, created_by) VALUES (?, ?, ?, ?)").bind(id, name, familyAvatarUrl, userId),
+      c.env.DB.prepare("INSERT INTO families (id, name, avatar_url, timezone, created_by) VALUES (?, ?, ?, ?, ?)").bind(id, name, familyAvatarUrl, familyTimezone, userId),
       c.env.DB.prepare("INSERT INTO family_members (id, family_id, user_id, role) VALUES (?, ?, ?, 'admin')").bind(memberId, id, userId),
     ]);
     const row = await c.env.DB.prepare("SELECT created_at FROM families WHERE id = ?").bind(id).first<any>();
-    return c.json(success({ id, name, avatarUrl: familyAvatarUrl, role: "admin", memberCount: 1, createdAt: row.created_at }), 201);
+    return c.json(success({ id, name, avatarUrl: familyAvatarUrl, timezone: familyTimezone, role: "admin", memberCount: 1, createdAt: row.created_at }), 201);
   });
 
   app.get("/api/v1/families/:familyId", async (c) => {
@@ -135,7 +136,7 @@ export function registerBusinessRoutes(app: App): void {
     const member = await membership(c.env, familyId, userId);
     const row = await c.env.DB.prepare("SELECT f.*, (SELECT COUNT(*) FROM family_members WHERE family_id = f.id AND status = 'active') member_count FROM families f WHERE f.id = ?").bind(familyId).first<any>();
     if (!row) throw new ApiError("FAMILY_NOT_FOUND", "Family not found", 404);
-    return c.json(success({ id: row.id, name: row.name, avatarUrl: row.avatar_url, status: row.status, createdBy: row.created_by, currentUserRole: member.role, memberCount: row.member_count, createdAt: row.created_at }));
+    return c.json(success({ id: row.id, name: row.name, avatarUrl: row.avatar_url, timezone: row.timezone, status: row.status, createdBy: row.created_by, currentUserRole: member.role, memberCount: row.member_count, createdAt: row.created_at }));
   });
 
   app.patch("/api/v1/families/:familyId", async (c) => {
@@ -146,11 +147,12 @@ export function registerBusinessRoutes(app: App): void {
     const input = await body(c);
     const name = input.name === undefined ? undefined : requireString(input.name, "name");
     const familyAvatarUrl = optionalUrl(input.avatarUrl, "avatarUrl");
-    await c.env.DB.prepare("UPDATE families SET name = COALESCE(?, name), avatar_url = CASE WHEN ? THEN ? ELSE avatar_url END, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .bind(name ?? null, familyAvatarUrl !== undefined ? 1 : 0, familyAvatarUrl ?? null, familyId)
+    const familyTimezone = input.timezone === undefined ? undefined : timezone(input.timezone);
+    await c.env.DB.prepare("UPDATE families SET name = COALESCE(?, name), avatar_url = CASE WHEN ? THEN ? ELSE avatar_url END, timezone = COALESCE(?, timezone), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(name ?? null, familyAvatarUrl !== undefined ? 1 : 0, familyAvatarUrl ?? null, familyTimezone ?? null, familyId)
       .run();
     const row = await c.env.DB.prepare("SELECT * FROM families WHERE id = ?").bind(familyId).first<any>();
-    return c.json(success({ id: row.id, name: row.name, avatarUrl: row.avatar_url, status: row.status }));
+    return c.json(success({ id: row.id, name: row.name, avatarUrl: row.avatar_url, timezone: row.timezone, status: row.status }));
   });
 
   app.get("/api/v1/families/:familyId/members", async (c) => {
@@ -171,11 +173,12 @@ export function registerBusinessRoutes(app: App): void {
     const targetMember = await membership(c.env, familyId, target);
     const input = await body(c);
     if (!["admin", "member"].includes(input.role as string)) throw new ApiError("INVALID_REQUEST", "role is invalid", 400);
-    if (targetMember.role === "admin" && input.role === "member") {
-      const count = await c.env.DB.prepare("SELECT COUNT(*) count FROM family_members WHERE family_id = ? AND status = 'active' AND role = 'admin'").bind(familyId).first<{ count: number }>();
-      if ((count?.count ?? 0) <= 1) throw new ApiError("LAST_ADMIN_CANNOT_BE_REMOVED", "The last administrator cannot be demoted", 409);
-    }
-    await c.env.DB.prepare("UPDATE family_members SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE family_id = ? AND user_id = ?").bind(input.role, familyId, target).run();
+    const result = await c.env.DB.prepare(`UPDATE family_members SET role=?, updated_at=CURRENT_TIMESTAMP
+      WHERE family_id=? AND user_id=? AND status='active'
+      AND (?!='member' OR role!='admin' OR EXISTS (
+        SELECT 1 FROM family_members other WHERE other.family_id=? AND other.status='active' AND other.role='admin' AND other.user_id!=?
+      ))`).bind(input.role, familyId, target, input.role, familyId, target).run();
+    if (!result.meta.changes && targetMember.role === "admin" && input.role === "member") throw new ApiError("LAST_ADMIN_CANNOT_BE_REMOVED", "The last administrator cannot be demoted", 409);
     return c.json(success({ userId: target, role: input.role }));
   });
 
@@ -186,11 +189,12 @@ export function registerBusinessRoutes(app: App): void {
       if (actor === target) throw new ApiError("CANNOT_REMOVE_SELF", "Use the leave endpoint to leave a family", 409);
     }
     const targetMember = await membership(c.env, familyId, target);
-    if (targetMember.role === "admin") {
-      const count = await c.env.DB.prepare("SELECT COUNT(*) count FROM family_members WHERE family_id = ? AND status = 'active' AND role = 'admin'").bind(familyId).first<{ count: number }>();
-      if ((count?.count ?? 0) <= 1) throw new ApiError("LAST_ADMIN_CANNOT_BE_REMOVED", "The last administrator cannot leave or be removed", 409);
-    }
-    await c.env.DB.prepare("UPDATE family_members SET status = 'removed', removed_at = CURRENT_TIMESTAMP, removed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE family_id = ? AND user_id = ?").bind(selfLeave ? target : actor, familyId, target).run();
+    const result = await c.env.DB.prepare(`UPDATE family_members SET status='removed', removed_at=CURRENT_TIMESTAMP, removed_by=?, updated_at=CURRENT_TIMESTAMP
+      WHERE family_id=? AND user_id=? AND status='active'
+      AND (role!='admin' OR EXISTS (
+        SELECT 1 FROM family_members other WHERE other.family_id=? AND other.status='active' AND other.role='admin' AND other.user_id!=?
+      ))`).bind(selfLeave ? target : actor, familyId, target, familyId, target).run();
+    if (!result.meta.changes && targetMember.role === "admin") throw new ApiError("LAST_ADMIN_CANNOT_BE_REMOVED", "The last administrator cannot leave or be removed", 409);
     return c.body(null, 204);
   }
 
@@ -261,11 +265,23 @@ export function registerBusinessRoutes(app: App): void {
     if (existing?.status === "active") throw new ApiError("ALREADY_FAMILY_MEMBER", "User is already a family member", 409);
     if (invite.member_count >= 8) throw new ApiError("FAMILY_MEMBER_LIMIT_REACHED", "Family member limit reached", 409);
     const joinedAt = new Date().toISOString();
+    const redemptionId = createId("ired");
     const memberStatement = existing
-      ? c.env.DB.prepare("UPDATE family_members SET role = 'member', status = 'active', joined_at = ?, removed_at = NULL, removed_by = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(joinedAt, existing.id)
-      : c.env.DB.prepare("INSERT INTO family_members (id, family_id, user_id, role, joined_at) VALUES (?, ?, ?, 'member', ?)").bind(createId("fmem"), invite.family_id, userId, joinedAt);
-    const increment = c.env.DB.prepare("UPDATE family_invites SET used_count = used_count + 1, status = CASE WHEN used_count + 1 >= max_uses THEN 'exhausted' ELSE status END, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'active' AND used_count < max_uses").bind(invite.id);
-    await c.env.DB.batch([memberStatement, increment]);
+      ? c.env.DB.prepare("UPDATE family_members SET role='member',status='active',joined_at=?,removed_at=NULL,removed_by=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS (SELECT 1 FROM family_invite_redemptions WHERE id=?)").bind(joinedAt, existing.id, redemptionId)
+      : c.env.DB.prepare("INSERT INTO family_members (id,family_id,user_id,role,joined_at) SELECT ?,?,?, 'member',? WHERE EXISTS (SELECT 1 FROM family_invite_redemptions WHERE id=?)").bind(createId("fmem"), invite.family_id, userId, joinedAt, redemptionId);
+    const redemption = c.env.DB.prepare(`INSERT INTO family_invite_redemptions (id,invite_id,family_id,user_id)
+      SELECT ?,i.id,i.family_id,? FROM family_invites i JOIN families f ON f.id=i.family_id
+      WHERE i.id=? AND i.status='active' AND i.used_count<i.max_uses AND datetime(i.expires_at)>CURRENT_TIMESTAMP AND f.status='active'
+      AND (SELECT COUNT(*) FROM family_members WHERE family_id=i.family_id AND status='active')<8
+      AND NOT EXISTS (SELECT 1 FROM family_members WHERE family_id=i.family_id AND user_id=? AND status='active')`)
+      .bind(redemptionId, userId, invite.id, userId);
+    const results = await c.env.DB.batch([redemption, memberStatement]);
+    if (!results[0].meta.changes) {
+      const current = await findInvite(c.env, c.req.param("code"));
+      assertInvite(current);
+      if (current.member_count >= 8) throw new ApiError("FAMILY_MEMBER_LIMIT_REACHED", "Family member limit reached", 409);
+      throw new ApiError("ALREADY_FAMILY_MEMBER", "User is already a family member", 409);
+    }
     return c.json(success({ familyId: invite.family_id, familyName: invite.family_name, role: "member", joinedAt }));
   });
 }

@@ -112,9 +112,16 @@ export function registerEventRoutes(app: App): void {
     const time = eventTime(input, previous);
     const attendeeIds = input.attendeeIds === undefined ? undefined : stringIds(input.attendeeIds, "attendeeIds");
     if (attendeeIds) await requireRelatedMembers(c.env, familyId, attendeeIds, "attendee");
-    const result = await c.env.DB.prepare(`UPDATE events SET summary=?, description=?, start_at=?, end_at=?, start_date=?, end_date=?, is_all_day=?, timezone=?, location=?, updated_by=?, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?`).bind(summary, description, time.startAt, time.endAt, time.startDate, time.endDate, time.isAllDay, zone, location, userId, eventId, familyId, expected).run();
-    if (!result.meta.changes) throw new ApiError("EVENT_VERSION_CONFLICT", "Event version conflict", 409);
-    if (attendeeIds) await c.env.DB.batch([c.env.DB.prepare("DELETE FROM event_attendees WHERE event_id = ?").bind(eventId), ...attendeeIds.map((id) => c.env.DB.prepare("INSERT INTO event_attendees (event_id, user_id) VALUES (?, ?)").bind(eventId, id))]);
+    const mutationToken = crypto.randomUUID();
+    const update = c.env.DB.prepare(`UPDATE events SET summary=?, description=?, start_at=?, end_at=?, start_date=?, end_date=?, is_all_day=?, timezone=?, location=?, updated_by=?, updated_at=CURRENT_TIMESTAMP, version=version+1, mutation_token=? WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?`).bind(summary, description, time.startAt, time.endAt, time.startDate, time.endDate, time.isAllDay, zone, location, userId, mutationToken, eventId, familyId, expected);
+    const statements = [update];
+    if (attendeeIds) {
+      statements.push(c.env.DB.prepare("DELETE FROM event_attendees WHERE event_id=? AND EXISTS (SELECT 1 FROM events WHERE id=? AND mutation_token=?)").bind(eventId, eventId, mutationToken));
+      statements.push(...attendeeIds.map((id) => c.env.DB.prepare("INSERT INTO event_attendees (event_id,user_id) SELECT ?,? WHERE EXISTS (SELECT 1 FROM events WHERE id=? AND mutation_token=?)").bind(eventId, id, eventId, mutationToken)));
+    }
+    statements.push(c.env.DB.prepare("UPDATE events SET mutation_token=NULL WHERE id=? AND mutation_token=?").bind(eventId, mutationToken));
+    const results = await c.env.DB.batch(statements);
+    if (!results[0].meta.changes) throw new ApiError("EVENT_VERSION_CONFLICT", "Event version conflict", 409);
     return c.json(success(await mapEvent(c.env, await findEvent(c.env, familyId, eventId))));
   });
 
@@ -132,7 +139,9 @@ export function registerEventRoutes(app: App): void {
     await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
     const startQuery = c.req.query("start"), endQuery = c.req.query("end");
     if ((startQuery === undefined) !== (endQuery === undefined)) throw new ApiError("INVALID_REQUEST", "start and end must be supplied together", 400);
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
+    const family = await c.env.DB.prepare("SELECT timezone FROM families WHERE id=?").bind(familyId).first<{ timezone: string }>();
+    const familyTimezone = family?.timezone ?? "Asia/Shanghai";
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: familyTimezone }).format(new Date());
     const start = startQuery ? exactDate(startQuery, "start") : shiftDate(today, -7);
     const end = endQuery ? exactDate(endQuery, "end") : shiftDate(today, 30);
     if (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`) > 366 * 86400000 || end <= start) throw new ApiError("INVALID_REQUEST", "event range must be positive and at most 366 days", 400);
@@ -143,7 +152,17 @@ export function registerEventRoutes(app: App): void {
     let attendee = c.req.query("attendeeId");
     if (attendee === "me") attendee = userId;
     if (attendee) await requireRelatedMembers(c.env, familyId, [attendee], "attendee");
-    const args: unknown[] = [familyId, status, new Date(`${end}T00:00:00+08:00`).toISOString(), new Date(`${start}T00:00:00+08:00`).toISOString(), end, start];
+    const midnight = (date: string) => {
+      let instant = new Date(`${date}T00:00:00Z`);
+      for (let i = 0; i < 2; i += 1) {
+        const parts = new Intl.DateTimeFormat("en-CA", { timeZone: familyTimezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(instant);
+        const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+        const represented = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+        instant = new Date(instant.getTime() + Date.parse(`${date}T00:00:00Z`) - represented);
+      }
+      return instant.toISOString();
+    };
+    const args: unknown[] = [familyId, status, midnight(end), midnight(start), end, start];
     let sql = `SELECT e.*, COALESCE(e.start_at, e.start_date) sort_key FROM events e WHERE e.family_id=? AND e.deleted_at IS NULL AND e.status=? AND ((e.is_all_day=0 AND e.start_at < ? AND e.end_at > ?) OR (e.is_all_day=1 AND e.start_date < ? AND e.end_date > ?))`;
     if (attendee) { sql += " AND EXISTS (SELECT 1 FROM event_attendees ea WHERE ea.event_id=e.id AND ea.user_id=?)"; args.push(attendee); }
     if (cursor) { sql += " AND (COALESCE(e.start_at,e.start_date) > ? OR (COALESCE(e.start_at,e.start_date)=? AND e.id>?))"; args.push(cursor.key, cursor.key, cursor.id); }
@@ -151,7 +170,7 @@ export function registerEventRoutes(app: App): void {
     const rows = await c.env.DB.prepare(sql).bind(...args).all<EventRow>();
     const page = rows.results.slice(0, limit), items = await Promise.all(page.map((row) => mapEvent(c.env, row)));
     const last = page.at(-1);
-    const nextCursor = rows.results.length > limit && last ? encodeCursor({ v: 1, resource: "events", sort, key: last.sort_key, id: last.id }) : null;
+    const nextCursor = rows.results.length > limit && last ? encodeCursor({ v: 2, resource: "events", sort, key: last.sort_key, id: last.id }) : null;
     return c.json(success({ items, nextCursor }));
   });
 }

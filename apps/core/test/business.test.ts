@@ -123,4 +123,26 @@ describe("user and family API", () => {
     const stored = await bindings.DB.prepare("SELECT used_count FROM family_invites WHERE id = ?").bind(invite.id).first<{ used_count: number }>();
     expect(stored?.used_count).toBe(0);
   });
+
+  it("allows only one concurrent redemption of the final invite use", async () => {
+    const admin = await createUser("Race Admin");
+    const first = await createUser("Race One");
+    const second = await createUser("Race Two");
+    const family = (await (await request("/api/v1/families", admin.token, { method: "POST", body: JSON.stringify({ name: "Race" }) })).json<any>()).data;
+    const invite = (await (await request(`/api/v1/families/${family.id}/invites`, admin.token, { method: "POST", body: JSON.stringify({ maxUses: 1 }) })).json<any>()).data;
+    const responses = await Promise.all([first, second].map((user) => request(`/api/v1/family-invites/${invite.code}/join`, user.token, { method: "POST", body: "{}" })));
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const count = await bindings.DB.prepare("SELECT COUNT(*) count FROM family_members WHERE family_id=? AND status='active'").bind(family.id).first<{ count: number }>();
+    const stored = await bindings.DB.prepare("SELECT used_count FROM family_invites WHERE id=?").bind(invite.id).first<{ used_count: number }>();
+    expect(count?.count).toBe(2);
+    expect(stored?.used_count).toBe(1);
+  });
+
+  it("stores and returns a family IANA timezone", async () => {
+    const admin = await createUser("Tokyo Admin");
+    const created = await request("/api/v1/families", admin.token, { method: "POST", body: JSON.stringify({ name: "Tokyo", timezone: "Asia/Tokyo" }) });
+    expect((await created.json<any>()).data.timezone).toBe("Asia/Tokyo");
+    const list = await request("/api/v1/me/families", admin.token);
+    expect((await list.json<any>()).data.items[0].timezone).toBe("Asia/Tokyo");
+  });
 });

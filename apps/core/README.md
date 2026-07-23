@@ -1,5 +1,16 @@
 # HomeMew Core
 
+## Security and calendar contract
+
+Core accepts HS256 bearer tokens with a maximum lifetime of one hour. Every token
+must include `sub`, `type`, `iss=homemew-identity`, `aud`, `iat`, and `exp`.
+User tokens use `type=user` and `aud=homemew-core`; internal service tokens use
+`type=service`, `aud=homemew-core-internal`, and the `internal` scope.
+
+Each family has an IANA `timezone`, defaulting to `Asia/Shanghai`. Date-only
+`start` and `end` values on event list queries are interpreted as midnight in
+the family's timezone.
+
 Core 是部署到 Cloudflare Workers 的 Hono API，使用 D1 binding `DB` 和 R2 binding `AVATARS`。
 
 ## API 约定

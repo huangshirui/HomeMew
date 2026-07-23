@@ -83,9 +83,16 @@ export function registerTaskRoutes(app: App): void {
     const dueDate = input.due === undefined ? previous.due_date : due(input.due);
     const assigneeIds = input.assigneeIds === undefined ? undefined : stringIds(input.assigneeIds, "assigneeIds");
     if (assigneeIds) await requireRelatedMembers(c.env, familyId, assigneeIds, "assignee");
-    const result = await c.env.DB.prepare("UPDATE tasks SET name=?,description=?,due_date=?,updated_by=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(name, description, dueDate, userId, taskId, familyId, expected).run();
-    if (!result.meta.changes) throw new ApiError("TASK_VERSION_CONFLICT", "Task version conflict", 409);
-    if (assigneeIds) await c.env.DB.batch([c.env.DB.prepare("DELETE FROM task_assignees WHERE task_id=?").bind(taskId), ...assigneeIds.map((id) => c.env.DB.prepare("INSERT INTO task_assignees (task_id,user_id) VALUES (?,?)").bind(taskId, id))]);
+    const mutationToken = crypto.randomUUID();
+    const update = c.env.DB.prepare("UPDATE tasks SET name=?,description=?,due_date=?,updated_by=?,updated_at=CURRENT_TIMESTAMP,version=version+1,mutation_token=? WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(name, description, dueDate, userId, mutationToken, taskId, familyId, expected);
+    const statements = [update];
+    if (assigneeIds) {
+      statements.push(c.env.DB.prepare("DELETE FROM task_assignees WHERE task_id=? AND EXISTS (SELECT 1 FROM tasks WHERE id=? AND mutation_token=?)").bind(taskId, taskId, mutationToken));
+      statements.push(...assigneeIds.map((id) => c.env.DB.prepare("INSERT INTO task_assignees (task_id,user_id) SELECT ?,? WHERE EXISTS (SELECT 1 FROM tasks WHERE id=? AND mutation_token=?)").bind(taskId, id, taskId, mutationToken)));
+    }
+    statements.push(c.env.DB.prepare("UPDATE tasks SET mutation_token=NULL WHERE id=? AND mutation_token=?").bind(taskId, mutationToken));
+    const results = await c.env.DB.batch(statements);
+    if (!results[0].meta.changes) throw new ApiError("TASK_VERSION_CONFLICT", "Task version conflict", 409);
     return c.json(success(await mapTask(c.env, await findTask(c.env, familyId, taskId))));
   });
 
@@ -128,26 +135,37 @@ export function registerTaskRoutes(app: App): void {
     let assignee = c.req.query("assigneeId"); if (assignee === "me") assignee = userId;
     if (assignee) await requireRelatedMembers(c.env, familyId, [assignee], "assignee");
     const placeholders = statuses.map(() => "?").join(",");
+    const filter = JSON.stringify({ statuses, dueFrom: dueFrom ?? null, dueTo: dueTo ?? null, includeNoDue, assignee: assignee ?? null });
+    const cursor = c.req.query("cursor") ? decodeCursor(c.req.query("cursor")!, "tasks", sort) : undefined;
+    if (cursor && cursor.filter !== filter) throw new ApiError("INVALID_REQUEST", "cursor is invalid for this query", 400);
     const args: unknown[] = [familyId, ...statuses];
     let sql = `SELECT t.* FROM tasks t WHERE t.family_id=? AND t.deleted_at IS NULL AND t.status IN (${placeholders})`;
     if (assignee) { sql += " AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id=t.id AND ta.user_id=?)"; args.push(assignee); }
+    if (dueFrom || dueTo) {
+      const dated: string[] = [];
+      if (dueFrom) { dated.push("t.due_date>=?"); args.push(dueFrom); }
+      if (dueTo) { dated.push("t.due_date<=?"); args.push(dueTo); }
+      sql += ` AND ((${dated.join(" AND ")})${includeNoDue ? " OR t.due_date IS NULL" : ""})`;
+    }
+    const keyColumn = sort === "created_desc" ? "t.created_at" : sort === "updated_desc" ? "t.updated_at" : "t.due_date";
+    const descending = sort.endsWith("desc");
+    if (cursor) {
+      if (sort.startsWith("due_")) {
+        if (cursor.key === null) { sql += " AND t.due_date IS NULL AND t.id>?"; args.push(cursor.id); }
+        else { sql += ` AND ((t.due_date IS NOT NULL AND (${keyColumn}${descending ? "<" : ">"}? OR (${keyColumn}=? AND t.id>?))) OR t.due_date IS NULL)`; args.push(cursor.key, cursor.key, cursor.id); }
+      } else {
+        sql += ` AND (${keyColumn}${descending ? "<" : ">"}? OR (${keyColumn}=? AND t.id>?))`; args.push(cursor.key, cursor.key, cursor.id);
+      }
+    }
+    sql += sort.startsWith("due_")
+      ? ` ORDER BY t.due_date IS NULL ASC, t.due_date ${descending ? "DESC" : "ASC"}, t.id ASC`
+      : ` ORDER BY ${keyColumn} DESC, t.id ASC`;
+    const limit = parseLimit(c.req.query("limit")); args.push(limit + 1); sql += " LIMIT ?";
     const rows = await c.env.DB.prepare(sql).bind(...args).all<TaskRow>();
-    let filtered = rows.results.filter((row) => {
-      if (row.due_date === null) return (!dueFrom && !dueTo) || includeNoDue;
-      return (!dueFrom || row.due_date >= dueFrom) && (!dueTo || row.due_date <= dueTo);
-    });
     const value = (row: TaskRow) => sort === "created_desc" ? row.created_at : sort === "updated_desc" ? row.updated_at : row.due_date;
-    filtered.sort((a, b) => {
-      if ((sort === "due_asc" || sort === "due_desc") && (a.due_date === null || b.due_date === null)) return a.due_date === b.due_date ? a.id.localeCompare(b.id) : a.due_date === null ? 1 : -1;
-      const comparison = String(value(a)).localeCompare(String(value(b)));
-      const direction = sort.endsWith("desc") ? -1 : 1;
-      return comparison === 0 ? a.id.localeCompare(b.id) : comparison * direction;
-    });
-    const cursor = c.req.query("cursor") ? decodeCursor(c.req.query("cursor")!, "tasks", sort) : undefined;
-    if (cursor) { const index = filtered.findIndex((row) => row.id === cursor.id && value(row) === cursor.key); if (index < 0) throw new ApiError("INVALID_REQUEST", "cursor is invalid for this query", 400); filtered = filtered.slice(index + 1); }
-    const limit = parseLimit(c.req.query("limit")), hasMore = filtered.length > limit, page = filtered.slice(0, limit), last = page.at(-1);
+    const hasMore = rows.results.length > limit, page = rows.results.slice(0, limit), last = page.at(-1);
     const items = await Promise.all(page.map((row) => mapTask(c.env, row)));
-    const nextCursor = hasMore && last ? encodeCursor({ v: 1, resource: "tasks", sort, key: value(last), id: last.id }) : null;
+    const nextCursor = hasMore && last ? encodeCursor({ v: 2, resource: "tasks", sort, key: value(last), id: last.id, filter }) : null;
     return c.json(success({ items, nextCursor }));
   });
 }

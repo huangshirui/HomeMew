@@ -42,7 +42,7 @@ describe("event and task schema", () => {
     expect(tables.results.map((row: { name: string }) => row.name)).toEqual([
       "event_attendees", "events", "task_assignees", "tasks",
     ]);
-    expect(version?.value).toBe("3");
+    expect(version?.value).toBe("5");
   });
 
   it("supports event and task identifiers", () => {
