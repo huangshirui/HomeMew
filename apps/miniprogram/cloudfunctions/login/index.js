@@ -285,9 +285,9 @@ function signInternalJwt() {
     {
       sub: 'identity-service',
       scope: 'internal',
-      type: 'internal',
+      type: 'service',
       iss: 'homemew-identity',
-      aud: 'homemew-core',
+      aud: 'homemew-core-internal',
       iat: now,
       exp: now + INTERNAL_TOKEN_EXPIRE_MINUTES * 60,
       jti: `int_${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,

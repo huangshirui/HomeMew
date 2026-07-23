@@ -1,1 +1,7 @@
-{"permissions": {"openapi": ["jscode2Session"]}}
+{
+  "permissions": {
+    "openapi": ["jscode2Session"]
+  },
+  "timeout": 15,
+  "memorySize": 128
+}

@@ -78,20 +78,44 @@ function guessMime(filePath: string): string {
   }
 }
 
+function utf8Encode(str: string): Uint8Array {
+  const bytes: number[] = [];
+  for (let i = 0; i < str.length; i++) {
+    let code = str.charCodeAt(i);
+    if (code < 0x80) {
+      bytes.push(code);
+    } else if (code < 0x800) {
+      bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      const hi = code;
+      const lo = str.charCodeAt(++i);
+      code = 0x10000 + ((hi - 0xd800) << 10) + (lo - 0xdc00);
+      bytes.push(
+        0xf0 | (code >> 18),
+        0x80 | ((code >> 12) & 0x3f),
+        0x80 | ((code >> 6) & 0x3f),
+        0x80 | (code & 0x3f),
+      );
+    } else {
+      bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
 function buildMultipartBody(buffer: ArrayBuffer, filename: string, mime: string, boundary: string): ArrayBuffer {
-  const enc = new TextEncoder();
-  const head = enc.encode(
+  const head = utf8Encode(
     `--${boundary}\r\n` +
       `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n` +
       `Content-Type: ${mime}\r\n\r\n`,
   );
-  const tail = enc.encode(`\r\n--${boundary}--\r\n`);
+  const tail = utf8Encode(`\r\n--${boundary}--\r\n`);
   const total = head.byteLength + buffer.byteLength + tail.byteLength;
   const result = new ArrayBuffer(total);
   const view = new Uint8Array(result);
-  view.set(new Uint8Array(head), 0);
+  view.set(head, 0);
   view.set(new Uint8Array(buffer), head.byteLength);
-  view.set(new Uint8Array(tail), head.byteLength + buffer.byteLength);
+  view.set(tail, head.byteLength + buffer.byteLength);
   return result;
 }
 
