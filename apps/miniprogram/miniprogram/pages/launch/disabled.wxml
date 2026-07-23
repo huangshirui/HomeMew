@@ -1,0 +1,15 @@
+<!-- 账号禁用页 -->
+<view class="disabled-container">
+  <view class="icon-wrapper">
+    <text class="icon">!</text>
+  </view>
+  <text class="title">账号不可用</text>
+  <text class="desc">你的账号已被禁用，暂时无法使用家事喵。如有疑问，请联系管理员。</text>
+  <button
+    class="btn-primary retry-btn"
+    disabled="{{retrying}}"
+    bindtap="onRelogin"
+  >
+    {{retrying ? '正在重新登录...' : '重新登录'}}
+  </button>
+</view>

@@ -19,6 +19,8 @@ This document defines product and business rules that clients and Core must foll
 - A family must always retain at least one active administrator.
 - Archived families are read-only when family archival is implemented.
 - Physical deletion of a family is not part of the MVP.
+- Family avatars are uploaded through the dedicated Core multipart endpoint. Clients cannot set arbitrary family avatar URLs through family create or profile update requests.
+- Core stores only the family avatar R2 object key and derives the public `avatarUrl` returned to clients.
 
 ## 3. Family membership and roles
 

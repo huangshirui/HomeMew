@@ -1,0 +1,44 @@
+/* 账号禁用页 */
+.disabled-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 160rpx 64rpx 0;
+  box-sizing: border-box;
+}
+
+.icon-wrapper {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background-color: #fdecec;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 40rpx;
+}
+
+.icon {
+  font-size: 64rpx;
+  font-weight: 700;
+  color: #e54d42;
+}
+
+.title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 20rpx;
+}
+
+.desc {
+  font-size: 26rpx;
+  color: #999999;
+  line-height: 1.6;
+  text-align: center;
+  margin-bottom: 64rpx;
+}
+
+.retry-btn {
+  width: 100%;
+}

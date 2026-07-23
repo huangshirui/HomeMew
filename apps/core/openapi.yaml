@@ -238,6 +238,52 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/families/{familyId}/avatar:
+    put:
+      tags: [Families]
+      summary: Upload and replace the family's avatar
+      operationId: uploadFamilyAvatar
+      x-homemew-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              additionalProperties: false
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: JPEG, PNG, or WebP image, at most 5 MB.
+      responses:
+        '200':
+          description: Avatar stored in R2 and assigned to the family
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarUploadResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          description: Avatar exceeds the 5 MB limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported avatar media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/families/{familyId}/members:
     parameters:
       - $ref: '#/components/parameters/FamilyId'
@@ -989,7 +1035,7 @@ components:
             avatarUrl:
               type: string
               format: uri
-              description: Public HTTPS URL derived by Core from ASSETS_PUBLIC_URL and users.avatar_key.
+              description: Public HTTPS URL derived by Core from ASSETS_PUBLIC_URL and the stored avatar key.
     FamilyListItem:
       type: object
       required: [id, name, avatarUrl, timezone, role, memberCount]
@@ -1030,9 +1076,6 @@ components:
         name:
           type: string
           minLength: 1
-        avatarUrl:
-          type: [string, 'null']
-          format: uri
         timezone:
           type: string
           default: Asia/Shanghai
@@ -1044,9 +1087,6 @@ components:
         name:
           type: string
           minLength: 1
-        avatarUrl:
-          type: [string, 'null']
-          format: uri
         timezone:
           type: string
     CreateFamilyResult:

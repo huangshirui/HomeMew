@@ -1,0 +1,63 @@
+<!-- 家庭详情页 -->
+<view class="container">
+  <!-- 家庭头部 -->
+  <view class="card family-header">
+    <view class="avatar-wrap">
+      <image
+        class="family-avatar"
+        src="{{detail.avatarUrl || '/assets/images/default-avatar.png'}}"
+        mode="aspectFill"
+      />
+      <view
+        wx:if="{{detail.currentUserRole === 'admin'}}"
+        class="avatar-edit"
+        bindtap="onChooseFamilyAvatar"
+      >
+        <text wx:if="{{avatarUploading}}">上传中</text>
+        <text wx:else>更换</text>
+      </view>
+    </view>
+    <view class="family-info">
+      <block wx:if="{{editingName}}">
+        <input
+          class="name-input"
+          value="{{nameDraft}}"
+          bindinput="onNameInput"
+          maxlength="20"
+          focus
+        />
+        <view class="name-actions">
+          <text class="link-btn" bindtap="onCancelEdit">取消</text>
+          <text class="link-btn primary" bindtap="onSaveName">保存</text>
+        </view>
+      </block>
+      <block wx:else>
+        <view class="name-row">
+          <text class="family-name">{{detail.name}}</text>
+          <text wx:if="{{detail.currentUserRole === 'admin'}}" class="edit-icon" bindtap="onEditName">编辑</text>
+        </view>
+        <text class="family-sub">{{detail.memberCount}} 位成员 · {{detail.currentUserRole === 'admin' ? '管理员' : '成员'}}</text>
+      </block>
+    </view>
+  </view>
+
+  <!-- 功能入口 -->
+  <view class="card">
+    <view class="menu-item" bindtap="onViewMembers">
+      <text class="menu-text">家庭成员</text>
+      <text class="arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="onViewInvites">
+      <text class="menu-text">家庭邀请</text>
+      <text class="arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 退出家庭 -->
+  <view class="card">
+    <view class="menu-item menu-item-danger" bindtap="onLeave">
+      <text class="menu-text text-danger">{{leaving ? '退出中...' : '退出家庭'}}</text>
+      <text class="arrow">›</text>
+    </view>
+  </view>
+</view>

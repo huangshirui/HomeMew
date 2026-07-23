@@ -85,10 +85,10 @@ Page({
     });
   },
 
-  /** 创建家庭 */
+  /** 创建家庭（跳转首页内联创建） */
   onCreateFamily(): void {
-    wx.navigateTo({
-      url: '/pages/family/create',
+    wx.switchTab({
+      url: '/pages/home/home',
     });
   },
 
@@ -99,11 +99,12 @@ Page({
     });
   },
 
-  /** 家庭管理 */
-  onFamilyManage(): void {
-    if (!this.data.currentFamily) return;
+  /** 点击某个家庭，进入其详情 */
+  onFamilyTap(e: WechatMiniprogram.TouchEvent): void {
+    const familyId = e.currentTarget.dataset.id as string;
+    if (!familyId) return;
     wx.navigateTo({
-      url: `/pages/family/detail?id=${this.data.currentFamily.id}`,
+      url: `/pages/family/detail?familyId=${familyId}`,
     });
   },
 

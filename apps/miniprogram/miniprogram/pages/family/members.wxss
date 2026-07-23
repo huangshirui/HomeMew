@@ -1,0 +1,108 @@
+/* 家庭成员列表页样式 */
+.header {
+  margin-bottom: 16rpx;
+  padding: 0 8rpx;
+}
+
+.title {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  display: block;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  margin-top: 4rpx;
+}
+
+.member-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx 0;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.member-item:last-child {
+  border-bottom: none;
+}
+
+.member-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background-color: var(--color-bg);
+  flex-shrink: 0;
+}
+
+.member-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.member-top {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.member-name {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.member-role {
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  background-color: var(--color-bg);
+  border-radius: 6rpx;
+  padding: 2rpx 12rpx;
+}
+
+.member-role.role-admin {
+  color: var(--color-primary);
+  background-color: #eaf7ec;
+}
+
+.self-tag {
+  font-size: 22rpx;
+  color: #ffffff;
+  background-color: var(--color-primary);
+  border-radius: 6rpx;
+  padding: 2rpx 12rpx;
+}
+
+.member-sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+}
+
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  flex-shrink: 0;
+}
+
+.action-link {
+  font-size: 26rpx;
+  color: var(--color-primary);
+}
+
+.action-link.danger {
+  color: var(--color-danger);
+}
+
+.hint {
+  display: block;
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}

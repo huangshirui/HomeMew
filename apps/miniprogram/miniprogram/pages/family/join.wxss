@@ -1,0 +1,91 @@
+/* 加入家庭页样式 */
+.header {
+  margin-bottom: 24rpx;
+}
+
+.title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8rpx;
+}
+
+.subtitle {
+  display: block;
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+}
+
+.input-row {
+  margin-bottom: 24rpx;
+}
+
+.code-input {
+  height: 88rpx;
+  background-color: var(--color-bg);
+  border-radius: 12rpx;
+  padding: 0 24rpx;
+  font-size: 30rpx;
+}
+
+.btn-row {
+  display: flex;
+  gap: 20rpx;
+}
+
+.preview-card {
+  margin-top: 8rpx;
+}
+
+.family-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 16rpx;
+}
+
+.family-avatar {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background-color: var(--color-bg);
+}
+
+.family-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.family-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.family-sub {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.preview-tip {
+  display: block;
+  font-size: 26rpx;
+  color: var(--color-primary);
+}
+
+.error-tip {
+  display: block;
+  margin: 24rpx 8rpx 0;
+  font-size: 26rpx;
+  color: var(--color-danger);
+  text-align: center;
+}
+
+.success-tip {
+  display: block;
+  margin: 24rpx 8rpx 0;
+  font-size: 26rpx;
+  color: var(--color-primary);
+  text-align: center;
+}

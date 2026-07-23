@@ -1,5 +1,8 @@
 /**
  * 家庭相关 API 服务
+ *
+ * 写请求（POST/PATCH/DELETE）默认不自动重试 401（见 api.ts 的 shouldAutoRetry）。
+ * 每个写方法都显式设置 skipRetry: true，避免重复提交。
  */
 
 import { request } from './api';
@@ -9,7 +12,9 @@ import {
   CreateFamilyRequest,
   CreateFamilyResult,
   UpdateFamilyRequest,
+  FamilySummary,
   FamilyMember,
+  UpdateMemberRoleRequest,
   InviteCreated,
   InviteListItem,
   CreateInviteRequest,
@@ -49,11 +54,13 @@ export function getFamily(familyId: string): Promise<FamilyDetail> {
 /**
  * 更新家庭资料
  * PATCH /api/v1/families/{familyId}
+ * 返回 FamilySummary（不含 role / memberCount）
  */
-export function updateFamily(familyId: string, data: UpdateFamilyRequest): Promise<FamilyListItem> {
-  return request<FamilyListItem>(`/api/v1/families/${familyId}`, {
+export function updateFamily(familyId: string, data: UpdateFamilyRequest): Promise<FamilySummary> {
+  return request<FamilySummary>(`/api/v1/families/${familyId}`, {
     method: 'PATCH',
     data: data as unknown as Record<string, unknown>,
+    skipRetry: true,
   });
 }
 
@@ -70,10 +77,11 @@ export function listFamilyMembers(familyId: string): Promise<FamilyMember[]> {
  * 修改成员角色
  * PATCH /api/v1/families/{familyId}/members/{userId}
  */
-export function updateMemberRole(familyId: string, userId: string, role: 'admin' | 'member'): Promise<{ userId: string; role: string }> {
-  return request(`/api/v1/families/${familyId}/members/${userId}`, {
+export function updateMemberRole(familyId: string, userId: string, role: 'admin' | 'member'): Promise<UpdateMemberRoleRequest & { userId: string }> {
+  return request<UpdateMemberRoleRequest & { userId: string }>(`/api/v1/families/${familyId}/members/${userId}`, {
     method: 'PATCH',
     data: { role },
+    skipRetry: true,
   });
 }
 
@@ -127,6 +135,7 @@ export function listInvites(familyId: string): Promise<InviteListItem[]> {
 export function revokeInvite(familyId: string, inviteId: string): Promise<void> {
   return request<void>(`/api/v1/families/${familyId}/invites/${inviteId}/revoke`, {
     method: 'POST',
+    skipRetry: true,
   });
 }
 
@@ -147,24 +156,4 @@ export function joinFamilyByCode(code: string): Promise<JoinFamilyResult> {
     method: 'POST',
     skipRetry: true,
   });
-}
-
-// 补充缺失的 InvitePreview 类型导出
-interface InvitePreview {
-  family: {
-    id: string;
-    name: string;
-    avatarUrl: string | null;
-    memberCount: number;
-  };
-  expiresAt: string;
-  canJoin: boolean;
-}
-
-// 补充缺失的 JoinFamilyResult 类型导出
-interface JoinFamilyResult {
-  familyId: string;
-  familyName: string;
-  role: 'member';
-  joinedAt: string;
 }

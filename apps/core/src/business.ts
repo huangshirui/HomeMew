@@ -1,12 +1,12 @@
 import type { Context, Hono } from "hono";
 import { authenticate, requireInternal } from "./auth";
-import { avatarUrl, parseAvatarFile, storeAvatar } from "./avatar";
+import { avatarUrl, parseAvatarFile, storeAvatar, storeFamilyAvatar } from "./avatar";
 import type { Bindings, Variables } from "./env";
 import { ApiError } from "./errors";
 import { requireActiveUser as activeUser, requireFamilyAdmin as admin, requireFamilyMember as membership } from "./family-access";
 import { success } from "./http";
 import { createId, createInviteCode } from "./ids";
-import { optionalUrl, positiveInteger, requireObject, requireString, timezone } from "./validation";
+import { positiveInteger, requireObject, requireString, timezone } from "./validation";
 
 type AppEnv = { Bindings: Bindings; Variables: Variables };
 type App = Hono<AppEnv>;
@@ -105,16 +105,18 @@ export function registerBusinessRoutes(app: App): void {
   app.get("/api/v1/me/families", async (c) => {
     const id = c.get("currentUserId");
     await activeUser(c.env, id);
-    const rows = await c.env.DB.prepare(`SELECT f.id, f.name, f.avatar_url, f.timezone, fm.role, COUNT(active.id) member_count FROM family_members fm JOIN families f ON f.id = fm.family_id LEFT JOIN family_members active ON active.family_id = f.id AND active.status = 'active' WHERE fm.user_id = ? AND fm.status = 'active' AND f.status = 'active' GROUP BY f.id, fm.role ORDER BY fm.joined_at`).bind(id).all<any>();
-    return c.json(success({ items: rows.results.map((row) => ({ id: row.id, name: row.name, avatarUrl: row.avatar_url, timezone: row.timezone, role: row.role, memberCount: row.member_count })) }));
+    const rows = await c.env.DB.prepare(`SELECT f.id, f.name, f.avatar_key, f.timezone, fm.role, COUNT(active.id) member_count FROM family_members fm JOIN families f ON f.id = fm.family_id LEFT JOIN family_members active ON active.family_id = f.id AND active.status = 'active' WHERE fm.user_id = ? AND fm.status = 'active' AND f.status = 'active' GROUP BY f.id, fm.role ORDER BY fm.joined_at`).bind(id).all<any>();
+    return c.json(success({ items: rows.results.map((row) => ({ id: row.id, name: row.name, avatarUrl: avatarUrl(c.env, row.avatar_key), timezone: row.timezone, role: row.role, memberCount: row.member_count })) }));
   });
 
   app.post("/api/v1/families", async (c) => {
     const userId = c.get("currentUserId");
     await activeUser(c.env, userId);
     const input = await body(c);
+    if (Object.keys(input).some((field) => !["name", "timezone"].includes(field))) {
+      throw new ApiError("INVALID_REQUEST", "Only name and timezone may be supplied", 400);
+    }
     const name = requireString(input.name, "name");
-    const familyAvatarUrl = optionalUrl(input.avatarUrl, "avatarUrl") ?? null;
     const familyTimezone = input.timezone === undefined ? "Asia/Shanghai" : timezone(input.timezone);
     const count = await c.env.DB.prepare("SELECT COUNT(*) count FROM families WHERE created_by = ? AND status = 'active'").bind(userId).first<{ count: number }>();
     if ((count?.count ?? 0) >= 3) throw new ApiError("FAMILY_CREATE_LIMIT_REACHED", "Active family creation limit reached", 409);
@@ -122,11 +124,11 @@ export function registerBusinessRoutes(app: App): void {
     const id = createId("fam");
     const memberId = createId("fmem");
     await c.env.DB.batch([
-      c.env.DB.prepare("INSERT INTO families (id, name, avatar_url, timezone, created_by) VALUES (?, ?, ?, ?, ?)").bind(id, name, familyAvatarUrl, familyTimezone, userId),
+      c.env.DB.prepare("INSERT INTO families (id, name, timezone, created_by) VALUES (?, ?, ?, ?)").bind(id, name, familyTimezone, userId),
       c.env.DB.prepare("INSERT INTO family_members (id, family_id, user_id, role) VALUES (?, ?, ?, 'admin')").bind(memberId, id, userId),
     ]);
     const row = await c.env.DB.prepare("SELECT created_at FROM families WHERE id = ?").bind(id).first<any>();
-    return c.json(success({ id, name, avatarUrl: familyAvatarUrl, timezone: familyTimezone, role: "admin", memberCount: 1, createdAt: row.created_at }), 201);
+    return c.json(success({ id, name, avatarUrl: null, timezone: familyTimezone, role: "admin", memberCount: 1, createdAt: row.created_at }), 201);
   });
 
   app.get("/api/v1/families/:familyId", async (c) => {
@@ -136,7 +138,7 @@ export function registerBusinessRoutes(app: App): void {
     const member = await membership(c.env, familyId, userId);
     const row = await c.env.DB.prepare("SELECT f.*, (SELECT COUNT(*) FROM family_members WHERE family_id = f.id AND status = 'active') member_count FROM families f WHERE f.id = ?").bind(familyId).first<any>();
     if (!row) throw new ApiError("FAMILY_NOT_FOUND", "Family not found", 404);
-    return c.json(success({ id: row.id, name: row.name, avatarUrl: row.avatar_url, timezone: row.timezone, status: row.status, createdBy: row.created_by, currentUserRole: member.role, memberCount: row.member_count, createdAt: row.created_at }));
+    return c.json(success({ id: row.id, name: row.name, avatarUrl: avatarUrl(c.env, row.avatar_key), timezone: row.timezone, status: row.status, createdBy: row.created_by, currentUserRole: member.role, memberCount: row.member_count, createdAt: row.created_at }));
   });
 
   app.patch("/api/v1/families/:familyId", async (c) => {
@@ -146,13 +148,43 @@ export function registerBusinessRoutes(app: App): void {
     await admin(c.env, familyId, userId);
     const input = await body(c);
     const name = input.name === undefined ? undefined : requireString(input.name, "name");
-    const familyAvatarUrl = optionalUrl(input.avatarUrl, "avatarUrl");
     const familyTimezone = input.timezone === undefined ? undefined : timezone(input.timezone);
-    await c.env.DB.prepare("UPDATE families SET name = COALESCE(?, name), avatar_url = CASE WHEN ? THEN ? ELSE avatar_url END, timezone = COALESCE(?, timezone), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .bind(name ?? null, familyAvatarUrl !== undefined ? 1 : 0, familyAvatarUrl ?? null, familyTimezone ?? null, familyId)
+    if (Object.keys(input).some((field) => !["name", "timezone"].includes(field)) || (name === undefined && familyTimezone === undefined)) {
+      throw new ApiError("INVALID_REQUEST", "Only name and timezone may be supplied", 400);
+    }
+    await c.env.DB.prepare("UPDATE families SET name = COALESCE(?, name), timezone = COALESCE(?, timezone), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(name ?? null, familyTimezone ?? null, familyId)
       .run();
     const row = await c.env.DB.prepare("SELECT * FROM families WHERE id = ?").bind(familyId).first<any>();
-    return c.json(success({ id: row.id, name: row.name, avatarUrl: row.avatar_url, timezone: row.timezone, status: row.status }));
+    return c.json(success({ id: row.id, name: row.name, avatarUrl: avatarUrl(c.env, row.avatar_key), timezone: row.timezone, status: row.status }));
+  });
+
+  app.put("/api/v1/families/:familyId/avatar", async (c) => {
+    const familyId = c.req.param("familyId");
+    const userId = c.get("currentUserId");
+    await activeUser(c.env, userId);
+    await admin(c.env, familyId, userId);
+    const previous = await c.env.DB.prepare("SELECT avatar_key FROM families WHERE id = ?")
+      .bind(familyId)
+      .first<{ avatar_key: string | null }>();
+    const file = await parseAvatarFile(c.req.raw);
+    const stored = await storeFamilyAvatar(c.env, familyId, file);
+
+    try {
+      await c.env.DB.prepare("UPDATE families SET avatar_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(stored.key, familyId)
+        .run();
+    } catch (error) {
+      await c.env.AVATARS.delete(stored.key).catch(() => undefined);
+      throw error;
+    }
+
+    const oldKey = previous?.avatar_key;
+    if (oldKey && oldKey !== stored.key && oldKey.startsWith(`avatars/families/${familyId}/`)) {
+      await c.env.AVATARS.delete(oldKey).catch(() => undefined);
+    }
+
+    return c.json(success({ avatarUrl: stored.url }));
   });
 
   app.get("/api/v1/families/:familyId/members", async (c) => {
@@ -236,7 +268,7 @@ export function registerBusinessRoutes(app: App): void {
   });
 
   async function findInvite(env: Bindings, code: string): Promise<any> {
-    const invite = await env.DB.prepare("SELECT i.*, f.name family_name, f.avatar_url family_avatar, f.status family_status, (SELECT COUNT(*) FROM family_members WHERE family_id = f.id AND status = 'active') member_count FROM family_invites i JOIN families f ON f.id = i.family_id WHERE i.code_hash = ?").bind(await hashCode(code)).first<any>();
+    const invite = await env.DB.prepare("SELECT i.*, f.name family_name, f.avatar_key family_avatar_key, f.status family_status, (SELECT COUNT(*) FROM family_members WHERE family_id = f.id AND status = 'active') member_count FROM family_invites i JOIN families f ON f.id = i.family_id WHERE i.code_hash = ?").bind(await hashCode(code)).first<any>();
     if (!invite) throw new ApiError("INVITE_NOT_FOUND", "Invite not found", 404);
     return invite;
   }
@@ -253,7 +285,7 @@ export function registerBusinessRoutes(app: App): void {
     await activeUser(c.env, userId);
     const invite = await findInvite(c.env, c.req.param("code"));
     const valid = inviteStatus(invite) === "active";
-    return c.json(success({ family: { id: invite.family_id, name: invite.family_name, avatarUrl: invite.family_avatar, memberCount: invite.member_count }, expiresAt: invite.expires_at, canJoin: valid && invite.member_count < 8 }));
+    return c.json(success({ family: { id: invite.family_id, name: invite.family_name, avatarUrl: avatarUrl(c.env, invite.family_avatar_key), memberCount: invite.member_count }, expiresAt: invite.expires_at, canJoin: valid && invite.member_count < 8 }));
   });
 
   app.post("/api/v1/family-invites/:code/join", async (c) => {

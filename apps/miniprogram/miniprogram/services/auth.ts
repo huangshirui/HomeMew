@@ -8,6 +8,7 @@
  */
 
 import { LoginResponse } from '../types/index';
+import { isTokenValid, STORAGE_KEYS } from './config';
 
 /**
  * 调用登录云函数
@@ -90,31 +91,19 @@ export async function loginAndSaveToken(): Promise<{ isNewUser: boolean }> {
  * 清除本地认证信息
  */
 export function clearAuth(): void {
-  wx.removeStorageSync('accessToken');
-  wx.removeStorageSync('tokenExpiresAt');
-  wx.removeStorageSync('currentFamilyId');
-  wx.removeStorageSync('coreApiUrl');
+  wx.removeStorageSync(STORAGE_KEYS.accessToken);
+  wx.removeStorageSync(STORAGE_KEYS.tokenExpiresAt);
+  wx.removeStorageSync(STORAGE_KEYS.currentFamilyId);
+  wx.removeStorageSync(STORAGE_KEYS.coreApiUrl);
 
   console.log('[Auth] Auth cleared');
 }
 
 /**
- * 检查是否有有效 token
+ * 检查是否有有效 token（统一委托给 config，避免多套判断逻辑）
  */
 export function hasValidToken(): boolean {
-  const token = wx.getStorageSync('accessToken');
-  const expiresAt = wx.getStorageSync('tokenExpiresAt');
-
-  if (!token) return false;
-
-  if (expiresAt) {
-    const now = new Date().getTime();
-    const expireTime = new Date(expiresAt).getTime();
-    // 提前 5 分钟认为过期
-    return now < expireTime - 5 * 60 * 1000;
-  }
-
-  return !!token;
+  return isTokenValid();
 }
 
 /**

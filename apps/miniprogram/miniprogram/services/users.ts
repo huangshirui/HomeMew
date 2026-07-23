@@ -24,6 +24,6 @@ export function updateCurrentUser(data: UpdateCurrentUserRequest): Promise<UserP
   return request<UserProfile>('/api/v1/me', {
     method: 'PATCH',
     data: data as unknown as Record<string, unknown>,
-    skipRetry: false,
+    skipRetry: true,
   });
 }

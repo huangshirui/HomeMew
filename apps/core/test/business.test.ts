@@ -61,7 +61,7 @@ describe("user and family API", () => {
   it("creates a family with its creator as admin and enforces the creation limit", async () => {
     const user = await createUser("Creator");
     for (let index = 0; index < 3; index += 1) {
-      const response = await request("/api/v1/families", user.token, { method: "POST", body: JSON.stringify({ name: `Family ${index}`, avatarUrl: null }) });
+      const response = await request("/api/v1/families", user.token, { method: "POST", body: JSON.stringify({ name: `Family ${index}` }) });
       expect(response.status).toBe(201);
       expect((await response.json<{ data: { role: string; memberCount: number } }>()).data).toMatchObject({ role: "admin", memberCount: 1 });
     }
@@ -69,6 +69,138 @@ describe("user and family API", () => {
     expect(fourth.status).toBe(409);
     expect((await fourth.json<{ error: { code: string } }>()).error.code).toBe("FAMILY_CREATE_LIMIT_REACHED");
   });
+
+  it("uploads and replaces a family avatar while exposing only its public URL", async () => {
+    const admin = await createUser("Avatar Admin");
+    const familyResponse = await request("/api/v1/families", admin.token, {
+      method: "POST",
+      body: JSON.stringify({ name: "Avatar Family" }),
+    });
+    const family = (await familyResponse.json<{ data: { id: string } }>()).data;
+
+    const firstForm = new FormData();
+    firstForm.set("file", new File([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], "first.jpg", { type: "image/jpeg" }));
+    const firstUpload = await request(`/api/v1/families/${family.id}/avatar`, admin.token, {
+      method: "PUT",
+      body: firstForm,
+    });
+    expect(firstUpload.status).toBe(200);
+    const firstPayload = await firstUpload.json<{ data: { avatarUrl: string } }>();
+    expect(firstPayload.data.avatarUrl).toMatch(
+      new RegExp(`^https://assets\\.test\\.example/avatars/families/${family.id}/.+\\.jpg$`),
+    );
+
+    const firstStored = await bindings.DB.prepare("SELECT avatar_key FROM families WHERE id = ?")
+      .bind(family.id)
+      .first<{ avatar_key: string }>();
+    expect(firstStored?.avatar_key).toMatch(new RegExp(`^avatars/families/${family.id}/.+\\.jpg$`));
+    expect(await bindings.AVATARS.get(firstStored!.avatar_key)).not.toBeNull();
+
+    const secondForm = new FormData();
+    secondForm.set("file", new File([new Uint8Array([1, 2, 3])], "second.png", { type: "image/png" }));
+    const secondUpload = await request(`/api/v1/families/${family.id}/avatar`, admin.token, {
+      method: "PUT",
+      body: secondForm,
+    });
+    expect(secondUpload.status).toBe(200);
+
+    const secondStored = await bindings.DB.prepare("SELECT avatar_key FROM families WHERE id = ?")
+      .bind(family.id)
+      .first<{ avatar_key: string }>();
+    expect(secondStored?.avatar_key).toMatch(new RegExp(`^avatars/families/${family.id}/.+\\.png$`));
+    expect(await bindings.AVATARS.get(firstStored!.avatar_key)).toBeNull();
+    expect(await bindings.AVATARS.get(secondStored!.avatar_key)).not.toBeNull();
+
+    const detail = await request(`/api/v1/families/${family.id}`, admin.token);
+    expect((await detail.json<{ data: { avatarUrl: string } }>()).data.avatarUrl)
+      .toBe(`https://assets.test.example/${secondStored!.avatar_key}`);
+
+    const familyList = await request("/api/v1/me/families", admin.token);
+    const listPayload = await familyList.json<{ data: { items: Array<{ id: string; avatarUrl: string }> } }>();
+    expect(listPayload.data.items.find((item) => item.id === family.id)?.avatarUrl)
+      .toBe(`https://assets.test.example/${secondStored!.avatar_key}`);
+
+    const inviteResponse = await request(`/api/v1/families/${family.id}/invites`, admin.token, {
+      method: "POST",
+      body: "{}",
+    });
+    const invite = (await inviteResponse.json<{ data: { code: string } }>()).data;
+    const preview = await request(`/api/v1/family-invites/${invite.code}`, admin.token);
+    expect((await preview.json<{ data: { family: { avatarUrl: string } } }>()).data.family.avatarUrl)
+      .toBe(`https://assets.test.example/${secondStored!.avatar_key}`);
+  }, 20_000);
+
+  it("allows only family admins to upload family avatars", async () => {
+    const admin = await createUser("Upload Admin");
+    const member = await createUser("Upload Member");
+    const outsider = await createUser("Upload Outsider");
+    const familyResponse = await request("/api/v1/families", admin.token, {
+      method: "POST",
+      body: JSON.stringify({ name: "Protected Avatar" }),
+    });
+    const family = (await familyResponse.json<{ data: { id: string } }>()).data;
+    const inviteResponse = await request(`/api/v1/families/${family.id}/invites`, admin.token, {
+      method: "POST",
+      body: "{}",
+    });
+    const code = (await inviteResponse.json<{ data: { code: string } }>()).data.code;
+    await request(`/api/v1/family-invites/${code}/join`, member.token, { method: "POST", body: "{}" });
+
+    for (const token of [member.token, outsider.token]) {
+      const form = new FormData();
+      form.set("file", new File([new Uint8Array([1])], "avatar.png", { type: "image/png" }));
+      const response = await request(`/api/v1/families/${family.id}/avatar`, token, {
+        method: "PUT",
+        body: form,
+      });
+      expect(response.status).toBe(403);
+    }
+  }, 20_000);
+
+  it("rejects arbitrary family avatar URLs in JSON writes", async () => {
+    const admin = await createUser("URL Admin");
+    const createResponse = await request("/api/v1/families", admin.token, {
+      method: "POST",
+      body: JSON.stringify({ name: "Unsafe", avatarUrl: "https://untrusted.example/avatar.png" }),
+    });
+    expect(createResponse.status).toBe(400);
+
+    const familyResponse = await request("/api/v1/families", admin.token, {
+      method: "POST",
+      body: JSON.stringify({ name: "Safe" }),
+    });
+    const family = (await familyResponse.json<{ data: { id: string } }>()).data;
+    const patchResponse = await request(`/api/v1/families/${family.id}`, admin.token, {
+      method: "PATCH",
+      body: JSON.stringify({ avatarUrl: "https://untrusted.example/avatar.png" }),
+    });
+    expect(patchResponse.status).toBe(400);
+  });
+
+  it("applies avatar file validation to family uploads", async () => {
+    const admin = await createUser("Validation Admin");
+    const familyResponse = await request("/api/v1/families", admin.token, {
+      method: "POST",
+      body: JSON.stringify({ name: "Validated Avatar" }),
+    });
+    const family = (await familyResponse.json<{ data: { id: string } }>()).data;
+    const cases = [
+      { file: new File(["text"], "avatar.txt", { type: "text/plain" }), status: 415, code: "UNSUPPORTED_AVATAR_TYPE" },
+      { file: new File([], "empty.png", { type: "image/png" }), status: 413, code: "AVATAR_TOO_LARGE" },
+      { file: new File([new Uint8Array(5 * 1024 * 1024 + 1)], "large.webp", { type: "image/webp" }), status: 413, code: "AVATAR_TOO_LARGE" },
+    ];
+
+    for (const item of cases) {
+      const form = new FormData();
+      form.set("file", item.file);
+      const response = await request(`/api/v1/families/${family.id}/avatar`, admin.token, {
+        method: "PUT",
+        body: form,
+      });
+      expect(response.status).toBe(item.status);
+      expect((await response.json<{ error: { code: string } }>()).error.code).toBe(item.code);
+    }
+  }, 20_000);
 
   it("creates an invitation and lets another user join atomically", async () => {
     const admin = await createUser("Admin");

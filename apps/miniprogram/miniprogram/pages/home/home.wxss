@@ -29,6 +29,43 @@
   color: #999999;
 }
 
+.family-meta {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.role-tag {
+  font-size: 22rpx;
+  color: #4CAF50;
+  background-color: #eaf7ec;
+  border-radius: 6rpx;
+  padding: 2rpx 12rpx;
+}
+
+/* 通用菜单项 */
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 0;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-text {
+  font-size: 30rpx;
+  color: #333333;
+}
+
+.arrow {
+  font-size: 36rpx;
+  color: #cccccc;
+}
+
 /* 区域标题 */
 .section-header {
   margin-bottom: 20rpx;

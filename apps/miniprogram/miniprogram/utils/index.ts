@@ -153,28 +153,6 @@ export function safeAvatarUrl(url: string | null | undefined): string {
 }
 
 /**
- * 错误码到用户友好消息的映射
+ * 错误码到用户友好消息的映射（统一来自 ./errors，避免多份映射）
  */
-const ERROR_MESSAGES: Record<string, string> = {
-  UNAUTHORIZED: '登录状态已过期，正在重新登录...',
-  FORBIDDEN: '你没有权限执行此操作',
-  NOT_FOUND: '内容不存在或已被删除',
-  CONFLICT: '内容已被其他家庭成员修改，请刷新后重试',
-  FAMILY_MEMBER_LIMIT_REACHED: '该家庭已有 8 名成员，暂时无法加入',
-  FAMILY_CREATION_LIMIT_REACHED: '每个用户最多创建 3 个家庭',
-  INVITE_EXPIRED: '邀请码已过期',
-  INVITE_REVOKED: '邀请码已被撤销',
-  INVITE_EXHAUSTED: '邀请码已用完',
-  ALREADY_FAMILY_MEMBER: '你已经是该家庭的成员了',
-  USER_DISABLED: '账号已被禁用',
-  NETWORK_ERROR: '网络请求失败，请检查网络连接',
-  TIMEOUT: '请求超时，请稍后重试',
-  INVALID_REQUEST: '请求参数有误',
-};
-
-/**
- * 根据错误码获取用户友好消息
- */
-export function getErrorMessage(code: string, fallback?: string): string {
-  return ERROR_MESSAGES[code] || fallback || '操作失败，请稍后重试';
-}
+export { getErrorMessage, ERROR_MESSAGES } from './errors';

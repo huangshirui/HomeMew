@@ -29,8 +29,8 @@ describe("user and family schema", () => {
   });
 });
 
-describe("event and task schema", () => {
-  it("creates the resource tables and advances the schema version", async () => {
+describe("current schema", () => {
+  it("creates resource tables, stores avatar keys, and advances the schema version", async () => {
     const tables = await env.DB.prepare(
       `SELECT name FROM sqlite_master WHERE type = 'table'
        AND name IN ('events', 'event_attendees', 'tasks', 'task_assignees') ORDER BY name`,
@@ -38,11 +38,16 @@ describe("event and task schema", () => {
     const version = await env.DB.prepare(
       "SELECT value FROM schema_metadata WHERE key = 'schema_version'",
     ).first<{ value: string }>();
+    const familyColumns = await env.DB.prepare(
+      "PRAGMA table_info('families')",
+    ).all<{ name: string }>();
 
     expect(tables.results.map((row: { name: string }) => row.name)).toEqual([
       "event_attendees", "events", "task_assignees", "tasks",
     ]);
-    expect(version?.value).toBe("5");
+    expect(familyColumns.results.map((column: { name: string }) => column.name)).toContain("avatar_key");
+    expect(familyColumns.results.map((column: { name: string }) => column.name)).not.toContain("avatar_url");
+    expect(version?.value).toBe("6");
   });
 
   it("supports event and task identifiers", () => {

@@ -8,7 +8,26 @@
         <text class="family-name">{{currentFamily.name}}</text>
         <text class="switch-hint">点击切换</text>
       </view>
-      <text class="member-count">{{currentFamily.memberCount}}人</text>
+      <view class="family-meta">
+        <text class="member-count">{{currentFamily.memberCount}}人</text>
+        <text class="role-tag">{{currentFamily.role === 'admin' ? '管理员' : '成员'}}</text>
+      </view>
+    </view>
+
+    <!-- 家庭操作 -->
+    <view class="card">
+      <view class="menu-item" bindtap="onViewDetail">
+        <text class="menu-text">家庭详情与成员</text>
+        <text class="arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="onCreateFamily">
+        <text class="menu-text">创建家庭</text>
+        <text class="arrow">›</text>
+      </view>
+      <view class="menu-item" bindtap="onJoinFamily">
+        <text class="menu-text">加入家庭</text>
+        <text class="arrow">›</text>
+      </view>
     </view>
 
     <!-- 占位：日程区域 -->
@@ -17,7 +36,7 @@
         <text class="section-title">今日日程</text>
       </view>
       <view class="empty-hint">
-        <text class="empty-text">暂无日程</text>
+        <text class="empty-text">功能即将上线</text>
       </view>
     </view>
 
@@ -27,11 +46,11 @@
         <text class="section-title">待完成任务</text>
       </view>
       <view class="empty-hint">
-        <text class="empty-text">暂无待办</text>
+        <text class="empty-text">功能即将上线</text>
       </view>
     </view>
 
-    <!-- 快速操作 -->
+    <!-- 快速操作（暂未开放） -->
     <view class="quick-actions">
       <view class="action-item" bindtap="onCreateEvent">
         <text class="action-text">+ 新建日程</text>

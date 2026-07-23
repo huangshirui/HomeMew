@@ -52,9 +52,9 @@ corepack pnpm --filter @homemew/core exec wrangler secret put JWT_SECRET
 - `GET /api/v1/family-invites/{code}`、`POST /api/v1/family-invites/{code}/join`
 - `POST /api/v1/internal/users`
 
-### 用户头像
+### 用户与家庭头像
 
-用户头像由 Core 统一写入 R2，客户端不能通过 `PATCH /api/v1/me` 提交任意头像 URL。
+用户和家庭头像由 Core 统一写入 R2。客户端不能通过普通资料 JSON 接口提交任意头像 URL。
 
 ```http
 PUT /api/v1/me/avatar
@@ -68,9 +68,10 @@ Core 使用对象路径：
 
 ```text
 avatars/{userId}/{uuid}.{ext}
+avatars/families/{familyId}/{uuid}.{ext}
 ```
 
-D1 的 `users` 表只保存 `avatar_key`。`GET /api/v1/me`、家庭成员、日程参与人和待办负责人等 API 仍向客户端返回完整的 `avatarUrl`，地址由 `ASSETS_PUBLIC_URL` 和 `avatar_key` 拼接。客户端不应依赖或保存 R2 object key。
+D1 的 `users` 和 `families` 表只保存 `avatar_key`。相关 API 仍向客户端返回完整的 `avatarUrl`，地址由 `ASSETS_PUBLIC_URL` 和 `avatar_key` 拼接。客户端不应依赖或保存 R2 object key。家庭头像由 active admin 通过 `PUT /api/v1/families/{familyId}/avatar` 上传；创建家庭和普通家庭资料更新不接受 `avatarUrl`。
 
 上传流程采用补偿顺序：先写入新 R2 对象，再更新 D1；D1 更新失败时删除新对象，成功后清理旧对象。
 
@@ -127,6 +128,7 @@ corepack pnpm --filter @homemew/core dev
 
 - `0003_create_event_task_schema.sql` 创建日程、参与人、待办和负责人表。
 - `0004_user_avatar_key.sql` 删除用户任意头像 URL 字段并增加 `avatar_key`。
+- `0006_family_avatar_key.sql` 删除家庭任意头像 URL 字段、增加 `avatar_key`，并将 schema version 更新为 `6`。
 
 已有环境升级后必须在部署新版 Worker 前应用 migration。
 

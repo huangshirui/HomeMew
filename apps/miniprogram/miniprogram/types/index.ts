@@ -42,7 +42,7 @@ export interface CurrentUserResponse extends ApiEnvelope<UserProfile> {}
 
 /** 头像通过 PUT /api/v1/me/avatar 单独上传，资料更新只支持昵称。 */
 export interface UpdateCurrentUserRequest {
-  displayName?: string;
+  displayName: string;
 }
 
 export interface AvatarUploadResult {
@@ -58,6 +58,7 @@ export interface FamilyListItem {
   id: string;
   name: string;
   avatarUrl: string | null;
+  timezone: string;
   role: FamilyRole;
   memberCount: number;
 }
@@ -68,7 +69,7 @@ export interface MyFamilyListResponse extends ApiEnvelope<{
 
 export interface CreateFamilyRequest {
   name: string;
-  avatarUrl?: string | null;
+  timezone?: string;
 }
 
 export interface CreateFamilyResult extends FamilyListItem {
@@ -79,13 +80,14 @@ export interface CreateFamilyResponse extends ApiEnvelope<CreateFamilyResult> {}
 
 export interface UpdateFamilyRequest {
   name?: string;
-  avatarUrl?: string | null;
+  timezone?: string;
 }
 
 export interface FamilyDetail {
   id: string;
   name: string;
   avatarUrl: string | null;
+  timezone: string;
   status: FamilyStatus;
   createdBy: string;
   currentUserRole: FamilyRole;
@@ -95,12 +97,16 @@ export interface FamilyDetail {
 
 export interface FamilyDetailResponse extends ApiEnvelope<FamilyDetail> {}
 
-export interface FamilySummaryResponse extends ApiEnvelope<{
+/** PATCH /families/{id} 的返回（不含 role / memberCount） */
+export interface FamilySummary {
   id: string;
   name: string;
   avatarUrl: string | null;
+  timezone: string;
   status: FamilyStatus;
-}> {}
+}
+
+export interface FamilySummaryResponse extends ApiEnvelope<FamilySummary> {}
 
 // ==================== 成员相关 ====================
 
@@ -159,7 +165,7 @@ export interface InviteListResponse extends ApiEnvelope<{
   items: InviteListItem[];
 }> {}
 
-export interface InvitePreviewResponse extends ApiEnvelope<{
+export interface InvitePreview {
   family: {
     id: string;
     name: string;
@@ -168,14 +174,18 @@ export interface InvitePreviewResponse extends ApiEnvelope<{
   };
   expiresAt: string;
   canJoin: boolean;
-}> {}
+}
 
-export interface JoinFamilyResponse extends ApiEnvelope<{
+export interface InvitePreviewResponse extends ApiEnvelope<InvitePreview> {}
+
+export interface JoinFamilyResult {
   familyId: string;
   familyName: string;
   role: 'member';
   joinedAt: string;
-}> {}
+}
+
+export interface JoinFamilyResponse extends ApiEnvelope<JoinFamilyResult> {}
 
 // ==================== 日程相关 ====================
 

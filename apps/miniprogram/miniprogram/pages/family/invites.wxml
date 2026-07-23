@@ -1,0 +1,61 @@
+<!-- 家庭邀请管理页 -->
+<view class="container">
+  <view class="header">
+    <text class="title">家庭邀请</text>
+    <text class="subtitle">创建邀请码，分享给家人加入本家庭</text>
+  </view>
+
+  <!-- 新建邀请 -->
+  <view class="card">
+    <button
+      class="btn-primary"
+      disabled="{{creating}}"
+      bindtap="onCreate"
+    >
+      {{creating ? '生成中...' : '创建邀请'}}
+    </button>
+
+    <!-- 创建成功后立即展示完整邀请码 -->
+    <view wx:if="{{newInvite}}" class="new-invite">
+      <text class="new-invite-label">新邀请码（请尽快分享）</text>
+      <view class="code-box">
+        <text class="code-text">{{newInvite.code}}</text>
+      </view>
+      <view class="new-invite-actions">
+        <button class="btn-outline sm" bindtap="onCopyCode">复制邀请码</button>
+        <button class="btn-outline sm" bindtap="onCopyPath">复制路径</button>
+        <button class="btn-outline sm" open-type="share">分享</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 邀请列表 -->
+  <view class="card">
+    <view class="section-header">
+      <text class="section-title">邀请记录</text>
+    </view>
+
+    <block wx:if="{{invites.length > 0}}">
+      <view
+        class="invite-item"
+        wx:for="{{invites}}"
+        wx:key="id"
+      >
+        <view class="invite-meta">
+          <text class="invite-status status-{{item.status}}">{{item.statusText}}</text>
+          <text class="invite-sub">已于 {{item.expiresAtText}} 失效</text>
+        </view>
+        <text
+          wx:if="{{item.status === 'active'}}"
+          class="action-link danger"
+          data-id="{{item.id}}"
+          bindtap="onRevoke"
+        >撤销</text>
+      </view>
+    </block>
+
+    <view wx:else class="empty-hint">
+      <text class="empty-text">暂无邀请记录</text>
+    </view>
+  </view>
+</view>

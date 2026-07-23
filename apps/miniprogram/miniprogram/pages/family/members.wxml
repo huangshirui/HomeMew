@@ -1,0 +1,54 @@
+<!-- 家庭成员列表页 -->
+<view class="container">
+  <view class="header">
+    <text class="title">家庭成员</text>
+    <text class="subtitle">{{members.length}} 位成员</text>
+  </view>
+
+  <view class="card">
+    <view
+      class="member-item"
+      wx:for="{{members}}"
+      wx:key="userId"
+    >
+      <image
+        class="member-avatar"
+        src="{{item.avatarUrl || '/assets/images/default-avatar.png'}}"
+        mode="aspectFill"
+      />
+      <view class="member-info">
+        <view class="member-top">
+          <text class="member-name">{{item.displayName}}</text>
+          <text class="member-role {{item.role === 'admin' ? 'role-admin' : ''}}">
+            {{item.role === 'admin' ? '管理员' : '成员'}}
+          </text>
+          <text wx:if="{{item.isSelf}}" class="self-tag">我</text>
+        </view>
+        <text class="member-sub">加入于 {{item.joinedAtText}}</text>
+      </view>
+
+      <!-- 仅管理员可见操作 -->
+      <view wx:if="{{isAdmin && !item.isSelf}}" class="member-actions">
+        <text
+          wx:if="{{item.role === 'member'}}"
+          class="action-link"
+          data-id="{{item.userId}}"
+          bindtap="onPromote"
+        >升管</text>
+        <text
+          wx:if="{{item.role === 'admin'}}"
+          class="action-link"
+          data-id="{{item.userId}}"
+          bindtap="onDemote"
+        >降级</text>
+        <text
+          class="action-link danger"
+          data-id="{{item.userId}}"
+          bindtap="onRemove"
+        >移除</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{!isAdmin}}" class="hint">仅家庭管理员可以管理成员</view>
+</view>

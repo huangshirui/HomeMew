@@ -1,11 +1,16 @@
 {
   "pages": [
     "pages/launch/launch",
+    "pages/launch/disabled",
     "pages/profile-setup/profile-setup",
     "pages/home/home",
     "pages/events/events",
     "pages/tasks/tasks",
-    "pages/profile/profile"
+    "pages/profile/profile",
+    "pages/family/join",
+    "pages/family/detail",
+    "pages/family/members",
+    "pages/family/invites"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",

@@ -12,6 +12,9 @@
  */
 
 import { UserProfile, FamilyListItem } from '../types/index';
+import { STORAGE_KEYS } from '../services/config';
+import { clearAuth } from '../services/auth';
+import { resolveCurrentFamily } from './family-state';
 
 /** 状态变化监听器类型 */
 type StateListener<T> = (value: T) => void;
@@ -55,22 +58,20 @@ class Store<T> {
 
 export const userStore = new Store<UserProfile | null>(null);
 
-/** 从远程加载当前用户并更新 store */
-export async function loadCurrentUser(): Promise<UserProfile | null> {
-  try {
-    const { getCurrentUser } = require('../services/users');
-    const user = await getCurrentUser();
-    userStore.value = user;
-    // 同步到 globalData
-    const app = getApp<IAppOption>();
-    if (app) {
-      app.globalData.userInfo = user;
-    }
-    return user;
-  } catch (e) {
-    console.error('[Store] Failed to load current user:', e);
-    return null;
+/**
+ * 从远程加载当前用户并更新 store。
+ * 失败时抛出原始错误（不吞掉网络 / 401 / 403 / 500）。
+ */
+export async function loadCurrentUser(): Promise<UserProfile> {
+  const { getCurrentUser } = require('../services/users');
+  const user = await getCurrentUser();
+  userStore.value = user;
+  // 同步到 globalData
+  const app = getApp<IAppOption>();
+  if (app) {
+    app.globalData.userInfo = user;
   }
+  return user;
 }
 
 // ==================== 家庭状态 ====================
@@ -78,31 +79,29 @@ export async function loadCurrentUser(): Promise<UserProfile | null> {
 export const familiesStore = new Store<FamilyListItem[]>([]);
 export const currentFamilyStore = new Store<FamilyListItem | null>(null);
 
-/** 从远程加载家庭列表并更新 store */
+/**
+ * 从远程加载家庭列表并更新 store。
+ * 失败时抛出原始错误（不吞掉网络 / 401 / 403 / 500）。
+ */
 export async function loadFamilies(): Promise<FamilyListItem[]> {
-  try {
-    const { listMyFamilies } = require('../services/families');
-    const families = await listMyFamilies();
-    familiesStore.value = families;
-    // 同步到 globalData
-    const app = getApp<IAppOption>();
-    if (app) {
-      app.globalData.families = families;
-    }
-    return families;
-  } catch (e) {
-    console.error('[Store] Failed to load families:', e);
-    return [];
+  const { listMyFamilies } = require('../services/families');
+  const families = await listMyFamilies();
+  familiesStore.value = families;
+  // 同步到 globalData
+  const app = getApp<IAppOption>();
+  if (app) {
+    app.globalData.families = families;
   }
+  return families;
 }
 
 /** 设置当前家庭 */
 export function setCurrentFamily(family: FamilyListItem | null): void {
   currentFamilyStore.value = family;
   if (family) {
-    wx.setStorageSync('currentFamilyId', family.id);
+    wx.setStorageSync(STORAGE_KEYS.currentFamilyId, family.id);
   } else {
-    wx.removeStorageSync('currentFamilyId');
+    wx.removeStorageSync(STORAGE_KEYS.currentFamilyId);
   }
   // 同步到 globalData
   const app = getApp<IAppOption>();
@@ -111,9 +110,43 @@ export function setCurrentFamily(family: FamilyListItem | null): void {
   }
 }
 
+/**
+ * 根据当前家庭列表恢复或选择当前家庭。
+ * 规则：
+ * - 列表为空：当前家庭设为 null，清除缓存。
+ * - 缓存的 currentFamilyId 仍有效：恢复该家庭。
+ * - 无缓存或缓存失效：清除缓存并选择第一个家庭。
+ */
+export function refreshFamilyState(families: FamilyListItem[]): FamilyListItem | null {
+  const savedId = wx.getStorageSync(STORAGE_KEYS.currentFamilyId) as string | undefined;
+  const { family, clearSaved } = resolveCurrentFamily(families, savedId);
+  if (clearSaved) {
+    wx.removeStorageSync(STORAGE_KEYS.currentFamilyId);
+  }
+  setCurrentFamily(family);
+  return family;
+}
+
+/**
+ * 更新当前家庭与家庭列表中某个家庭的头像，保持两处 store 同步。
+ */
+export function updateFamilyAvatar(familyId: string, avatarUrl: string | null): void {
+  const current = currentFamilyStore.value;
+  if (current && current.id === familyId) {
+    setCurrentFamily({ ...current, avatarUrl });
+  }
+  const list = familiesStore.value;
+  const idx = list.findIndex(f => f.id === familyId);
+  if (idx >= 0) {
+    const next = list.slice();
+    next[idx] = { ...next[idx], avatarUrl };
+    familiesStore.value = next;
+  }
+}
+
 /** 恢复上次选择的家庭（验证是否仍在家庭列表中） */
 export function restoreCurrentFamily(families: FamilyListItem[]): FamilyListItem | null {
-  const savedId = wx.getStorageSync('currentFamilyId') as string | undefined;
+  const savedId = wx.getStorageSync(STORAGE_KEYS.currentFamilyId) as string | undefined;
 
   if (!savedId || !families.length) {
     return null;
@@ -127,8 +160,27 @@ export function restoreCurrentFamily(families: FamilyListItem[]): FamilyListItem
   }
 
   // 缓存的家庭已无效，清除
-  wx.removeStorageSync('currentFamilyId');
+  wx.removeStorageSync(STORAGE_KEYS.currentFamilyId);
   return null;
+}
+
+/**
+ * 清空登录与全部本地状态（用户、家庭、当前家庭、globalData、Storage）。
+ * 登录清除时调用，保证三处状态同步。
+ */
+export function clearUserState(): void {
+  userStore.value = null;
+  familiesStore.value = [];
+  currentFamilyStore.value = null;
+
+  const app = getApp<IAppOption>();
+  if (app) {
+    app.globalData.userInfo = null;
+    app.globalData.families = [];
+    app.globalData.currentFamily = null;
+  }
+
+  clearAuth();
 }
 
 // ==================== 加载状态 ====================

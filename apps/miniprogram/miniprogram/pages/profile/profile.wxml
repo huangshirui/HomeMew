@@ -26,7 +26,8 @@
         class="family-item"
         wx:for="{{families}}"
         wx:key="id"
-        bindtap="onFamilyManage"
+        bindtap="onFamilyTap"
+        data-id="{{item.id}}"
       >
         <view class="family-item-info">
           <text class="family-item-name">{{item.name}}</text>

@@ -1,0 +1,55 @@
+<!-- 加入家庭页 -->
+<view class="container">
+  <view class="header">
+    <text class="title">加入家庭</text>
+    <text class="subtitle">输入家人分享的邀请码，加入对应的家庭</text>
+  </view>
+
+  <!-- 输入区 -->
+  <view class="card">
+    <view class="input-row">
+      <input
+        class="code-input"
+        placeholder="请输入邀请码"
+        value="{{code}}"
+        bindinput="onCodeInput"
+        confirm-type="search"
+        bindconfirm="onPreview"
+      />
+    </view>
+    <view class="btn-row">
+      <button class="btn-outline flex-1" bindtap="onPreview">验证</button>
+      <button
+        class="btn-primary flex-1"
+        disabled="{{submitting}}"
+        bindtap="onJoin"
+      >
+        {{submitting ? '加入中...' : '确认加入'}}
+      </button>
+    </view>
+  </view>
+
+  <!-- 预览结果 -->
+  <block wx:if="{{preview}}">
+    <view class="card preview-card">
+      <view class="family-row">
+        <image
+          class="family-avatar"
+          src="{{preview.family.avatarUrl || '/assets/images/default-avatar.png'}}"
+          mode="aspectFill"
+        />
+        <view class="family-meta">
+          <text class="family-name">{{preview.family.name}}</text>
+          <text class="family-sub">{{preview.family.memberCount}} 位成员</text>
+        </view>
+      </view>
+      <text class="preview-tip">验证通过，点击「确认加入」即可成为家庭成员</text>
+    </view>
+  </block>
+
+  <!-- 预览错误 -->
+  <view wx:if="{{previewError}}" class="error-tip">{{previewError}}</view>
+
+  <!-- 已加入提示 -->
+  <view wx:if="{{joined}}" class="success-tip">已成功加入家庭，正在进入首页...</view>
+</view>

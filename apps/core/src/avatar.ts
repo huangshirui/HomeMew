@@ -54,12 +54,30 @@ export function avatarObjectKey(userId: string, contentType: string): string {
 
 export async function storeAvatar(env: Bindings, userId: string, file: File): Promise<{ key: string; url: string }> {
   const key = avatarObjectKey(userId, file.type);
+  return storeAvatarObject(env, key, file, { userId });
+}
+
+export function familyAvatarObjectKey(familyId: string, contentType: string): string {
+  return `avatars/families/${familyId}/${crypto.randomUUID()}.${CONTENT_TYPES[contentType]}`;
+}
+
+export async function storeFamilyAvatar(env: Bindings, familyId: string, file: File): Promise<{ key: string; url: string }> {
+  const key = familyAvatarObjectKey(familyId, file.type);
+  return storeAvatarObject(env, key, file, { familyId });
+}
+
+async function storeAvatarObject(
+  env: Bindings,
+  key: string,
+  file: File,
+  customMetadata: Record<string, string>,
+): Promise<{ key: string; url: string }> {
   await env.AVATARS.put(key, file.stream(), {
     httpMetadata: {
       contentType: file.type,
       cacheControl: 'public, max-age=31536000, immutable',
     },
-    customMetadata: { userId },
+    customMetadata,
   });
 
   return { key, url: avatarUrl(env, key)! };

@@ -1,0 +1,94 @@
+/* 家庭详情页样式 */
+.family-header {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.family-avatar {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 24rpx;
+  background-color: var(--color-bg);
+  flex-shrink: 0;
+  display: block;
+}
+
+.avatar-wrap {
+  position: relative;
+  width: 112rpx;
+  height: 112rpx;
+  flex-shrink: 0;
+}
+
+.avatar-edit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40rpx;
+  border-bottom-left-radius: 24rpx;
+  border-bottom-right-radius: 24rpx;
+  background-color: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  font-size: 20rpx;
+  line-height: 40rpx;
+  text-align: center;
+}
+
+.family-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.family-name {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.edit-icon {
+  font-size: 24rpx;
+  color: var(--color-primary);
+}
+
+.family-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.name-input {
+  height: 72rpx;
+  background-color: var(--color-bg);
+  border-radius: 10rpx;
+  padding: 0 20rpx;
+  font-size: 32rpx;
+}
+
+.name-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 32rpx;
+  margin-top: 12rpx;
+}
+
+.link-btn {
+  font-size: 28rpx;
+  color: var(--color-text-hint);
+}
+
+.link-btn.primary {
+  color: var(--color-primary);
+}
+
+.menu-item-danger .arrow {
+  color: #cccccc;
+}
