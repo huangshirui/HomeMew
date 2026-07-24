@@ -2,7 +2,8 @@ import type { Context, Hono } from "hono";
 import { avatarUrl } from "./avatar";
 import type { Bindings, Variables } from "./env";
 import { ApiError } from "./errors";
-import { requireActiveUser, requireFamilyMember, requireRelatedMembers } from "./family-access";
+import { requireRelatedMembers } from "./family-access";
+import { mapActor, requireFamilyCapability } from "./principal-access";
 import { success } from "./http";
 import { createId } from "./ids";
 import { decodeCursor, encodeCursor, parseLimit } from "./pagination";
@@ -57,18 +58,13 @@ function shiftDate(value: string, days: number): string {
 
 async function mapEvent(env: Bindings, row: EventRow): Promise<Record<string, unknown>> {
   const attendees = await env.DB.prepare(`SELECT u.id user_id, u.display_name, u.avatar_key FROM event_attendees ea JOIN family_members fm ON fm.family_id = ? AND fm.user_id = ea.user_id AND fm.status = 'active' JOIN users u ON u.id = ea.user_id WHERE ea.event_id = ? ORDER BY ea.created_at, u.id`).bind(row.family_id, row.id).all<any>();
-  const people = await env.DB.prepare("SELECT id, display_name, avatar_key FROM users WHERE id IN (?, ?)").bind(row.created_by, row.updated_by).all<any>();
-  const person = (id: string) => {
-    const found = people.results.find((item) => item.id === id);
-    return { userId: id, displayName: found?.display_name ?? "", avatarUrl: avatarUrl(env, found?.avatar_key) };
-  };
   return {
     id: row.id, familyId: row.family_id, summary: row.summary, description: row.description,
     start: row.is_all_day ? row.start_date : formatInZone(row.start_at, row.timezone),
     end: row.is_all_day ? row.end_date : formatInZone(row.end_at, row.timezone),
     isAllDay: Boolean(row.is_all_day), timezone: row.timezone, location: row.location, status: row.status,
     attendees: attendees.results.map((item) => ({ userId: item.user_id, displayName: item.display_name, avatarUrl: avatarUrl(env, item.avatar_key) })),
-    createdBy: person(row.created_by), updatedBy: person(row.updated_by), version: row.version,
+    createdBy: await mapActor(env,row.created_by_type,row.created_by_id), updatedBy: await mapActor(env,row.updated_by_type,row.updated_by_id), version: row.version,
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
@@ -81,8 +77,8 @@ async function findEvent(env: Bindings, familyId: string, eventId: string): Prom
 
 export function registerEventRoutes(app: App): void {
   app.post("/api/v1/families/:familyId/events", async (c) => {
-    const familyId = c.req.param("familyId"), userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
+    const familyId = c.req.param("familyId"), principal=c.get("currentPrincipal");
+    await requireFamilyCapability(c.env,principal,familyId,"events:write");
     const input = await jsonBody(c), summary = requireString(input.summary, "summary", 100);
     const description = optionalText(input.description, "description", 5000) ?? null;
     const location = optionalText(input.location, "location", 500) ?? null;
@@ -90,20 +86,20 @@ export function registerEventRoutes(app: App): void {
     const attendeeIds = input.attendeeIds === undefined ? [] : stringIds(input.attendeeIds, "attendeeIds");
     await requireRelatedMembers(c.env, familyId, attendeeIds, "attendee");
     const id = createId("evt");
-    const statements = [c.env.DB.prepare(`INSERT INTO events (id, family_id, summary, description, start_at, end_at, start_date, end_date, is_all_day, timezone, location, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(id, familyId, summary, description, time.startAt, time.endAt, time.startDate, time.endDate, time.isAllDay, zone, location, userId, userId), ...attendeeIds.map((attendeeId) => c.env.DB.prepare("INSERT INTO event_attendees (event_id, user_id) VALUES (?, ?)").bind(id, attendeeId))];
+    const statements = [c.env.DB.prepare(`INSERT INTO events (id,family_id,summary,description,start_at,end_at,start_date,end_date,is_all_day,timezone,location,created_by_type,created_by_id,updated_by_type,updated_by_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id,familyId,summary,description,time.startAt,time.endAt,time.startDate,time.endDate,time.isAllDay,zone,location,principal.type,principal.id,principal.type,principal.id), ...attendeeIds.map((attendeeId) => c.env.DB.prepare("INSERT INTO event_attendees (event_id, user_id) VALUES (?, ?)").bind(id, attendeeId))];
     await c.env.DB.batch(statements);
     return c.json(success(await mapEvent(c.env, await findEvent(c.env, familyId, id))), 201);
   });
 
   app.get("/api/v1/families/:familyId/events/:eventId", async (c) => {
-    const familyId = c.req.param("familyId"), userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
+    const familyId = c.req.param("familyId"), principal=c.get("currentPrincipal");
+    await requireFamilyCapability(c.env,principal,familyId,"events:read");
     return c.json(success(await mapEvent(c.env, await findEvent(c.env, familyId, c.req.param("eventId")))));
   });
 
   app.patch("/api/v1/families/:familyId/events/:eventId", async (c) => {
-    const familyId = c.req.param("familyId"), eventId = c.req.param("eventId"), userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
+    const familyId = c.req.param("familyId"), eventId = c.req.param("eventId"), principal=c.get("currentPrincipal");
+    await requireFamilyCapability(c.env,principal,familyId,"events:write");
     const previous = await findEvent(c.env, familyId, eventId), input = await jsonBody(c), expected = integer(input.version, "version");
     const summary = input.summary === undefined ? previous.summary : requireString(input.summary, "summary", 100);
     const description = input.description === undefined ? previous.description : optionalText(input.description, "description", 5000) ?? null;
@@ -113,7 +109,7 @@ export function registerEventRoutes(app: App): void {
     const attendeeIds = input.attendeeIds === undefined ? undefined : stringIds(input.attendeeIds, "attendeeIds");
     if (attendeeIds) await requireRelatedMembers(c.env, familyId, attendeeIds, "attendee");
     const mutationToken = crypto.randomUUID();
-    const update = c.env.DB.prepare(`UPDATE events SET summary=?, description=?, start_at=?, end_at=?, start_date=?, end_date=?, is_all_day=?, timezone=?, location=?, updated_by=?, updated_at=CURRENT_TIMESTAMP, version=version+1, mutation_token=? WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?`).bind(summary, description, time.startAt, time.endAt, time.startDate, time.endDate, time.isAllDay, zone, location, userId, mutationToken, eventId, familyId, expected);
+    const update = c.env.DB.prepare(`UPDATE events SET summary=?,description=?,start_at=?,end_at=?,start_date=?,end_date=?,is_all_day=?,timezone=?,location=?,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1,mutation_token=? WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?`).bind(summary,description,time.startAt,time.endAt,time.startDate,time.endDate,time.isAllDay,zone,location,principal.type,principal.id,mutationToken,eventId,familyId,expected);
     const statements = [update];
     if (attendeeIds) {
       statements.push(c.env.DB.prepare("DELETE FROM event_attendees WHERE event_id=? AND EXISTS (SELECT 1 FROM events WHERE id=? AND mutation_token=?)").bind(eventId, eventId, mutationToken));
@@ -126,17 +122,17 @@ export function registerEventRoutes(app: App): void {
   });
 
   app.delete("/api/v1/families/:familyId/events/:eventId", async (c) => {
-    const familyId = c.req.param("familyId"), eventId = c.req.param("eventId"), userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId); await findEvent(c.env, familyId, eventId);
+    const familyId = c.req.param("familyId"), eventId = c.req.param("eventId"), principal=c.get("currentPrincipal");
+    await requireFamilyCapability(c.env,principal,familyId,"events:write"); await findEvent(c.env, familyId, eventId);
     const version = integer(Number(c.req.query("version")), "version");
-    const result = await c.env.DB.prepare("UPDATE events SET deleted_at=CURRENT_TIMESTAMP, deleted_by=?, updated_by=?, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(userId, userId, eventId, familyId, version).run();
+    const result=await c.env.DB.prepare("UPDATE events SET deleted_at=CURRENT_TIMESTAMP,deleted_by_type=?,deleted_by_id=?,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(principal.type,principal.id,principal.type,principal.id,eventId,familyId,version).run();
     if (!result.meta.changes) throw new ApiError("EVENT_VERSION_CONFLICT", "Event version conflict", 409);
     return c.body(null, 204);
   });
 
   app.get("/api/v1/families/:familyId/events", async (c) => {
-    const familyId = c.req.param("familyId"), userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
+    const familyId = c.req.param("familyId"), principal=c.get("currentPrincipal");
+    await requireFamilyCapability(c.env,principal,familyId,"events:read"); const userId=principal.id;
     const startQuery = c.req.query("start"), endQuery = c.req.query("end");
     if ((startQuery === undefined) !== (endQuery === undefined)) throw new ApiError("INVALID_REQUEST", "start and end must be supplied together", 400);
     const family = await c.env.DB.prepare("SELECT timezone FROM families WHERE id=?").bind(familyId).first<{ timezone: string }>();
@@ -150,6 +146,7 @@ export function registerEventRoutes(app: App): void {
     if (status !== "active" && status !== "cancelled") throw new ApiError("INVALID_REQUEST", "status must be active or cancelled", 400);
     const cursor = c.req.query("cursor") ? decodeCursor(c.req.query("cursor")!, "events", sort) : undefined;
     let attendee = c.req.query("attendeeId");
+    if(attendee==="me"&&principal.type==="system")throw new ApiError("INVALID_FILTER","me is unavailable for system identities",400);
     if (attendee === "me") attendee = userId;
     if (attendee) await requireRelatedMembers(c.env, familyId, [attendee], "attendee");
     const midnight = (date: string) => {

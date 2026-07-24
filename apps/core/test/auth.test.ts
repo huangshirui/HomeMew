@@ -34,6 +34,15 @@ describe("HS256 JWT verification", () => {
     });
   });
 
+  it("accepts only credential-bound system JWTs", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const claims = { sub: "sys_valid", type: "system", scope: "events:read", iss: "homemew-identity", aud: "homemew-core", iat: now, exp: now + 3600 };
+    await expect(verifyJwt(await token({ ...claims, cid: "crd_valid", jti: "tok_valid" }), secret)).resolves.toEqual({
+      userId: "sys_valid", scopes: ["events:read"], type: "system", credentialId: "crd_valid", tokenId: "tok_valid",
+    });
+    await expect(verifyJwt(await token(claims), secret)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
   it("rejects an invalid signature", async () => {
     await expect(verifyJwt(await token({ sub: "usr_valid" }, "wrong-secret-at-least-32-characters"), secret)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });

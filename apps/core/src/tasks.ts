@@ -2,7 +2,8 @@ import type { Context, Hono } from "hono";
 import { avatarUrl } from "./avatar";
 import type { Bindings, Variables } from "./env";
 import { ApiError } from "./errors";
-import { requireActiveUser, requireFamilyMember, requireRelatedMembers } from "./family-access";
+import { requireRelatedMembers } from "./family-access";
+import { mapActor, requireFamilyCapability } from "./principal-access";
 import { success } from "./http";
 import { createId } from "./ids";
 import { decodeCursor, encodeCursor, parseLimit } from "./pagination";
@@ -37,45 +38,34 @@ async function findTask(env: Bindings, familyId: string, taskId: string): Promis
 
 async function mapTask(env: Bindings, row: TaskRow): Promise<Record<string, unknown>> {
   const assignees = await env.DB.prepare(`SELECT u.id user_id, u.display_name, u.avatar_key FROM task_assignees ta JOIN family_members fm ON fm.family_id=? AND fm.user_id=ta.user_id AND fm.status='active' JOIN users u ON u.id=ta.user_id WHERE ta.task_id=? ORDER BY ta.created_at,u.id`).bind(row.family_id, row.id).all<any>();
-  const ids = [row.created_by, row.updated_by, row.completed_by].filter(Boolean);
-  const placeholders = ids.map(() => "?").join(",") || "NULL";
-  const users = ids.length ? await env.DB.prepare(`SELECT id,display_name,avatar_key FROM users WHERE id IN (${placeholders})`).bind(...ids).all<any>() : { results: [] as any[] };
-  const person = (id: string | null) => {
-    if (!id) return null;
-    const found = users.results.find((item) => item.id === id);
-    return { userId: id, displayName: found?.display_name ?? "", avatarUrl: avatarUrl(env, found?.avatar_key) };
-  };
   return {
     id: row.id, familyId: row.family_id, name: row.name, description: row.description, due: row.due_date,
     status: row.status, assignees: assignees.results.map((item) => ({ userId: item.user_id, displayName: item.display_name, avatarUrl: avatarUrl(env, item.avatar_key) })),
-    completedAt: row.completed_at, completedBy: person(row.completed_by), createdBy: person(row.created_by), updatedBy: person(row.updated_by),
+    completedAt: row.completed_at, completedBy: await mapActor(env,row.completed_by_type,row.completed_by_id), createdBy: await mapActor(env,row.created_by_type,row.created_by_id), updatedBy: await mapActor(env,row.updated_by_type,row.updated_by_id),
     version: row.version, createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
 
 export function registerTaskRoutes(app: App): void {
   app.post("/api/v1/families/:familyId/tasks", async (c) => {
-    const familyId = c.req.param("familyId"), userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
+    const familyId=c.req.param("familyId"),principal=c.get("currentPrincipal");await requireFamilyCapability(c.env,principal,familyId,"tasks:write");
     const input = await jsonBody(c), name = requireString(input.name, "name", 100);
     const description = optionalText(input.description, "description", 5000) ?? null;
     const dueDate = input.due === undefined ? null : due(input.due);
     const assigneeIds = input.assigneeIds === undefined ? [] : stringIds(input.assigneeIds, "assigneeIds");
     await requireRelatedMembers(c.env, familyId, assigneeIds, "assignee");
     const id = createId("tsk");
-    await c.env.DB.batch([c.env.DB.prepare("INSERT INTO tasks (id,family_id,name,description,due_date,created_by,updated_by) VALUES (?,?,?,?,?,?,?)").bind(id, familyId, name, description, dueDate, userId, userId), ...assigneeIds.map((assigneeId) => c.env.DB.prepare("INSERT INTO task_assignees (task_id,user_id) VALUES (?,?)").bind(id, assigneeId))]);
+    await c.env.DB.batch([c.env.DB.prepare("INSERT INTO tasks (id,family_id,name,description,due_date,created_by_type,created_by_id,updated_by_type,updated_by_id) VALUES (?,?,?,?,?,?,?,?,?)").bind(id,familyId,name,description,dueDate,principal.type,principal.id,principal.type,principal.id), ...assigneeIds.map((assigneeId) => c.env.DB.prepare("INSERT INTO task_assignees (task_id,user_id) VALUES (?,?)").bind(id, assigneeId))]);
     return c.json(success(await mapTask(c.env, await findTask(c.env, familyId, id))), 201);
   });
 
   app.get("/api/v1/families/:familyId/tasks/:taskId", async (c) => {
-    const familyId = c.req.param("familyId"), userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
+    const familyId=c.req.param("familyId"),principal=c.get("currentPrincipal");await requireFamilyCapability(c.env,principal,familyId,"tasks:read");
     return c.json(success(await mapTask(c.env, await findTask(c.env, familyId, c.req.param("taskId")))));
   });
 
   app.patch("/api/v1/families/:familyId/tasks/:taskId", async (c) => {
-    const familyId = c.req.param("familyId")!, taskId = c.req.param("taskId")!, userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
+    const familyId=c.req.param("familyId")!,taskId=c.req.param("taskId")!,principal=c.get("currentPrincipal");await requireFamilyCapability(c.env,principal,familyId,"tasks:write");
     const previous = await findTask(c.env, familyId, taskId), input = await jsonBody(c), expected = version(input.version);
     if (input.status !== undefined) throw new ApiError("INVALID_REQUEST", "status must be changed with an action endpoint", 400);
     const name = input.name === undefined ? previous.name : requireString(input.name, "name", 100);
@@ -84,7 +74,7 @@ export function registerTaskRoutes(app: App): void {
     const assigneeIds = input.assigneeIds === undefined ? undefined : stringIds(input.assigneeIds, "assigneeIds");
     if (assigneeIds) await requireRelatedMembers(c.env, familyId, assigneeIds, "assignee");
     const mutationToken = crypto.randomUUID();
-    const update = c.env.DB.prepare("UPDATE tasks SET name=?,description=?,due_date=?,updated_by=?,updated_at=CURRENT_TIMESTAMP,version=version+1,mutation_token=? WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(name, description, dueDate, userId, mutationToken, taskId, familyId, expected);
+    const update=c.env.DB.prepare("UPDATE tasks SET name=?,description=?,due_date=?,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1,mutation_token=? WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(name,description,dueDate,principal.type,principal.id,mutationToken,taskId,familyId,expected);
     const statements = [update];
     if (assigneeIds) {
       statements.push(c.env.DB.prepare("DELETE FROM task_assignees WHERE task_id=? AND EXISTS (SELECT 1 FROM tasks WHERE id=? AND mutation_token=?)").bind(taskId, taskId, mutationToken));
@@ -97,22 +87,20 @@ export function registerTaskRoutes(app: App): void {
   });
 
   app.delete("/api/v1/families/:familyId/tasks/:taskId", async (c) => {
-    const familyId = c.req.param("familyId"), taskId = c.req.param("taskId"), userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId); await findTask(c.env, familyId, taskId);
+    const familyId=c.req.param("familyId"),taskId=c.req.param("taskId"),principal=c.get("currentPrincipal");await requireFamilyCapability(c.env,principal,familyId,"tasks:write");await findTask(c.env,familyId,taskId);
     const expected = version(Number(c.req.query("version")));
-    const result = await c.env.DB.prepare("UPDATE tasks SET deleted_at=CURRENT_TIMESTAMP,deleted_by=?,updated_by=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(userId, userId, taskId, familyId, expected).run();
+    const result=await c.env.DB.prepare("UPDATE tasks SET deleted_at=CURRENT_TIMESTAMP,deleted_by_type=?,deleted_by_id=?,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(principal.type,principal.id,principal.type,principal.id,taskId,familyId,expected).run();
     if (!result.meta.changes) throw new ApiError("TASK_VERSION_CONFLICT", "Task version conflict", 409);
     return c.body(null, 204);
   });
 
   async function action(c: Context<AppEnv>, kind: "complete" | "reopen") {
-    const familyId = c.req.param("familyId")!, taskId = c.req.param("taskId")!, userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
+    const familyId=c.req.param("familyId")!,taskId=c.req.param("taskId")!,principal=c.get("currentPrincipal");await requireFamilyCapability(c.env,principal,familyId,"tasks:write");
     const row = await findTask(c.env, familyId, taskId), input = await jsonBody(c), expected = version(input.version);
     if (kind === "complete" && row.status === "completed") throw new ApiError("TASK_ALREADY_COMPLETED", "Task is already completed", 409);
     if (kind === "reopen" && row.status === "pending") throw new ApiError("TASK_ALREADY_PENDING", "Task is already pending", 409);
-    const sql = kind === "complete" ? "UPDATE tasks SET status='completed',completed_at=CURRENT_TIMESTAMP,completed_by=?,updated_by=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?" : "UPDATE tasks SET status='pending',completed_at=NULL,completed_by=NULL,updated_by=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?";
-    const statement = kind === "complete" ? c.env.DB.prepare(sql).bind(userId, userId, taskId, familyId, expected) : c.env.DB.prepare(sql).bind(userId, taskId, familyId, expected);
+    const sql=kind==="complete"?"UPDATE tasks SET status='completed',completed_at=CURRENT_TIMESTAMP,completed_by_type=?,completed_by_id=?,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?":"UPDATE tasks SET status='pending',completed_at=NULL,completed_by_type=NULL,completed_by_id=NULL,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?";
+    const statement=kind==="complete"?c.env.DB.prepare(sql).bind(principal.type,principal.id,principal.type,principal.id,taskId,familyId,expected):c.env.DB.prepare(sql).bind(principal.type,principal.id,taskId,familyId,expected);
     const result = await statement.run();
     if (!result.meta.changes) throw new ApiError("TASK_VERSION_CONFLICT", "Task version conflict", 409);
     return c.json(success(await mapTask(c.env, await findTask(c.env, familyId, taskId))));
@@ -121,8 +109,7 @@ export function registerTaskRoutes(app: App): void {
   app.post("/api/v1/families/:familyId/tasks/:taskId/reopen", (c) => action(c, "reopen"));
 
   app.get("/api/v1/families/:familyId/tasks", async (c) => {
-    const familyId = c.req.param("familyId"), userId = c.get("currentUserId");
-    await requireActiveUser(c.env, userId); await requireFamilyMember(c.env, familyId, userId);
+    const familyId=c.req.param("familyId"),principal=c.get("currentPrincipal");await requireFamilyCapability(c.env,principal,familyId,"tasks:read");const userId=principal.id;
     const statuses = (c.req.query("status") ?? "pending").split(",");
     if (statuses.length === 0 || new Set(statuses).size !== statuses.length || statuses.some((item) => !["pending", "completed", "cancelled"].includes(item))) throw new ApiError("INVALID_REQUEST", "status is invalid", 400);
     const sort = c.req.query("sort") ?? "due_asc";
@@ -132,7 +119,7 @@ export function registerTaskRoutes(app: App): void {
     if (dueFrom && dueTo && dueTo < dueFrom) throw new ApiError("INVALID_REQUEST", "dueTo must not precede dueFrom", 400);
     const includeNoDue = c.req.query("includeNoDue") === "true";
     if (c.req.query("includeNoDue") && !["true", "false"].includes(c.req.query("includeNoDue")!)) throw new ApiError("INVALID_REQUEST", "includeNoDue must be true or false", 400);
-    let assignee = c.req.query("assigneeId"); if (assignee === "me") assignee = userId;
+    let assignee=c.req.query("assigneeId");if(assignee==="me"&&principal.type==="system")throw new ApiError("INVALID_FILTER","me is unavailable for system identities",400);if(assignee==="me")assignee=userId;
     if (assignee) await requireRelatedMembers(c.env, familyId, [assignee], "assignee");
     const placeholders = statuses.map(() => "?").join(",");
     const filter = JSON.stringify({ statuses, dueFrom: dueFrom ?? null, dueTo: dueTo ?? null, includeNoDue, assignee: assignee ?? null });
