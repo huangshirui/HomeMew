@@ -10,7 +10,9 @@
     "pages/family/join",
     "pages/family/detail",
     "pages/family/members",
-    "pages/family/invites"
+    "pages/family/invites",
+    "pages/family/create",
+    "pages/family/edit"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",

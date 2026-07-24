@@ -139,10 +139,17 @@ export function copyToClipboard(text: string): Promise<void> {
 }
 
 /**
- * 获取默认头像 URL
+ * 获取默认用户头像 URL
  */
 export function getDefaultAvatar(): string {
   return '/assets/images/default-avatar.png';
+}
+
+/**
+ * 获取默认家庭头像 URL（绿色猫屋图形，无家庭图片时使用）
+ */
+export function getDefaultFamilyAvatar(): string {
+  return '/assets/images/default-family.png';
 }
 
 /**

@@ -3,15 +3,18 @@
  *
  * 展示：
  * - 用户头像和昵称
- * - 当前加入的家庭
- * - 创建/加入家庭入口
- * - 关于 HomeMew
- * - 退出登录
+ * - 当前加入的家庭与家庭列表（切换 / 进入详情）
+ * - 创建 / 加入家庭入口
+ * - 关于家事喵
+ * - 调试信息（仅开发版）
+ *
+ * 微信小程序登录通常为静默恢复身份，因此不提供「退出登录」。
+ * 需要重置本地登录状态时，使用开发版「调试信息」中的「清除本地登录状态」。
  */
 
-import { userStore, familiesStore, currentFamilyStore, loadCurrentUser, loadFamilies } from '../../stores/index';
-import { clearAuth } from '../../services/auth';
+import { userStore, familiesStore, currentFamilyStore, loadCurrentUser, loadFamilies, clearUserState } from '../../stores/index';
 import { showConfirm, showSuccess, showError, safeAvatarUrl } from '../../utils/index';
+import { FamilyListItem } from '../../types/index';
 
 Page({
   data: {
@@ -85,10 +88,10 @@ Page({
     });
   },
 
-  /** 创建家庭（跳转首页内联创建） */
+  /** 创建家庭（独立页面） */
   onCreateFamily(): void {
-    wx.switchTab({
-      url: '/pages/home/home',
+    wx.navigateTo({
+      url: '/pages/family/create',
     });
   },
 
@@ -99,8 +102,26 @@ Page({
     });
   },
 
-  /** 点击某个家庭，进入其详情 */
+  /** 点击某个家庭：设为当前家庭（切换） */
   onFamilyTap(e: WechatMiniprogram.TouchEvent): void {
+    const familyId = e.currentTarget.dataset.id as string;
+    if (!familyId) return;
+
+    const current = this.data.currentFamily as { id: string } | null;
+    if (current && current.id === familyId) {
+      showSuccess('已在该家庭');
+      return;
+    }
+
+    const target = (this.data.families as FamilyListItem[]).find(f => f.id === familyId);
+    if (target) {
+      setCurrentFamily(target);
+      showSuccess(`已切换到 ${target.name}`);
+    }
+  },
+
+  /** 点击「管理」：进入家庭详情 */
+  onManageFamily(e: WechatMiniprogram.TouchEvent): void {
     const familyId = e.currentTarget.dataset.id as string;
     if (!familyId) return;
     wx.navigateTo({
@@ -132,19 +153,18 @@ Page({
     });
   },
 
-  /** 退出登录 */
-  async onLogout(): Promise<void> {
-    const confirmed = await showConfirm('退出登录', '确定要退出登录吗？');
+  /** 清除本地登录状态（仅开发版，用于重置身份） */
+  async onClearLocalAuth(): Promise<void> {
+    const confirmed = await showConfirm('清除本地登录状态', '将清除本地用户与家庭缓存并重新初始化，确定吗？');
     if (!confirmed) return;
 
-    clearAuth();
-    showSuccess('已退出登录');
+    clearUserState();
+    showSuccess('已清除');
 
-    // 回到启动页重新初始化
     setTimeout(() => {
       wx.reLaunch({
         url: '/pages/launch/launch',
       });
-    }, 1500);
+    }, 1200);
   },
 });

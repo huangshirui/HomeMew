@@ -2,23 +2,24 @@
  * 家庭详情页
  *
  * 展示：
- * - 家庭名称 / 头像 / 成员数 / 当前用户角色
- * - 成员入口、邀请入口、退出家庭入口
+ * - 家庭大图 / 名称 / 成员数 / 当前用户角色
+ * - 管理员显示「编辑家庭资料」入口
  *
- * 管理员可编辑家庭名称（PATCH /families/{id}，返回 FamilySummary）。
- * 不新增家庭头像上传能力。
+ * 管理分组：
+ * - 家庭成员（右侧展示人数）
+ * - 邀请家人加入（仅管理员）
+ * - 退出家庭（危险操作）
  *
+ * 编辑名称与图片统一在独立「编辑家庭资料」页完成。
  * 唯一管理员退出失败时提示：请先将其他成员设为管理员，再退出家庭。
  */
 
-import { getFamily, updateFamily, leaveFamily } from '../../services/families';
-import { uploadFamilyAvatar } from '../../services/media';
+import { getFamily, leaveFamily } from '../../services/families';
 import {
   loadFamilies,
   currentFamilyStore,
   setCurrentFamily,
   refreshFamilyState,
-  updateFamilyAvatar,
 } from '../../stores/index';
 import {
   showError,
@@ -34,10 +35,7 @@ Page({
   data: {
     familyId: '',
     detail: null as FamilyDetail | null,
-    editingName: false,
-    nameDraft: '',
     leaving: false,
-    avatarUploading: false,
     loaded: false,
   },
 
@@ -53,7 +51,7 @@ Page({
   },
 
   onShow(): void {
-    // 从子页面（成员/邀请）返回时刷新角色与成员数
+    // 从子页面（成员 / 邀请 / 编辑）返回时刷新角色与成员数
     if (this.data.familyId && this.data.detail) {
       this.loadDetail();
     }
@@ -62,7 +60,7 @@ Page({
   async loadDetail(): Promise<void> {
     try {
       const detail = await getFamily(this.data.familyId);
-      this.setData({ detail, nameDraft: detail.name, loaded: true });
+      this.setData({ detail, loaded: true });
     } catch (error: unknown) {
       console.error('[FamilyDetail] Load failed:', error);
       const err = error as { code?: string; message?: string };
@@ -71,84 +69,21 @@ Page({
     }
   },
 
-  get isAdmin(): boolean {
+  /** 当前用户是否为该家庭管理员 */
+  isAdmin(): boolean {
     return this.data.detail?.currentUserRole === 'admin';
   },
 
-  onEditName(): void {
-    if (!this.isAdmin) return;
-    this.setData({ editingName: true, nameDraft: this.data.detail?.name || '' });
-  },
-
-  onNameInput(e: WechatMiniprogram.Input): void {
-    this.setData({ nameDraft: e.detail.value });
-  },
-
-  onCancelEdit(): void {
-    this.setData({ editingName: false, nameDraft: this.data.detail?.name || '' });
-  },
-
-  async onSaveName(): Promise<void> {
-    const name = (this.data.nameDraft || '').trim();
-    if (!name) {
-      showError('请输入家庭名称');
-      return;
-    }
-    showLoading('保存中...');
-    try {
-      const updated = await updateFamily(this.data.familyId, { name });
-      // 同步当前家庭 store 的名称（保持角色不变）
-      const current = currentFamilyStore.value;
-      if (current && current.id === updated.id) {
-        setCurrentFamily({ ...current, name: updated.name });
-      }
-      // 刷新家庭列表确保列表项名称一致
-      await loadFamilies();
-      this.setData({ editingName: false, detail: { ...this.data.detail!, name: updated.name } });
-      showSuccess('已保存');
-    } catch (error: unknown) {
-      hideLoading();
-      console.error('[FamilyDetail] Save name failed:', error);
-      const err = error as { code?: string; message?: string };
-      showError(getErrorMessage(err.code, err.message));
-    }
+  /** 编辑家庭资料（独立页面，管理员） */
+  onEditProfile(): void {
+    if (!this.isAdmin()) return;
+    wx.navigateTo({
+      url: `/pages/family/edit?familyId=${this.data.familyId}`,
+    });
   },
 
   onViewMembers(): void {
     wx.navigateTo({ url: `/pages/family/members?familyId=${this.data.familyId}` });
-  },
-
-  async onChooseFamilyAvatar(): Promise<void> {
-    if (!this.isAdmin || this.data.avatarUploading) return;
-    try {
-      const res = await new Promise<WechatMiniprogram.ChooseMediaSuccessCallbackResult>((resolve, reject) => {
-        wx.chooseMedia({
-          count: 1,
-          mediaType: ['image'],
-          sourceType: ['album', 'camera'],
-          sizeType: ['compressed'],
-          success: resolve,
-          fail: reject,
-        });
-      });
-      const tempFile = res.tempFiles && res.tempFiles[0];
-      if (!tempFile?.tempFilePath) return;
-
-      this.setData({ avatarUploading: true });
-      const avatarUrl = await uploadFamilyAvatar(this.data.familyId, tempFile.tempFilePath);
-      updateFamilyAvatar(this.data.familyId, avatarUrl);
-      this.setData({ detail: { ...this.data.detail!, avatarUrl } });
-      showSuccess('已更新');
-    } catch (error: unknown) {
-      const err = error as { errMsg?: string; code?: string; message?: string };
-      const errMsg = String(err?.errMsg || '');
-      if (!errMsg.includes('cancel')) {
-        console.error('[FamilyDetail] Avatar upload failed:', error);
-        showError(getErrorMessage(err.code, err.message) || '头像上传失败，请重试');
-      }
-    } finally {
-      this.setData({ avatarUploading: false });
-    }
   },
 
   onViewInvites(): void {

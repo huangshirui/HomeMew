@@ -1,92 +1,85 @@
 /* 家庭详情页样式 */
-.family-header {
+.family-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 24rpx;
+  padding: 48rpx 32rpx 40rpx;
 }
 
 .family-avatar {
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 24rpx;
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 32rpx;
   background-color: var(--color-bg);
-  flex-shrink: 0;
-  display: block;
-}
-
-.avatar-wrap {
-  position: relative;
-  width: 112rpx;
-  height: 112rpx;
-  flex-shrink: 0;
-}
-
-.avatar-edit {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 40rpx;
-  border-bottom-left-radius: 24rpx;
-  border-bottom-right-radius: 24rpx;
-  background-color: rgba(0, 0, 0, 0.45);
-  color: #ffffff;
-  font-size: 20rpx;
-  line-height: 40rpx;
-  text-align: center;
-}
-
-.family-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.name-row {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
+  margin-bottom: 24rpx;
 }
 
 .family-name {
-  font-size: 36rpx;
+  font-size: 40rpx;
   font-weight: 600;
   color: var(--color-text-primary);
 }
 
-.edit-icon {
-  font-size: 24rpx;
-  color: var(--color-primary);
-}
-
 .family-sub {
   display: block;
-  margin-top: 8rpx;
-  font-size: 24rpx;
+  margin-top: 12rpx;
+  font-size: 26rpx;
   color: var(--color-text-hint);
 }
 
-.name-input {
-  height: 72rpx;
-  background-color: var(--color-bg);
-  border-radius: 10rpx;
-  padding: 0 20rpx;
-  font-size: 32rpx;
+.edit-profile-btn {
+  margin-top: 28rpx;
+  padding: 14rpx 40rpx;
+  background-color: var(--color-primary);
+  border-radius: 32rpx;
 }
 
-.name-actions {
+.edit-profile-text {
+  font-size: 28rpx;
+  color: #ffffff;
+}
+
+/* 分组 */
+.group {
+  margin-top: 20rpx;
+  padding: 0 8rpx;
+}
+
+.menu-item {
   display: flex;
-  justify-content: flex-end;
-  gap: 32rpx;
-  margin-top: 12rpx;
+  align-items: center;
+  padding: 30rpx 16rpx;
+  border-bottom: 2rpx solid var(--color-divider);
 }
 
-.link-btn {
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-text {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+.menu-right {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.menu-count {
   font-size: 28rpx;
   color: var(--color-text-hint);
 }
 
-.link-btn.primary {
-  color: var(--color-primary);
+.arrow {
+  font-size: 32rpx;
+  color: #cccccc;
+}
+
+.text-danger {
+  color: var(--color-danger);
 }
 
 .menu-item-danger .arrow {

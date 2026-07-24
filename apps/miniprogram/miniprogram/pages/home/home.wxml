@@ -1,62 +1,55 @@
 <!-- 首页 -->
 <view class="container">
-  <!-- 有家庭时 -->
+  <!-- 有家庭时：当前家庭工作台 -->
   <block wx:if="{{currentFamily}}">
-    <!-- 家庭头部 -->
+    <!-- 当前家庭头部 -->
     <view class="family-header card">
-      <view class="family-info" bindtap="onSwitchFamily">
-        <text class="family-name">{{currentFamily.name}}</text>
-        <text class="switch-hint">点击切换</text>
+      <image
+        class="family-avatar"
+        src="{{currentFamily.avatarUrl || '/assets/images/default-family.png'}}"
+        mode="aspectFill"
+      />
+      <view class="family-info">
+        <view class="family-name-row">
+          <text class="family-name">{{currentFamily.name}}</text>
+          <text wx:if="{{canSwitch}}" class="switch-icon">▾</text>
+        </view>
+        <text class="family-meta">{{currentFamily.memberCount}} 位成员</text>
       </view>
-      <view class="family-meta">
-        <text class="member-count">{{currentFamily.memberCount}}人</text>
-        <text class="role-tag">{{currentFamily.role === 'admin' ? '管理员' : '成员'}}</text>
-      </view>
-    </view>
-
-    <!-- 家庭操作 -->
-    <view class="card">
-      <view class="menu-item" bindtap="onViewDetail">
-        <text class="menu-text">家庭详情与成员</text>
-        <text class="arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onCreateFamily">
-        <text class="menu-text">创建家庭</text>
-        <text class="arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onJoinFamily">
-        <text class="menu-text">加入家庭</text>
-        <text class="arrow">›</text>
+      <view
+        wx:if="{{canSwitch}}"
+        class="switch-btn"
+        bindtap="onSwitchFamily"
+      >
+        <text class="switch-btn-text">切换</text>
       </view>
     </view>
 
-    <!-- 占位：日程区域 -->
-    <view class="card">
-      <view class="section-header">
+    <!-- 今日日程 -->
+    <view class="card section">
+      <view class="section-header" bindtap="onViewEvents">
         <text class="section-title">今日日程</text>
+        <text class="section-more">查看全部 ›</text>
       </view>
       <view class="empty-hint">
         <text class="empty-text">功能即将上线</text>
       </view>
+      <view class="quick-action" bindtap="onCreateEvent">
+        <text class="quick-action-text">+ 快速新建日程</text>
+      </view>
     </view>
 
-    <!-- 占位：待办区域 -->
-    <view class="card">
-      <view class="section-header">
-        <text class="section-title">待完成任务</text>
+    <!-- 待办任务 -->
+    <view class="card section">
+      <view class="section-header" bindtap="onViewTasks">
+        <text class="section-title">待办任务</text>
+        <text class="section-more">查看全部 ›</text>
       </view>
       <view class="empty-hint">
         <text class="empty-text">功能即将上线</text>
       </view>
-    </view>
-
-    <!-- 快速操作（暂未开放） -->
-    <view class="quick-actions">
-      <view class="action-item" bindtap="onCreateEvent">
-        <text class="action-text">+ 新建日程</text>
-      </view>
-      <view class="action-item" bindtap="onCreateTask">
-        <text class="action-text">+ 新建待办</text>
+      <view class="quick-action" bindtap="onCreateTask">
+        <text class="quick-action-text">+ 快速新建待办</text>
       </view>
     </view>
   </block>

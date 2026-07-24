@@ -1,0 +1,37 @@
+<!-- 编辑家庭资料页 -->
+<view class="container">
+  <view class="card">
+    <!-- 点击图片更换 -->
+    <view class="avatar-row">
+      <image
+        class="family-avatar"
+        src="{{avatarUrl}}"
+        mode="aspectFill"
+        bindtap="onChooseAvatar"
+      />
+      <view class="avatar-tip" bindtap="onChooseAvatar">
+        <text class="avatar-tip-text">{{uploading ? '上传中...' : '点击更换图片'}}</text>
+      </view>
+    </view>
+
+    <!-- 家庭名称 -->
+    <view class="field">
+      <text class="field-label">家庭名称</text>
+      <input
+        class="field-input"
+        value="{{nameDraft}}"
+        bindinput="onNameInput"
+        placeholder="请输入家庭名称"
+        maxlength="20"
+      />
+    </view>
+  </view>
+
+  <button
+    class="btn-primary save-btn"
+    disabled="{{saving || uploading}}"
+    bindtap="onSave"
+  >
+    {{saving ? '保存中...' : '保存'}}
+  </button>
+</view>

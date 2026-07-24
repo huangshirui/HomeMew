@@ -72,21 +72,54 @@
   border-bottom: none;
 }
 
+.family-item-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 20rpx;
+  background-color: #f0f0f0;
+  flex-shrink: 0;
+  margin-right: 20rpx;
+}
+
 .family-item-info {
   flex: 1;
+  min-width: 0;
+}
+
+.family-item-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
 }
 
 .family-item-name {
-  display: block;
   font-size: 30rpx;
   color: #333333;
-  margin-bottom: 6rpx;
+}
+
+.current-tag {
+  font-size: 20rpx;
+  color: #4CAF50;
+  background-color: #eaf7ec;
+  border-radius: 6rpx;
+  padding: 2rpx 10rpx;
 }
 
 .family-item-role {
   display: block;
+  margin-top: 6rpx;
   font-size: 24rpx;
   color: #999999;
+}
+
+.manage-btn {
+  flex-shrink: 0;
+  padding: 8rpx 4rpx 8rpx 20rpx;
+}
+
+.manage-text {
+  font-size: 26rpx;
+  color: #4CAF50;
 }
 
 .no-family-text {

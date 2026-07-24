@@ -24,7 +24,7 @@ import {
 } from '../../utils/index';
 import { InviteListItem, InviteCreated } from '../../types/index';
 
-type InviteView = InviteListItem & { statusText: string; expiresAtText: string };
+type InviteView = InviteListItem & { statusText: string; subText: string; expiresAtText: string };
 
 const STATUS_TEXT: Record<string, string> = {
   active: '有效',
@@ -38,6 +38,7 @@ Page({
     familyId: '',
     invites: [] as InviteView[],
     newInvite: null as InviteCreated | null,
+    newInviteView: null as { expiresAtText: string; usesText: string } | null,
     creating: false,
     loaded: false,
   },
@@ -60,11 +61,32 @@ Page({
   },
 
   mapInvites(list: InviteListItem[]): InviteView[] {
-    return list.map(i => ({
-      ...i,
-      statusText: STATUS_TEXT[i.status] || i.status,
-      expiresAtText: formatDate(i.expiresAt, 'datetime'),
-    }));
+    return list.map(i => {
+      const expiresAtText = formatDate(i.expiresAt, 'datetime');
+      let subText = '';
+      switch (i.status) {
+        case 'active':
+          subText = `有效期至 ${expiresAtText}`;
+          break;
+        case 'expired':
+          subText = `已于 ${expiresAtText} 过期`;
+          break;
+        case 'exhausted':
+          subText = '邀请次数已用完';
+          break;
+        case 'revoked':
+          subText = '已撤销';
+          break;
+        default:
+          subText = STATUS_TEXT[i.status] || i.status;
+      }
+      return {
+        ...i,
+        statusText: STATUS_TEXT[i.status] || i.status,
+        expiresAtText,
+        subText,
+      };
+    });
   },
 
   async loadInvites(): Promise<void> {
@@ -86,16 +108,23 @@ Page({
     try {
       const created = await createInvite(this.data.familyId);
       hideLoading();
-      this.setData({ newInvite: created });
+      this.setData({
+        newInvite: created,
+        newInviteView: {
+          expiresAtText: formatDate(created.expiresAt, 'datetime'),
+          usesText: `可加入人数：${created.maxUses} 人`,
+        },
+      });
       // 重新加载列表（列表项不含 code，仅用于状态追踪）
       await this.loadInvites();
       showSuccess('邀请已生成');
     } catch (error: unknown) {
-      hideLoading();
-      this.setData({ creating: false });
       console.error('[Invites] Create failed:', error);
       const err = error as { code?: string; message?: string };
       showError(getErrorMessage(err.code, err.message));
+    } finally {
+      hideLoading();
+      this.setData({ creating: false });
     }
   },
 

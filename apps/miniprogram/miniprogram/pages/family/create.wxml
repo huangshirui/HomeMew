@@ -1,0 +1,40 @@
+<!-- 创建家庭页 -->
+<view class="container">
+  <view class="card">
+    <!-- 家庭图片（可选） -->
+    <view class="avatar-row">
+      <image
+        class="family-avatar"
+        src="{{avatarUrl}}"
+        mode="aspectFill"
+        bindtap="onChooseAvatar"
+      />
+      <view class="avatar-tip" bindtap="onChooseAvatar">
+        <text class="avatar-tip-text">点击更换图片（可选）</text>
+      </view>
+    </view>
+
+    <!-- 家庭名称（必填） -->
+    <view class="field">
+      <text class="field-label">家庭名称</text>
+      <input
+        class="field-input"
+        value="{{name}}"
+        bindinput="onNameInput"
+        placeholder="例如：开心一家"
+        maxlength="20"
+        focus
+      />
+    </view>
+  </view>
+
+  <button
+    class="btn-primary create-btn"
+    disabled="{{submitting}}"
+    bindtap="onCreate"
+  >
+    {{submitting ? '创建中...' : '创建家庭'}}
+  </button>
+
+  <button class="btn-text cancel-btn" bindtap="onCancel">取消</button>
+</view>

@@ -1,21 +1,19 @@
 /**
  * 首页
  *
- * 展示当前家庭并支持：
- * - 当前家庭名称 / 人数 / 当前角色
- * - 多家庭切换
- * - 无家庭空状态
- * - 创建家庭（内联输入名称）
- * - 加入家庭
- * - 进入家庭详情
+ * 有家庭时：展示当前家庭的工作台
+ * - 当前家庭头部（图片 / 名称 / 人数 / 切换）
+ * - 今日日程（占位，查看全部进入日程 Tab）
+ * - 待办任务（占位，查看全部进入待办 Tab）
  *
- * 日程与待办编辑入口暂未实现，点击提示「功能即将上线」。
- * 当前家庭状态统一来自 familiesStore / currentFamilyStore。
+ * 无家庭时：保留创建 / 加入家庭引导。
+ *
+ * 家庭管理（创建、加入、详情、成员、邀请）统一收归「我的」，
+ * 首页只负责当前家庭的日常协作入口。
  */
 
-import { currentFamilyStore, familiesStore, loadFamilies, setCurrentFamily } from '../../stores/index';
-import { createFamily } from '../../services/families';
-import { showConfirm, showSuccess, showError, showLoading, hideLoading } from '../../utils/index';
+import { currentFamilyStore, familiesStore, loadFamilies, setCurrentFamily, restoreCurrentFamily } from '../../stores/index';
+import { showSuccess, showError } from '../../utils/index';
 
 type FamilyView = {
   id: string;
@@ -29,6 +27,7 @@ Page({
   data: {
     currentFamily: null as FamilyView | null,
     families: [] as FamilyView[],
+    canSwitch: false,
     loaded: false,
   },
 
@@ -40,7 +39,13 @@ Page({
       this.setData({ currentFamily: family as FamilyView | null });
     });
     this._familiesUnsubscribe = familiesStore.subscribe((families) => {
-      this.setData({ families: families as FamilyView[], loaded: true });
+      const cf = currentFamilyStore.value;
+      this.setData({
+        families: families as FamilyView[],
+        canSwitch: (families as FamilyView[]).length > 1,
+        loaded: true,
+        currentFamily: (cf as FamilyView | null),
+      });
     });
   },
 
@@ -56,11 +61,12 @@ Page({
   async loadData(): Promise<void> {
     try {
       const families = await loadFamilies();
-      const currentFamily = currentFamilyStore.value;
-
+      // 确保当前家庭已恢复并有效
+      const current = restoreCurrentFamily(families) || currentFamilyStore.value;
       this.setData({
         families: families as FamilyView[],
-        currentFamily: currentFamily as FamilyView | null,
+        currentFamily: current as FamilyView | null,
+        canSwitch: families.length > 1,
         loaded: true,
       });
 
@@ -68,7 +74,7 @@ Page({
       const app = getApp<IAppOption>();
       if (app) {
         app.globalData.families = families;
-        app.globalData.currentFamily = currentFamily;
+        app.globalData.currentFamily = current;
       }
     } catch (e) {
       console.error('[Home] Load data failed:', e);
@@ -76,7 +82,7 @@ Page({
     }
   },
 
-  /** 切换家庭 */
+  /** 切换家庭（仅在多个家庭时可用） */
   onSwitchFamily(): void {
     const { families, currentFamily } = this.data;
     if (!families || families.length <= 1) return;
@@ -93,50 +99,11 @@ Page({
     });
   },
 
-  /** 进入家庭详情 */
-  onViewDetail(): void {
-    const { currentFamily } = this.data;
-    if (!currentFamily) return;
+  /** 创建家庭（独立页面） */
+  onCreateFamily(): void {
     wx.navigateTo({
-      url: `/pages/family/detail?familyId=${currentFamily.id}`,
+      url: '/pages/family/create',
     });
-  },
-
-  /** 创建家庭（内联输入名称，不允许固定名称） */
-  async onCreateFamily(): Promise<void> {
-    const res = await new Promise<WechatMiniprogram.ShowModalSuccessCallbackResult>((resolve) => {
-      wx.showModal({
-        title: '创建家庭',
-        editable: true,
-        placeholderText: '请输入家庭名称',
-        success: resolve,
-        fail: () => resolve({ confirm: false } as WechatMiniprogram.ShowModalSuccessCallbackResult),
-      });
-    });
-    if (!res.confirm) return;
-
-    const name = (res.content || '').trim();
-    if (!name) {
-      showError('请输入家庭名称');
-      return;
-    }
-
-    showLoading('正在创建...');
-    try {
-      const result = await createFamily({ name });
-      hideLoading();
-      showSuccess('创建成功');
-
-      // 刷新家庭列表并设置当前家庭
-      const families = await loadFamilies();
-      const newFamily = families.find(f => f.id === result.id) || result;
-      setCurrentFamily(newFamily);
-    } catch (error: unknown) {
-      hideLoading();
-      console.error('[Home] Create family failed:', error);
-      const err = error as { code?: string; message?: string };
-      showError(err?.message || '创建失败，请重试');
-    }
   },
 
   /** 加入家庭 */
@@ -144,6 +111,16 @@ Page({
     wx.navigateTo({
       url: '/pages/family/join',
     });
+  },
+
+  /** 查看全部日程 */
+  onViewEvents(): void {
+    wx.switchTab({ url: '/pages/events/events' });
+  },
+
+  /** 查看全部待办 */
+  onViewTasks(): void {
+    wx.switchTab({ url: '/pages/tasks/tasks' });
   },
 
   /** 新建日程（暂未开放） */
