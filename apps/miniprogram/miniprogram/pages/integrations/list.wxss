@@ -1,0 +1,112 @@
+/* 外部系统列表页样式 */
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding-top: 120rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: var(--color-text-hint);
+}
+
+.intro {
+  padding: 8rpx 8rpx 20rpx;
+}
+
+.intro-text {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  line-height: 1.6;
+}
+
+/* 系统条目 */
+.sys-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  padding: 28rpx 48rpx 28rpx 24rpx;
+}
+
+.sys-top {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.sys-name {
+  flex: 1;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.sys-status {
+  font-size: 22rpx;
+  padding: 2rpx 14rpx;
+  border-radius: 8rpx;
+}
+
+.status-active {
+  color: var(--color-primary-dark);
+  background-color: rgba(76, 175, 80, 0.12);
+}
+
+.status-disabled {
+  color: var(--color-text-hint);
+  background-color: #f0f0f0;
+}
+
+.status-deleted {
+  color: var(--color-danger);
+  background-color: rgba(244, 67, 54, 0.1);
+}
+
+.sys-perm {
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+}
+
+.sys-used {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.arrow {
+  position: absolute;
+  right: 24rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 40rpx;
+  color: #cccccc;
+}
+
+/* 空状态 */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+  padding: 100rpx 40rpx;
+}
+
+.empty-title {
+  font-size: 30rpx;
+  color: var(--color-text-secondary);
+}
+
+.empty-desc {
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* 底部操作 */
+.footer {
+  margin-top: 32rpx;
+  padding: 0 8rpx;
+}

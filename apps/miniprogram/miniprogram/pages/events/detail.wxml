@@ -42,7 +42,10 @@
     <view class="card meta">
       <view class="meta-row">
         <text class="meta-label">创建人</text>
-        <text class="meta-value">{{createdByText}}</text>
+        <view class="meta-value actor-value">
+          <text>{{createdByText}}</text>
+          <text wx:if="{{createdBySystem}}" class="source-tag">外部系统</text>
+        </view>
       </view>
       <view class="meta-row">
         <text class="meta-label">创建时间</text>
@@ -50,7 +53,10 @@
       </view>
       <view class="meta-row">
         <text class="meta-label">最后修改</text>
-        <text class="meta-value">{{updatedByText}}</text>
+        <view class="meta-value actor-value">
+          <text>{{updatedByText}}</text>
+          <text wx:if="{{updatedBySystem}}" class="source-tag">外部系统</text>
+        </view>
       </view>
       <view class="meta-row">
         <text class="meta-label">修改时间</text>

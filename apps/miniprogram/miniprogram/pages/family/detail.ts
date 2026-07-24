@@ -90,6 +90,12 @@ Page({
     wx.navigateTo({ url: `/pages/family/invites?familyId=${this.data.familyId}` });
   },
 
+  /** 外部系统管理（仅管理员） */
+  onViewIntegrations(): void {
+    if (!this.isAdmin()) return;
+    wx.navigateTo({ url: `/pages/integrations/list?familyId=${this.data.familyId}` });
+  },
+
   async onLeave(): Promise<void> {
     if (this.data.leaving) return;
     const confirmed = await showConfirm('退出家庭', '确定要退出该家庭吗？');

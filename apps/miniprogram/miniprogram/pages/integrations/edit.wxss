@@ -1,0 +1,112 @@
+/* 创建 / 编辑外部系统页样式 */
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding-top: 120rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: var(--color-text-hint);
+}
+
+/* 表单字段 */
+.field {
+  padding: 16rpx 0;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.field:last-child {
+  border-bottom: none;
+}
+
+.field-label {
+  display: block;
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+  margin-bottom: 12rpx;
+}
+
+.field-input {
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+  height: 56rpx;
+}
+
+.field-textarea {
+  width: 100%;
+  min-height: 120rpx;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+  box-sizing: border-box;
+}
+
+/* 权限区 */
+.section-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.section-hint {
+  display: block;
+  margin: 8rpx 0 12rpx;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.perm-group-label {
+  margin-top: 16rpx;
+  padding: 8rpx 0;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.perm-row {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.perm-row:last-child {
+  border-bottom: none;
+}
+
+.perm-info {
+  flex: 1;
+}
+
+.perm-name {
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+/* 复选框 */
+.checkbox {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  border: 2rpx solid var(--color-divider);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox.checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.check-mark {
+  color: #ffffff;
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.footer {
+  margin-top: 32rpx;
+  padding: 0 8rpx;
+}

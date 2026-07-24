@@ -16,7 +16,11 @@
     "pages/family/members",
     "pages/family/invites",
     "pages/family/create",
-    "pages/family/edit"
+    "pages/family/edit",
+    "pages/integrations/list",
+    "pages/integrations/edit",
+    "pages/integrations/detail",
+    "pages/integrations/credential"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",

@@ -197,6 +197,21 @@ export interface PersonRef {
   avatarUrl?: string | null;
 }
 
+/**
+ * 操作主体（Actor）。
+ * Core 的 createdBy / updatedBy / completedBy 可能是真实用户，也可能是外部系统。
+ * 注意：与家庭成员 PersonRef 不同，Actor 使用 { type, id, name }，
+ * 外部系统不应作为参与人 / 负责人展示，也不使用用户头像占位。
+ */
+export type PrincipalType = 'user' | 'system';
+
+export interface Actor {
+  type: PrincipalType;
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+}
+
 export interface Event {
   id: string;
   familyId: string;
@@ -209,8 +224,8 @@ export interface Event {
   location: string | null;
   status: EventStatus;
   attendees: PersonRef[];
-  createdBy: PersonRef;
-  updatedBy: PersonRef;
+  createdBy: Actor;
+  updatedBy: Actor;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -255,9 +270,9 @@ export interface Task {
   status: TaskStatus;
   assignees: PersonRef[];
   completedAt: string | null;
-  completedBy: PersonRef | null;
-  createdBy: PersonRef;
-  updatedBy: PersonRef;
+  completedBy: Actor | null;
+  createdBy: Actor;
+  updatedBy: Actor;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -283,6 +298,81 @@ export interface UpdateTaskRequest {
 
 export interface VersionActionRequest {
   version: number;
+}
+
+// ==================== 外部系统（集成）相关 ====================
+
+/** 系统可被授予的权限（MVP 仅支持读写日程与待办、读取家庭信息） */
+export type SystemPermission =
+  | 'family:read'
+  | 'events:read'
+  | 'events:write'
+  | 'tasks:read'
+  | 'tasks:write';
+
+export type IntegrationStatus = 'active' | 'disabled' | 'deleted';
+
+/** 外部系统（integration） */
+export interface Integration {
+  id: string;
+  name: string;
+  description: string | null;
+  status: IntegrationStatus;
+  permissions: SystemPermission[];
+  createdBy: Actor;
+  createdAt: string;
+  updatedAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface IntegrationListResponse extends ApiEnvelope<{
+  items: Integration[];
+}> {}
+
+export interface IntegrationResponse extends ApiEnvelope<Integration> {}
+
+export interface CreateIntegrationRequest {
+  name: string;
+  description?: string | null;
+  permissions: SystemPermission[];
+}
+
+export interface UpdateIntegrationRequest {
+  name?: string;
+  description?: string | null;
+  status?: 'active' | 'disabled';
+  permissions?: SystemPermission[];
+}
+
+export type CredentialType = 'oauth_client_secret' | 'api_token';
+export type CredentialStatus = 'active' | 'revoked';
+
+/** 凭证摘要（列表 / 详情，永远不含完整明文） */
+export interface IntegrationCredential {
+  id: string;
+  type: CredentialType;
+  /** 明文尾 4 位，仅用于识别 */
+  suffix: string;
+  status: CredentialStatus;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
+export interface CredentialListResponse extends ApiEnvelope<{
+  items: IntegrationCredential[];
+}> {}
+
+/** 创建 Client Secret 的一次性响应（含明文 clientSecret，仅本次可见） */
+export interface ClientSecretCreated extends IntegrationCredential {
+  clientId: string;
+  clientSecret: string;
+}
+
+/** 创建 API Token 的一次性响应（含明文 token，仅本次可见） */
+export interface ApiTokenCreated extends IntegrationCredential {
+  token: string;
 }
 
 // ==================== 内部用户创建 ====================

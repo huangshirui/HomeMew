@@ -24,6 +24,15 @@ export const ERROR_MESSAGES: Record<string, string> = {
   NETWORK_ERROR: '网络请求失败，请检查网络连接',
   TIMEOUT: '请求超时，请稍后重试',
 
+  // 外部系统 / 集成相关
+  INTEGRATION_NOT_FOUND: '外部系统不存在或已被删除',
+  CREDENTIAL_NOT_FOUND: '凭证不存在或已被吊销',
+  CREDENTIAL_REVOKED: '凭证已被吊销',
+  INVALID_PERMISSIONS: '权限设置无效',
+  SYSTEM_DISABLED: '该外部系统已被停用',
+  SYSTEM_ACCESS_DENIED: '该外部系统无权访问本家庭',
+  SYSTEM_PERMISSION_DENIED: '该外部系统缺少所需权限',
+
   // 兼容别名，避免契约未明确时使用方拿到不同字符串导致文案缺失
   FAMILY_CREATION_LIMIT_REACHED: '每个用户最多创建 3 个家庭',
   NOT_FOUND: '内容不存在或已被删除',

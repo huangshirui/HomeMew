@@ -160,6 +160,35 @@ export function safeAvatarUrl(url: string | null | undefined): string {
 }
 
 /**
+ * 外部系统权限 → 中文标签映射
+ */
+export const PERMISSION_LABELS: Record<string, string> = {
+  'family:read': '查看家庭基础信息',
+  'events:read': '查看日程',
+  'events:write': '创建和编辑日程',
+  'tasks:read': '查看待办',
+  'tasks:write': '创建和编辑待办',
+};
+
+/**
+ * 生成权限摘要文案，例如「日程读写、待办只读、家庭信息」。
+ */
+export function summarizePermissions(permissions: string[]): string {
+  if (!permissions || permissions.length === 0) return '无权限';
+  const parts: string[] = [];
+  const rw = (read: string, write: string, label: string): void => {
+    const canRead = permissions.includes(read);
+    const canWrite = permissions.includes(write);
+    if (canWrite) parts.push(`${label}读写`);
+    else if (canRead) parts.push(`${label}只读`);
+  };
+  rw('events:read', 'events:write', '日程');
+  rw('tasks:read', 'tasks:write', '待办');
+  if (permissions.includes('family:read')) parts.push('家庭信息');
+  return parts.length ? parts.join('、') : '无权限';
+}
+
+/**
  * 错误码到用户友好消息的映射（统一来自 ./errors，避免多份映射）
  */
 export { getErrorMessage, ERROR_MESSAGES } from './errors';

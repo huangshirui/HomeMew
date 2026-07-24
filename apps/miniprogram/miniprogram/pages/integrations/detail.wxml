@@ -1,0 +1,97 @@
+<!-- 外部系统详情页 -->
+<view class="container">
+  <view wx:if="{{!loaded}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- 主信息 -->
+    <view class="card hero-card">
+      <view class="hero-row">
+        <text class="hero-title">{{integration.name}}</text>
+        <text class="status-tag status-{{integration.status}}">{{statusText}}</text>
+      </view>
+      <text wx:if="{{integration.description}}" class="hero-desc">{{integration.description}}</text>
+    </view>
+
+    <!-- 基本信息 -->
+    <view class="card">
+      <view class="info-row">
+        <text class="info-label">权限</text>
+        <text class="info-value">{{permissionSummary}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">创建人</text>
+        <text class="info-value">{{createdByText}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">创建时间</text>
+        <text class="info-value">{{createdAtText}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">最近使用</text>
+        <text class="info-value">{{lastUsedText}}</text>
+      </view>
+      <view class="info-actions">
+        <text class="action-link" bindtap="onEdit">修改名称 / 权限</text>
+        <text
+          class="action-link {{integration.status === 'active' ? 'danger' : ''}}"
+          bindtap="onToggleStatus"
+        >{{integration.status === 'active' ? '停用' : '启用'}}</text>
+      </view>
+    </view>
+
+    <!-- 凭证列表 -->
+    <view class="card">
+      <text class="section-title">凭证</text>
+      <text class="section-hint">完整值仅在创建时展示一次，此处只显示尾号。</text>
+
+      <block wx:if="{{credentials.length > 0}}">
+        <view class="cred-item" wx:for="{{credentials}}" wx:key="id">
+          <view class="cred-info">
+            <view class="cred-top">
+              <text class="cred-type">{{item.typeText}}</text>
+              <text class="cred-mask">{{item.maskedText}}</text>
+              <text class="cred-status {{item.status === 'revoked' ? 'revoked' : ''}}">{{item.statusText}}</text>
+            </view>
+            <text class="cred-sub">{{item.subText}}</text>
+          </view>
+          <text
+            wx:if="{{item.status === 'active'}}"
+            class="action-link danger"
+            data-id="{{item.id}}"
+            bindtap="onRevokeCredential"
+          >吊销</text>
+        </view>
+      </block>
+
+      <view wx:else class="cred-empty">
+        <text class="cred-empty-text">还没有凭证，请选择下方一种方式生成。</text>
+      </view>
+
+      <view class="cred-create">
+        <view class="cred-create-item" bindtap="onCreateClientSecret">
+          <view class="cci-info">
+            <text class="cci-title">生成 OAuth Client Secret</text>
+            <text class="cci-desc">推荐用于 n8n、Make、Zapier 和后端服务</text>
+          </view>
+          <text class="arrow">›</text>
+        </view>
+        <view class="cred-create-item" bindtap="onCreateApiToken">
+          <view class="cci-info">
+            <text class="cci-title">生成 API Token</text>
+            <text class="cci-desc">适用于脚本、Home Assistant 和简单 HTTP 客户端</text>
+          </view>
+          <text class="arrow">›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 删除 -->
+    <view class="card">
+      <view class="delete-row" bindtap="onDelete">
+        <text class="text-danger">删除外部系统</text>
+      </view>
+    </view>
+  </block>
+</view>
