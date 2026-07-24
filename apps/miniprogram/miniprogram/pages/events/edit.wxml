@@ -1,0 +1,148 @@
+<!-- 日程创建/编辑页 -->
+<view class="container">
+  <view wx:if="{{!loaded}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- 标题 -->
+    <view class="card section">
+      <view class="field-row">
+        <text class="field-label">标题</text>
+        <input
+          class="field-input"
+          value="{{summary}}"
+          bindinput="onSummaryInput"
+          placeholder="例如：周末家庭聚餐"
+          maxlength="60"
+        />
+      </view>
+    </view>
+
+    <!-- 日期 / 时间 -->
+    <view class="card section">
+      <!-- 起始日期 -->
+      <picker mode="date" value="{{startDate}}" start="{{minDate}}" bindchange="onStartDateChange">
+        <view class="field-row">
+          <text class="field-label">日期</text>
+          <view class="field-value">
+            <text class="field-text">{{startDate || '请选择日期'}}</text>
+            <text class="field-arrow">›</text>
+          </view>
+        </view>
+      </picker>
+
+      <!-- 结束日期 -->
+      <picker mode="date" value="{{endDate}}" start="{{minDate}}" bindchange="onEndDateChange">
+        <view class="field-row">
+          <text class="field-label">结束日期</text>
+          <view class="field-value">
+            <text class="field-text">{{endDate || '请选择结束日期'}}</text>
+            <text class="field-arrow">›</text>
+          </view>
+        </view>
+      </picker>
+
+      <!-- 全天开关 -->
+      <view class="field-row all-day-row">
+        <text class="field-label">全天</text>
+        <switch checked="{{isAllDay}}" bindchange="onAllDayChange" color="#4CAF50" />
+      </view>
+
+      <block wx:if="{{!isAllDay}}">
+        <picker mode="time" value="{{startTime}}" bindchange="onStartTimeChange">
+          <view class="field-row">
+            <text class="field-label">开始时间</text>
+            <view class="field-value">
+              <text class="field-text">{{startTime}}</text>
+              <text class="field-arrow">›</text>
+            </view>
+          </view>
+        </picker>
+        <picker mode="time" value="{{endTime}}" bindchange="onEndTimeChange">
+          <view class="field-row">
+            <text class="field-label">结束时间</text>
+            <view class="field-value">
+              <text class="field-text">{{endTime}}</text>
+              <text class="field-arrow">›</text>
+            </view>
+          </view>
+        </picker>
+      </block>
+
+      <view wx:else class="time-hint">
+        <text class="time-hint-text">全天日程不选择具体时间</text>
+      </view>
+    </view>
+
+    <!-- 参与人多选 -->
+    <view class="card section">
+      <view class="member-header">
+        <text class="field-label">参与人</text>
+        <view class="select-all" bindtap="onSelectAll">
+          <text class="select-all-text">全选/反选</text>
+        </view>
+      </view>
+      <view class="member-list">
+        <view
+          wx:for="{{members}}"
+          wx:key="userId"
+          class="member-item {{item.selected ? 'member-selected' : ''}}"
+          data-id="{{item.userId}}"
+          bindtap="onMemberToggle"
+        >
+          <view class="member-check {{item.selected ? 'member-check-on' : ''}}">
+            <text wx:if="{{item.selected}}" class="check-icon">✓</text>
+          </view>
+          <image
+            class="member-avatar"
+            src="{{item.avatarUrl}}"
+            mode="aspectFill"
+          />
+          <text class="member-name">{{item.displayName}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 地点 -->
+    <view class="card section">
+      <view class="field-row">
+        <text class="field-label">地点</text>
+        <input
+          class="field-input"
+          value="{{location}}"
+          bindinput="onLocationInput"
+          placeholder="选填"
+          maxlength="100"
+        />
+      </view>
+    </view>
+
+    <!-- 备注 -->
+    <view class="card section">
+      <view class="field-row column">
+        <text class="field-label">备注</text>
+        <textarea
+          class="field-textarea"
+          value="{{description}}"
+          bindinput="onDescriptionInput"
+          placeholder="选填"
+          maxlength="500"
+          auto-height
+        />
+      </view>
+    </view>
+
+    <!-- 操作 -->
+    <view class="actions">
+      <button class="btn-outline flex-1" bindtap="onCancel">取消</button>
+      <button
+        class="btn-primary flex-1"
+        disabled="{{submitting}}"
+        bindtap="onSubmit"
+      >
+        {{submitting ? '保存中...' : (mode === 'edit' ? '保存' : '创建')}}
+      </button>
+    </view>
+  </block>
+</view>

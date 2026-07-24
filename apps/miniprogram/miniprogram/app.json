@@ -5,6 +5,8 @@
     "pages/profile-setup/profile-setup",
     "pages/home/home",
     "pages/events/events",
+    "pages/events/detail",
+    "pages/events/edit",
     "pages/tasks/tasks",
     "pages/profile/profile",
     "pages/family/join",

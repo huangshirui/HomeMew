@@ -1,7 +1,108 @@
-<!-- 日程页（占位） -->
+<!-- 日程列表页 -->
 <view class="container">
-  <view class="placeholder">
-    <text class="placeholder-title">日程</text>
-    <text class="placeholder-desc">日程功能即将上线，敬请期待</text>
+  <!-- 加载中 -->
+  <view wx:if="{{!loaded}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
   </view>
+
+  <block wx:else>
+    <!-- 日历卡片 -->
+    <view class="calendar-card">
+      <!-- 月份导航 -->
+      <view class="calendar-header">
+        <view class="nav-arrow" bindtap="onPrevMonth">
+          <text class="arrow-text">‹</text>
+        </view>
+        <text class="month-label">{{monthLabel}}</text>
+        <view class="nav-arrow" bindtap="onNextMonth">
+          <text class="arrow-text">›</text>
+        </view>
+        <view
+          wx:if="{{selectedDate !== 'all'}}"
+          class="show-all-btn"
+          bindtap="onShowAll"
+        >
+          <text class="show-all-text">全部</text>
+        </view>
+      </view>
+
+      <!-- 星期表头 -->
+      <view class="week-row">
+        <view class="week-cell" wx:for="{{weekLabels}}" wx:key="*this">
+          <text class="week-text">{{item}}</text>
+        </view>
+      </view>
+
+      <!-- 日期格子 -->
+      <view class="day-grid">
+        <block wx:for="{{calendar}}" wx:for-item="row" wx:for-index="rowIdx" wx:key="rowIdx">
+          <view class="day-row">
+            <view
+              wx:for="{{row}}"
+              wx:for-item="cell"
+              wx:key="date"
+              class="day-cell {{cell.inMonth ? '' : 'day-out'}} {{cell.isToday ? 'day-today' : ''}} {{cell.isSelected ? 'day-selected' : ''}}"
+              data-date="{{cell.date}}"
+              bindtap="onDayTap"
+            >
+              <text class="day-num">{{cell.day}}</text>
+              <view wx:if="{{cell.hasEvent}}" class="dot"></view>
+            </view>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <!-- 列表标题与筛选 -->
+    <view class="list-header">
+      <text class="list-title">
+        {{selectedDate === 'all' ? '全部日程' : selectedDate}}
+      </text>
+      <view class="filter-btn {{attendeeFilter === 'me' ? 'filter-active' : ''}}" bindtap="onToggleFilter">
+        <text class="filter-text">{{attendeeFilter === 'me' ? '只看我的' : '全部参与人'}}</text>
+      </view>
+    </view>
+
+    <!-- 日程列表 / 空状态 -->
+    <block wx:if="{{displayedEvents.length > 0}}">
+      <view
+        wx:for="{{displayedEvents}}"
+        wx:key="id"
+        class="event-card"
+        data-id="{{item.id}}"
+        bindtap="onEventTap"
+      >
+        <view class="event-accent"></view>
+        <view class="event-body">
+          <view class="event-title-row">
+            <text class="event-title">{{item.summary}}</text>
+            <text wx:if="{{item.cancelled}}" class="event-cancelled">已取消</text>
+          </view>
+          <view class="event-meta">
+            <text class="event-time">{{item.startText}}</text>
+            <text wx:if="{{item.attendees.length > 0}}" class="event-attendees">
+              {{item.attendees[0].displayName}}
+              <text wx:if="{{item.attendees.length > 1}}" class="event-attendees-more">
+                等 {{item.attendees.length}} 人
+              </text>
+            </text>
+          </view>
+        </view>
+        <view class="event-arrow">
+          <text class="arrow-text">×</text>
+        </view>
+      </view>
+    </block>
+
+    <view wx:else class="empty-state">
+      <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
+      <text class="empty-title">这里还没有日程</text>
+      <text wx:if="{{selectedDate !== 'all'}}" class="empty-hint">点击右上角"全部"查看所有日程</text>
+    </view>
+
+    <!-- 悬浮新增按钮 -->
+    <view class="fab" bindtap="onCreate">
+      <text class="fab-text">+</text>
+    </view>
+  </block>
 </view>

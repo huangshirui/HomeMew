@@ -1,0 +1,73 @@
+<!-- 日程详情页 -->
+<view class="container">
+  <view wx:if="{{!loaded}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- 主信息卡片 -->
+    <view class="card hero-card">
+      <view class="hero-row">
+        <text class="hero-title">{{summary}}</text>
+        <text wx:if="{{event.status === 'cancelled'}}" class="cancelled-tag">已取消</text>
+      </view>
+      <view class="hero-time">
+        <text class="time-text">{{dateText}}</text>
+        <text class="time-sep"> · </text>
+        <text class="time-text">{{timeText}}</text>
+      </view>
+    </view>
+
+    <!-- 参与人 -->
+    <view class="card section">
+      <text class="section-label">参与人</text>
+      <text class="section-value">{{attendeeNames}}</text>
+    </view>
+
+    <!-- 地点 -->
+    <view class="card section">
+      <text class="section-label">地点</text>
+      <text class="section-value">{{locationText}}</text>
+    </view>
+
+    <!-- 备注 -->
+    <block wx:if="{{description}}">
+      <view class="card section">
+        <text class="section-label">备注</text>
+        <text class="section-value multiline">{{description}}</text>
+      </view>
+    </block>
+
+    <!-- 元数据 -->
+    <view class="card meta">
+      <view class="meta-row">
+        <text class="meta-label">创建人</text>
+        <text class="meta-value">{{createdByText}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="meta-label">创建时间</text>
+        <text class="meta-value">{{createdAtText}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="meta-label">最后修改</text>
+        <text class="meta-value">{{updatedByText}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="meta-label">修改时间</text>
+        <text class="meta-value">{{updatedAtText}}</text>
+      </view>
+    </view>
+
+    <!-- 操作 -->
+    <view class="actions">
+      <button class="btn-outline flex-1" bindtap="onEdit">编辑</button>
+      <button
+        class="btn-outline danger flex-1"
+        disabled="{{deleting}}"
+        bindtap="onDelete"
+      >
+        {{deleting ? '删除中...' : '删除'}}
+      </button>
+    </view>
+  </block>
+</view>

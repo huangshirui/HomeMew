@@ -31,9 +31,41 @@
         <text class="section-title">今日日程</text>
         <text class="section-more">查看全部 ›</text>
       </view>
-      <view class="empty-hint">
-        <text class="empty-text">功能即将上线</text>
+
+      <!-- 加载中 -->
+      <view wx:if="{{eventsLoading}}" class="empty-hint">
+        <text class="empty-text">加载中...</text>
       </view>
+
+      <!-- 加载失败 -->
+      <view wx:elif="{{eventsError}}" class="empty-hint" bindtap="onRetryEvents">
+        <text class="empty-text">加载失败，点击重试</text>
+      </view>
+
+      <!-- 日程列表 -->
+      <view wx:elif="{{todayEvents.length > 0}}" class="event-list">
+        <view
+          wx:for="{{todayEvents}}"
+          wx:key="id"
+          class="event-item"
+          data-id="{{item.id}}"
+          bindtap="onEventTap"
+        >
+          <view class="event-time-col">
+            <text class="event-time">{{item.timeText}}</text>
+          </view>
+          <view class="event-info">
+            <text class="event-summary">{{item.summary}}</text>
+            <text wx:if="{{item.attendeeText}}" class="event-attendees">{{item.attendeeText}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 空状态 -->
+      <view wx:else class="empty-hint">
+        <text class="empty-text">今天暂无日程</text>
+      </view>
+
       <view class="quick-action" bindtap="onCreateEvent">
         <text class="quick-action-text">+ 快速新建日程</text>
       </view>
