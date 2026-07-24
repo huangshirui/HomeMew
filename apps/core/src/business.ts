@@ -7,6 +7,7 @@ import { requireActiveUser as activeUser, requireFamilyAdmin as admin, requireFa
 import { success } from "./http";
 import { createId, createInviteCode } from "./ids";
 import { positiveInteger, requireObject, requireString, timezone } from "./validation";
+import { requireFamilyCapability } from "./principal-access";
 
 type AppEnv = { Bindings: Bindings; Variables: Variables };
 type App = Hono<AppEnv>;
@@ -133,12 +134,11 @@ export function registerBusinessRoutes(app: App): void {
 
   app.get("/api/v1/families/:familyId", async (c) => {
     const familyId = c.req.param("familyId");
-    const userId = c.get("currentUserId");
-    await activeUser(c.env, userId);
-    const member = await membership(c.env, familyId, userId);
+    const principal=c.get("currentPrincipal");
+    const member=await requireFamilyCapability(c.env,principal,familyId,"family:read");
     const row = await c.env.DB.prepare("SELECT f.*, (SELECT COUNT(*) FROM family_members WHERE family_id = f.id AND status = 'active') member_count FROM families f WHERE f.id = ?").bind(familyId).first<any>();
     if (!row) throw new ApiError("FAMILY_NOT_FOUND", "Family not found", 404);
-    return c.json(success({ id: row.id, name: row.name, avatarUrl: avatarUrl(c.env, row.avatar_key), timezone: row.timezone, status: row.status, createdBy: row.created_by, currentUserRole: member.role, memberCount: row.member_count, createdAt: row.created_at }));
+    return c.json(success({ id: row.id, name: row.name, avatarUrl: avatarUrl(c.env, row.avatar_key), timezone: row.timezone, status: row.status, createdBy: row.created_by, currentUserRole: member?.role??null, memberCount: row.member_count, createdAt: row.created_at }));
   });
 
   app.patch("/api/v1/families/:familyId", async (c) => {

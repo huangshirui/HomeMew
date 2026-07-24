@@ -22,8 +22,36 @@ tags:
   - name: Invitations
   - name: Events
   - name: Tasks
+  - name: Integrations
+  - name: OAuth
   - name: Internal
 paths:
+  /oauth/token:
+    post:
+      tags: [OAuth]
+      summary: Exchange system client credentials for a short-lived access token
+      operationId: exchangeClientCredentials
+      security: []
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OAuthTokenRequest'
+      responses:
+        '200':
+          description: OAuth access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/OAuthError'
+        '401':
+          $ref: '#/components/responses/OAuthError'
+        '429':
+          $ref: '#/components/responses/OAuthError'
   /health:
     get:
       tags: [System]
@@ -465,6 +493,163 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /api/v1/families/{familyId}/integrations:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+    get:
+      tags: [Integrations]
+      summary: List external systems
+      operationId: listIntegrations
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: External systems
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntegrationListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Integrations]
+      summary: Create an external system
+      operationId: createIntegration
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateIntegrationRequest' }
+      responses:
+        '201':
+          description: External system created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntegrationResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/families/{familyId}/integrations/{integrationId}:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/IntegrationId'
+    get:
+      tags: [Integrations]
+      operationId: getIntegration
+      summary: Get an external system
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: External system
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntegrationResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Integrations]
+      operationId: updateIntegration
+      summary: Update an external system
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateIntegrationRequest' }
+      responses:
+        '200':
+          description: Updated external system
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntegrationResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Integrations]
+      operationId: deleteIntegration
+      summary: Soft-delete an external system and revoke its credentials
+      x-homemew-status: implemented
+      responses:
+        '204': { description: External system deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/families/{familyId}/integrations/{integrationId}/client-secrets:
+    post:
+      tags: [Integrations]
+      operationId: createIntegrationClientSecret
+      summary: Create a one-time OAuth client secret
+      x-homemew-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/IntegrationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '201':
+          description: Client secret shown once
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientSecretResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/families/{familyId}/integrations/{integrationId}/api-tokens:
+    post:
+      tags: [Integrations]
+      operationId: createIntegrationApiToken
+      summary: Create a one-time long-lived API token
+      x-homemew-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/IntegrationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '201':
+          description: API token shown once
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiTokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/families/{familyId}/integrations/{integrationId}/credentials:
+    get:
+      tags: [Integrations]
+      operationId: listIntegrationCredentials
+      summary: List redacted integration credentials
+      x-homemew-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/IntegrationId'
+      responses:
+        '200':
+          description: Redacted credentials
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CredentialListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/families/{familyId}/integrations/{integrationId}/credentials/{credentialId}:
+    delete:
+      tags: [Integrations]
+      operationId: revokeIntegrationCredential
+      summary: Revoke one credential immediately
+      x-homemew-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/IntegrationId'
+        - $ref: '#/components/parameters/CredentialId'
+      responses:
+        '204': { description: Credential revoked }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/families/{familyId}/events:
     parameters:
       - $ref: '#/components/parameters/FamilyId'
@@ -860,6 +1045,16 @@ components:
       schema:
         type: string
         pattern: '^fam_'
+    IntegrationId:
+      name: integrationId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^sys_' }
+    CredentialId:
+      name: credentialId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^crd_' }
     UserId:
       name: userId
       in: path
@@ -916,6 +1111,12 @@ components:
       schema:
         type: string
   responses:
+    OAuthError:
+      description: OAuth protocol error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OAuthError'
     InvalidRequest:
       description: Invalid request
       content:
@@ -953,6 +1154,132 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    SystemPermission:
+      type: string
+      enum: [family:read, events:read, events:write, tasks:read, tasks:write]
+    ActorRef:
+      type: object
+      required: [type, id, name, avatarUrl]
+      properties:
+        type: { type: string, enum: [user, system] }
+        id: { type: string }
+        name: { type: string }
+        avatarUrl: { type: [string, 'null'], format: uri }
+    Integration:
+      type: object
+      required: [id, name, description, status, permissions, createdBy, createdAt, updatedAt, lastUsedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        status: { type: string, enum: [active, disabled] }
+        permissions:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/SystemPermission' }
+        createdBy: { $ref: '#/components/schemas/ActorRef' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastUsedAt: { type: [string, 'null'], format: date-time }
+    CreateIntegrationRequest:
+      type: object
+      required: [name, permissions]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 500 }
+        permissions:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/SystemPermission' }
+    UpdateIntegrationRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 500 }
+        status: { type: string, enum: [active, disabled] }
+        permissions:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/SystemPermission' }
+    IntegrationResponse:
+      type: object
+      required: [data]
+      properties: { data: { $ref: '#/components/schemas/Integration' } }
+    IntegrationListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Integration' } }
+    Credential:
+      type: object
+      required: [id, type, suffix, status, expiresAt, lastUsedAt, createdAt, revokedAt]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [oauth_client_secret, api_token] }
+        suffix: { type: string }
+        status: { type: string, enum: [active, revoked] }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        lastUsedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        revokedAt: { type: [string, 'null'], format: date-time }
+    CredentialListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Credential' } }
+    ClientSecretResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          allOf:
+            - { $ref: '#/components/schemas/Credential' }
+            - type: object
+              required: [clientId, clientSecret]
+              properties: { clientId: { type: string }, clientSecret: { type: string, writeOnly: true } }
+    ApiTokenResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          allOf:
+            - { $ref: '#/components/schemas/Credential' }
+            - type: object
+              required: [token]
+              properties: { token: { type: string, writeOnly: true } }
+    OAuthTokenRequest:
+      type: object
+      required: [grant_type]
+      properties:
+        grant_type: { type: string, const: client_credentials }
+        client_id: { type: string }
+        client_secret: { type: string, writeOnly: true }
+        scope: { type: string }
+    OAuthTokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in, scope]
+      properties:
+        access_token: { type: string, writeOnly: true }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, const: 3600 }
+        scope: { type: string }
+    OAuthError:
+      type: object
+      required: [error, error_description]
+      properties:
+        error: { type: string, enum: [invalid_request, invalid_client, invalid_scope, unsupported_grant_type, temporarily_unavailable] }
+        error_description: { type: string }
     ErrorResponse:
       type: object
       required: [error]
@@ -1126,7 +1453,9 @@ components:
         createdBy:
           type: string
         currentUserRole:
-          $ref: '#/components/schemas/FamilyRole'
+          oneOf:
+            - $ref: '#/components/schemas/FamilyRole'
+            - type: 'null'
         memberCount:
           type: integer
         createdAt:
@@ -1365,9 +1694,9 @@ components:
           items:
             $ref: '#/components/schemas/PersonRef'
         createdBy:
-          $ref: '#/components/schemas/PersonRef'
+          $ref: '#/components/schemas/ActorRef'
         updatedBy:
-          $ref: '#/components/schemas/PersonRef'
+          $ref: '#/components/schemas/ActorRef'
         version:
           type: integer
           minimum: 1
@@ -1486,12 +1815,12 @@ components:
           format: date-time
         completedBy:
           oneOf:
-            - $ref: '#/components/schemas/PersonRef'
+            - $ref: '#/components/schemas/ActorRef'
             - type: 'null'
         createdBy:
-          $ref: '#/components/schemas/PersonRef'
+          $ref: '#/components/schemas/ActorRef'
         updatedBy:
-          $ref: '#/components/schemas/PersonRef'
+          $ref: '#/components/schemas/ActorRef'
         version:
           type: integer
           minimum: 1

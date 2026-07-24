@@ -297,3 +297,23 @@ Explicitly out of the first event/task scope:
 - Recurring tasks, subtasks, labels, priorities, comments, and attachments
 - Per-assignee completion state
 - External calendar synchronization
+
+## 13. External system integrations
+
+An external integration is a non-human `system` principal owned by exactly one
+family. It is not a family member and never appears in attendee or assignee
+lists. Active family administrators manage integrations through the implemented
+`/api/v1/families/{familyId}/integrations` contract.
+
+Core resolves user JWTs, OAuth system JWTs, and `hmw_pat_` API tokens into one
+Principal used by the shared family, event, and task routes. System OAuth JWTs
+are issued only by `POST /oauth/token`, use `aud=homemew-core`, live for one
+hour, and identify their originating credential. Core checks the credential,
+integration, family grant, token scope, and current database permissions on
+every request. Disabling or deleting an integration, removing a permission, or
+revoking the originating credential therefore takes effect immediately.
+Internal `service` identities remain limited to internal endpoints.
+
+Secrets are generated and handled only by Core. The Mini Program may receive a
+new secret from an administrator API once for display, but must not persist it.
+Core stores only credential hashes and redacted suffixes.

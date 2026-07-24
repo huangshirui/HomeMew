@@ -31,10 +31,18 @@ export async function makeToken(sub: string, scope?: string): Promise<string> {
   return `${body}.${encoded}`;
 }
 
+export async function makeSystemToken(sub: string, credentialId: string, jti: string, scope: string): Promise<string> {
+  const now=Math.floor(Date.now()/1000);
+  const body=`${encode({alg:"HS256",typ:"JWT"})}.${encode({sub,type:"system",cid:credentialId,jti,scope,iss:"homemew-identity",aud:"homemew-core",iat:now,exp:now+3600})}`;
+  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(jwtSecret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
+  const signature=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(body)));
+  return `${body}.${btoa(String.fromCharCode(...signature)).replaceAll("+","-").replaceAll("/","_").replace(/=+$/,"")}`;
+}
+
 export async function request(path: string, token: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  headers.set("authorization", `Bearer ${token}`);
-  if (init.body && !(init.body instanceof FormData)) headers.set("content-type", "application/json");
+  if (token && !headers.has("authorization")) headers.set("authorization", `Bearer ${token}`);
+  if (init.body && !(init.body instanceof FormData) && !headers.has("content-type")) headers.set("content-type", "application/json");
   const app = (await import("../src/index")).default;
   return app.request(path, { ...init, headers }, bindings);
 }

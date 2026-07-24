@@ -221,3 +221,20 @@ The first version has one task-level completion state. It does not track complet
 - Resources requested under `/families/{familyId}/...` must be constrained to the same `familyId` in database queries.
 - API responses use `{ "data": ... }`; errors use `{ "error": { "code", "message", "requestId" } }`.
 - All responses return `x-request-id`.
+
+## 11. External systems
+
+- Only an active family administrator may create, edit, disable, delete, or
+  rotate credentials for an external system.
+- An external system belongs to one family, is not a member, and cannot manage
+  users, members, invitations, family settings, or avatars.
+- Available permissions are `family:read`, `events:read`, `events:write`,
+  `tasks:read`, and `tasks:write`; write requires the matching read permission.
+- Systems use the same event and task resources as users. `attendeeId=me` and
+  `assigneeId=me` are invalid for systems.
+- Client secrets and API tokens are returned only at creation. Multiple active
+  credentials may coexist for rotation; revocation is immediate.
+- Deleting an integration is a soft deletion and does not delete events or
+  tasks it created. Historical actor names remain available.
+- Event/task creation, update, completion, reopening, and deletion record the
+  true `user` or `system` actor.

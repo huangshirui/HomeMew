@@ -36,7 +36,7 @@ describe("family task API", () => {
     const family = await createFamily("Actions");
     const task = (await (await createTask(family.id, family.admin.token, { name: "Action", assigneeIds: [] })).json<any>()).data;
     const completed = await request(`/api/v1/families/${family.id}/tasks/${task.id}/complete`, family.admin.token, { method: "POST", body: JSON.stringify({ version: 1 }) });
-    expect((await completed.json<any>()).data).toMatchObject({ status: "completed", version: 2, completedBy: { userId: family.admin.id } });
+    expect((await completed.json<any>()).data).toMatchObject({ status: "completed", version: 2, completedBy: { type: "user", id: family.admin.id } });
     const again = await request(`/api/v1/families/${family.id}/tasks/${task.id}/complete`, family.admin.token, { method: "POST", body: JSON.stringify({ version: 2 }) });
     expect((await again.json<any>()).error.code).toBe("TASK_ALREADY_COMPLETED");
     const reopened = await request(`/api/v1/families/${family.id}/tasks/${task.id}/reopen`, family.admin.token, { method: "POST", body: JSON.stringify({ version: 2 }) });

@@ -9,6 +9,7 @@ export type Bindings = {
 export type Variables = {
   requestId: string;
   currentUserId: string;
+  currentPrincipal: { type: "user" | "system" | "service"; id: string; scopes: string[]; credentialId?: string; tokenId?: string };
   authScopes: string[];
-  authType: "user" | "service";
+  authType: "user" | "system" | "service";
 };

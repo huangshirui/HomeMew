@@ -172,6 +172,33 @@ corepack pnpm --filter @homemew/core db:migrate:remote
 corepack pnpm --filter @homemew/core run deploy
 ```
 
+## 外部系统接入
+
+`0007_external_system_integrations.sql` 增加外部系统、家庭授权、凭证、OAuth
+限流与统一 actor 审计字段，并将 schema version 更新为 `7`。家庭 active
+admin 通过 `/api/v1/families/{familyId}/integrations` 管理外部系统。完整
+Client Secret 或 API Token 只在创建响应中返回一次，Core 仅保存 SHA-256
+哈希和显示尾缀。
+
+OAuth 2.0 Client Credentials 示例：
+
+```http
+POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic base64(<sys_id>:<hmw_cs_secret>)
+
+grant_type=client_credentials&scope=events%3Aread%20tasks%3Aread
+```
+
+n8n 使用 OAuth2 API credential、Client Credentials、Header/Basic
+authentication 和上述 Token URL。简单客户端也可以发送
+`Authorization: Bearer hmw_pat_xxxxx`。
+
+系统继续调用普通家庭、日程和待办 API。权限为 `family:read`、
+`events:read/write`、`tasks:read/write`。系统不是家庭成员，不能使用
+`attendeeId=me` 或 `assigneeId=me`。停用或删除系统、修改权限、吊销来源
+凭证都会立即影响后续请求。
+
 远程 migration 必须先于 Worker 部署。
 
 ## GitHub Actions

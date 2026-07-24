@@ -29,7 +29,7 @@ describe("family event API", () => {
 
     const detail = await request(`/api/v1/families/${family.id}/events/${body.data.id}`, family.admin.token);
     expect(detail.status).toBe(200);
-    expect((await detail.json<any>()).data.createdBy.userId).toBe(family.admin.id);
+    expect((await detail.json<any>()).data.createdBy).toMatchObject({ type: "user", id: family.admin.id });
   });
 
   it("validates event times, family membership, and attendees", async () => {

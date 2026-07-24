@@ -11,6 +11,6 @@
     "test": "pnpm --filter @homemew/core test",
     "typecheck": "pnpm --filter @homemew/core typecheck",
     "build": "pnpm --filter @homemew/core build",
-    "check": "pnpm test && pnpm typecheck && pnpm build"
+    "check": "pnpm --filter @homemew/core contract && pnpm test && pnpm typecheck && pnpm build"
   }
 }

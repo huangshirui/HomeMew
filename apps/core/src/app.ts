@@ -6,6 +6,7 @@ import { failure, success } from "./http";
 import { registerBusinessRoutes } from "./business";
 import { registerEventRoutes } from "./events";
 import { registerTaskRoutes } from "./tasks";
+import { registerIntegrationRoutes } from "./integrations";
 
 type AppEnv = {
   Bindings: Bindings;
@@ -88,6 +89,7 @@ export function createApp(
   });
 
   registerBusinessRoutes(app);
+  registerIntegrationRoutes(app);
   registerEventRoutes(app);
   registerTaskRoutes(app);
 
