@@ -1,0 +1,98 @@
+<!-- 待办任务创建/编辑页 -->
+<view class="container">
+  <view wx:if="{{!loaded}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- 任务名称 -->
+    <view class="card section">
+      <view class="field-row">
+        <text class="field-label">任务名称</text>
+        <input
+          class="field-input"
+          value="{{name}}"
+          bindinput="onNameInput"
+          placeholder="例如：购买日用品"
+          maxlength="60"
+        />
+      </view>
+    </view>
+
+    <!-- 截止日期 -->
+    <view class="card section">
+      <picker mode="date" value="{{due}}" start="{{minDate}}" bindchange="onDueChange">
+        <view class="field-row">
+          <text class="field-label">截止日期</text>
+          <view class="field-value">
+            <text class="field-text {{due ? '' : 'field-placeholder'}}">{{dueText}}</text>
+            <text wx:if="{{due}}" class="clear-btn" catchtap="onClearDue">✕</text>
+            <text wx:else class="field-arrow">›</text>
+          </view>
+        </view>
+      </picker>
+      <view class="field-hint">
+        <text class="hint-text">选填，仅精确到天</text>
+      </view>
+    </view>
+
+    <!-- 负责人多选 -->
+    <view class="card section">
+      <view class="member-header">
+        <text class="field-label">负责人</text>
+        <view class="select-all" bindtap="onSelectAll">
+          <text class="select-all-text">全选/反选</text>
+        </view>
+      </view>
+      <view class="member-list">
+        <view
+          wx:for="{{members}}"
+          wx:key="userId"
+          class="member-item {{item.selected ? 'member-selected' : ''}}"
+          data-id="{{item.userId}}"
+          bindtap="onMemberToggle"
+        >
+          <view class="member-check {{item.selected ? 'member-check-on' : ''}}">
+            <text wx:if="{{item.selected}}" class="check-icon">✓</text>
+          </view>
+          <image
+            class="member-avatar"
+            src="{{item.avatarUrl}}"
+            mode="aspectFill"
+          />
+          <text class="member-name">{{item.displayName}}</text>
+        </view>
+      </view>
+      <view class="assignee-hint">
+        <text class="hint-text">不选择则为家庭公共待办</text>
+      </view>
+    </view>
+
+    <!-- 备注/描述 -->
+    <view class="card section">
+      <view class="field-row column">
+        <text class="field-label">备注</text>
+        <textarea
+          class="field-textarea"
+          value="{{description}}"
+          bindinput="onDescriptionInput"
+          placeholder="选填，添加任务详细说明"
+          maxlength="500"
+          auto-height
+        />
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="actions">
+      <button class="btn-outline flex-1" bindtap="onCancel">取消</button>
+      <button
+        class="btn-primary flex-1"
+        disabled="{{submitting}}"
+        bindtap="onSubmit"
+      >
+        {{submitting ? '保存中...' : (mode === 'edit' ? '保存' : '创建')}}
+      </button>
+    </view>
+  </block>
+</view>

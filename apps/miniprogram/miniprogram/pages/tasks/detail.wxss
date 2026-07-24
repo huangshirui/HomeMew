@@ -1,0 +1,154 @@
+/* 待办任务详情页样式 */
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding-top: 120rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: var(--color-text-hint);
+}
+
+/* 主信息卡片 */
+.hero-card {
+  padding: 32rpx 28rpx;
+}
+
+.hero-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.hero-title {
+  flex: 1;
+  font-size: 40rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.hero-title.name-done {
+  text-decoration: line-through;
+  color: var(--color-text-hint);
+}
+
+/* 状态标签 */
+.status-tag {
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+  flex-shrink: 0;
+}
+
+.status-tag.status-pending {
+  background-color: #e8f5e9;
+}
+
+.status-tag.status-completed {
+  background-color: #eaf7ec;
+}
+
+.status-tag.status-cancelled {
+  background-color: var(--color-bg);
+}
+
+.status-text {
+  font-size: 22rpx;
+  font-weight: 500;
+}
+
+.status-pending .status-text {
+  color: var(--color-primary);
+}
+
+.status-completed .status-text {
+  color: var(--color-text-secondary);
+}
+
+.status-cancelled .status-text {
+  color: var(--color-text-hint);
+}
+
+/* 截止日期 */
+.hero-due {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.due-icon-text {
+  font-size: 26rpx;
+}
+
+.due-date {
+  font-size: 28rpx;
+  color: var(--color-text-secondary);
+}
+
+/* 区块 */
+.section {
+  padding: 24rpx 28rpx;
+}
+
+.section-label {
+  display: block;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  margin-bottom: 12rpx;
+}
+
+.section-value {
+  display: block;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+.section-value.multiline {
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
+}
+
+/* 元数据 */
+.meta {
+  padding: 24rpx 28rpx;
+}
+
+.meta-row {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 0;
+}
+
+.meta-label {
+  width: 160rpx;
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+}
+
+.meta-value {
+  flex: 1;
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+}
+
+/* 操作按钮 */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+  margin-top: 24rpx;
+}
+
+.actions .flex-1 {
+  flex: 1;
+  min-width: 160rpx;
+}
+
+.btn-outline.danger {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}

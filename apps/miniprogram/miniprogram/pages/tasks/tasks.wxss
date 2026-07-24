@@ -1,21 +1,257 @@
-/* 待办占位样式 */
-.placeholder {
+/* 待办任务列表页样式 */
+
+/* 加载状态 */
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding-top: 120rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: var(--color-text-hint);
+}
+
+/* 统计卡片 */
+.stats-row {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx 0;
+}
+
+.stat-card {
+  flex: 1;
+  background-color: var(--color-bg-white);
+  border-radius: 16rpx;
+  padding: 28rpx 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+}
+
+.stat-number {
+  font-size: 56rpx;
+  font-weight: 600;
+  color: var(--color-primary);
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+  margin-top: 8rpx;
+}
+
+/* 标签筛选 */
+.tab-bar {
+  display: flex;
+  gap: 16rpx;
+  padding: 16rpx 0 24rpx;
+}
+
+.tab-item {
+  flex: 1;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  min-height: 60vh;
-  padding: 48rpx;
+  border-radius: 36rpx;
+  background-color: var(--color-bg-white);
+  border: 2rpx solid transparent;
+  transition: all 0.2s ease;
 }
 
-.placeholder-title {
-  font-size: 36rpx;
-  font-weight: 500;
-  color: #333333;
-  margin-bottom: 16rpx;
+.tab-item.tab-active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
-.placeholder-desc {
+.tab-text {
   font-size: 28rpx;
-  color: #999999;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.tab-item.tab-active .tab-text {
+  color: #ffffff;
+}
+
+/* 任务卡片 */
+.task-card {
+  background-color: var(--color-bg-white);
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  padding: 24rpx 20rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+}
+
+/* 复选框 */
+.task-check {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  border: 3rpx solid #d0d0d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 20rpx;
+  background-color: #ffffff;
+}
+
+.task-check.check-done {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.task-check.check-loading {
+  opacity: 0.6;
+}
+
+.check-icon-done {
+  font-size: 28rpx;
+  color: #ffffff;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.loading-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* 任务内容 */
+.task-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-name-row {
+  margin-bottom: 10rpx;
+}
+
+.task-name {
+  font-size: 32rpx;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.task-name.name-done {
+  text-decoration: line-through;
+  color: var(--color-text-hint);
+}
+
+.task-name.name-overdue {
+  color: var(--color-danger);
+}
+
+/* 任务元信息 */
+.task-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.assignee-tag {
+  font-size: 22rpx;
+  color: var(--color-primary);
+  background-color: #eaf7ec;
+  padding: 4rpx 14rpx;
+  border-radius: 6rpx;
+}
+
+.due-tag {
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  background-color: var(--color-bg);
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.due-tag.due-overdue {
+  color: var(--color-danger);
+  background-color: #fff5f5;
+}
+
+.due-icon {
+  font-size: 20rpx;
+}
+
+/* 删除按钮 */
+.task-delete {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 12rpx;
+}
+
+.delete-icon {
+  font-size: 40rpx;
+  color: #cccccc;
+  line-height: 1;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 120rpx;
+}
+
+.empty-image {
+  width: 200rpx;
+  height: 200rpx;
+  margin-bottom: 24rpx;
+  opacity: 0.6;
+}
+
+.empty-title {
+  font-size: 30rpx;
+  color: var(--color-text-secondary);
+}
+
+/* 悬浮新增按钮 */
+.fab {
+  position: fixed;
+  right: 32rpx;
+  bottom: 160rpx;
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 24rpx rgba(76, 175, 80, 0.35);
+  z-index: 10;
+}
+
+.fab-text {
+  font-size: 60rpx;
+  color: #ffffff;
+  font-weight: 300;
+  line-height: 1;
 }

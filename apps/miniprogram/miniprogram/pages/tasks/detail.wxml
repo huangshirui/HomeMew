@@ -1,0 +1,95 @@
+<!-- 待办任务详情页 -->
+<view class="container">
+  <view wx:if="{{!loaded}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- 主信息卡片 -->
+    <view class="card hero-card">
+      <view class="hero-row">
+        <text class="hero-title {{status === 'completed' ? 'name-done' : ''}}">{{name}}</text>
+        <view class="status-tag status-{{status}}">
+          <text class="status-text">{{statusText}}</text>
+        </view>
+      </view>
+      <view wx:if="{{due}}" class="hero-due">
+        <text class="due-icon-text">📅</text>
+        <text class="due-date">{{dueText}}</text>
+      </view>
+    </view>
+
+    <!-- 负责人 -->
+    <view class="card section">
+      <text class="section-label">负责人</text>
+      <text class="section-value">{{assigneeNames}}</text>
+    </view>
+
+    <!-- 截止日期 -->
+    <view class="card section">
+      <text class="section-label">截止日期</text>
+      <text class="section-value">{{dueText}}</text>
+    </view>
+
+    <!-- 备注 -->
+    <block wx:if="{{description}}">
+      <view class="card section">
+        <text class="section-label">备注</text>
+        <text class="section-value multiline">{{description}}</text>
+      </view>
+    </block>
+
+    <!-- 完成信息（仅已完成时显示） -->
+    <block wx:if="{{status === 'completed'}}">
+      <view class="card section">
+        <text class="section-label">完成人</text>
+        <text class="section-value">{{completedByText || '未知'}}</text>
+      </view>
+      <view class="card section">
+        <text class="section-label">完成时间</text>
+        <text class="section-value">{{completedAtText}}</text>
+      </view>
+    </block>
+
+    <!-- 元数据 -->
+    <view class="card meta">
+      <view class="meta-row">
+        <text class="meta-label">创建人</text>
+        <text class="meta-value">{{createdByText}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="meta-label">创建时间</text>
+        <text class="meta-value">{{createdAtText}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="meta-label">最后修改</text>
+        <text class="meta-value">{{updatedByText}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="meta-label">修改时间</text>
+        <text class="meta-value">{{updatedAtText}}</text>
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="actions">
+      <!-- 完成/恢复 按钮（非取消状态可操作） -->
+      <button
+        wx:if="{{status !== 'cancelled'}}"
+        class="btn-primary flex-1"
+        disabled="{{toggling}}"
+        bindtap="onToggleStatus"
+      >
+        {{toggling ? '处理中...' : (status === 'pending' ? '标记完成' : '恢复待办')}}
+      </button>
+      <button class="btn-outline flex-1" bindtap="onEdit">编辑</button>
+      <button
+        class="btn-outline danger flex-1"
+        disabled="{{deleting}}"
+        bindtap="onDelete"
+      >
+        {{deleting ? '删除中...' : '删除'}}
+      </button>
+    </view>
+  </block>
+</view>

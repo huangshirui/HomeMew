@@ -8,6 +8,8 @@
     "pages/events/detail",
     "pages/events/edit",
     "pages/tasks/tasks",
+    "pages/tasks/detail",
+    "pages/tasks/edit",
     "pages/profile/profile",
     "pages/family/join",
     "pages/family/detail",
