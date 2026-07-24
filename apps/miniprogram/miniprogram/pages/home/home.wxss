@@ -156,6 +156,128 @@
   color: #4CAF50;
 }
 
+/* 待办任务计数徽标 */
+.section-count {
+  margin-left: 12rpx;
+  min-width: 36rpx;
+  height: 36rpx;
+  padding: 0 10rpx;
+  border-radius: 18rpx;
+  background-color: #f0f7f1;
+  color: #4CAF50;
+  font-size: 24rpx;
+  font-weight: 600;
+  text-align: center;
+  line-height: 36rpx;
+}
+
+/* 待办任务列表 */
+.task-list {
+  padding: 0 28rpx 16rpx;
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid #f5f5f5;
+}
+
+.task-item:last-child {
+  border-bottom: none;
+}
+
+/* 复选框 */
+.task-check {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  border: 3rpx solid #d0d0d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 20rpx;
+  background-color: #ffffff;
+}
+
+.task-check.check-done {
+  background-color: #4CAF50;
+  border-color: #4CAF50;
+}
+
+.task-check.check-loading {
+  opacity: 0.6;
+}
+
+.check-icon-done {
+  font-size: 28rpx;
+  color: #ffffff;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.loading-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background-color: #4CAF50;
+  animation: task-pulse 1s ease-in-out infinite;
+}
+
+@keyframes task-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* 任务内容 */
+.task-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-name {
+  display: block;
+  font-size: 28rpx;
+  color: #333333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-name.name-overdue {
+  color: #e53935;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 6rpx;
+}
+
+.assignee-tag {
+  font-size: 22rpx;
+  color: #4CAF50;
+  background-color: #eaf7ec;
+  padding: 4rpx 14rpx;
+  border-radius: 6rpx;
+}
+
+.due-tag {
+  font-size: 22rpx;
+  color: #999999;
+  background-color: #f5f5f5;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+}
+
+.due-tag.due-overdue {
+  color: #e53935;
+  background-color: #fff5f5;
+}
+
 /* 无家庭空状态 */
 .empty-state {
   display: flex;

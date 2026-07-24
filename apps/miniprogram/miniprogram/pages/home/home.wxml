@@ -75,11 +75,52 @@
     <view class="card section">
       <view class="section-header" bindtap="onViewTasks">
         <text class="section-title">待办任务</text>
+        <text wx:if="{{pendingTaskCount > 0}}" class="section-count">{{pendingTaskCount}}</text>
         <text class="section-more">查看全部 ›</text>
       </view>
-      <view class="empty-hint">
-        <text class="empty-text">功能即将上线</text>
+
+      <!-- 加载中 -->
+      <view wx:if="{{tasksLoading}}" class="empty-hint">
+        <text class="empty-text">加载中...</text>
       </view>
+
+      <!-- 加载失败 -->
+      <view wx:elif="{{tasksError}}" class="empty-hint" bindtap="onRetryTasks">
+        <text class="empty-text">加载失败，点击重试</text>
+      </view>
+
+      <!-- 任务列表 -->
+      <view wx:elif="{{tasks.length > 0}}" class="task-list">
+        <view
+          wx:for="{{tasks}}"
+          wx:key="id"
+          class="task-item"
+          data-id="{{item.id}}"
+          bindtap="onTaskTap"
+        >
+          <view
+            class="task-check {{item.status === 'completed' ? 'check-done' : ''}} {{item.completing ? 'check-loading' : ''}}"
+            data-id="{{item.id}}"
+            catchtap="onToggleTaskStatus"
+          >
+            <text wx:if="{{item.status === 'completed' && !item.completing}}" class="check-icon-done">✓</text>
+            <text wx:if="{{item.completing}}" class="loading-dot"></text>
+          </view>
+          <view class="task-body">
+            <text class="task-name {{item.isOverdue ? 'name-overdue' : ''}}">{{item.name}}</text>
+            <view wx:if="{{item.assigneeText || item.dueText}}" class="task-meta">
+              <text wx:if="{{item.assigneeText}}" class="assignee-tag">{{item.assigneeText}}</text>
+              <text wx:if="{{item.dueText}}" class="due-tag {{item.isOverdue ? 'due-overdue' : ''}}">📅 {{item.dueText}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 空状态 -->
+      <view wx:else class="empty-hint">
+        <text class="empty-text">暂无待办任务</text>
+      </view>
+
       <view class="quick-action" bindtap="onCreateTask">
         <text class="quick-action-text">+ 快速新建待办</text>
       </view>
