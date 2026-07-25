@@ -26,9 +26,10 @@ type FamilyView = {
   memberCount: number;
 };
 
-type TodayEventView = {
+type UpcomingEventView = {
   id: string;
   summary: string;
+  dateText: string;
   timeText: string;
   attendeeText: string;
 };
@@ -45,13 +46,18 @@ type TaskHomeView = {
   completing: boolean;
 };
 
+/** 首页每个模块最多展示的条目数，超出由「查看全部」进入对应 Tab */
+const HOME_LIMIT = 3;
+
 Page({
   data: {
     currentFamily: null as FamilyView | null,
     families: [] as FamilyView[],
     canSwitch: false,
+    isAdmin: false,
     loaded: false,
-    todayEvents: [] as TodayEventView[],
+    upcomingEvents: [] as UpcomingEventView[],
+    upcomingTotal: 0,
     eventsLoading: false,
     eventsError: false,
     tasks: [] as TaskHomeView[],
@@ -66,10 +72,13 @@ Page({
     // 订阅当前家庭变化
     this._familyUnsubscribe = currentFamilyStore.subscribe((family) => {
       const prevId = this.data.currentFamily?.id;
-      this.setData({ currentFamily: family as FamilyView | null });
+      this.setData({
+        currentFamily: family as FamilyView | null,
+        isAdmin: (family as FamilyView | null)?.role === 'admin',
+      });
       const newId = (family as FamilyView | null)?.id;
       if (newId && newId !== prevId) {
-        this.loadTodayEvents(newId);
+        this.loadUpcomingEvents(newId);
         this.loadTasks(newId);
       }
     });
@@ -80,6 +89,7 @@ Page({
         canSwitch: (families as FamilyView[]).length > 1,
         loaded: true,
         currentFamily: (cf as FamilyView | null),
+        isAdmin: (cf as FamilyView | null)?.role === 'admin',
       });
     });
   },
@@ -102,6 +112,7 @@ Page({
         families: families as FamilyView[],
         currentFamily: current as FamilyView | null,
         canSwitch: families.length > 1,
+        isAdmin: (current as FamilyView | null)?.role === 'admin',
         loaded: true,
       });
 
@@ -112,9 +123,9 @@ Page({
         app.globalData.currentFamily = current;
       }
 
-      // 今日日程与待办任务独立加载，失败不影响页面其余部分
+      // 近期日程与待办任务独立加载，失败不影响页面其余部分
       if (current) {
-        this.loadTodayEvents(current.id);
+        this.loadUpcomingEvents(current.id);
         this.loadTasks(current.id);
       }
     } catch (e) {
@@ -123,26 +134,32 @@ Page({
     }
   },
 
-  /** 加载今日日程（独立于家庭信息加载） */
-  async loadTodayEvents(familyId: string): Promise<void> {
+  /** 加载近期日程（未来 7 天，独立于家庭信息加载） */
+  async loadUpcomingEvents(familyId: string): Promise<void> {
     this.setData({ eventsLoading: true, eventsError: false });
     try {
       const today = new Date();
       const start = formatYmd(today);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const end = formatYmd(tomorrow);
+      const end = new Date(today);
+      end.setDate(end.getDate() + 7);
+      const endStr = formatYmd(end);
 
-      const events = await listEvents(familyId, { start, end, status: 'active' });
+      const events = await listEvents(familyId, { start, end: endStr, status: 'active' });
       // 家庭已切换则丢弃过期结果
       if (this.data.currentFamily?.id !== familyId) return;
 
+      // 按开始时间升序，确保"最近"的排在最前
+      const sorted = [...events].sort(
+        (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+      );
+      const all = sorted.map(mapUpcomingEvent);
       this.setData({
-        todayEvents: events.map(mapTodayEvent),
+        upcomingEvents: all.slice(0, HOME_LIMIT),
+        upcomingTotal: all.length,
         eventsLoading: false,
       });
     } catch (e) {
-      console.error('[Home] Load today events failed:', e);
+      console.error('[Home] Load upcoming events failed:', e);
       if (this.data.currentFamily?.id !== familyId) return;
       this.setData({ eventsLoading: false, eventsError: true });
     }
@@ -157,10 +174,10 @@ Page({
     });
   },
 
-  /** 重试加载今日日程 */
+  /** 重试加载近期日程 */
   onRetryEvents(): void {
     if (!this.data.currentFamily) return;
-    this.loadTodayEvents(this.data.currentFamily.id);
+    this.loadUpcomingEvents(this.data.currentFamily.id);
   },
 
   /** 加载待办任务（独立于家庭信息加载，默认展示进行中的任务） */
@@ -171,9 +188,10 @@ Page({
       // 家庭已切换则丢弃过期结果
       if (this.data.currentFamily?.id !== familyId) return;
 
+      const all = tasks.map(mapTaskHome);
       this.setData({
-        tasks: tasks.map(mapTaskHome),
-        pendingTaskCount: tasks.length,
+        tasks: all.slice(0, HOME_LIMIT),
+        pendingTaskCount: all.length,
         tasksLoading: false,
       });
     } catch (e) {
@@ -300,6 +318,14 @@ Page({
       url: `/pages/tasks/edit?familyId=${this.data.currentFamily.id}`,
     });
   },
+
+  /** 邀请家人（仅管理员可见入口） */
+  onInviteFamily(): void {
+    if (!this.data.currentFamily) return;
+    wx.navigateTo({
+      url: `/pages/family/invites?familyId=${this.data.currentFamily.id}`,
+    });
+  },
 });
 
 /* ----------------- 工具函数 ----------------- */
@@ -309,17 +335,32 @@ function formatYmd(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function mapTodayEvent(e: Event): { id: string; summary: string; timeText: string; attendeeText: string } {
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+function mapUpcomingEvent(e: Event): UpcomingEventView {
+  const start = new Date(e.start);
+  const today = formatYmd(new Date());
+  const tomorrow = formatYmd(addDays(new Date(), 1));
+  const startDate = formatYmd(start);
+  let dateText = '今天';
+  if (startDate === tomorrow) dateText = '明天';
+  else if (startDate !== today) {
+    dateText = `${start.getMonth() + 1}/${start.getDate()}`;
+  }
+
   let timeText = '全天';
   if (!e.isAllDay) {
     const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-    const start = new Date(e.start);
     const end = new Date(e.end);
     timeText = `${pad(start.getHours())}:${pad(start.getMinutes())} - ${pad(end.getHours())}:${pad(end.getMinutes())}`;
   }
   const names = e.attendees.map(a => a.displayName);
   const attendeeText = names.length > 0 ? names.join('、') : '';
-  return { id: e.id, summary: e.summary, timeText, attendeeText };
+  return { id: e.id, summary: e.summary, dateText, timeText, attendeeText };
 }
 
 function mapTaskHome(t: Task): TaskHomeView {

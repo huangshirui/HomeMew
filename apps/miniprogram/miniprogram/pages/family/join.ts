@@ -70,6 +70,11 @@ Page({
       showError('请输入邀请码');
       return;
     }
+    // 必须先验证通过（拿到预览）才能确认加入
+    if (!this.data.preview) {
+      showError('请先验证邀请码');
+      return;
+    }
     if (this.data.submitting) return;
     this.setData({ submitting: true });
     showLoading('正在加入...');

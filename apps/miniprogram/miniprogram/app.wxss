@@ -7,6 +7,8 @@ page {
   --color-primary-dark: #388E3C;
   --color-danger: #F44336;
   --color-warning: #FF9800;
+  --color-info: #2196F3;
+  --color-primary-tint: #eaf7ec;
   --color-text-primary: #333333;
   --color-text-secondary: #666666;
   --color-text-hint: #999999;
@@ -119,7 +121,7 @@ page {
   border: 2rpx solid var(--color-primary);
   border-radius: 44rpx;
   height: 88rpx;
-  line-height: 84rpx;
+  line-height: 88rpx;
   font-size: 32rpx;
   text-align: center;
 }

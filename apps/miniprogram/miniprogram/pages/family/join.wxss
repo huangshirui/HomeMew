@@ -74,6 +74,10 @@
   color: var(--color-primary);
 }
 
+.confirm-btn {
+  margin-top: 24rpx;
+}
+
 .error-tip {
   display: block;
   margin: 24rpx 8rpx 0;

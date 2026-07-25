@@ -1,5 +1,10 @@
 /* 待办任务列表页样式 */
 
+/* 页面容器：底部留白，避免最后一条内容被 FAB 遮挡 */
+.container {
+  padding-bottom: 160rpx;
+}
+
 /* 加载状态 */
 .loading-state {
   display: flex;
@@ -12,53 +17,24 @@
   color: var(--color-text-hint);
 }
 
-/* 统计卡片 */
-.stats-row {
-  display: flex;
-  gap: 20rpx;
-  padding: 20rpx 0;
-}
-
-.stat-card {
-  flex: 1;
-  background-color: var(--color-bg-white);
-  border-radius: 16rpx;
-  padding: 28rpx 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
-}
-
-.stat-number {
-  font-size: 56rpx;
-  font-weight: 600;
-  color: var(--color-primary);
-  line-height: 1.2;
-}
-
-.stat-label {
-  font-size: 26rpx;
-  color: var(--color-text-secondary);
-  margin-top: 8rpx;
-}
-
-/* 标签筛选 */
+/* 两段式统计 + 切换 */
 .tab-bar {
   display: flex;
   gap: 16rpx;
-  padding: 16rpx 0 24rpx;
+  padding: 20rpx 0 24rpx;
 }
 
 .tab-item {
   flex: 1;
-  height: 72rpx;
+  height: 96rpx;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 36rpx;
+  border-radius: 16rpx;
   background-color: var(--color-bg-white);
   border: 2rpx solid transparent;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
   transition: all 0.2s ease;
 }
 
@@ -67,14 +43,34 @@
   border-color: var(--color-primary);
 }
 
-.tab-text {
-  font-size: 28rpx;
-  color: var(--color-text-secondary);
-  font-weight: 500;
+.tab-count {
+  font-size: 40rpx;
+  font-weight: 600;
+  color: var(--color-primary);
+  line-height: 1.1;
 }
 
+.tab-text {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+  margin-top: 4rpx;
+}
+
+.tab-item.tab-active .tab-count,
 .tab-item.tab-active .tab-text {
   color: #ffffff;
+}
+
+/* 加载失败 */
+.list-error {
+  display: flex;
+  justify-content: center;
+  padding: 60rpx 0;
+}
+
+.list-error-text {
+  font-size: 28rpx;
+  color: var(--color-text-hint);
 }
 
 /* 任务卡片 */
@@ -83,12 +79,21 @@
   border-radius: 16rpx;
   display: flex;
   align-items: center;
-  padding: 24rpx 20rpx;
+  padding: 20rpx 12rpx 20rpx 4rpx;
   margin-bottom: 16rpx;
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
-/* 复选框 */
+/* 复选框点击热区（视觉 44rpx，热区 ~84rpx） */
+.task-check-hit {
+  width: 84rpx;
+  height: 84rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .task-check {
   width: 44rpx;
   height: 44rpx;
@@ -97,8 +102,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  margin-right: 20rpx;
   background-color: #ffffff;
 }
 
@@ -138,7 +141,7 @@
 }
 
 .task-name-row {
-  margin-bottom: 10rpx;
+  margin-bottom: 8rpx;
 }
 
 .task-name {
@@ -182,9 +185,6 @@
   background-color: var(--color-bg);
   padding: 4rpx 12rpx;
   border-radius: 6rpx;
-  display: inline-flex;
-  align-items: center;
-  gap: 4rpx;
 }
 
 .due-tag.due-overdue {
@@ -192,25 +192,14 @@
   background-color: #fff5f5;
 }
 
-.due-icon {
-  font-size: 20rpx;
-}
-
-/* 删除按钮 */
-.task-delete {
-  width: 56rpx;
-  height: 56rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-left: 12rpx;
-}
-
-.delete-icon {
+/* 进入详情箭头 */
+.task-arrow {
   font-size: 40rpx;
-  color: #cccccc;
+  color: #c8c8c8;
   line-height: 1;
+  flex-shrink: 0;
+  margin-left: 8rpx;
+  padding: 0 8rpx;
 }
 
 /* 空状态 */
@@ -233,19 +222,35 @@
   color: var(--color-text-secondary);
 }
 
+.empty-desc {
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+  margin-top: 16rpx;
+  text-align: center;
+  padding: 0 60rpx;
+  line-height: 1.6;
+}
+
+.empty-actions {
+  margin-top: 48rpx;
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+}
+
 /* 悬浮新增按钮 */
 .fab {
   position: fixed;
   right: 32rpx;
-  bottom: 160rpx;
-  width: 100rpx;
-  height: 100rpx;
+  bottom: 32rpx;
+  width: 96rpx;
+  height: 96rpx;
   border-radius: 50%;
   background-color: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(76, 175, 80, 0.35);
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.16);
   z-index: 10;
 }
 

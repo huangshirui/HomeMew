@@ -5,33 +5,28 @@
     <text class="loading-text">加载中...</text>
   </view>
 
-  <block wx:else>
-    <!-- 统计卡片 -->
-    <view class="stats-row">
-      <view class="stat-card">
-        <text class="stat-number">{{pendingCount}}</text>
-        <text class="stat-label">进行中</text>
-      </view>
-      <view class="stat-card">
-        <text class="stat-number">{{completedCount}}</text>
-        <text class="stat-label">已完成</text>
+  <!-- 无家庭引导 -->
+  <block wx:elif="{{noFamily}}">
+    <view class="empty-state">
+      <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
+      <text class="empty-title">还没有家庭</text>
+      <text class="empty-desc">加入或创建家庭后，就可以和家人共享日程和待办。</text>
+      <view class="empty-actions">
+        <button class="btn-primary" bindtap="onCreateFamily">创建家庭</button>
+        <button class="btn-outline" style="margin-top: 24rpx;" bindtap="onJoinFamily">加入家庭</button>
       </view>
     </view>
+  </block>
 
-    <!-- 标签筛选 -->
+  <block wx:else>
+    <!-- 两段式统计 + 切换 -->
     <view class="tab-bar">
-      <view
-        class="tab-item {{activeTab === 'all' ? 'tab-active' : ''}}"
-        data-tab="all"
-        bindtap="onTabChange"
-      >
-        <text class="tab-text">全部</text>
-      </view>
       <view
         class="tab-item {{activeTab === 'pending' ? 'tab-active' : ''}}"
         data-tab="pending"
         bindtap="onTabChange"
       >
+        <text class="tab-count">{{pendingCount}}</text>
         <text class="tab-text">进行中</text>
       </view>
       <view
@@ -39,28 +34,31 @@
         data-tab="completed"
         bindtap="onTabChange"
       >
+        <text class="tab-count">{{completedCount}}</text>
         <text class="tab-text">已完成</text>
       </view>
     </view>
 
-    <!-- 任务列表 / 空状态 -->
-    <block wx:if="{{tasks.length > 0}}">
+    <!-- 加载失败 -->
+    <view wx:if="{{listError}}" class="list-error" bindtap="onRetry">
+      <text class="list-error-text">加载失败，点击重试</text>
+    </view>
+
+    <!-- 任务列表 -->
+    <block wx:elif="{{displayTasks.length > 0}}">
       <view
-        wx:for="{{tasks}}"
+        wx:for="{{displayTasks}}"
         wx:key="id"
-        wx:if="{{activeTab === 'all' || (activeTab === 'pending' && item.status === 'pending') || (activeTab === 'completed' && item.status === 'completed')}}"
         class="task-card"
         data-id="{{item.id}}"
         bindtap="onTaskTap"
       >
-        <!-- 左侧复选框 -->
-        <view
-          class="task-check {{item.status === 'completed' ? 'check-done' : ''}} {{item.completing ? 'check-loading' : ''}}"
-          data-id="{{item.id}}"
-          catchtap="onToggleStatus"
-        >
-          <text wx:if="{{item.status === 'completed' && !item.completing}}" class="check-icon-done">✓</text>
-          <text wx:if="{{item.completing}}" class="loading-dot"></text>
+        <!-- 左侧复选框（扩大点击热区） -->
+        <view class="task-check-hit" data-id="{{item.id}}" catchtap="onToggleStatus">
+          <view class="task-check {{item.status === 'completed' ? 'check-done' : ''}} {{item.completing ? 'check-loading' : ''}}">
+            <text wx:if="{{item.status === 'completed' && !item.completing}}" class="check-icon-done">✓</text>
+            <text wx:if="{{item.completing}}" class="loading-dot"></text>
+          </view>
         </view>
 
         <!-- 任务内容 -->
@@ -68,29 +66,24 @@
           <view class="task-name-row">
             <text class="task-name {{item.status === 'completed' ? 'name-done' : ''}} {{item.isOverdue ? 'name-overdue' : ''}}">{{item.name}}</text>
           </view>
-          <view class="task-meta">
-            <block wx:if="{{item.assignees.length > 0}}">
-              <text wx:for="{{item.assignees}}" wx:for-item="assignee" wx:for-index="assigneeIdx" wx:key="userId" class="assignee-tag">
-                {{assignee.displayName}}
-              </text>
-            </block>
-            <text wx:if="{{item.dueText}}" class="due-tag {{item.isOverdue ? 'due-overdue' : ''}}">
-              <text class="due-icon">📅</text> {{item.dueText}}
-            </text>
+          <view wx:if="{{item.assigneeText || item.dueText}}" class="task-meta">
+            <text wx:if="{{item.assigneeText}}" class="assignee-tag">{{item.assigneeText}}</text>
+            <text wx:if="{{item.dueText}}" class="due-tag {{item.isOverdue ? 'due-overdue' : ''}}">{{item.dueText}}</text>
           </view>
         </view>
 
-        <!-- 删除按钮 -->
-        <view class="task-delete" data-id="{{item.id}}" catchtap="onDelete">
-          <text class="delete-icon">×</text>
-        </view>
+        <!-- 进入详情箭头 -->
+        <text class="task-arrow">›</text>
       </view>
     </block>
 
-    <!-- 空状态 -->
-    <view wx:if="{{tasks.length === 0}}" class="empty-state">
+    <!-- 空状态（按当前 tab 区分） -->
+    <view wx:else class="empty-state">
       <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
-      <text class="empty-title">暂无任务，去添加吧</text>
+      <text class="empty-title">{{activeTab === 'pending' ? '还没有进行中的待办' : '还没有已完成的待办'}}</text>
+      <view wx:if="{{activeTab === 'pending'}}" class="empty-actions">
+        <button class="btn-primary" bindtap="onCreate">新建待办</button>
+      </view>
     </view>
 
     <!-- 悬浮新增按钮 -->

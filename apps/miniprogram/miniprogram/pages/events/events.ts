@@ -15,8 +15,6 @@ import { listEvents } from '../../services/events';
 import { currentFamilyStore } from '../../stores/index';
 import {
   showError,
-  showLoading,
-  hideLoading,
   getErrorMessage,
 } from '../../utils/index';
 import { Event } from '../../types/index';
@@ -55,14 +53,17 @@ Page({
     allEvents: [] as EventView[],
     displayedEvents: [] as EventView[],
     loaded: false,
+    noFamily: false,
     familyId: '' as string,
+    monthLoading: false,
+    listTitle: '全部日程',
+    showTodayBtn: false,
   },
 
   onLoad(options: { date?: string; familyId?: string; attendee?: string }): void {
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
     if (!familyId) {
-      showError('缺少家庭信息');
-      this.setData({ loaded: true });
+      this.setData({ loaded: true, noFamily: true });
       return;
     }
     const today = formatYmd(new Date());
@@ -71,6 +72,7 @@ Page({
       : 'all';
     this.setData({
       familyId,
+      noFamily: false,
       attendeeFilter: options?.attendee === 'me' ? 'me' : 'all',
       selectedDate: initialDate,
       shownYear: new Date().getFullYear(),
@@ -81,14 +83,32 @@ Page({
   },
 
   onShow(): void {
-    const familyId = currentFamilyStore.value?.id;
+    const familyId = currentFamilyStore.value?.id || '';
+    // 从无家庭恢复到有家庭
+    if (familyId && this.data.noFamily) {
+      this.setData({
+        familyId,
+        noFamily: false,
+        shownYear: new Date().getFullYear(),
+        shownMonth: new Date().getMonth() + 1,
+      });
+      this.refreshCalendar(formatYmd(new Date()));
+      this.loadEvents();
+      return;
+    }
+    // 家庭切换
     if (familyId && this.data.familyId && familyId !== this.data.familyId) {
       this.setData({ familyId });
       this.refreshCalendar(formatYmd(new Date()));
       this.loadEvents();
       return;
     }
-    if (this.data.loaded) {
+    // 变为无家庭
+    if (!familyId && this.data.loaded && !this.data.noFamily) {
+      this.setData({ noFamily: true });
+      return;
+    }
+    if (this.data.loaded && !this.data.noFamily) {
       this.loadEvents();
     }
   },
@@ -97,9 +117,13 @@ Page({
     const { shownYear, shownMonth } = this.data;
     const selected = this.data.selectedDate;
     const selectedDate = selected !== 'all' && selected ? new Date(selected + 'T00:00:00') : null;
+    const now = new Date();
+    const isCurMonth = shownYear === now.getFullYear() && shownMonth === now.getMonth() + 1;
+    const showTodayBtn = !(selected !== 'all' && selected === today && isCurMonth);
     this.setData({
       monthLabel: `${shownYear}年${shownMonth}月`,
       calendar: this.buildCalendarMatrix(shownYear, shownMonth, today, selectedDate),
+      showTodayBtn,
     });
   },
 
@@ -162,23 +186,25 @@ Page({
     const { shownYear, shownMonth } = this.data;
     const rangeStart = new Date(shownYear, shownMonth - 2, 1);
     const rangeEnd = new Date(shownYear, shownMonth + 1, 0);
-    showLoading('加载中...');
+    // 月份切换 / 初次加载使用局部 loading，避免整页转圈
+    this.setData({ monthLoading: true });
     try {
       const events = await listEvents(this.data.familyId, {
         start: formatYmd(rangeStart),
         end: formatYmd(addDays(rangeEnd, 1)),
+        ...(this.data.attendeeFilter === 'me' ? { attendeeId: 'me' } : {}),
       });
-      hideLoading();
       const views = this.mapEvents(events);
       this.setData({ allEvents: views, loaded: true });
       this.markCalendarHasEvent();
       this.applyFilter();
     } catch (error: unknown) {
-      hideLoading();
       console.error('[Events] Load failed:', error);
       const err = error as { code?: string; message?: string };
       showError(getErrorMessage(err.code, err.message));
       this.setData({ loaded: true });
+    } finally {
+      this.setData({ monthLoading: false });
     }
   },
 
@@ -216,20 +242,27 @@ Page({
   },
 
   applyFilter(): void {
-    const { allEvents, selectedDate, attendeeFilter } = this.data;
+    // 「只看我的」由服务端 attendeeId=me 过滤（见 loadEvents），此处仅做日期过滤。
+    const { allEvents, selectedDate } = this.data;
     let list = allEvents;
     if (selectedDate !== 'all') {
       list = list.filter(ev => expandEventDays(ev.raw).includes(selectedDate as string));
     }
-    if (attendeeFilter === 'me') {
-      // 当前用户 id 在 attendees 中包含自己；这里用一个简单占位：
-      // 通过 raw.attendees 列表无法直接知道"我"是谁，留作后续接入 currentUser 后再过滤。
-      // 当前实现下 attendeeFilter='me' 仅控制是否显示"只看我的"按钮，不在数据层硬过滤。
-    }
-    this.setData({ displayedEvents: list });
+    this.setData({ displayedEvents: list, listTitle: this.friendlyListTitle(selectedDate) });
+  },
+
+  /** 列表标题：友好展示当前筛选日期 */
+  friendlyListTitle(selectedDate: string | 'all'): string {
+    if (selectedDate === 'all') return '全部日程';
+    const today = formatYmd(new Date());
+    if (selectedDate === today) return '今天';
+    const tomorrow = formatYmd(addDays(new Date(), 1));
+    if (selectedDate === tomorrow) return '明天';
+    return friendlyDate(selectedDate);
   },
 
   onPrevMonth(): void {
+    if (this.data.monthLoading) return;
     const cur = this.data;
     let y = cur.shownYear;
     let m = cur.shownMonth - 1;
@@ -243,6 +276,7 @@ Page({
   },
 
   onNextMonth(): void {
+    if (this.data.monthLoading) return;
     const cur = this.data;
     let y = cur.shownYear;
     let m = cur.shownMonth + 1;
@@ -252,6 +286,20 @@ Page({
     }
     this.setData({ shownYear: y, shownMonth: m });
     this.refreshCalendar(formatYmd(new Date()));
+    this.loadEvents();
+  },
+
+  /** 回到今天：切回当前月并选中今天 */
+  onBackToToday(): void {
+    if (this.data.monthLoading) return;
+    const now = new Date();
+    const today = formatYmd(now);
+    this.setData({
+      shownYear: now.getFullYear(),
+      shownMonth: now.getMonth() + 1,
+      selectedDate: today,
+    });
+    this.refreshCalendar(today);
     this.loadEvents();
   },
 
@@ -272,7 +320,22 @@ Page({
   onToggleFilter(): void {
     const next = this.data.attendeeFilter === 'me' ? 'all' : 'me';
     this.setData({ attendeeFilter: next });
-    this.applyFilter();
+    // 「只看我的」需要服务端重新过滤，故重新拉取数据
+    this.loadEvents();
+  },
+
+  onClearFilter(): void {
+    this.setData({ attendeeFilter: 'all', selectedDate: 'all' });
+    this.refreshCalendar(formatYmd(new Date()));
+    this.loadEvents();
+  },
+
+  onCreateFamily(): void {
+    wx.navigateTo({ url: '/pages/family/create' });
+  },
+
+  onJoinFamily(): void {
+    wx.navigateTo({ url: '/pages/family/join' });
   },
 
   onEventTap(e: WechatMiniprogram.TouchEvent): void {
@@ -309,6 +372,21 @@ function addDays(d: Date, n: number): Date {
 
 function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六'];
+
+/** 将 YYYY-MM-DD 转成「M月D日 周X」或跨年时「YYYY年M月D日 周X」 */
+function friendlyDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return dateStr;
+  const week = WEEK_CN[d.getDay()];
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  if (d.getFullYear() === new Date().getFullYear()) {
+    return `${m}月${day}日 周${week}`;
+  }
+  return `${d.getFullYear()}年${m}月${day}日 周${week}`;
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {

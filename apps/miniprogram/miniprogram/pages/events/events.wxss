@@ -1,5 +1,10 @@
 /* 日程列表页样式 */
 
+/* 页面容器：底部留白，避免最后一条内容被 FAB 遮挡 */
+.container {
+  padding-bottom: 160rpx;
+}
+
 /* 加载状态 */
 .loading-state {
   display: flex;
@@ -14,6 +19,7 @@
 
 /* 日历卡片 */
 .calendar-card {
+  position: relative;
   background-color: var(--color-bg-white);
   border-radius: 16rpx;
   padding: 24rpx 24rpx 16rpx;
@@ -56,9 +62,55 @@
   border-radius: 24rpx;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-left: 16rpx;
+}
+
+.today-btn {
+  padding: 6rpx 18rpx;
+  border: 2rpx solid var(--color-primary);
+  border-radius: 24rpx;
+}
+
+.today-text {
+  font-size: 24rpx;
+  color: var(--color-primary);
+}
+
 .show-all-text {
   font-size: 24rpx;
   color: var(--color-primary);
+}
+
+/* 月份切换局部 loading 遮罩 */
+.cal-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.65);
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.cal-spinner {
+  width: 48rpx;
+  height: 48rpx;
+  border: 4rpx solid #e0e0e0;
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* 星期表头 */
@@ -137,7 +189,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8rpx;
+  padding: 0;
   margin-bottom: 16rpx;
 }
 
@@ -226,6 +278,16 @@
   color: var(--color-text-hint);
 }
 
+/* 全天日程标识 */
+.event-allday-tag {
+  font-size: 22rpx;
+  color: #ffffff;
+  background-color: #FF9800;
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+  font-weight: 500;
+}
+
 .event-attendees {
   font-size: 24rpx;
   color: var(--color-text-hint);
@@ -254,7 +316,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 80rpx;
+  padding-top: 120rpx;
 }
 
 .empty-image {
@@ -275,19 +337,49 @@
   color: var(--color-text-hint);
 }
 
+.empty-desc {
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+  margin-top: 16rpx;
+  text-align: center;
+  padding: 0 60rpx;
+  line-height: 1.6;
+}
+
+.empty-actions {
+  margin-top: 48rpx;
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+}
+
+.empty-actions-row {
+  flex-direction: row;
+  justify-content: center;
+  gap: 24rpx;
+  width: auto;
+}
+
+.btn-sm {
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 28rpx;
+  padding: 0 40rpx;
+}
+
 /* 悬浮新增按钮 */
 .fab {
   position: fixed;
   right: 32rpx;
-  bottom: 160rpx;
-  width: 100rpx;
-  height: 100rpx;
+  bottom: 32rpx;
+  width: 96rpx;
+  height: 96rpx;
   border-radius: 50%;
   background-color: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(76, 175, 80, 0.35);
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.16);
   z-index: 10;
 }
 

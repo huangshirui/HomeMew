@@ -5,6 +5,19 @@
     <text class="loading-text">加载中...</text>
   </view>
 
+  <!-- 无家庭引导 -->
+  <block wx:elif="{{noFamily}}">
+    <view class="empty-state">
+      <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
+      <text class="empty-title">还没有家庭</text>
+      <text class="empty-desc">加入或创建家庭后，就可以和家人共享日程和待办。</text>
+      <view class="empty-actions">
+        <button class="btn-primary" bindtap="onCreateFamily">创建家庭</button>
+        <button class="btn-outline" style="margin-top: 24rpx;" bindtap="onJoinFamily">加入家庭</button>
+      </view>
+    </view>
+  </block>
+
   <block wx:else>
     <!-- 日历卡片 -->
     <view class="calendar-card">
@@ -17,13 +30,27 @@
         <view class="nav-arrow" bindtap="onNextMonth">
           <text class="arrow-text">›</text>
         </view>
-        <view
-          wx:if="{{selectedDate !== 'all'}}"
-          class="show-all-btn"
-          bindtap="onShowAll"
-        >
-          <text class="show-all-text">全部</text>
+        <view class="header-actions">
+          <view
+            wx:if="{{showTodayBtn}}"
+            class="today-btn"
+            bindtap="onBackToToday"
+          >
+            <text class="today-text">今天</text>
+          </view>
+          <view
+            wx:if="{{selectedDate !== 'all'}}"
+            class="show-all-btn"
+            bindtap="onShowAll"
+          >
+            <text class="show-all-text">全部</text>
+          </view>
         </view>
+      </view>
+
+      <!-- 月份切换局部 loading -->
+      <view wx:if="{{monthLoading}}" class="cal-loading">
+        <view class="cal-spinner"></view>
       </view>
 
       <!-- 星期表头 -->
@@ -55,9 +82,7 @@
 
     <!-- 列表标题与筛选 -->
     <view class="list-header">
-      <text class="list-title">
-        {{selectedDate === 'all' ? '全部日程' : selectedDate}}
-      </text>
+      <text class="list-title">{{listTitle}}</text>
       <view class="filter-btn {{attendeeFilter === 'me' ? 'filter-active' : ''}}" bindtap="onToggleFilter">
         <text class="filter-text">{{attendeeFilter === 'me' ? '只看我的' : '全部参与人'}}</text>
       </view>
@@ -79,7 +104,8 @@
             <text wx:if="{{item.cancelled}}" class="event-cancelled">已取消</text>
           </view>
           <view class="event-meta">
-            <text class="event-time">{{item.startText}}</text>
+            <text wx:if="{{item.isAllDay}}" class="event-allday-tag">全天</text>
+            <text wx:else class="event-time">{{item.startText}}</text>
             <text wx:if="{{item.attendees.length > 0}}" class="event-attendees">
               {{item.attendees[0].displayName}}
               <text wx:if="{{item.attendees.length > 1}}" class="event-attendees-more">
@@ -89,15 +115,24 @@
           </view>
         </view>
         <view class="event-arrow">
-          <text class="arrow-text">×</text>
+          <text class="arrow-text">›</text>
         </view>
       </view>
     </block>
 
     <view wx:else class="empty-state">
       <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
-      <text class="empty-title">这里还没有日程</text>
-      <text wx:if="{{selectedDate !== 'all'}}" class="empty-hint">点击右上角"全部"查看所有日程</text>
+      <text class="empty-title">
+        {{attendeeFilter === 'me' ? '没有分配给我的日程' : (selectedDate === 'all' ? '本月没有日程' : '这一天没有日程')}}
+      </text>
+      <view class="empty-actions empty-actions-row">
+        <button class="btn-primary btn-sm" bindtap="onCreate">新建日程</button>
+        <button
+          wx:if="{{attendeeFilter === 'me' || selectedDate !== 'all'}}"
+          class="btn-outline btn-sm"
+          bindtap="onClearFilter"
+        >查看全部</button>
+      </view>
     </view>
 
     <!-- 悬浮新增按钮 -->

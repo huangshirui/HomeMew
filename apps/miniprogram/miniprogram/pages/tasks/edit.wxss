@@ -174,14 +174,25 @@
   padding: 12rpx 0 4rpx;
 }
 
-/* 操作按钮 */
-.actions {
-  display: flex;
-  gap: 20rpx;
-  margin-top: 40rpx;
-  padding: 0 0rpx;
+/* 底部固定保存栏 */
+.footer-spacer {
+  height: 180rpx;
 }
 
-.actions .flex-1 {
+.footer-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 20rpx;
+  padding: 16rpx 24rpx;
+  background-color: var(--color-bg-white);
+  border-top: 2rpx solid var(--color-divider);
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.04);
+  z-index: 20;
+}
+
+.footer-btn {
   flex: 1;
 }

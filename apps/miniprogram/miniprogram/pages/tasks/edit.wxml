@@ -83,16 +83,18 @@
       </view>
     </view>
 
-    <!-- 操作按钮 -->
-    <view class="actions">
-      <button class="btn-outline flex-1" bindtap="onCancel">取消</button>
-      <button
-        class="btn-primary flex-1"
-        disabled="{{submitting}}"
-        bindtap="onSubmit"
-      >
-        {{submitting ? '保存中...' : (mode === 'edit' ? '保存' : '创建')}}
-      </button>
-    </view>
+    <view class="footer-spacer"></view>
   </block>
+
+  <!-- 底部固定保存栏 -->
+  <view class="footer-bar safe-area-bottom">
+    <button class="btn-outline footer-btn" bindtap="onCancel">取消</button>
+    <button
+      class="btn-primary footer-btn"
+      disabled="{{submitting}}"
+      bindtap="onSubmit"
+    >
+      {{submitting ? '保存中...' : (mode === 'edit' ? '保存' : '创建')}}
+    </button>
+  </view>
 </view>

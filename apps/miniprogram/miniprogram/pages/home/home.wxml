@@ -25,10 +25,30 @@
       </view>
     </view>
 
-    <!-- 今日日程 -->
+    <!-- 快速操作区 -->
+    <view class="card section quick-actions">
+      <view class="quick-action-item" bindtap="onCreateEvent">
+        <view class="qa-icon qa-event">日</view>
+        <text class="qa-label">新建日程</text>
+      </view>
+      <view class="quick-action-item" bindtap="onCreateTask">
+        <view class="qa-icon qa-task">✓</view>
+        <text class="qa-label">新建待办</text>
+      </view>
+      <view
+        wx:if="{{isAdmin}}"
+        class="quick-action-item"
+        bindtap="onInviteFamily"
+      >
+        <view class="qa-icon qa-invite">＋</view>
+        <text class="qa-label">邀请家人</text>
+      </view>
+    </view>
+
+    <!-- 近期日程 -->
     <view class="card section">
       <view class="section-header" bindtap="onViewEvents">
-        <text class="section-title">今日日程</text>
+        <text class="section-title">近期日程</text>
         <text class="section-more">查看全部 ›</text>
       </view>
 
@@ -43,15 +63,16 @@
       </view>
 
       <!-- 日程列表 -->
-      <view wx:elif="{{todayEvents.length > 0}}" class="event-list">
+      <view wx:elif="{{upcomingEvents.length > 0}}" class="event-list">
         <view
-          wx:for="{{todayEvents}}"
+          wx:for="{{upcomingEvents}}"
           wx:key="id"
           class="event-item"
           data-id="{{item.id}}"
           bindtap="onEventTap"
         >
-          <view class="event-time-col">
+          <view class="event-date-col">
+            <text class="event-date">{{item.dateText}}</text>
             <text class="event-time">{{item.timeText}}</text>
           </view>
           <view class="event-info">
@@ -63,11 +84,11 @@
 
       <!-- 空状态 -->
       <view wx:else class="empty-hint">
-        <text class="empty-text">今天暂无日程</text>
+        <text class="empty-text">未来 7 天暂无日程</text>
       </view>
 
-      <view class="quick-action" bindtap="onCreateEvent">
-        <text class="quick-action-text">+ 快速新建日程</text>
+      <view wx:if="{{upcomingTotal > 3}}" class="view-more" bindtap="onViewEvents">
+        <text class="view-more-text">查看全部 {{upcomingTotal}} 条日程 ›</text>
       </view>
     </view>
 
@@ -110,7 +131,7 @@
             <text class="task-name {{item.isOverdue ? 'name-overdue' : ''}}">{{item.name}}</text>
             <view wx:if="{{item.assigneeText || item.dueText}}" class="task-meta">
               <text wx:if="{{item.assigneeText}}" class="assignee-tag">{{item.assigneeText}}</text>
-              <text wx:if="{{item.dueText}}" class="due-tag {{item.isOverdue ? 'due-overdue' : ''}}">📅 {{item.dueText}}</text>
+              <text wx:if="{{item.dueText}}" class="due-tag {{item.isOverdue ? 'due-overdue' : ''}}">{{item.dueText}}</text>
             </view>
           </view>
         </view>
@@ -121,8 +142,8 @@
         <text class="empty-text">暂无待办任务</text>
       </view>
 
-      <view class="quick-action" bindtap="onCreateTask">
-        <text class="quick-action-text">+ 快速新建待办</text>
+      <view wx:if="{{pendingTaskCount > 3}}" class="view-more" bindtap="onViewTasks">
+        <text class="view-more-text">查看全部 {{pendingTaskCount}} 条待办 ›</text>
       </view>
     </view>
   </block>
