@@ -1,1 +1,19 @@
-{"compilerOptions": {"target": "ES2017", "module": "CommonJS", "strict": true, "esModuleInterop": true, "skipLibCheck": true, "forceConsistentCasingInFileNames": true, "lib": ["ES2017"], "types": ["miniprogram-api-typings"], "outDir": "./dist", "rootDir": ".", "baseUrl": ".", "paths": {"@/*": ["./*"]}}, "include": ["**/*.ts"], "exclude": ["node_modules", "dist"]}
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "CommonJS",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2017"],
+    "types": ["miniprogram-api-typings"],
+    "outDir": "./dist",
+    "rootDir": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
