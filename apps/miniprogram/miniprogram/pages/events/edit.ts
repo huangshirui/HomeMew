@@ -15,14 +15,21 @@
 
 import { getEvent, createEvent, updateEvent } from '../../services/events';
 import { listFamilyMembers } from '../../services/families';
+import { currentFamilyStore, familiesStore } from '../../stores/index';
 import {
   showError,
   showSuccess,
   showLoading,
   hideLoading,
   getErrorMessage,
+  isVersionConflict,
+  parseDateOnly,
+  formatDateOnly,
+  addDaysToDateOnly,
+  zonedDateTimeToIso,
 } from '../../utils/index';
 import { Event, FamilyMember, CreateEventRequest, UpdateEventRequest } from '../../types/index';
+import { markDirty } from '../../stores/dirty';
 
 type MemberOption = {
   userId: string;
@@ -40,7 +47,10 @@ Page({
     eventId: '',
     version: 0,
     loaded: false,
+    loadError: false,
     submitting: false,
+    /** 家庭时区（IANA），用于带时间日程的正确转换 */
+    timezone: 'Asia/Shanghai',
     members: [] as MemberOption[],
     summary: '',
     description: '',
@@ -75,6 +85,7 @@ Page({
       startDate: initialDate,
       endDate: initialDate,
       minDate: '1970-01-01',
+      timezone: resolveFamilyTimezone(familyId),
     });
     wx.setNavigationBarTitle({
       title: options?.id ? '编辑日程' : '添加日程',
@@ -86,8 +97,17 @@ Page({
     }
   },
 
+  onRetryLoad(): void {
+    if (this.data.mode === 'edit') {
+      this.loadEvent();
+    } else {
+      this.loadMembersAndInit();
+    }
+  },
+
   async loadEvent(): Promise<void> {
     showLoading('加载日程中...');
+    this.setData({ loadError: false });
     try {
       const [event, members] = await Promise.all([
         getEvent(this.data.familyId, this.data.eventId),
@@ -99,12 +119,14 @@ Page({
       hideLoading();
       console.error('[EventEdit] Load event failed:', error);
       const err = error as { code?: string; message?: string };
+      this.setData({ loadError: true });
       showError(getErrorMessage(err.code, err.message) || '日程加载失败');
     }
   },
 
   async loadMembersAndInit(): Promise<void> {
     showLoading('加载成员中...');
+    this.setData({ loadError: false });
     try {
       const members = await listFamilyMembers(this.data.familyId);
       hideLoading();
@@ -122,28 +144,37 @@ Page({
       hideLoading();
       console.error('[EventEdit] Load members failed:', error);
       const err = error as { code?: string; message?: string };
+      this.setData({ loadError: true });
       showError(getErrorMessage(err.code, err.message) || '成员加载失败');
     }
   },
 
   applyEvent(event: Event, members: FamilyMember[]): void {
     const selectedIds = new Set(event.attendees.map(a => a.userId));
-    const start = new Date(event.start);
-    const end = new Date(event.end);
+    let startDateStr: string;
     let endDateStr: string;
+    let startTimeStr = '09:00';
+    let endTimeStr = '10:00';
     if (event.isAllDay) {
-      endDateStr = formatYmd(addDays(end, -1));
+      // 全天：start / end 为纯日期，按天解析（不走 UTC），end 为不包含式，显示时回退一天
+      startDateStr = formatDateOnly(parseDateOnly(event.start));
+      endDateStr = addDaysToDateOnly(formatDateOnly(parseDateOnly(event.end)), -1);
     } else {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      startDateStr = formatYmd(start);
       endDateStr = formatYmd(end);
+      startTimeStr = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+      endTimeStr = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
     }
     this.setData({
       summary: event.summary,
       description: event.description || '',
       isAllDay: event.isAllDay,
-      startDate: formatYmd(start),
+      startDate: startDateStr,
       endDate: endDateStr,
-      startTime: event.isAllDay ? '09:00' : `${pad(start.getHours())}:${pad(start.getMinutes())}`,
-      endTime: event.isAllDay ? '10:00' : `${pad(end.getHours())}:${pad(end.getMinutes())}`,
+      startTime: startTimeStr,
+      endTime: endTimeStr,
       location: event.location || '',
       version: event.version,
       members: members.map(m => ({
@@ -247,28 +278,30 @@ Page({
       showError('请选择日期');
       return;
     }
-    if (new Date(this.data.startDate) > new Date(this.data.endDate)) {
+    // 纯日期比较：按天解析，避免 UTC 解析在负时区偏移
+    if (parseDateOnly(this.data.startDate) > parseDateOnly(this.data.endDate)) {
       showError('结束日期不能早于开始日期');
       return;
     }
+    const timezone = this.data.timezone || 'Asia/Shanghai';
     let startIso = '';
     let endIso = '';
     if (this.data.isAllDay) {
+      // 全天：使用纯日期，end 为不包含式（显示的最后一天 +1）
       startIso = this.data.startDate;
-      endIso = formatYmd(addDays(new Date(this.data.endDate), 1));
+      endIso = addDaysToDateOnly(this.data.endDate, 1);
     } else {
       if (!/^\d{1,2}:\d{2}$/.test(this.data.startTime) || !/^\d{1,2}:\d{2}$/.test(this.data.endTime)) {
         showError('请输入有效的时间');
         return;
       }
-      const startDt = new Date(`${this.data.startDate}T${this.data.startTime}:00+08:00`);
-      const endDt = new Date(`${this.data.endDate}T${this.data.endTime}:00+08:00`);
-      if (isNaN(startDt.getTime()) || isNaN(endDt.getTime()) || endDt <= startDt) {
+      // 按家庭时区把墙上时间转换为 UTC ISO，避免非东八区家庭产生偏移
+      startIso = zonedDateTimeToIso(this.data.startDate, this.data.startTime, timezone);
+      endIso = zonedDateTimeToIso(this.data.endDate, this.data.endTime, timezone);
+      if (new Date(endIso).getTime() <= new Date(startIso).getTime()) {
         showError('结束时间必须晚于开始时间');
         return;
       }
-      startIso = startDt.toISOString();
-      endIso = endDt.toISOString();
     }
 
     const attendeeIds = this.data.members.filter(m => m.selected).map(m => m.userId);
@@ -278,7 +311,7 @@ Page({
       start: startIso,
       end: endIso,
       isAllDay: this.data.isAllDay,
-      timezone: 'Asia/Shanghai',
+      timezone,
       attendeeIds,
       location: this.data.location.trim() || null,
     };
@@ -294,13 +327,14 @@ Page({
       }
       hideLoading();
       showSuccess(this.data.mode === 'edit' ? '已保存' : '已创建');
+      markDirty('events');
       setTimeout(() => wx.navigateBack(), 800);
     } catch (error: unknown) {
       hideLoading();
       this.setData({ submitting: false });
       console.error('[EventEdit] Submit failed:', error);
       const err = error as { code?: string; message?: string };
-      if (err.code === 'CONFLICT' || err.code === 'VERSION_CONFLICT') {
+      if (isVersionConflict(err.code)) {
         showError('该日程已被其他成员修改，请重新进入编辑');
         return;
       }
@@ -321,8 +355,12 @@ function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
+/** 根据 familyId 解析家庭时区（优先当前家庭，其次家庭列表，最后回退东八区） */
+function resolveFamilyTimezone(familyId: string): string {
+  const current = currentFamilyStore.value;
+  if (current && current.id === familyId && current.timezone) {
+    return current.timezone;
+  }
+  const found = familiesStore.value.find(f => f.id === familyId);
+  return found?.timezone || 'Asia/Shanghai';
 }

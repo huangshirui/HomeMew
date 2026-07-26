@@ -1,3 +1,5 @@
+import { FamilyListItem } from './types/index';
+
 App<IAppOption>({
   globalData: {
     userInfo: null,
@@ -11,7 +13,7 @@ App<IAppOption>({
       return;
     }
     wx.cloud.init({
-      env: wx.cloud.DYNAMIC_CURRENT_ENV,
+      env: (wx.cloud as unknown as { DYNAMIC_CURRENT_ENV: string }).DYNAMIC_CURRENT_ENV,
       traceUser: true,
     });
   },

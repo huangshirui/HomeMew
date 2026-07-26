@@ -88,8 +88,16 @@
       </view>
     </view>
 
+    <!-- 加载失败 -->
+    <view wx:if="{{listError}}" class="empty-state">
+      <text class="empty-title">日程加载失败</text>
+      <view class="empty-actions">
+        <button class="btn-outline btn-sm" bindtap="onRetry">点击重试</button>
+      </view>
+    </view>
+
     <!-- 日程列表 / 空状态 -->
-    <block wx:if="{{displayedEvents.length > 0}}">
+    <block wx:elif="{{displayedEvents.length > 0}}">
       <view
         wx:for="{{displayedEvents}}"
         wx:key="id"

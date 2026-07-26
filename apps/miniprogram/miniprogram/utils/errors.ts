@@ -33,11 +33,29 @@ export const ERROR_MESSAGES: Record<string, string> = {
   SYSTEM_ACCESS_DENIED: '该外部系统无权访问本家庭',
   SYSTEM_PERMISSION_DENIED: '该外部系统缺少所需权限',
 
+  // 乐观并发版本冲突（Core 实际返回值）
+  TASK_VERSION_CONFLICT: '待办已被其他家庭成员修改，请刷新后重试',
+  EVENT_VERSION_CONFLICT: '日程已被其他家庭成员修改，请刷新后重试',
+
   // 兼容别名，避免契约未明确时使用方拿到不同字符串导致文案缺失
   FAMILY_CREATION_LIMIT_REACHED: '每个用户最多创建 3 个家庭',
   NOT_FOUND: '内容不存在或已被删除',
   CONFLICT: '内容已被其他家庭成员修改，请刷新后重试',
+  VERSION_CONFLICT: '内容已被其他家庭成员修改，请刷新后重试',
 };
+
+/**
+ * 是否为乐观并发版本冲突。
+ * 统一判断入口，避免各页面各写一套不一致的错误码判断。
+ */
+export function isVersionConflict(code?: string): boolean {
+  return (
+    code === 'TASK_VERSION_CONFLICT' ||
+    code === 'EVENT_VERSION_CONFLICT' ||
+    code === 'VERSION_CONFLICT' ||
+    code === 'CONFLICT'
+  );
+}
 
 /**
  * 根据错误码获取用户友好提示。

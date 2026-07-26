@@ -29,10 +29,15 @@ Page({
   data: {
     code: '',
     preview: null as InvitePreview | null,
+    /** 当前 preview 对应的邀请码，用于防止预览与输入框不一致时误加入 */
+    previewCode: '',
     previewError: '',
     submitting: false,
     joined: false,
   },
+
+  /** 预览请求序号：丢弃过期（快速改码）返回结果 */
+  _previewSeq: 0,
 
   onLoad(options: { code?: string }): void {
     if (options?.code) {
@@ -42,7 +47,8 @@ Page({
   },
 
   onCodeInput(e: WechatMiniprogram.Input): void {
-    this.setData({ code: e.detail.value, preview: null, previewError: '' });
+    // 修改邀请码时清除旧预览，避免用旧家庭预览加入新码
+    this.setData({ code: e.detail.value, preview: null, previewCode: '', previewError: '' });
   },
 
   async onPreview(): Promise<void> {
@@ -51,14 +57,18 @@ Page({
       showError('请输入邀请码');
       return;
     }
+    const seq = ++this._previewSeq;
     showLoading('验证邀请码...');
     try {
       const preview = await previewInvite(code);
-      this.setData({ preview, previewError: '' });
+      // 已发起更新的预览，或输入框已改成别的码：丢弃本次结果
+      if (seq !== this._previewSeq || code !== (this.data.code || '').trim()) return;
+      this.setData({ preview, previewCode: code, previewError: '' });
     } catch (error: unknown) {
+      if (seq !== this._previewSeq || code !== (this.data.code || '').trim()) return;
       console.error('[Join] Preview failed:', error);
       const err = error as { code?: string; message?: string };
-      this.setData({ preview: null, previewError: getErrorMessage(err.code, err.message) });
+      this.setData({ preview: null, previewCode: '', previewError: getErrorMessage(err.code, err.message) });
     } finally {
       hideLoading();
     }
@@ -73,6 +83,12 @@ Page({
     // 必须先验证通过（拿到预览）才能确认加入
     if (!this.data.preview) {
       showError('请先验证邀请码');
+      return;
+    }
+    // 预览与当前邀请码不一致（预览返回晚于改码）：要求重新验证，避免加入错误家庭
+    if (this.data.previewCode !== code) {
+      this.setData({ preview: null, previewCode: '' });
+      showError('邀请码已修改，请重新验证');
       return;
     }
     if (this.data.submitting) return;

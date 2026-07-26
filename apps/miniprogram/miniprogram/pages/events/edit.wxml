@@ -1,6 +1,12 @@
 <!-- 日程创建/编辑页 -->
 <view class="container">
-  <view wx:if="{{!loaded}}" class="loading-state">
+  <!-- 加载失败 -->
+  <view wx:if="{{loadError}}" class="load-error-state">
+    <text class="load-error-text">加载失败</text>
+    <button class="btn-outline btn-sm" bindtap="onRetryLoad">重新加载</button>
+  </view>
+
+  <view wx:elif="{{!loaded}}" class="loading-state">
     <text class="loading-text">加载中...</text>
   </view>
 
@@ -136,8 +142,8 @@
     <view class="footer-spacer"></view>
   </block>
 
-  <!-- 底部固定保存栏 -->
-  <view class="footer-bar safe-area-bottom">
+  <!-- 底部固定保存栏（仅加载成功后显示，避免加载中 / 失败时仍可点击） -->
+  <view wx:if="{{loaded}}" class="footer-bar safe-area-bottom">
     <button class="btn-outline footer-btn" bindtap="onCancel">取消</button>
     <button
       class="btn-primary footer-btn"

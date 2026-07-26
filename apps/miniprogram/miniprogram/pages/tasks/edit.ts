@@ -19,8 +19,10 @@ import {
   showLoading,
   hideLoading,
   getErrorMessage,
+  isVersionConflict,
 } from '../../utils/index';
 import { Task, FamilyMember, CreateTaskRequest, UpdateTaskRequest } from '../../types/index';
+import { markDirty } from '../../stores/dirty';
 
 type MemberOption = {
   userId: string;
@@ -38,6 +40,7 @@ Page({
     taskId: '',
     version: 0,
     loaded: false,
+    loadError: false,
     submitting: false,
     members: [] as MemberOption[],
     name: '',
@@ -74,8 +77,17 @@ Page({
     }
   },
 
+  onRetryLoad(): void {
+    if (this.data.mode === 'edit') {
+      this.loadTask();
+    } else {
+      this.loadMembersAndInit();
+    }
+  },
+
   async loadTask(): Promise<void> {
     showLoading('加载任务中...');
+    this.setData({ loadError: false });
     try {
       const [task, members] = await Promise.all([
         getTask(this.data.familyId, this.data.taskId),
@@ -87,12 +99,14 @@ Page({
       hideLoading();
       console.error('[TaskEdit] Load task failed:', error);
       const err = error as { code?: string; message?: string };
+      this.setData({ loadError: true });
       showError(getErrorMessage(err.code, err.message) || '任务加载失败');
     }
   },
 
   async loadMembersAndInit(): Promise<void> {
     showLoading('加载成员中...');
+    this.setData({ loadError: false });
     try {
       const members = await listFamilyMembers(this.data.familyId);
       hideLoading();
@@ -110,6 +124,7 @@ Page({
       hideLoading();
       console.error('[TaskEdit] Load members failed:', error);
       const err = error as { code?: string; message?: string };
+      this.setData({ loadError: true });
       showError(getErrorMessage(err.code, err.message) || '成员加载失败');
     }
   },
@@ -208,13 +223,14 @@ Page({
       }
       hideLoading();
       showSuccess(this.data.mode === 'edit' ? '已保存' : '已创建');
+      markDirty('tasks');
       setTimeout(() => wx.navigateBack(), 800);
     } catch (error: unknown) {
       hideLoading();
       this.setData({ submitting: false });
       console.error('[TaskEdit] Submit failed:', error);
       const err = error as { code?: string; message?: string };
-      if (err.code === 'CONFLICT' || err.code === 'VERSION_CONFLICT') {
+      if (isVersionConflict(err.code)) {
         showError('该任务已被其他成员修改，请重新进入编辑');
         return;
       }

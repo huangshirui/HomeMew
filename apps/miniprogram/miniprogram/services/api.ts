@@ -119,7 +119,7 @@ function doRequest(
   return new Promise<WxRequestResult>((resolve, reject) => {
     wx.request({
       url,
-      method,
+      method: method as unknown as WechatMiniprogram.RequestOption['method'],
       data,
       header: requestHeaders,
       timeout,
@@ -153,18 +153,25 @@ export function request<T>(path: string, options: RequestOptions = {}): Promise<
   } = options;
 
   const url = `${getCoreBaseUrl()}${path}`;
-  const token = getValidToken();
-
-  const requestHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...headers,
-  };
-
-  if (token) {
-    requestHeaders['Authorization'] = `Bearer ${token}`;
-  }
 
   return (async (): Promise<T> => {
+    // 发送前保证 Token 有效：本地已过期（或缺失）时先刷新一次。
+    // 这样写请求（POST/PATCH/DELETE）在 Token 刚过期时也能在发送前拿到有效令牌，
+    // 而不会因缺少 Authorization 直接 401 失败。写请求发送后仍不自动重试。
+    let token = getValidToken();
+    if (!token) {
+      token = await refreshToken();
+    }
+    if (!token) {
+      throw new AppError('UNAUTHORIZED', '登录状态已过期，请重新登录');
+    }
+
+    const requestHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...headers,
+      Authorization: `Bearer ${token}`,
+    };
+
     const res = await doRequest(url, method, data, requestHeaders, REQUEST_TIMEOUT);
 
     if (res.statusCode >= 200 && res.statusCode < 300) {

@@ -12,7 +12,8 @@
 
 import { listTasks, completeTask, reopenTask } from '../../services/tasks';
 import { currentFamilyStore } from '../../stores/index';
-import { showError, showSuccess, getErrorMessage } from '../../utils/index';
+import { consumeDirty, markDirty, subscribe } from '../../stores/dirty';
+import { showError, showSuccess, getErrorMessage, isVersionConflict } from '../../utils/index';
 import { Task } from '../../types/index';
 
 type TabType = 'pending' | 'completed';
@@ -43,6 +44,12 @@ Page({
     familyId: '' as string,
   },
 
+  /** 请求序号：用于丢弃过期（家庭切换 / 慢网络）返回结果 */
+  _reqSeq: 0,
+
+  // 脏标记订阅句柄：页面可见期间订阅，隐藏时取消，避免误刷新与泄漏
+  _dirtyUnsubscribe: null as (() => void) | null,
+
   onLoad(options: { familyId?: string }): void {
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
     if (!familyId) {
@@ -54,6 +61,7 @@ Page({
   },
 
   onShow(): void {
+    this._subscribeDirty();
     const familyId = currentFamilyStore.value?.id || '';
     // 从无家庭恢复到有家庭
     if (familyId && this.data.noFamily) {
@@ -73,21 +81,43 @@ Page({
       return;
     }
     if (this.data.loaded && !this.data.noFamily) {
+      // 已加载：仅当数据被标记变更（新建 / 编辑 / 删除 / 完成 / 恢复后返回）时才重新拉取
+      if (consumeDirty('tasks')) {
+        this.loadTasks();
+      }
+      return;
+    }
+  },
+
+  _subscribeDirty(): void {
+    this._unsubscribeDirty();
+    this._dirtyUnsubscribe = subscribe((domain) => {
+      if (domain !== 'tasks') return;
+      if (!this.data.loaded || this.data.noFamily) return;
+      if (currentFamilyStore.value?.id !== this.data.familyId) return;
       this.loadTasks();
+    });
+  },
+
+  _unsubscribeDirty(): void {
+    if (this._dirtyUnsubscribe) {
+      this._dirtyUnsubscribe();
+      this._dirtyUnsubscribe = null;
     }
   },
 
   async loadTasks(): Promise<void> {
-    if (!this.data.familyId) return;
-    if (!this.data.loaded) {
-      // 首次加载展示加载态；刷新时静默
-    }
+    const familyId = this.data.familyId;
+    if (!familyId) return;
+    const reqSeq = ++this._reqSeq;
     this.setData({ listError: false });
     try {
       const [pending, completed] = await Promise.all([
-        listTasks(this.data.familyId, { status: 'pending' }),
-        listTasks(this.data.familyId, { status: 'completed' }),
+        listTasks(familyId, { status: 'pending' }),
+        listTasks(familyId, { status: 'completed' }),
       ]);
+      // 家庭已切换 / 存在更新的请求：丢弃过期结果，避免旧家庭数据覆盖当前页面
+      if (reqSeq !== this._reqSeq || familyId !== this.data.familyId) return;
       const pendingTasks = this.mapTasks(pending);
       const completedTasks = this.mapTasks(completed);
       this.setData({
@@ -100,6 +130,7 @@ Page({
         listError: false,
       });
     } catch (error: unknown) {
+      if (reqSeq !== this._reqSeq || familyId !== this.data.familyId) return;
       console.error('[Tasks] Load failed:', error);
       const err = error as { code?: string; message?: string };
       this.setData({ loaded: true, listError: true });
@@ -142,6 +173,7 @@ Page({
 
   async onToggleStatus(e: WechatMiniprogram.TouchEvent): Promise<void> {
     const id = e.currentTarget.dataset.id as string;
+    const familyId = this.data.familyId;
     const inPending = this.data.pendingTasks.find(t => t.id === id);
     const inCompleted = this.data.completedTasks.find(t => t.id === id);
     const task = inPending || inCompleted;
@@ -151,26 +183,47 @@ Page({
     this.setCompleting(id, true);
 
     try {
-      if (task.status === 'pending') {
-        await completeTask(this.data.familyId, id, task.version);
-        showSuccess('已完成');
-      } else {
-        await reopenTask(this.data.familyId, id, task.version);
-        showSuccess('已恢复');
-      }
-      // 操作成功后重新拉取，保证两份列表与计数一致
-      this.loadTasks();
+      const updated = task.status === 'pending'
+        ? await completeTask(familyId, id, task.version)
+        : await reopenTask(familyId, id, task.version);
+      // 家庭已切换：不再改动当前页面
+      if (familyId !== this.data.familyId) return;
+      showSuccess(task.status === 'pending' ? '已完成' : '已恢复');
+      // 直接用返回结果在两份列表间移动，立即消除 loading；再后台静默刷新校准
+      this.applyToggledTask(id, updated);
+      // mark dirty so home / other tabs refresh on return, and this page refreshes live via subscription
+      markDirty('tasks');
     } catch (error: unknown) {
+      if (familyId !== this.data.familyId) return;
       this.setCompleting(id, false);
       console.error('[Tasks] Toggle status failed:', error);
       const err = error as { code?: string; message?: string };
-      if (err.code === 'CONFLICT' || err.code === 'VERSION_CONFLICT') {
-        showError('内容已被其他家庭成员修改，请刷新后重试');
+      if (isVersionConflict(err.code)) {
+        showError(getErrorMessage(err.code) || '内容已被其他家庭成员修改，请刷新后重试');
         this.loadTasks();
         return;
       }
       showError(getErrorMessage(err.code, err.message) || '操作失败，请重试');
     }
+  },
+
+  /** 根据返回的最新 Task，在「进行中 / 已完成」两份列表间移动该任务 */
+  applyToggledTask(id: string, updated: Task): void {
+    const mapped = this.mapTasks([updated])[0];
+    const pendingTasks = this.data.pendingTasks.filter(t => t.id !== id);
+    const completedTasks = this.data.completedTasks.filter(t => t.id !== id);
+    if (mapped.status === 'pending') {
+      pendingTasks.unshift(mapped);
+    } else {
+      completedTasks.unshift(mapped);
+    }
+    this.setData({
+      pendingTasks,
+      completedTasks,
+      pendingCount: pendingTasks.length,
+      completedCount: completedTasks.length,
+      displayTasks: this.data.activeTab === 'pending' ? pendingTasks : completedTasks,
+    });
   },
 
   setCompleting(id: string, completing: boolean): void {

@@ -13,10 +13,15 @@ import {
   hideLoading,
   showConfirm,
   getErrorMessage,
+  isVersionConflict,
   formatDate,
   timeAgo,
+  parseDateOnly,
+  formatDateOnly,
+  addDaysToDateOnly,
 } from '../../utils/index';
 import { Event } from '../../types/index';
+import { markDirty } from '../../stores/dirty';
 
 Page({
   data: {
@@ -54,6 +59,13 @@ Page({
     this.loadEvent();
   },
 
+  onShow(): void {
+    // 从编辑页返回后刷新，避免继续展示编辑前的旧数据
+    if (this.data.loaded && this.data.eventId) {
+      this.loadEvent();
+    }
+  },
+
   async loadEvent(): Promise<void> {
     try {
       const event = await getEvent(this.data.familyId, this.data.eventId);
@@ -68,18 +80,19 @@ Page({
 
   applyEvent(event: Event): void {
     const isAllDay = event.isAllDay;
-    const start = new Date(event.start);
-    const end = new Date(event.end);
     let dateText = '';
     let timeText = '';
     if (isAllDay) {
-      // 全天：end 不包含，显示时使用 end-1 作为最后一天
-      const inclusiveEnd = addDays(end, -1);
-      dateText = sameYmd(start, inclusiveEnd)
-        ? formatDate(event.start, 'date')
-        : `${formatDate(event.start, 'date')} 至 ${formatDate(inclusiveEnd, 'date')}`;
+      // 全天：start / end 为纯日期，按天解析（不走 UTC），end 为不包含式，显示回退一天
+      const startStr = formatDateOnly(parseDateOnly(event.start));
+      const inclusiveEndStr = addDaysToDateOnly(formatDateOnly(parseDateOnly(event.end)), -1);
+      dateText = startStr === inclusiveEndStr
+        ? formatDate(startStr, 'date')
+        : `${formatDate(startStr, 'date')} 至 ${formatDate(inclusiveEndStr, 'date')}`;
       timeText = '全天';
     } else {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
       dateText = formatDate(event.start, 'date');
       timeText = `${pad(start.getHours())}:${pad(start.getMinutes())} - ${pad(end.getHours())}:${pad(end.getMinutes())}`;
     }
@@ -122,14 +135,15 @@ Page({
       await deleteEvent(this.data.familyId, event.id, event.version);
       hideLoading();
       showSuccess('已删除');
+      markDirty('events');
       setTimeout(() => wx.navigateBack(), 800);
     } catch (error: unknown) {
       hideLoading();
       this.setData({ deleting: false });
       console.error('[EventDetail] Delete failed:', error);
       const err = error as { code?: string; message?: string };
-      if (err.code === 'CONFLICT' || err.code === 'VERSION_CONFLICT') {
-        showError('内容已被其他家庭成员修改，请刷新后重试');
+      if (isVersionConflict(err.code)) {
+        showError(getErrorMessage(err.code) || '内容已被其他家庭成员修改，请刷新后重试');
         this.loadEvent();
         return;
       }
@@ -140,14 +154,4 @@ Page({
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
-}
-
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-
-function sameYmd(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }

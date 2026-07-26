@@ -2,6 +2,8 @@
  * 工具函数库
  */
 
+import { parseDateOnly } from './datetime';
+
 /**
  * 显示成功提示
  */
@@ -64,9 +66,12 @@ export function showConfirm(title: string, content?: string): Promise<boolean> {
 
 /**
  * 格式化日期为本地显示格式
+ *
+ * 纯日期字符串（YYYY-MM-DD）按本地零点解析，避免 `new Date('YYYY-MM-DD')`
+ * 被当作 UTC 解析后在负时区显示成前一天。
  */
 export function formatDate(dateStr: string, format: 'date' | 'datetime' | 'time' = 'date'): string {
-  const date = new Date(dateStr);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? parseDateOnly(dateStr) : new Date(dateStr);
   if (isNaN(date.getTime())) return dateStr;
 
   const year = date.getFullYear();
@@ -191,4 +196,14 @@ export function summarizePermissions(permissions: string[]): string {
 /**
  * 错误码到用户友好消息的映射（统一来自 ./errors，避免多份映射）
  */
-export { getErrorMessage, ERROR_MESSAGES } from './errors';
+export { getErrorMessage, ERROR_MESSAGES, isVersionConflict } from './errors';
+
+/**
+ * 日期 / 时区安全工具（统一从 ./datetime 导出）
+ */
+export {
+  parseDateOnly,
+  formatDateOnly,
+  addDaysToDateOnly,
+  zonedDateTimeToIso,
+} from './datetime';

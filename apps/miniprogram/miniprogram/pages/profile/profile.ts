@@ -12,7 +12,7 @@
  * 需要重置本地登录状态时，使用开发版「调试信息」中的「清除本地登录状态」。
  */
 
-import { userStore, familiesStore, currentFamilyStore, loadCurrentUser, loadFamilies, clearUserState } from '../../stores/index';
+import { userStore, familiesStore, currentFamilyStore, loadCurrentUser, loadFamilies, setCurrentFamily, clearUserState } from '../../stores/index';
 import { showConfirm, showSuccess, showError, safeAvatarUrl } from '../../utils/index';
 import { FamilyListItem } from '../../types/index';
 

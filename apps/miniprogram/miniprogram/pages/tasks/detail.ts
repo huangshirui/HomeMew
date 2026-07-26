@@ -13,10 +13,12 @@ import {
   hideLoading,
   showConfirm,
   getErrorMessage,
+  isVersionConflict,
   formatDate,
   timeAgo,
 } from '../../utils/index';
 import { Task } from '../../types/index';
+import { markDirty } from '../../stores/dirty';
 
 Page({
   data: {
@@ -55,6 +57,13 @@ Page({
     }
     this.setData({ taskId, familyId });
     this.loadTask();
+  },
+
+  onShow(): void {
+    // 从编辑页返回后刷新，避免继续展示编辑前的旧数据
+    if (this.data.loaded && this.data.taskId) {
+      this.loadTask();
+    }
   },
 
   async loadTask(): Promise<void> {
@@ -106,6 +115,9 @@ Page({
       createdAtText: `${formatDate(task.createdAt, 'datetime')} · ${timeAgo(task.createdAt)}`,
       updatedAtText: `${formatDate(task.updatedAt, 'datetime')} · ${timeAgo(task.updatedAt)}`,
       loaded: true,
+      // 重新加载后复位操作态，避免完成/恢复成功后按钮永久停留在「处理中...」
+      toggling: false,
+      deleting: false,
     });
   },
 
@@ -131,22 +143,21 @@ Page({
     this.setData({ toggling: true });
     showLoading(action === 'complete' ? '完成中...' : '恢复中...');
     try {
-      if (action === 'complete') {
-        await completeTask(this.data.familyId, task.id, task.version);
-      } else {
-        await reopenTask(this.data.familyId, task.id, task.version);
-      }
+      const updated = action === 'complete'
+        ? await completeTask(this.data.familyId, task.id, task.version)
+        : await reopenTask(this.data.familyId, task.id, task.version);
       hideLoading();
       showSuccess(action === 'complete' ? '已完成' : '已恢复');
-      // 重新加载最新数据
-      this.loadTask();
+      markDirty('tasks');
+      // 直接用返回的最新 Task 更新视图（applyTask 会复位 toggling）
+      this.applyTask(updated);
     } catch (error: unknown) {
       hideLoading();
       this.setData({ toggling: false });
       console.error('[TaskDetail] Toggle failed:', error);
       const err = error as { code?: string; message?: string };
-      if (err.code === 'CONFLICT' || err.code === 'VERSION_CONFLICT') {
-        showError('内容已被其他家庭成员修改，请刷新后重试');
+      if (isVersionConflict(err.code)) {
+        showError(getErrorMessage(err.code) || '内容已被其他家庭成员修改，请刷新后重试');
         this.loadTask();
         return;
       }
@@ -165,14 +176,15 @@ Page({
       await deleteTask(this.data.familyId, task.id, task.version);
       hideLoading();
       showSuccess('已删除');
+      markDirty('tasks');
       setTimeout(() => wx.navigateBack(), 800);
     } catch (error: unknown) {
       hideLoading();
       this.setData({ deleting: false });
       console.error('[TaskDetail] Delete failed:', error);
       const err = error as { code?: string; message?: string };
-      if (err.code === 'CONFLICT' || err.code === 'VERSION_CONFLICT') {
-        showError('内容已被其他家庭成员修改，请刷新后重试');
+      if (isVersionConflict(err.code)) {
+        showError(getErrorMessage(err.code) || '内容已被其他家庭成员修改，请刷新后重试');
         this.loadTask();
         return;
       }

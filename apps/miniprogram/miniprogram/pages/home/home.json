@@ -1,1 +1,7 @@
-{"navigationBarTitleText": "家事喵"}
+{
+  "navigationBarTitleText": "家事喵",
+  "navigationBarBackgroundColor": "#2DBB78",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#F1F9F5",
+  "enablePullDownRefresh": true
+}

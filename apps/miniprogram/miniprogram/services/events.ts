@@ -21,23 +21,35 @@ import {
  * @param end 结束时间（不包含），与 start 配对
  * @param attendeeId 仅看指定参与人；传 'me' 表示仅看自己
  */
-export function listEvents(
+export async function listEvents(
   familyId: string,
   params?: { start?: string; end?: string; attendeeId?: string; status?: 'active' | 'cancelled' },
 ): Promise<Event[]> {
-  const query: Record<string, string> = {};
-  if (params?.start) query.start = params.start;
-  if (params?.end) query.end = params.end;
-  if (params?.attendeeId) query.attendeeId = params.attendeeId;
-  if (params?.status) query.status = params.status;
+  const items: Event[] = [];
+  let cursor: string | null = null;
+  // 循环拉取所有分页，保证日历圆点与列表数量完整。
+  for (let page = 0; page < 50; page++) {
+    const query: Record<string, string> = { limit: '100' };
+    if (params?.start) query.start = params.start;
+    if (params?.end) query.end = params.end;
+    if (params?.attendeeId) query.attendeeId = params.attendeeId;
+    if (params?.status) query.status = params.status;
+    if (cursor) query.cursor = cursor;
 
-  const qs = Object.keys(query).length
-    ? '?' + Object.entries(query).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')
-    : '';
+    const qs = '?' + Object.entries(query)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&');
 
-  return request<{ items: Event[]; nextCursor: string | null }>(
-    `/api/v1/families/${familyId}/events${qs}`,
-  ).then(data => data.items ?? []);
+    const data: { items: Event[]; nextCursor: string | null } = await request<{
+      items: Event[];
+      nextCursor: string | null;
+    }>(`/api/v1/families/${familyId}/events${qs}`);
+
+    items.push(...(data.items ?? []));
+    cursor = data.nextCursor;
+    if (!cursor) break;
+  }
+  return items;
 }
 
 /**

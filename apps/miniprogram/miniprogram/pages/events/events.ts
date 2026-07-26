@@ -13,9 +13,11 @@
 
 import { listEvents } from '../../services/events';
 import { currentFamilyStore } from '../../stores/index';
+import { consumeDirty, subscribe } from '../../stores/dirty';
 import {
   showError,
   getErrorMessage,
+  parseDateOnly,
 } from '../../utils/index';
 import { Event } from '../../types/index';
 
@@ -53,12 +55,19 @@ Page({
     allEvents: [] as EventView[],
     displayedEvents: [] as EventView[],
     loaded: false,
+    listError: false,
     noFamily: false,
     familyId: '' as string,
     monthLoading: false,
-    listTitle: '全部日程',
+    listTitle: '',
     showTodayBtn: false,
   },
+
+  /** 请求序号：用于丢弃过期（家庭切换 / 慢网络 / 翻月）返回结果 */
+  _reqSeq: 0,
+
+  // 脏标记订阅句柄：页面可见期间订阅，隐藏时取消，避免误刷新与泄漏
+  _dirtyUnsubscribe: null as (() => void) | null,
 
   onLoad(options: { date?: string; familyId?: string; attendee?: string }): void {
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
@@ -70,19 +79,22 @@ Page({
     const initialDate = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date)
       ? options.date
       : 'all';
+    // 带 date 参数进入时，日历展示该日期所在月份，而不是永远当前月
+    const anchor = initialDate !== 'all' ? parseDateOnly(initialDate) : new Date();
     this.setData({
       familyId,
       noFamily: false,
       attendeeFilter: options?.attendee === 'me' ? 'me' : 'all',
       selectedDate: initialDate,
-      shownYear: new Date().getFullYear(),
-      shownMonth: new Date().getMonth() + 1,
+      shownYear: anchor.getFullYear(),
+      shownMonth: anchor.getMonth() + 1,
     });
     this.refreshCalendar(today);
     this.loadEvents();
   },
 
   onShow(): void {
+    this._subscribeDirty();
     const familyId = currentFamilyStore.value?.id || '';
     // 从无家庭恢复到有家庭
     if (familyId && this.data.noFamily) {
@@ -109,7 +121,11 @@ Page({
       return;
     }
     if (this.data.loaded && !this.data.noFamily) {
-      this.loadEvents();
+      // 已加载：仅当数据被标记变更（新建 / 编辑 / 删除后返回）时才重新拉取
+      if (consumeDirty('events')) {
+        this.loadEvents();
+      }
+      return;
     }
   },
 
@@ -180,31 +196,60 @@ Page({
     return chunk(cells, 7);
   },
 
+  onRetry(): void {
+    this.loadEvents();
+  },
+
   /** 拉取当前展示月份前后 1 个月范围内的事件 */
+  _subscribeDirty(): void {
+    this._unsubscribeDirty();
+    this._dirtyUnsubscribe = subscribe((domain) => {
+      if (domain !== 'events') return;
+      if (!this.data.loaded || this.data.noFamily) return;
+      if (currentFamilyStore.value?.id !== this.data.familyId) return;
+      this.loadEvents();
+    });
+  },
+
+  _unsubscribeDirty(): void {
+    if (this._dirtyUnsubscribe) {
+      this._dirtyUnsubscribe();
+      this._dirtyUnsubscribe = null;
+    }
+  },
+
   async loadEvents(): Promise<void> {
-    if (!this.data.familyId) return;
+    const familyId = this.data.familyId;
+    if (!familyId) return;
+    const reqSeq = ++this._reqSeq;
     const { shownYear, shownMonth } = this.data;
     const rangeStart = new Date(shownYear, shownMonth - 2, 1);
     const rangeEnd = new Date(shownYear, shownMonth + 1, 0);
     // 月份切换 / 初次加载使用局部 loading，避免整页转圈
-    this.setData({ monthLoading: true });
+    this.setData({ monthLoading: true, listError: false });
     try {
-      const events = await listEvents(this.data.familyId, {
+      const events = await listEvents(familyId, {
         start: formatYmd(rangeStart),
         end: formatYmd(addDays(rangeEnd, 1)),
         ...(this.data.attendeeFilter === 'me' ? { attendeeId: 'me' } : {}),
       });
+      // 家庭已切换 / 存在更新的请求（翻月等）：丢弃过期结果，避免旧数据覆盖当前页面
+      if (reqSeq !== this._reqSeq || familyId !== this.data.familyId) return;
       const views = this.mapEvents(events);
-      this.setData({ allEvents: views, loaded: true });
+      this.setData({ allEvents: views, loaded: true, listError: false });
       this.markCalendarHasEvent();
       this.applyFilter();
     } catch (error: unknown) {
+      if (reqSeq !== this._reqSeq || familyId !== this.data.familyId) return;
       console.error('[Events] Load failed:', error);
       const err = error as { code?: string; message?: string };
+      // 网络失败设为 listError，避免被伪装成「本月没有日程」空状态
+      this.setData({ loaded: true, listError: true });
       showError(getErrorMessage(err.code, err.message));
-      this.setData({ loaded: true });
     } finally {
-      this.setData({ monthLoading: false });
+      if (reqSeq === this._reqSeq) {
+        this.setData({ monthLoading: false });
+      }
     }
   },
 
@@ -243,17 +288,21 @@ Page({
 
   applyFilter(): void {
     // 「只看我的」由服务端 attendeeId=me 过滤（见 loadEvents），此处仅做日期过滤。
-    const { allEvents, selectedDate } = this.data;
-    let list = allEvents;
-    if (selectedDate !== 'all') {
-      list = list.filter(ev => expandEventDays(ev.raw).includes(selectedDate as string));
+    // allEvents 含前后月数据（仅用于日历圆点）；列表展示始终限定在当前展示月或选中日。
+    const { allEvents, selectedDate, shownYear, shownMonth } = this.data;
+    let list: EventView[];
+    if (selectedDate === 'all') {
+      const prefix = `${shownYear}-${pad(shownMonth)}`;
+      list = allEvents.filter(ev => expandEventDays(ev.raw).some(d => d.slice(0, 7) === prefix));
+    } else {
+      list = allEvents.filter(ev => expandEventDays(ev.raw).includes(selectedDate as string));
     }
     this.setData({ displayedEvents: list, listTitle: this.friendlyListTitle(selectedDate) });
   },
 
   /** 列表标题：友好展示当前筛选日期 */
   friendlyListTitle(selectedDate: string | 'all'): string {
-    if (selectedDate === 'all') return '全部日程';
+    if (selectedDate === 'all') return `${this.data.shownYear}年${this.data.shownMonth}月日程`;
     const today = formatYmd(new Date());
     if (selectedDate === today) return '今天';
     const tomorrow = formatYmd(addDays(new Date(), 1));
@@ -270,7 +319,8 @@ Page({
       m = 12;
       y -= 1;
     }
-    this.setData({ shownYear: y, shownMonth: m });
+    // 翻月清除旧月份的选中日期，避免继续按旧日期过滤
+    this.setData({ shownYear: y, shownMonth: m, selectedDate: 'all' });
     this.refreshCalendar(formatYmd(new Date()));
     this.loadEvents();
   },
@@ -284,7 +334,8 @@ Page({
       m = 1;
       y += 1;
     }
-    this.setData({ shownYear: y, shownMonth: m });
+    // 翻月清除旧月份的选中日期，避免继续按旧日期过滤
+    this.setData({ shownYear: y, shownMonth: m, selectedDate: 'all' });
     this.refreshCalendar(formatYmd(new Date()));
     this.loadEvents();
   },

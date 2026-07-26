@@ -97,7 +97,7 @@
 .task-check {
   width: 44rpx;
   height: 44rpx;
-  border-radius: 50%;
+  border-radius: 10rpx;
   border: 3rpx solid #d0d0d0;
   display: flex;
   align-items: center;
