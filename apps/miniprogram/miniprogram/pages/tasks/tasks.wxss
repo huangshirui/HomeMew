@@ -75,13 +75,13 @@
 
 /* 任务卡片 */
 .task-card {
-  background-color: var(--color-bg-white);
-  border-radius: 16rpx;
+  background-color: var(--color-card);
+  border-radius: 26rpx;
   display: flex;
   align-items: center;
   padding: 20rpx 12rpx 20rpx 4rpx;
   margin-bottom: 16rpx;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4rpx 16rpx rgba(45, 187, 120, 0.06);
 }
 
 /* 复选框点击热区（视觉 44rpx，热区 ~84rpx） */
@@ -238,25 +238,4 @@
   flex-direction: column;
 }
 
-/* 悬浮新增按钮 */
-.fab {
-  position: fixed;
-  right: 32rpx;
-  bottom: 32rpx;
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 50%;
-  background-color: var(--color-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.16);
-  z-index: 10;
-}
-
-.fab-text {
-  font-size: 60rpx;
-  color: #ffffff;
-  font-weight: 300;
-  line-height: 1;
-}
+/* 悬浮新增按钮样式已统一到全局 app.wxss */

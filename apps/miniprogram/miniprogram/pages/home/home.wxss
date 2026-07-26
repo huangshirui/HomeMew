@@ -1,35 +1,5 @@
 /* 首页：今天的家庭工作台 */
 
-page {
-  --home-primary: #2DBB78;
-  --home-primary-dark: #20A968;
-  --home-hero: #4AC986;
-  --home-bg: #F1F9F5;
-  --home-card: #FFFFFF;
-  --home-text: #303442;
-  --home-secondary: #9299A3;
-  --home-danger: #E85A5A;
-
-  background: var(--home-bg);
-  color: var(--home-text);
-}
-
-.container {
-  padding: 24rpx;
-  min-height: 100vh;
-  box-sizing: border-box;
-  padding-bottom: 160rpx;
-}
-
-/* 卡片（覆盖全局 .card，使用首页绿色调） */
-.card {
-  background: var(--home-card);
-  border-radius: 26rpx;
-  padding: 28rpx 28rpx 24rpx;
-  margin-bottom: 22rpx;
-  box-shadow: 0 4rpx 16rpx rgba(45, 187, 120, 0.06);
-}
-
 /* 欢迎卡片 */
 .greeting-card {
   display: flex;
@@ -172,51 +142,7 @@ page {
   min-height: 200rpx;
 }
 
-/* 栏目标题 */
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 18rpx;
-}
-
-.section-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--home-text);
-}
-
-.section-more {
-  font-size: 24rpx;
-  color: var(--home-secondary);
-}
-
-.section-header-right {
-  display: flex;
-  align-items: center;
-}
-
-/* 非破坏性刷新指示：区头小转圈，不替换已有内容 */
-.inline-spin {
-  font-size: 26rpx;
-  color: var(--home-secondary);
-  margin-right: 12rpx;
-  display: inline-block;
-  animation: home-spin 0.8s linear infinite;
-}
-
-@keyframes home-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* 有旧数据时后台刷新失败：保留旧数据，仅显示细错误提示条 */
-.thin-error {
-  padding: 18rpx 4rpx 8rpx;
-  text-align: center;
-  font-size: 24rpx;
-  color: var(--home-danger);
-}
+/* 栏目标题等公共样式已在全局 app.wxss 统一定义 */
 
 /* 今天安排列表 */
 .event-list {
@@ -335,40 +261,7 @@ page {
   background-color: #fdecec;
 }
 
-/* 空状态 / 加载提示 */
-.empty-hint {
-  padding: 24rpx 4rpx 8rpx;
-  text-align: center;
-}
-
-.empty-text {
-  font-size: 26rpx;
-  color: var(--home-secondary);
-}
-
-.empty-link {
-  font-size: 26rpx;
-  color: var(--home-primary);
-}
-
 /* 悬浮新增按钮 */
-.fab {
-  position: fixed;
-  right: 36rpx;
-  bottom: calc(56rpx + env(safe-area-inset-bottom));
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 50%;
-  background: var(--home-primary);
-  color: #ffffff;
-  font-size: 60rpx;
-  font-weight: 300;
-  line-height: 104rpx;
-  text-align: center;
-  box-shadow: 0 10rpx 28rpx rgba(45, 187, 120, 0.4);
-  z-index: 50;
-}
-
 .fab-mask {
   position: fixed;
   top: 0;

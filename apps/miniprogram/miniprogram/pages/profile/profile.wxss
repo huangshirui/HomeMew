@@ -11,7 +11,7 @@
   width: 120rpx;
   height: 120rpx;
   border-radius: 50%;
-  background-color: #f0f0f0;
+  background-color: var(--color-border);
   margin-right: 24rpx;
 }
 
@@ -23,25 +23,25 @@
   display: block;
   font-size: 34rpx;
   font-weight: 500;
-  color: #333333;
+  color: var(--color-text-primary);
   margin-bottom: 8rpx;
 }
 
 .user-id {
   display: block;
   font-size: 22rpx;
-  color: #999999;
+  color: var(--color-text-hint);
 }
 
 .edit-btn {
   padding: 12rpx 24rpx;
-  border: 2rpx solid #eeeeee;
+  border: 2rpx solid var(--color-border);
   border-radius: 24rpx;
 }
 
 .edit-text {
   font-size: 24rpx;
-  color: #666666;
+  color: var(--color-text-secondary);
 }
 
 /* 区域 */
@@ -51,13 +51,13 @@
 
 .section-header {
   padding: 20rpx 16rpx;
-  border-bottom: 2rpx solid #f5f5f5;
+  border-bottom: 2rpx solid var(--color-divider);
 }
 
 .section-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #333333;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
 /* 家庭项 */
@@ -65,7 +65,7 @@
   display: flex;
   align-items: center;
   padding: 24rpx 16rpx;
-  border-bottom: 2rpx solid #f5f5f5;
+  border-bottom: 2rpx solid var(--color-divider);
 }
 
 .family-item:last-child {
@@ -76,7 +76,7 @@
   width: 80rpx;
   height: 80rpx;
   border-radius: 20rpx;
-  background-color: #f0f0f0;
+  background-color: var(--color-border);
   flex-shrink: 0;
   margin-right: 20rpx;
 }
@@ -94,13 +94,13 @@
 
 .family-item-name {
   font-size: 30rpx;
-  color: #333333;
+  color: var(--color-text-primary);
 }
 
 .current-tag {
   font-size: 20rpx;
-  color: #4CAF50;
-  background-color: #eaf7ec;
+  color: var(--color-primary);
+  background-color: var(--color-primary-tint);
   border-radius: 6rpx;
   padding: 2rpx 10rpx;
 }
@@ -109,7 +109,7 @@
   display: block;
   margin-top: 6rpx;
   font-size: 24rpx;
-  color: #999999;
+  color: var(--color-text-hint);
 }
 
 .manage-btn {
@@ -119,7 +119,7 @@
 
 .manage-text {
   font-size: 26rpx;
-  color: #4CAF50;
+  color: var(--color-primary);
 }
 
 .no-family-text {
@@ -127,20 +127,20 @@
   padding: 32rpx 16rpx;
   text-align: center;
   font-size: 26rpx;
-  color: #999999;
+  color: var(--color-text-hint);
 }
 
 .family-actions {
   display: flex;
   gap: 24rpx;
   padding: 20rpx 16rpx;
-  border-top: 2rpx solid #f5f5f5;
+  border-top: 2rpx solid var(--color-divider);
 }
 
 .action-link {
   background: transparent;
   font-size: 26rpx;
-  color: #4CAF50;
+  color: var(--color-primary);
   padding: 0;
   line-height: normal;
   border: none;
@@ -155,7 +155,7 @@
   display: flex;
   align-items: center;
   padding: 28rpx 16rpx;
-  border-bottom: 2rpx solid #f5f5f5;
+  border-bottom: 2rpx solid var(--color-divider);
 }
 
 .menu-item:last-child {
@@ -165,19 +165,19 @@
 .menu-text {
   flex: 1;
   font-size: 30rpx;
-  color: #333333;
+  color: var(--color-text-primary);
 }
 
 .menu-text-hint {
-  color: #999999;
+  color: var(--color-text-hint);
 }
 
 .arrow {
   font-size: 32rpx;
-  color: #cccccc;
+  color: var(--color-text-hint);
 }
 
 .menu-item-danger {
   margin-top: 16rpx;
-  border-top: 2rpx solid #f5f5f5;
+  border-top: 2rpx solid var(--color-divider);
 }

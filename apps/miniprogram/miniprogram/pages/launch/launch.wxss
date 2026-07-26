@@ -23,18 +23,18 @@
 .app-name {
   font-size: 44rpx;
   font-weight: 600;
-  color: #333333;
+  color: var(--color-text-primary);
   margin-bottom: 24rpx;
 }
 
 .status-text {
   font-size: 28rpx;
-  color: #999999;
+  color: var(--color-text-hint);
 }
 
 .error-text {
   font-size: 28rpx;
-  color: #F44336;
+  color: var(--color-danger);
   margin-bottom: 32rpx;
   text-align: center;
 }

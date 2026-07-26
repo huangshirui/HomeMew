@@ -52,7 +52,7 @@
 
 .status-active {
   color: var(--color-primary-dark);
-  background-color: rgba(76, 175, 80, 0.12);
+  background-color: rgba(45, 187, 120, 0.12);
 }
 
 .status-disabled {

@@ -1,5 +1,10 @@
 /* 日程创建/编辑页样式 */
 
+/* 编辑页使用底部固定保存栏，无需为悬浮按钮预留底部留白 */
+.container {
+  padding-bottom: 0;
+}
+
 .loading-state {
   display: flex;
   justify-content: center;

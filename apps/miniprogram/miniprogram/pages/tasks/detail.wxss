@@ -10,7 +10,7 @@
 .source-tag {
   font-size: 20rpx;
   color: var(--color-primary-dark);
-  background-color: rgba(76, 175, 80, 0.12);
+  background-color: rgba(45, 187, 120, 0.12);
   border-radius: 8rpx;
   padding: 2rpx 12rpx;
   line-height: 1.6;

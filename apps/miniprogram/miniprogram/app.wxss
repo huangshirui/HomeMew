@@ -1,21 +1,35 @@
-/* HomeMew 全局样式 */
+/* HomeMew 全局样式（以首页为基准统一设计系统） */
 
-/* 设计色板 */
+/* 设计色板：以首页绿色调为基准 */
 page {
-  --color-primary: #4CAF50;
-  --color-primary-light: #81C784;
-  --color-primary-dark: #388E3C;
-  --color-danger: #F44336;
+  /* 主色板 */
+  --color-primary: #2DBB78;
+  --color-primary-dark: #20A968;
+  --color-primary-light: #4AC986;
+  --color-primary-tint: #EAF7EF;
+  --color-danger: #E85A5A;
   --color-warning: #FF9800;
   --color-info: #2196F3;
-  --color-primary-tint: #eaf7ec;
-  --color-text-primary: #333333;
-  --color-text-secondary: #666666;
-  --color-text-hint: #999999;
-  --color-bg: #f5f6f7;
-  --color-bg-white: #ffffff;
-  --color-border: #eeeeee;
-  --color-divider: #e0e0e0;
+
+  /* 中性色 */
+  --color-bg: #F1F9F5;
+  --color-bg-white: #FFFFFF;
+  --color-card: #FFFFFF;
+  --color-text-primary: #303442;
+  --color-text-secondary: #9299A3;
+  --color-text-hint: #A6ADB6;
+  --color-border: #E8EDEA;
+  --color-divider: #EDF1EF;
+
+  /* 首页样式别名（保持首页 wxss 兼容，避免重复定义） */
+  --home-primary: #2DBB78;
+  --home-primary-dark: #20A968;
+  --home-hero: #4AC986;
+  --home-bg: #F1F9F5;
+  --home-card: #FFFFFF;
+  --home-text: #303442;
+  --home-secondary: #9299A3;
+  --home-danger: #E85A5A;
 
   background-color: var(--color-bg);
   color: var(--color-text-primary);
@@ -24,19 +38,21 @@ page {
   line-height: 1.5;
 }
 
-/* 容器 */
+/* 容器：底部留白，避免最后一条内容被悬浮按钮遮挡 */
 .container {
   padding: 24rpx;
   min-height: 100vh;
   box-sizing: border-box;
+  padding-bottom: 160rpx;
 }
 
-/* 卡片 */
+/* 卡片：统一为首页绿色调圆角卡片 */
 .card {
-  background-color: var(--color-bg-white);
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-bottom: 20rpx;
+  background-color: var(--color-card);
+  border-radius: 26rpx;
+  padding: 28rpx 28rpx 24rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 4rpx 16rpx rgba(45, 187, 120, 0.06);
 }
 
 /* 文本工具类 */
@@ -94,7 +110,7 @@ page {
 .mb-md { margin-bottom: 24rpx; }
 .mb-lg { margin-bottom: 32rpx; }
 
-/* 按钮样式 */
+/* 按钮样式（与首页一致） */
 .btn-primary {
   background-color: var(--color-primary);
   color: #ffffff;
@@ -128,6 +144,151 @@ page {
 
 .btn-outline::after {
   border: none;
+}
+
+.btn-outline.danger {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.btn-sm {
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 28rpx;
+  padding: 0 40rpx;
+  border-radius: 36rpx;
+}
+
+/* 栏目标题（与首页一致） */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 18rpx;
+}
+
+.section-header-right {
+  display: flex;
+  align-items: center;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.section-more {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}
+
+/* 加载 / 内联刷新 / 错误提示（与首页一致） */
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding-top: 120rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: var(--color-text-hint);
+}
+
+.inline-spin {
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+  margin-right: 12rpx;
+  display: inline-block;
+  animation: home-spin 0.8s linear infinite;
+}
+
+@keyframes home-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.thin-error {
+  padding: 18rpx 4rpx 8rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--color-danger);
+}
+
+/* 空状态（与首页一致） */
+.empty-hint {
+  padding: 24rpx 4rpx 8rpx;
+  text-align: center;
+}
+
+.empty-text {
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+}
+
+.empty-link {
+  font-size: 26rpx;
+  color: var(--color-primary);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 120rpx;
+}
+
+.empty-image {
+  width: 200rpx;
+  height: 200rpx;
+  margin-bottom: 24rpx;
+  opacity: 0.6;
+}
+
+.empty-title {
+  font-size: 30rpx;
+  color: var(--color-text-secondary);
+}
+
+.empty-desc {
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+  margin-top: 16rpx;
+  text-align: center;
+  padding: 0 60rpx;
+  line-height: 1.6;
+}
+
+.empty-actions {
+  margin-top: 48rpx;
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 悬浮新增按钮（与首页一致） */
+.fab {
+  position: fixed;
+  right: 36rpx;
+  bottom: calc(56rpx + env(safe-area-inset-bottom));
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  color: #ffffff;
+  font-size: 60rpx;
+  font-weight: 300;
+  line-height: 104rpx;
+  text-align: center;
+  box-shadow: 0 10rpx 28rpx rgba(45, 187, 120, 0.4);
+  z-index: 50;
+}
+
+.fab-text {
+  font-size: 60rpx;
+  color: #ffffff;
+  font-weight: 300;
+  line-height: 1;
 }
 
 /* 安全区域适配 */
