@@ -6,7 +6,7 @@
 
   <block wx:else>
     <view class="intro">
-      <text class="intro-text">可将 n8n、Agent、Home Assistant 或其他应用连接到本家庭，让外部系统以独立身份访问家庭日程与待办。</text>
+      <text class="intro-text">可将其他应用连接到本家庭，让外部系统以独立身份访问家庭日程与待办。</text>
     </view>
 
     <!-- 列表 -->
