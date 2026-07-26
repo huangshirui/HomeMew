@@ -1,0 +1,147 @@
+.tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 108rpx;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 -1rpx 0 rgba(0, 0, 0, 0.06);
+  z-index: 500;
+}
+
+.tab-bar-border {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1rpx;
+  background: rgba(0, 0, 0, 0.1);
+  transform: scaleY(0.5);
+}
+
+.tab-item {
+  flex: 1;
+  height: 108rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-icon {
+  width: 54rpx;
+  height: 54rpx;
+  margin-bottom: 6rpx;
+}
+
+.tab-text {
+  font-size: 24rpx;
+  color: #999999;
+  line-height: 1;
+}
+
+.tab-text-active {
+  color: #43a047;
+}
+
+/* 中央凸起按钮：叠在 TabBar 之上，吃掉安全区 */
+.tab-plus {
+  flex: 1;
+  height: 108rpx;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plus-btn {
+  position: absolute;
+  top: -28rpx;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: #43a047;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 18rpx rgba(67, 160, 71, 0.4);
+  border: 6rpx solid #ffffff;
+}
+
+.plus-sign {
+  color: #ffffff;
+  font-size: 58rpx;
+  line-height: 1;
+  font-weight: 300;
+}
+
+/* 底部操作面板 */
+.sheet-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sheet {
+  background: #ffffff;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 16rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  animation: sheetUp 0.2s ease-out;
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet-handle {
+  width: 64rpx;
+  height: 8rpx;
+  border-radius: 4rpx;
+  background: #e0e0e0;
+  margin: 8rpx auto 16rpx;
+}
+
+.sheet-title {
+  font-size: 26rpx;
+  color: #999999;
+  text-align: center;
+  margin-bottom: 12rpx;
+}
+
+.sheet-action {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 16rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.sheet-action:first-of-type {
+  border-top: none;
+}
+
+.sheet-action-icon {
+  width: 48rpx;
+  margin-right: 24rpx;
+  font-size: 40rpx;
+  text-align: center;
+}
+
+.sheet-action-text {
+  font-size: 32rpx;
+  color: #333333;
+}
+
+.sheet-action-disabled {
+  opacity: 0.4;
+}

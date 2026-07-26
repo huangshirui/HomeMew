@@ -61,6 +61,7 @@ Page({
   },
 
   onShow(): void {
+    this.getTabBar()?.setData({ selected: 2 });
     this._subscribeDirty();
     const familyId = currentFamilyStore.value?.id || '';
     // 从无家庭恢复到有家庭

@@ -21,6 +21,7 @@ Page({
   },
 
   onShow(): void {
+    this.getTabBar()?.setData({ selected: 3 });
     this.loadData();
 
     // 订阅状态变化
@@ -124,17 +125,7 @@ Page({
   onAbout(): void {
     wx.showModal({
       title: '关于家事喵',
-      content: '家事喵 v0.1.0\n\n一个帮助家庭成员管理日程与待办的工具。',
-      showCancel: false,
-      confirmText: '知道了',
-    });
-  },
-
-  /** 关于 */
-  onAbout(): void {
-    wx.showModal({
-      title: '关于家事喵',
-      content: '家事喵 v0.1.0\n\n一个帮助家庭成员管理日程与待办的工具。',
+      content: '家事喵 v1.0.0\n\n你的家庭事务小助手\n\n帮助家庭成员共同管理日程与待办，让家务协作更轻松。',
       showCancel: false,
       confirmText: '知道了',
     });

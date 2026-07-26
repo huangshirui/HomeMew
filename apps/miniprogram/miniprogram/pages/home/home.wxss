@@ -7,10 +7,10 @@
   justify-content: space-between;
   padding: 42rpx 36rpx;
   border-radius: 30rpx;
-  background: linear-gradient(135deg, #57CF91, #30BC78);
+  background: linear-gradient(135deg, #5ABF5E, #43A047);
   color: #ffffff;
   margin-bottom: 22rpx;
-  box-shadow: 0 8rpx 24rpx rgba(45, 187, 120, 0.18);
+  box-shadow: 0 8rpx 24rpx rgba(67, 160, 71, 0.18);
 }
 
 .greeting-main {
@@ -89,7 +89,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  box-shadow: 0 4rpx 16rpx rgba(45, 187, 120, 0.06);
+  box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
 }
 
 .stat-num {
@@ -249,7 +249,7 @@
 .task-due {
   font-size: 22rpx;
   color: var(--home-secondary);
-  background-color: #eef4f0;
+  background-color: #EAF6EB;
   padding: 4rpx 14rpx;
   border-radius: 8rpx;
   margin-left: 16rpx;

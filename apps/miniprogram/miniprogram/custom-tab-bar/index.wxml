@@ -1,0 +1,59 @@
+<!-- 自定义 TabBar：4 个 tab + 中央凸起「＋」 -->
+<view class="tab-bar">
+  <view class="tab-bar-border"></view>
+
+  <!-- 首页 -->
+  <view class="tab-item" data-path="{{list[0].pagePath}}" bindtap="switchTab">
+    <image class="tab-icon" src="{{selected === 0 ? list[0].selectedIcon : list[0].icon}}" />
+    <text class="tab-text {{selected === 0 ? 'tab-text-active' : ''}}">{{list[0].text}}</text>
+  </view>
+
+  <!-- 日程 -->
+  <view class="tab-item" data-path="{{list[1].pagePath}}" bindtap="switchTab">
+    <image class="tab-icon" src="{{selected === 1 ? list[1].selectedIcon : list[1].icon}}" />
+    <text class="tab-text {{selected === 1 ? 'tab-text-active' : ''}}">{{list[1].text}}</text>
+  </view>
+
+  <!-- 中央凸起「＋」（不是页面切换项） -->
+  <view class="tab-plus" bindtap="onPlusTap">
+    <view class="plus-btn">
+      <text class="plus-sign">＋</text>
+    </view>
+  </view>
+
+  <!-- 待办 -->
+  <view class="tab-item" data-path="{{list[2].pagePath}}" bindtap="switchTab">
+    <image class="tab-icon" src="{{selected === 2 ? list[2].selectedIcon : list[2].icon}}" />
+    <text class="tab-text {{selected === 2 ? 'tab-text-active' : ''}}">{{list[2].text}}</text>
+  </view>
+
+  <!-- 我的 -->
+  <view class="tab-item" data-path="{{list[3].pagePath}}" bindtap="switchTab">
+    <image class="tab-icon" src="{{selected === 3 ? list[3].selectedIcon : list[3].icon}}" />
+    <text class="tab-text {{selected === 3 ? 'tab-text-active' : ''}}">{{list[3].text}}</text>
+  </view>
+</view>
+
+<!-- 底部操作面板 -->
+<view wx:if="{{sheetOpen}}" class="sheet-mask" bindtap="onSheetClose" catchtouchmove="noop">
+  <view
+    class="sheet"
+    catchtap="noop"
+    bindtouchstart="onSheetTouchStart"
+    bindtouchend="onSheetTouchEnd"
+  >
+    <view class="sheet-handle"></view>
+    <text class="sheet-title">新建</text>
+    <view
+      wx:for="{{actions}}"
+      wx:key="key"
+      class="sheet-action {{item.disabled ? 'sheet-action-disabled' : ''}}"
+      data-path="{{item.path}}"
+      data-disabled="{{item.disabled}}"
+      bindtap="onActionTap"
+    >
+      <text class="sheet-action-icon">{{item.icon}}</text>
+      <text class="sheet-action-text">{{item.text}}</text>
+    </view>
+  </view>
+</view>

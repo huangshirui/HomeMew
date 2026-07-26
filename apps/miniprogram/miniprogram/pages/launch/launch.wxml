@@ -4,6 +4,7 @@
     <image class="logo" src="/assets/images/logo.png" mode="aspectFit" />
   </view>
   <text class="app-name">家事喵</text>
+  <text class="app-slogan">你的家庭事务小助手</text>
   <text wx:if="{{statusText}}" class="status-text">{{statusText}}</text>
 
   <!-- 重试耗尽后的手动重试入口 -->

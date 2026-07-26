@@ -23,14 +23,15 @@
     "pages/integrations/credential"
   ],
   "window": {
-    "navigationBarBackgroundColor": "#2DBB78",
+    "navigationBarBackgroundColor": "#43A047",
     "navigationBarTitleText": "家事喵",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#F1F9F5"
   },
   "tabBar": {
+    "custom": true,
     "color": "#999999",
-    "selectedColor": "#2DBB78",
+    "selectedColor": "#43A047",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [

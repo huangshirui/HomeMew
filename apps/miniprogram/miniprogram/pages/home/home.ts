@@ -100,8 +100,6 @@ Page({
     tasksLoading: false,
     tasksRefreshing: false,
     tasksError: false,
-
-    fabOpen: false,
   },
 
   // 原始列表（不参与渲染，仅用于派生视图与排序）
@@ -116,6 +114,7 @@ Page({
 
   /** 页面显示：刷新问候 + 订阅状态 */
   onShow(): void {
+    this.getTabBar()?.setData({ selected: 0 });
     this.refreshGreeting();
 
     const storeFamilyId = currentFamilyStore.value?.id || '';
@@ -409,21 +408,8 @@ Page({
     wx.switchTab({ url: '/pages/tasks/tasks' });
   },
 
-  /** 悬浮新增按钮 */
-  onFabTap(): void {
-    this.setData({ fabOpen: true });
-  },
-
-  onFabClose(): void {
-    this.setData({ fabOpen: false });
-  },
-
-  /** 阻止点击菜单内部冒泡到遮罩 */
-  noop(): void {},
-
   /** 新建日程 */
   onCreateEvent(): void {
-    this.setData({ fabOpen: false });
     if (!this.data.currentFamily) return;
     wx.navigateTo({
       url: `/pages/events/edit?familyId=${this.data.currentFamily.id}`,
@@ -432,7 +418,6 @@ Page({
 
   /** 新建待办 */
   onCreateTask(): void {
-    this.setData({ fabOpen: false });
     if (!this.data.currentFamily) return;
     wx.navigateTo({
       url: `/pages/tasks/edit?familyId=${this.data.currentFamily.id}`,

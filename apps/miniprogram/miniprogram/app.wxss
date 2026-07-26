@@ -1,33 +1,33 @@
 /* HomeMew 全局样式（以首页为基准统一设计系统） */
 
-/* 设计色板：以首页绿色调为基准 */
+/* 设计色板：家事喵品牌色系 */
 page {
-  /* 主色板 */
-  --color-primary: #2DBB78;
-  --color-primary-dark: #20A968;
-  --color-primary-light: #4AC986;
-  --color-primary-tint: #EAF7EF;
+  /* 主色板 — 品牌绿 #43A047 为基准 */
+  --color-primary: #43A047;
+  --color-primary-dark: #358539;
+  --color-primary-light: #5ABF5E;
+  --color-primary-tint: #EAF6EB;
   --color-danger: #E85A5A;
   --color-warning: #FF9800;
   --color-info: #2196F3;
 
   /* 中性色 */
-  --color-bg: #F1F9F5;
+  --color-bg: #F1F8F4;
   --color-bg-white: #FFFFFF;
   --color-card: #FFFFFF;
-  --color-text-primary: #303442;
+  --color-text-primary: #222222;
   --color-text-secondary: #9299A3;
   --color-text-hint: #A6ADB6;
   --color-border: #E8EDEA;
   --color-divider: #EDF1EF;
 
   /* 首页样式别名（保持首页 wxss 兼容，避免重复定义） */
-  --home-primary: #2DBB78;
-  --home-primary-dark: #20A968;
-  --home-hero: #4AC986;
-  --home-bg: #F1F9F5;
+  --home-primary: #43A047;
+  --home-primary-dark: #358539;
+  --home-hero: #5ABF5E;
+  --home-bg: #F1F8F4;
   --home-card: #FFFFFF;
-  --home-text: #303442;
+  --home-text: #222222;
   --home-secondary: #9299A3;
   --home-danger: #E85A5A;
 
@@ -52,7 +52,7 @@ page {
   border-radius: 26rpx;
   padding: 28rpx 28rpx 24rpx;
   margin-bottom: 22rpx;
-  box-shadow: 0 4rpx 16rpx rgba(45, 187, 120, 0.06);
+  box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
 }
 
 /* 文本工具类 */
@@ -280,7 +280,7 @@ page {
   font-weight: 300;
   line-height: 104rpx;
   text-align: center;
-  box-shadow: 0 10rpx 28rpx rgba(45, 187, 120, 0.4);
+  box-shadow: 0 10rpx 28rpx rgba(67, 160, 71, 0.4);
   z-index: 50;
 }
 

@@ -150,16 +150,4 @@
       <text class="loading-text">加载中...</text>
     </view>
   </block>
-
-  <!-- 悬浮新增按钮 -->
-  <view class="fab" bindtap="onFabTap">＋</view>
-
-  <!-- 新增菜单 -->
-  <view wx:if="{{fabOpen}}" class="fab-mask" bindtap="onFabClose">
-    <view class="fab-sheet" catchtap="noop">
-      <button class="fab-action" bindtap="onCreateEvent">新建日程</button>
-      <button class="fab-action" bindtap="onCreateTask">新建待办</button>
-      <button class="fab-action fab-cancel" bindtap="onFabClose">取消</button>
-    </view>
-  </view>
 </view>
