@@ -65,17 +65,5 @@
       <text class="menu-text">关于家事喵</text>
       <text class="arrow">›</text>
     </view>
-
-    <!-- 开发版显示调试信息 -->
-    <block wx:if="{{isDev}}">
-      <view class="menu-item" bindtap="onDebugInfo">
-        <text class="menu-text menu-text-hint">调试信息</text>
-        <text class="arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onClearLocalAuth">
-        <text class="menu-text menu-text-hint">清除本地登录状态</text>
-        <text class="arrow">›</text>
-      </view>
-    </block>
   </view>
 </view>
