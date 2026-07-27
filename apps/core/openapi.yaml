@@ -657,7 +657,7 @@ paths:
       tags: [Events]
       summary: List family events overlapping a time range
       operationId: listFamilyEvents
-      x-homemew-status: planned
+      x-homemew-status: implemented
       parameters:
         - name: start
           in: query
@@ -697,7 +697,7 @@ paths:
       tags: [Events]
       summary: Create an event
       operationId: createEvent
-      x-homemew-status: planned
+      x-homemew-status: implemented
       requestBody:
         required: true
         content:
@@ -725,7 +725,7 @@ paths:
       tags: [Events]
       summary: Get an event
       operationId: getEvent
-      x-homemew-status: planned
+      x-homemew-status: implemented
       responses:
         '200':
           description: Event details
@@ -743,7 +743,7 @@ paths:
       tags: [Events]
       summary: Update an event
       operationId: updateEvent
-      x-homemew-status: planned
+      x-homemew-status: implemented
       requestBody:
         required: true
         content:
@@ -771,7 +771,7 @@ paths:
       tags: [Events]
       summary: Soft-delete an event
       operationId: deleteEvent
-      x-homemew-status: planned
+      x-homemew-status: implemented
       parameters:
         - $ref: '#/components/parameters/Version'
       responses:

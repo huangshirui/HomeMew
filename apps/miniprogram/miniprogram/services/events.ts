@@ -12,42 +12,68 @@ import {
   UpdateEventRequest,
 } from '../types/index';
 
+/** 事件列表查询参数（时间窗口 + 窗口内游标） */
+export interface ListEventsParams {
+  start?: string;
+  end?: string;
+  attendeeId?: string;
+  status?: 'active' | 'cancelled';
+  cursor?: string;
+  limit?: number;
+}
+
+/** 单页结果：items + 窗口内翻页游标 */
+export interface EventsPage {
+  items: Event[];
+  nextCursor: string | null;
+}
+
 /**
- * 列出家庭日程（按时间范围）
+ * 拉取一页日程（不做内部循环，游标由调用方管理）
  *
  * GET /api/v1/families/{familyId}/events
  *
- * @param start 起始时间（日期 YYYY-MM-DD 或 RFC 3339），与 end 配对
- * @param end 结束时间（不包含），与 start 配对
- * @param attendeeId 仅看指定参与人；传 'me' 表示仅看自己
+ * @param params.start 起始时间（日期 YYYY-MM-DD 或 RFC 3339），与 end 配对
+ * @param params.end 结束时间（不包含），与 start 配对
+ * @param params.attendeeId 仅看指定参与人；传 'me' 表示仅看自己
+ * @param params.cursor 窗口内翻页游标（仅在同一 start/end 窗口内有效）
+ */
+export function fetchEventsPage(
+  familyId: string,
+  params?: ListEventsParams,
+): Promise<EventsPage> {
+  const query: Record<string, string> = { limit: String(params?.limit ?? 100) };
+  if (params?.start) query.start = params.start;
+  if (params?.end) query.end = params.end;
+  if (params?.attendeeId) query.attendeeId = params.attendeeId;
+  if (params?.status) query.status = params.status;
+  if (params?.cursor) query.cursor = params.cursor;
+
+  const qs = '?' + Object.entries(query)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('&');
+
+  return request<EventsPage>(`/api/v1/families/${familyId}/events${qs}`);
+}
+
+/**
+ * 列出家庭日程（按时间范围，自动拉满窗口内所有分页）
+ *
+ * 注意：跨窗口的多日事件会同时命中相邻窗口（Core 是重叠查询），
+ * 调用方若合并多个窗口结果，必须按 event id 去重。
  */
 export async function listEvents(
   familyId: string,
-  params?: { start?: string; end?: string; attendeeId?: string; status?: 'active' | 'cancelled' },
+  params?: Omit<ListEventsParams, 'cursor' | 'limit'>,
 ): Promise<Event[]> {
   const items: Event[] = [];
-  let cursor: string | null = null;
+  let cursor: string | undefined;
   // 循环拉取所有分页，保证日历圆点与列表数量完整。
   for (let page = 0; page < 50; page++) {
-    const query: Record<string, string> = { limit: '100' };
-    if (params?.start) query.start = params.start;
-    if (params?.end) query.end = params.end;
-    if (params?.attendeeId) query.attendeeId = params.attendeeId;
-    if (params?.status) query.status = params.status;
-    if (cursor) query.cursor = cursor;
-
-    const qs = '?' + Object.entries(query)
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join('&');
-
-    const data: { items: Event[]; nextCursor: string | null } = await request<{
-      items: Event[];
-      nextCursor: string | null;
-    }>(`/api/v1/families/${familyId}/events${qs}`);
-
+    const data = await fetchEventsPage(familyId, { ...params, cursor, limit: 100 });
     items.push(...(data.items ?? []));
+    if (!data.nextCursor) break;
     cursor = data.nextCursor;
-    if (!cursor) break;
   }
   return items;
 }

@@ -14,6 +14,8 @@ export const STORAGE_KEYS = {
   tokenExpiresAt: 'tokenExpiresAt',
   currentFamilyId: 'currentFamilyId',
   coreApiUrl: 'coreApiUrl',
+  /** 日程页成员范围选择前缀，完整 key 为 `eventsScope:{familyId}:{userId}` */
+  eventsScope: 'eventsScope',
 } as const;
 
 /** 普通请求超时 (ms) */

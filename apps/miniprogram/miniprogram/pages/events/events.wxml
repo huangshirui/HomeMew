@@ -1,12 +1,8 @@
-<!-- 日程列表页 -->
-<view class="container">
-  <!-- 加载中 -->
-  <view wx:if="{{!loaded}}" class="loading-state">
-    <text class="loading-text">加载中...</text>
-  </view>
+<!-- 日程页：成员范围 + 折叠月历 + 双向时间线 -->
+<view class="page">
 
   <!-- 无家庭引导 -->
-  <block wx:elif="{{noFamily}}">
+  <block wx:if="{{noFamily}}">
     <view class="empty-state">
       <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
       <text class="empty-title">还没有家庭</text>
@@ -18,49 +14,54 @@
     </view>
   </block>
 
+  <!-- 首屏加载失败 -->
+  <block wx:elif="{{initError}}">
+    <view class="empty-state">
+      <text class="empty-title">日程加载失败</text>
+      <view class="empty-actions empty-actions-row">
+        <button class="btn-outline btn-sm" bindtap="onRetryInit">点击重试</button>
+      </view>
+    </view>
+  </block>
+
   <block wx:else>
-    <!-- 日历卡片 -->
-    <view class="calendar-card">
-      <!-- 月份导航 -->
-      <view class="calendar-header">
-        <view class="nav-arrow" bindtap="onPrevMonth">
-          <text class="arrow-text">‹</text>
-        </view>
-        <text class="month-label">{{monthLabel}}</text>
-        <view class="nav-arrow" bindtap="onNextMonth">
-          <text class="arrow-text">›</text>
-        </view>
-        <view class="header-actions">
-          <view
-            wx:if="{{showTodayBtn}}"
-            class="today-btn"
-            bindtap="onBackToToday"
-          >
-            <text class="today-text">今天</text>
-          </view>
-          <view
-            wx:if="{{selectedDate !== 'all'}}"
-            class="show-all-btn"
-            bindtap="onShowAll"
-          >
-            <text class="show-all-text">全部</text>
-          </view>
-        </view>
+    <!-- 顶栏：成员范围 + 月份（居中，点击展开/折叠月历） + 今天 -->
+    <view class="topbar">
+      <view class="scope-btn" bindtap="onOpenScope">
+        <text class="scope-text">{{scopeLabel}}</text>
+        <text class="scope-caret">▾</text>
       </view>
-
-      <!-- 月份切换局部 loading -->
-      <view wx:if="{{monthLoading}}" class="cal-loading">
-        <view class="cal-spinner"></view>
+      <view
+        class="cal-bar-center"
+        bindtap="onToggleCalendar"
+        bindtouchstart="onCalTouchStart"
+        bindtouchend="onCalTouchEnd"
+      >
+        <text class="cal-bar-month">{{monthLabel}}</text>
+        <text class="cal-bar-caret">{{calendarExpanded ? '⌃' : '⌄'}}</text>
       </view>
+      <view class="today-btn" bindtap="onToday">
+        <text class="today-text">今天</text>
+      </view>
+    </view>
 
-      <!-- 星期表头 -->
+    <!-- 折叠态：紧凑周条（当前周）；展开态：完整月历 -->
+    <view
+      wx:if="{{calendarExpanded}}"
+      class="cal-panel"
+      bindtouchstart="onCalTouchStart"
+      bindtouchend="onCalTouchEnd"
+    >
+      <view class="cal-header">
+        <view class="cal-nav" catchtap="onCalPrevMonth"><text class="cal-nav-text">‹</text></view>
+        <text class="cal-title">{{calYear}}年{{calMonth}}月</text>
+        <view class="cal-nav" catchtap="onCalNextMonth"><text class="cal-nav-text">›</text></view>
+      </view>
       <view class="week-row">
         <view class="week-cell" wx:for="{{weekLabels}}" wx:key="*this">
           <text class="week-text">{{item}}</text>
         </view>
       </view>
-
-      <!-- 日期格子 -->
       <view class="day-grid">
         <block wx:for="{{calendar}}" wx:for-item="row" wx:for-index="rowIdx" wx:key="rowIdx">
           <view class="day-row">
@@ -68,9 +69,9 @@
               wx:for="{{row}}"
               wx:for-item="cell"
               wx:key="date"
-              class="day-cell {{cell.inMonth ? '' : 'day-out'}} {{cell.isToday ? 'day-today' : ''}} {{cell.isSelected ? 'day-selected' : ''}}"
+              class="day-cell {{cell.inMonth ? '' : 'day-out'}} {{cell.isToday ? 'day-today' : ''}}"
               data-date="{{cell.date}}"
-              bindtap="onDayTap"
+              catchtap="onCalDayTap"
             >
               <text class="day-num">{{cell.day}}</text>
               <view wx:if="{{cell.hasEvent}}" class="dot"></view>
@@ -79,69 +80,144 @@
         </block>
       </view>
     </view>
-
-    <!-- 列表标题与筛选 -->
-    <view class="list-header">
-      <text class="list-title">{{listTitle}}</text>
-      <view class="filter-btn {{attendeeFilter === 'me' ? 'filter-active' : ''}}" bindtap="onToggleFilter">
-        <text class="filter-text">{{attendeeFilter === 'me' ? '只看我的' : '全部参与人'}}</text>
-      </view>
-    </view>
-
-    <!-- 加载失败 -->
-    <view wx:if="{{listError}}" class="empty-state">
-      <text class="empty-title">日程加载失败</text>
-      <view class="empty-actions">
-        <button class="btn-outline btn-sm" bindtap="onRetry">点击重试</button>
-      </view>
-    </view>
-
-    <!-- 日程列表 / 空状态 -->
-    <block wx:elif="{{displayedEvents.length > 0}}">
+    <view wx:else class="cal-week">
       <view
-        wx:for="{{displayedEvents}}"
-        wx:key="id"
-        class="event-card"
-        data-id="{{item.id}}"
-        bindtap="onEventTap"
+        wx:for="{{weekStrip}}"
+        wx:key="date"
+        class="cal-week-cell {{item.isToday ? 'cal-week-today' : ''}} {{item.date === visibleDate ? 'cal-week-sel' : ''}}"
+        data-date="{{item.date}}"
+        bindtap="onWeekDayTap"
       >
-        <view class="event-accent"></view>
-        <view class="event-body">
-          <view class="event-title-row">
-            <text class="event-title">{{item.summary}}</text>
-            <text wx:if="{{item.cancelled}}" class="event-cancelled">已取消</text>
-          </view>
-          <view class="event-meta">
-            <text wx:if="{{item.isAllDay}}" class="event-allday-tag">全天</text>
-            <text wx:else class="event-time">{{item.startText}}</text>
-            <text wx:if="{{item.attendees.length > 0}}" class="event-attendees">
-              {{item.attendees[0].displayName}}
-              <text wx:if="{{item.attendees.length > 1}}" class="event-attendees-more">
-                等 {{item.attendees.length}} 人
-              </text>
-            </text>
-          </view>
-        </view>
-        <view class="event-arrow">
-          <text class="arrow-text">›</text>
-        </view>
-      </view>
-    </block>
-
-    <view wx:else class="empty-state">
-      <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
-      <text class="empty-title">
-        {{attendeeFilter === 'me' ? '没有分配给我的日程' : (selectedDate === 'all' ? '本月没有日程' : '这一天没有日程')}}
-      </text>
-      <view class="empty-actions empty-actions-row">
-        <button class="btn-primary btn-sm" bindtap="onCreate">新建日程</button>
-        <button
-          wx:if="{{attendeeFilter === 'me' || selectedDate !== 'all'}}"
-          class="btn-outline btn-sm"
-          bindtap="onClearFilter"
-        >查看全部</button>
+        <text class="cal-week-day">{{item.day}}</text>
       </view>
     </view>
 
+    <!-- 首次加载骨架屏 -->
+    <view wx:if="{{!loaded}}" class="skeleton">
+      <view class="skel-day" wx:for="{{[0, 1, 2]}}" wx:key="*this">
+        <view class="skel-bar skel-title"></view>
+        <view class="skel-card"></view>
+        <view class="skel-card"></view>
+      </view>
+    </view>
+
+    <!-- 时间线 -->
+    <scroll-view
+      wx:else
+      id="scroller"
+      class="timeline"
+      scroll-y
+      scroll-top="{{scrollTop}}"
+      scroll-into-view="{{scrollIntoView}}"
+      upper-threshold="{{edgeThreshold}}"
+      lower-threshold="{{edgeThreshold}}"
+      bindscroll="onScroll"
+      bindscrolltoupper="onNearTop"
+      bindscrolltolower="onNearBottom"
+    >
+      <view id="timeline-inner" class="timeline-inner">
+
+        <!-- 顶部：向前加载状态 -->
+        <view class="edge-row">
+          <block wx:if="{{loadingBack}}">
+            <view class="edge-spinner"></view>
+            <text class="edge-text">正在加载更早的日程…</text>
+          </block>
+          <text wx:elif="{{reachedEarliest}}" class="edge-text">已加载到最早</text>
+          <text wx:elif="{{backError}}" class="edge-text edge-retry" bindtap="onTapLoadOlder">加载失败，点击重试</text>
+          <text wx:else class="edge-text edge-action" bindtap="onTapLoadOlder">点击加载更早的日程</text>
+        </view>
+
+        <!-- 当前范围没有日程 -->
+        <view wx:if="{{isEmpty}}" class="range-empty">
+          <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
+          <text class="empty-title">这个时间范围内还没有日程</text>
+          <view class="empty-actions empty-actions-row">
+            <button class="btn-primary btn-sm" bindtap="onCreate">新建日程</button>
+          </view>
+        </view>
+
+        <!-- 日期分组 -->
+        <block wx:else>
+          <view
+            wx:for="{{sections}}"
+            wx:key="date"
+            id="{{item.id}}"
+            class="day-section"
+            data-date="{{item.date}}"
+          >
+            <view class="day-header {{item.isToday ? 'day-header-today' : ''}}">
+              <text class="day-header-date">{{item.dateLabel}}</text>
+              <text class="day-header-week">{{item.weekLabel}}</text>
+              <text wx:if="{{item.isToday}}" class="day-header-tag">今天</text>
+            </view>
+
+            <view wx:if="{{item.items.length === 0}}" class="day-empty">
+              <text class="day-empty-text">没有日程</text>
+            </view>
+
+            <view
+              wx:for="{{item.items}}"
+              wx:for-item="ev"
+              wx:key="id"
+              class="event-card"
+              data-id="{{ev.id}}"
+              bindtap="onEventTap"
+            >
+              <view class="event-accent {{ev.isAllDay ? 'event-accent-allday' : ''}}"></view>
+              <view class="event-body">
+                <view class="event-time-row">
+                  <text wx:if="{{ev.isAllDay}}" class="event-allday-tag">全天</text>
+                  <text wx:else class="event-time">{{ev.timeText}}</text>
+                </view>
+                <text class="event-title">{{ev.summary}}</text>
+                <text wx:if="{{ev.metaText}}" class="event-meta">{{ev.metaText}}</text>
+              </view>
+            </view>
+          </view>
+        </block>
+
+        <!-- 底部：向后加载状态 -->
+        <view class="edge-row">
+          <block wx:if="{{loadingFwd}}">
+            <view class="edge-spinner"></view>
+            <text class="edge-text">正在加载更多日程…</text>
+          </block>
+          <text wx:elif="{{reachedLatest}}" class="edge-text">已加载到最晚</text>
+          <text wx:elif="{{fwdError}}" class="edge-text edge-retry" bindtap="onTapLoadNewer">加载失败，点击重试</text>
+          <text wx:else class="edge-text edge-action" bindtap="onTapLoadNewer">点击加载更多日程</text>
+        </view>
+
+        <view class="timeline-bottom-space"></view>
+      </view>
+    </scroll-view>
+
+    <!-- 成员范围选择弹层 -->
+    <view wx:if="{{showScopeSheet}}" class="sheet-mask" bindtap="onCloseScope" catchtouchmove="noop">
+      <view class="sheet" catchtap="noop">
+        <view class="sheet-header">
+          <text class="sheet-title">选择日历</text>
+        </view>
+        <view
+          wx:for="{{scopeOptions}}"
+          wx:key="key"
+          class="sheet-option {{scope === item.key ? 'sheet-option-active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onSelectScope"
+        >
+          <view wx:if="{{item.showAvatar}}" class="sheet-avatar-wrap">
+            <image class="sheet-avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+          </view>
+          <view wx:else class="sheet-avatar-wrap sheet-avatar-all">
+            <text class="sheet-avatar-all-text">家</text>
+          </view>
+          <text class="sheet-option-label">{{item.label}}</text>
+          <text wx:if="{{scope === item.key}}" class="sheet-check">✓</text>
+        </view>
+        <view class="sheet-cancel" bindtap="onCloseScope">
+          <text class="sheet-cancel-text">取消</text>
+        </view>
+      </view>
+    </view>
   </block>
 </view>

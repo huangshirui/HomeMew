@@ -1,120 +1,156 @@
-/* 日程列表页样式 */
+/* 日程页样式：成员范围 + 折叠月历 + 双向时间线 */
 
-/* 页面容器：底部留白，避免最后一条内容被 FAB 遮挡 */
-.container {
-  padding-bottom: 160rpx;
+page {
+  height: 100%;
 }
 
-/* 加载状态 */
-.loading-state {
+.page {
   display: flex;
-  justify-content: center;
-  padding-top: 120rpx;
+  flex-direction: column;
+  height: 100vh;
+  background-color: var(--color-bg);
 }
 
-.loading-text {
-  font-size: 28rpx;
-  color: var(--color-text-hint);
-}
+/* ---------- 顶栏 ---------- */
 
-/* 日历卡片 */
-.calendar-card {
-  position: relative;
-  background-color: var(--color-card);
-  border-radius: 26rpx;
-  padding: 24rpx 24rpx 16rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(45, 187, 120, 0.06);
-}
-
-.calendar-header {
+.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24rpx 16rpx;
+  padding: 20rpx 32rpx 12rpx;
+  background-color: var(--color-card);
 }
 
-.month-label {
-  flex: 1;
-  text-align: center;
-  font-size: 32rpx;
+.scope-btn {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  max-width: 40%;
+  flex-shrink: 0;
+}
+
+.scope-text {
+  font-size: 34rpx;
   font-weight: 600;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-caret {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.today-btn {
+  padding: 8rpx 24rpx;
+  border: 2rpx solid var(--color-primary);
+  border-radius: 28rpx;
+  flex-shrink: 0;
+}
+
+.today-text {
+  font-size: 26rpx;
+  color: var(--color-primary);
+}
+
+/* ---------- 顶栏居中月份（折叠月历开关） ---------- */
+
+.cal-bar-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+
+.cal-bar-month {
+  font-size: 30rpx;
+  font-weight: 500;
   color: var(--color-text-primary);
 }
 
-.nav-arrow {
-  width: 48rpx;
-  height: 48rpx;
+.cal-bar-caret {
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+  line-height: 1;
+}
+
+/* 折叠态紧凑周条（当前周，周一..周日） */
+.cal-week {
+  display: flex;
+  align-items: center;
+  background-color: var(--color-card);
+  padding: 8rpx 16rpx 16rpx;
+  border-bottom: 2rpx solid rgba(0, 0, 0, 0.04);
+}
+
+.cal-week-cell {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.arrow-text {
+.cal-week-day {
+  width: 60rpx;
+  height: 60rpx;
+  line-height: 60rpx;
+  text-align: center;
+  border-radius: 50%;
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+}
+
+.cal-week-today .cal-week-day {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.cal-week-sel .cal-week-day {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* ---------- 展开月历 ---------- */
+
+.cal-panel {
+  background-color: var(--color-card);
+  padding: 8rpx 24rpx 16rpx;
+  border-bottom: 2rpx solid rgba(0, 0, 0, 0.04);
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32rpx;
+  padding: 8rpx 0;
+}
+
+.cal-nav {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cal-nav-text {
   font-size: 40rpx;
   color: var(--color-text-hint);
   line-height: 1;
 }
 
-.show-all-btn {
-  margin-left: 16rpx;
-  padding: 6rpx 18rpx;
-  border: 2rpx solid var(--color-primary);
-  border-radius: 24rpx;
+.cal-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  margin-left: 16rpx;
-}
-
-.today-btn {
-  padding: 6rpx 18rpx;
-  border: 2rpx solid var(--color-primary);
-  border-radius: 24rpx;
-}
-
-.today-text {
-  font-size: 24rpx;
-  color: var(--color-primary);
-}
-
-.show-all-text {
-  font-size: 24rpx;
-  color: var(--color-primary);
-}
-
-/* 月份切换局部 loading 遮罩 */
-.cal-loading {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.65);
-  border-radius: 26rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 5;
-}
-
-.cal-spinner {
-  width: 48rpx;
-  height: 48rpx;
-  border: 4rpx solid #e0e0e0;
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* 星期表头 */
 .week-row {
   display: flex;
   padding: 8rpx 0;
@@ -130,7 +166,6 @@
   color: var(--color-text-hint);
 }
 
-/* 日期网格 */
 .day-grid {
   padding-bottom: 8rpx;
 }
@@ -158,23 +193,14 @@
   color: var(--color-text-primary);
 }
 
-.day-today {
-  border-radius: 50%;
-}
-
 .day-today .day-num {
   color: var(--color-primary);
   font-weight: 600;
 }
 
-.day-selected {
+.day-today {
   background-color: #eaf7ec;
   border-radius: 50%;
-}
-
-.day-selected .day-num {
-  color: var(--color-primary);
-  font-weight: 600;
 }
 
 .dot {
@@ -185,45 +211,139 @@
   background-color: var(--color-primary);
 }
 
-/* 列表标题与筛选 */
-.list-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0;
+/* ---------- 骨架屏 ---------- */
+
+.skeleton {
+  flex: 1;
+  padding: 24rpx 32rpx;
+  overflow: hidden;
+}
+
+.skel-day {
+  margin-bottom: 40rpx;
+}
+
+.skel-bar {
+  background-color: #e8ede9;
+  border-radius: 10rpx;
+}
+
+.skel-title {
+  width: 240rpx;
+  height: 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.skel-card {
+  height: 120rpx;
+  border-radius: 22rpx;
+  background-color: #eef2ef;
   margin-bottom: 16rpx;
 }
 
-.list-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: var(--color-text-primary);
+/* ---------- 时间线 ---------- */
+
+.timeline {
+  flex: 1;
+  height: 0;
 }
 
-.filter-btn {
-  padding: 8rpx 20rpx;
-  border: 2rpx solid var(--color-border);
-  border-radius: 24rpx;
+.timeline-inner {
+  padding: 0 32rpx;
 }
 
-.filter-btn.filter-active {
-  border-color: var(--color-primary);
-  background-color: #eaf7ec;
+/* 顶部 / 底部加载状态行（等高，保证向上插入补偿准确） */
+.edge-row {
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
 }
 
-.filter-text {
+.edge-text {
   font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.edge-action {
   color: var(--color-text-secondary);
 }
 
-.filter-btn.filter-active .filter-text {
+.edge-retry {
   color: var(--color-primary);
+}
+
+.edge-spinner {
+  width: 32rpx;
+  height: 32rpx;
+  border: 4rpx solid #e0e0e0;
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 范围内无日程 */
+.range-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0;
+}
+
+/* 日期分组 */
+.day-section {
+  margin-bottom: 8rpx;
+}
+
+.day-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  padding: 20rpx 4rpx 14rpx;
+}
+
+.day-header-date {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.day-header-week {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.day-header-today .day-header-date,
+.day-header-today .day-header-week {
+  color: var(--color-primary);
+}
+
+.day-header-tag {
+  font-size: 20rpx;
+  color: #ffffff;
+  background-color: var(--color-primary);
+  border-radius: 8rpx;
+  padding: 2rpx 12rpx;
+}
+
+.day-empty {
+  padding: 8rpx 4rpx 16rpx;
+}
+
+.day-empty-text {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
 }
 
 /* 日程卡片 */
 .event-card {
   background-color: var(--color-card);
-  border-radius: 26rpx;
+  border-radius: 22rpx;
   display: flex;
   align-items: stretch;
   margin-bottom: 16rpx;
@@ -236,83 +356,161 @@
   background-color: var(--color-primary);
 }
 
-.event-body {
-  flex: 1;
-  padding: 24rpx 20rpx;
-  min-width: 0;
+.event-accent-allday {
+  background-color: #ff9800;
 }
 
-.event-title-row {
+.event-body {
+  flex: 1;
+  min-width: 0;
+  padding: 20rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.event-time-row {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin-bottom: 12rpx;
+}
+
+.event-time {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}
+
+.event-allday-tag {
+  font-size: 20rpx;
+  color: #ffffff;
+  background-color: #ff9800;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  font-weight: 500;
 }
 
 .event-title {
-  font-size: 32rpx;
+  font-size: 30rpx;
   font-weight: 600;
   color: var(--color-text-primary);
-  flex: 1;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.event-cancelled {
-  font-size: 22rpx;
+.event-meta {
+  font-size: 24rpx;
   color: var(--color-text-hint);
-  background-color: var(--color-bg);
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.event-meta {
+/* 底部留白：避免被悬浮按钮 / 自定义 TabBar 遮挡 */
+.timeline-bottom-space {
+  height: calc(180rpx + env(safe-area-inset-bottom));
+}
+
+/* ---------- 成员范围弹层 ---------- */
+
+.sheet-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sheet {
+  background-color: var(--color-card);
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.sheet-header {
+  padding: 8rpx 0 20rpx;
+  text-align: center;
+}
+
+.sheet-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.sheet-option {
   display: flex;
   align-items: center;
   gap: 20rpx;
+  padding: 20rpx 12rpx;
+  border-radius: 18rpx;
 }
 
-.event-time {
-  font-size: 24rpx;
-  color: var(--color-text-hint);
+.sheet-option-active {
+  background-color: #eaf7ec;
 }
 
-/* 全天日程标识 */
-.event-allday-tag {
-  font-size: 22rpx;
+.sheet-avatar-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sheet-avatar {
+  width: 100%;
+  height: 100%;
+}
+
+.sheet-avatar-all {
+  background-color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sheet-avatar-all-text {
+  font-size: 30rpx;
   color: #ffffff;
-  background-color: #FF9800;
-  padding: 4rpx 14rpx;
-  border-radius: 8rpx;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.event-attendees {
-  font-size: 24rpx;
-  color: var(--color-text-hint);
-  background-color: var(--color-bg);
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
+.sheet-option-label {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.event-attendees-more {
+.sheet-check {
+  font-size: 30rpx;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.sheet-cancel {
+  margin-top: 16rpx;
+  padding: 24rpx 0 8rpx;
+  text-align: center;
+  border-top: 2rpx solid rgba(0, 0, 0, 0.05);
+}
+
+.sheet-cancel-text {
+  font-size: 28rpx;
   color: var(--color-text-secondary);
 }
 
-.event-arrow {
-  display: flex;
-  align-items: center;
-  padding: 0 16rpx;
-}
+/* ---------- 空状态（无家庭 / 失败） ---------- */
 
-.event-arrow .arrow-text {
-  font-size: 32rpx;
-  color: #cccccc;
-}
-
-/* 空状态 */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -330,12 +528,6 @@
 .empty-title {
   font-size: 30rpx;
   color: var(--color-text-secondary);
-}
-
-.empty-hint {
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: var(--color-text-hint);
 }
 
 .empty-desc {
@@ -367,5 +559,3 @@
   font-size: 28rpx;
   padding: 0 40rpx;
 }
-
-/* 悬浮新增按钮样式已统一到全局 app.wxss */
