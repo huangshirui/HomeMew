@@ -47,7 +47,7 @@ describe("current schema", () => {
     ]);
     expect(familyColumns.results.map((column: { name: string }) => column.name)).toContain("avatar_key");
     expect(familyColumns.results.map((column: { name: string }) => column.name)).not.toContain("avatar_url");
-    expect(version?.value).toBe("7");
+    expect(version?.value).toBe("8");
     const integrationTables = await env.DB.prepare(
       `SELECT name FROM sqlite_master WHERE type='table'
        AND name IN ('system_identities','family_system_access','system_credentials','oauth_rate_limits')
@@ -58,10 +58,25 @@ describe("current schema", () => {
     ]);
     const eventColumns = await env.DB.prepare("PRAGMA table_info('events')").all<{ name: string }>();
     const taskColumns = await env.DB.prepare("PRAGMA table_info('tasks')").all<{ name: string }>();
+    const eventColumnNames = eventColumns.results.map((column: { name: string }) => column.name);
+    expect(eventColumnNames).toEqual(expect.arrayContaining(["start_timezone", "end_timezone"]));
+    expect(eventColumnNames).not.toContain("timezone");
     expect(eventColumns.results.map((column: { name: string }) => column.name)).toEqual(expect.arrayContaining(["created_by_type", "created_by_id", "updated_by_type", "updated_by_id", "deleted_by_type", "deleted_by_id"]));
     expect(taskColumns.results.map((column: { name: string }) => column.name)).toEqual(expect.arrayContaining(["completed_by_type", "completed_by_id"]));
     expect(eventColumns.results.map((column: { name: string }) => column.name)).not.toEqual(expect.arrayContaining(["created_by", "updated_by", "deleted_by"]));
     expect(taskColumns.results.map((column: { name: string }) => column.name)).not.toEqual(expect.arrayContaining(["created_by", "updated_by", "deleted_by", "completed_by"]));
+  });
+
+  it("stores database-generated text timestamps as canonical UTC", async () => {
+    const adminId = createId("usr");
+    await env.DB.prepare(
+      "INSERT INTO users (id, display_name, created_from) VALUES (?, ?, ?)",
+    ).bind(adminId, "UTC user", "admin").run();
+    const row = await env.DB.prepare(
+      "SELECT created_at, updated_at FROM users WHERE id=?",
+    ).bind(adminId).first<{ created_at: string; updated_at: string }>();
+    expect(row?.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(row?.updated_at).toMatch(/Z$/);
   });
 
   it("supports event and task identifiers", () => {

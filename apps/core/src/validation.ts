@@ -50,9 +50,25 @@ export function exactDate(value: unknown, field: string): string {
   return value;
 }
 
-export function offsetDateTime(value: unknown, field: string): string {
-  if (typeof value !== "string" || !/(Z|[+-]\d{2}:\d{2})$/.test(value) || Number.isNaN(Date.parse(value))) throw new ApiError("INVALID_REQUEST", `${field} must be a date-time with timezone offset`, 400);
-  return new Date(value).toISOString();
+export function utcDateTime(value: unknown, field: string): string {
+  const match = typeof value === "string"
+    ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?Z$/.exec(value)
+    : null;
+  const instant = match ? new Date(value as string) : null;
+  if (
+    !match ||
+    !instant ||
+    Number.isNaN(instant.getTime()) ||
+    instant.getUTCFullYear() !== Number(match[1]) ||
+    instant.getUTCMonth() + 1 !== Number(match[2]) ||
+    instant.getUTCDate() !== Number(match[3]) ||
+    instant.getUTCHours() !== Number(match[4]) ||
+    instant.getUTCMinutes() !== Number(match[5]) ||
+    instant.getUTCSeconds() !== Number(match[6])
+  ) {
+    throw new ApiError("INVALID_REQUEST", `${field} must be an RFC 3339 UTC date-time ending in Z`, 400);
+  }
+  return instant.toISOString();
 }
 
 export function timezone(value: unknown): string {

@@ -7,6 +7,7 @@ import { mapActor, requireFamilyCapability } from "./principal-access";
 import { success } from "./http";
 import { createId } from "./ids";
 import { decodeCursor, encodeCursor, parseLimit } from "./pagination";
+import { nowUtc } from "./time";
 import { exactDate, optionalText, requireObject, requireString, stringIds } from "./validation";
 
 type AppEnv = { Bindings: Bindings; Variables: Variables };
@@ -25,9 +26,9 @@ function version(value: unknown): number {
   return value as number;
 }
 
-function due(value: unknown): string | null {
+function dueDate(value: unknown): string | null {
   if (value === null || value === undefined) return null;
-  try { return exactDate(value, "due"); } catch { throw new ApiError("INVALID_DUE_DATE", "due must be YYYY-MM-DD or null", 400); }
+  try { return exactDate(value, "dueDate"); } catch { throw new ApiError("INVALID_DUE_DATE", "dueDate must be YYYY-MM-DD or null", 400); }
 }
 
 async function findTask(env: Bindings, familyId: string, taskId: string): Promise<TaskRow> {
@@ -39,7 +40,7 @@ async function findTask(env: Bindings, familyId: string, taskId: string): Promis
 async function mapTask(env: Bindings, row: TaskRow): Promise<Record<string, unknown>> {
   const assignees = await env.DB.prepare(`SELECT u.id user_id, u.display_name, u.avatar_key FROM task_assignees ta JOIN family_members fm ON fm.family_id=? AND fm.user_id=ta.user_id AND fm.status='active' JOIN users u ON u.id=ta.user_id WHERE ta.task_id=? ORDER BY ta.created_at,u.id`).bind(row.family_id, row.id).all<any>();
   return {
-    id: row.id, familyId: row.family_id, name: row.name, description: row.description, due: row.due_date,
+    id: row.id, familyId: row.family_id, name: row.name, description: row.description, dueDate: row.due_date,
     status: row.status, assignees: assignees.results.map((item) => ({ userId: item.user_id, displayName: item.display_name, avatarUrl: avatarUrl(env, item.avatar_key) })),
     completedAt: row.completed_at, completedBy: await mapActor(env,row.completed_by_type,row.completed_by_id), createdBy: await mapActor(env,row.created_by_type,row.created_by_id), updatedBy: await mapActor(env,row.updated_by_type,row.updated_by_id),
     version: row.version, createdAt: row.created_at, updatedAt: row.updated_at,
@@ -50,12 +51,13 @@ export function registerTaskRoutes(app: App): void {
   app.post("/api/v1/families/:familyId/tasks", async (c) => {
     const familyId=c.req.param("familyId"),principal=c.get("currentPrincipal");await requireFamilyCapability(c.env,principal,familyId,"tasks:write");
     const input = await jsonBody(c), name = requireString(input.name, "name", 100);
+    if (Object.keys(input).some((field) => !["name", "description", "dueDate", "assigneeIds"].includes(field))) throw new ApiError("INVALID_REQUEST", "Request contains unsupported task fields", 400);
     const description = optionalText(input.description, "description", 5000) ?? null;
-    const dueDate = input.due === undefined ? null : due(input.due);
+    const taskDueDate = input.dueDate === undefined ? null : dueDate(input.dueDate);
     const assigneeIds = input.assigneeIds === undefined ? [] : stringIds(input.assigneeIds, "assigneeIds");
     await requireRelatedMembers(c.env, familyId, assigneeIds, "assignee");
     const id = createId("tsk");
-    await c.env.DB.batch([c.env.DB.prepare("INSERT INTO tasks (id,family_id,name,description,due_date,created_by_type,created_by_id,updated_by_type,updated_by_id) VALUES (?,?,?,?,?,?,?,?,?)").bind(id,familyId,name,description,dueDate,principal.type,principal.id,principal.type,principal.id), ...assigneeIds.map((assigneeId) => c.env.DB.prepare("INSERT INTO task_assignees (task_id,user_id) VALUES (?,?)").bind(id, assigneeId))]);
+    await c.env.DB.batch([c.env.DB.prepare("INSERT INTO tasks (id,family_id,name,description,due_date,created_by_type,created_by_id,updated_by_type,updated_by_id) VALUES (?,?,?,?,?,?,?,?,?)").bind(id,familyId,name,description,taskDueDate,principal.type,principal.id,principal.type,principal.id), ...assigneeIds.map((assigneeId) => c.env.DB.prepare("INSERT INTO task_assignees (task_id,user_id) VALUES (?,?)").bind(id, assigneeId))]);
     return c.json(success(await mapTask(c.env, await findTask(c.env, familyId, id))), 201);
   });
 
@@ -67,14 +69,16 @@ export function registerTaskRoutes(app: App): void {
   app.patch("/api/v1/families/:familyId/tasks/:taskId", async (c) => {
     const familyId=c.req.param("familyId")!,taskId=c.req.param("taskId")!,principal=c.get("currentPrincipal");await requireFamilyCapability(c.env,principal,familyId,"tasks:write");
     const previous = await findTask(c.env, familyId, taskId), input = await jsonBody(c), expected = version(input.version);
+    if (Object.keys(input).some((field) => !["name", "description", "dueDate", "assigneeIds", "version"].includes(field))) throw new ApiError("INVALID_REQUEST", "Request contains unsupported task fields", 400);
+    if (Object.keys(input).length < 2) throw new ApiError("INVALID_REQUEST", "At least one task change is required", 400);
     if (input.status !== undefined) throw new ApiError("INVALID_REQUEST", "status must be changed with an action endpoint", 400);
     const name = input.name === undefined ? previous.name : requireString(input.name, "name", 100);
     const description = input.description === undefined ? previous.description : optionalText(input.description, "description", 5000) ?? null;
-    const dueDate = input.due === undefined ? previous.due_date : due(input.due);
+    const taskDueDate = input.dueDate === undefined ? previous.due_date : dueDate(input.dueDate);
     const assigneeIds = input.assigneeIds === undefined ? undefined : stringIds(input.assigneeIds, "assigneeIds");
     if (assigneeIds) await requireRelatedMembers(c.env, familyId, assigneeIds, "assignee");
     const mutationToken = crypto.randomUUID();
-    const update=c.env.DB.prepare("UPDATE tasks SET name=?,description=?,due_date=?,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1,mutation_token=? WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(name,description,dueDate,principal.type,principal.id,mutationToken,taskId,familyId,expected);
+    const update=c.env.DB.prepare("UPDATE tasks SET name=?,description=?,due_date=?,updated_by_type=?,updated_by_id=?,updated_at=?,version=version+1,mutation_token=? WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(name,description,taskDueDate,principal.type,principal.id,nowUtc(),mutationToken,taskId,familyId,expected);
     const statements = [update];
     if (assigneeIds) {
       statements.push(c.env.DB.prepare("DELETE FROM task_assignees WHERE task_id=? AND EXISTS (SELECT 1 FROM tasks WHERE id=? AND mutation_token=?)").bind(taskId, taskId, mutationToken));
@@ -89,7 +93,8 @@ export function registerTaskRoutes(app: App): void {
   app.delete("/api/v1/families/:familyId/tasks/:taskId", async (c) => {
     const familyId=c.req.param("familyId"),taskId=c.req.param("taskId"),principal=c.get("currentPrincipal");await requireFamilyCapability(c.env,principal,familyId,"tasks:write");await findTask(c.env,familyId,taskId);
     const expected = version(Number(c.req.query("version")));
-    const result=await c.env.DB.prepare("UPDATE tasks SET deleted_at=CURRENT_TIMESTAMP,deleted_by_type=?,deleted_by_id=?,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(principal.type,principal.id,principal.type,principal.id,taskId,familyId,expected).run();
+    const now=nowUtc();
+    const result=await c.env.DB.prepare("UPDATE tasks SET deleted_at=?,deleted_by_type=?,deleted_by_id=?,updated_by_type=?,updated_by_id=?,updated_at=?,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?").bind(now,principal.type,principal.id,principal.type,principal.id,now,taskId,familyId,expected).run();
     if (!result.meta.changes) throw new ApiError("TASK_VERSION_CONFLICT", "Task version conflict", 409);
     return c.body(null, 204);
   });
@@ -99,8 +104,9 @@ export function registerTaskRoutes(app: App): void {
     const row = await findTask(c.env, familyId, taskId), input = await jsonBody(c), expected = version(input.version);
     if (kind === "complete" && row.status === "completed") throw new ApiError("TASK_ALREADY_COMPLETED", "Task is already completed", 409);
     if (kind === "reopen" && row.status === "pending") throw new ApiError("TASK_ALREADY_PENDING", "Task is already pending", 409);
-    const sql=kind==="complete"?"UPDATE tasks SET status='completed',completed_at=CURRENT_TIMESTAMP,completed_by_type=?,completed_by_id=?,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?":"UPDATE tasks SET status='pending',completed_at=NULL,completed_by_type=NULL,completed_by_id=NULL,updated_by_type=?,updated_by_id=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?";
-    const statement=kind==="complete"?c.env.DB.prepare(sql).bind(principal.type,principal.id,principal.type,principal.id,taskId,familyId,expected):c.env.DB.prepare(sql).bind(principal.type,principal.id,taskId,familyId,expected);
+    const now=nowUtc();
+    const sql=kind==="complete"?"UPDATE tasks SET status='completed',completed_at=?,completed_by_type=?,completed_by_id=?,updated_by_type=?,updated_by_id=?,updated_at=?,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?":"UPDATE tasks SET status='pending',completed_at=NULL,completed_by_type=NULL,completed_by_id=NULL,updated_by_type=?,updated_by_id=?,updated_at=?,version=version+1 WHERE id=? AND family_id=? AND deleted_at IS NULL AND version=?";
+    const statement=kind==="complete"?c.env.DB.prepare(sql).bind(now,principal.type,principal.id,principal.type,principal.id,now,taskId,familyId,expected):c.env.DB.prepare(sql).bind(principal.type,principal.id,now,taskId,familyId,expected);
     const result = await statement.run();
     if (!result.meta.changes) throw new ApiError("TASK_VERSION_CONFLICT", "Task version conflict", 409);
     return c.json(success(await mapTask(c.env, await findTask(c.env, familyId, taskId))));
@@ -114,9 +120,10 @@ export function registerTaskRoutes(app: App): void {
     if (statuses.length === 0 || new Set(statuses).size !== statuses.length || statuses.some((item) => !["pending", "completed", "cancelled"].includes(item))) throw new ApiError("INVALID_REQUEST", "status is invalid", 400);
     const sort = c.req.query("sort") ?? "due_asc";
     if (!["due_asc", "due_desc", "created_desc", "updated_desc"].includes(sort)) throw new ApiError("INVALID_REQUEST", "sort is invalid", 400);
-    const dueFrom = c.req.query("dueFrom") ? exactDate(c.req.query("dueFrom"), "dueFrom") : undefined;
-    const dueTo = c.req.query("dueTo") ? exactDate(c.req.query("dueTo"), "dueTo") : undefined;
-    if (dueFrom && dueTo && dueTo < dueFrom) throw new ApiError("INVALID_REQUEST", "dueTo must not precede dueFrom", 400);
+    if (c.req.query("dueFrom") !== undefined || c.req.query("dueTo") !== undefined) throw new ApiError("INVALID_REQUEST", "Use dueDateFrom and dueDateTo", 400);
+    const dueFrom = c.req.query("dueDateFrom") ? exactDate(c.req.query("dueDateFrom"), "dueDateFrom") : undefined;
+    const dueTo = c.req.query("dueDateTo") ? exactDate(c.req.query("dueDateTo"), "dueDateTo") : undefined;
+    if (dueFrom && dueTo && dueTo < dueFrom) throw new ApiError("INVALID_REQUEST", "dueDateTo must not precede dueDateFrom", 400);
     const includeNoDue = c.req.query("includeNoDue") === "true";
     if (c.req.query("includeNoDue") && !["true", "false"].includes(c.req.query("includeNoDue")!)) throw new ApiError("INVALID_REQUEST", "includeNoDue must be true or false", 400);
     let assignee=c.req.query("assigneeId");if(assignee==="me"&&principal.type==="system")throw new ApiError("INVALID_FILTER","me is unavailable for system identities",400);if(assignee==="me")assignee=userId;

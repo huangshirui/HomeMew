@@ -60,7 +60,7 @@ export function authenticate(): MiddlewareHandler<AppEnv> {
         FROM system_credentials c JOIN system_identities s ON s.id=c.system_id
         JOIN family_system_access a ON a.system_id=s.id
         WHERE c.secret_hash=? AND c.credential_type='api_token' AND c.status='active' AND c.revoked_at IS NULL
-          AND (c.expires_at IS NULL OR c.expires_at>CURRENT_TIMESTAMP)`).bind(hash).first<any>();
+          AND (c.expires_at IS NULL OR julianday(c.expires_at)>julianday('now'))`).bind(hash).first<any>();
       if (!row || row.status !== "active" || row.deleted_at) throw unauthorized();
       auth = { userId: row.system_id, scopes: JSON.parse(row.permissions), type: "system", credentialId: row.credential_id };
     } else {

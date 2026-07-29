@@ -41,6 +41,6 @@ export async function requireSystemAccess(env: Bindings, principal: { id: string
   }
   const current = JSON.parse(row.permissions) as string[];
   if (!principal.scopes.includes(permission) || !current.includes(permission)) throw new ApiError("SYSTEM_PERMISSION_DENIED", "System permission is required", 403);
-  await env.DB.prepare("UPDATE system_identities SET last_used_at=CURRENT_TIMESTAMP WHERE id=?").bind(principal.id).run();
-  if (principal.credentialId) await env.DB.prepare("UPDATE system_credentials SET last_used_at=CURRENT_TIMESTAMP WHERE id=?").bind(principal.credentialId).run();
+  await env.DB.prepare("UPDATE system_identities SET last_used_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?").bind(principal.id).run();
+  if (principal.credentialId) await env.DB.prepare("UPDATE system_credentials SET last_used_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?").bind(principal.credentialId).run();
 }

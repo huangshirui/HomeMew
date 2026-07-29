@@ -52,21 +52,12 @@ Rules:
 
 ### 5.1 Core fields
 
-An event contains:
+Every event has common identity, family, content, attendee, status, audit, and
+version fields. Its time fields are one of two mutually exclusive shapes:
 
-- `id`
-- `familyId`
-- `summary`
-- optional `description`
-- `start`
-- `end`
-- `isAllDay`
-- `timezone`
-- optional `location` text
-- attendees
-- status
-- audit fields
-- `version`
+- Timed: `isAllDay=false`, `startAt`, `endAt`, optional nullable
+  `startTimezone`, and optional nullable `endTimezone`.
+- All-day: `isAllDay=true`, `startDate`, and `endDateExclusive`.
 
 ### 5.2 Access and editing
 
@@ -78,17 +69,20 @@ An event contains:
 
 ### 5.3 Timed events
 
-- `start` and `end` are RFC 3339 date-time strings with explicit UTC offset.
-- `end` must be later than `start`.
-- `timezone` is a valid IANA timezone such as `Asia/Shanghai`.
-- Core may normalize the instant to UTC internally while preserving `timezone` for display and future calculations.
+- `startAt` and `endAt` are RFC 3339 UTC strings ending in `Z`; Core stores and returns canonical millisecond-precision UTC.
+- `endAt` must be later than `startAt`.
+- `startTimezone` and `endTimezone` are independently nullable IANA display metadata and never participate in calculations.
+- On create, an omitted endpoint timezone defaults to the family timezone while an explicit `null` remains `null`.
+- On update, an omitted endpoint timezone is unchanged while an explicit `null` clears it.
+- Changing the family timezone does not rewrite existing event display metadata.
 
 ### 5.4 All-day events
 
-- `start` and `end` are date-only strings in `YYYY-MM-DD` format.
-- The range is half-open: `[start, end)`.
-- A one-day event on July 25 uses `start=2026-07-25`, `end=2026-07-26`.
-- `end` must be later than `start`.
+- `startDate` and `endDateExclusive` are date-only strings in `YYYY-MM-DD` format.
+- The range is half-open: `[startDate, endDateExclusive)`.
+- A one-day event on July 25 uses `startDate=2026-07-25` and `endDateExclusive=2026-07-26`.
+- `endDateExclusive` must be later than `startDate`.
+- Time-point and timezone fields are forbidden and all-day dates are never converted to UTC.
 - Clients may show inclusive end dates in forms, but must convert to the exclusive Core representation.
 
 ### 5.5 Updates and deletion
@@ -101,8 +95,9 @@ An event contains:
 
 ### 5.6 Event list queries
 
-- Time range queries use half-open query ranges.
-- Date-only query boundaries are interpreted in the family's default timezone.
+- Every query supplies `startDate` and `endDateExclusive`; there is no implicit default range.
+- An optional IANA `timezone` determines the viewing-day UTC bounds for timed events and defaults to the family timezone.
+- Timed and all-day overlap checks both use half-open query ranges.
 - Return events that overlap the requested range, not only events whose start falls inside it.
 - Deleted events are excluded by default.
 - Default ordering is ascending by start.
@@ -128,7 +123,7 @@ A task contains:
 - `familyId`
 - `name`
 - optional `description`
-- optional date-only `due`
+- optional date-only `dueDate`
 - status
 - assignees
 - completion audit fields
@@ -144,10 +139,10 @@ A task contains:
 
 ### 6.3 Due date
 
-- `due` is optional.
+- `dueDate` is optional.
 - When present, it is `YYYY-MM-DD` only.
 - It is not a UTC timestamp and must not be shifted because of timezone conversion.
-- Overdue is a derived UI/query condition: task is pending and `due` is before the household's current date.
+- Overdue is a derived UI/query condition: task is pending and `dueDate` is before the household's current date.
 
 ### 6.4 Status
 

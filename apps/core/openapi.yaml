@@ -7,6 +7,8 @@ info:
     `x-homemew-status: implemented` exist in the current Core. Endpoints marked
     `x-homemew-status: planned` are approved contracts but must not be called by
     clients until implemented and deployed.
+    Every `date-time` value returned by Core is canonical RFC 3339 UTC with a
+    `Z` suffix. Date-only values are never converted to timestamps.
 servers:
   - url: https://homemew.aisr.online
     description: Production placeholder; verify the deployed Worker route before use
@@ -659,16 +661,25 @@ paths:
       operationId: listFamilyEvents
       x-homemew-status: implemented
       parameters:
-        - name: start
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Inclusive calendar date at the start of the viewing window.
+        - name: endDateExclusive
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Exclusive calendar date at the end of the viewing window.
+        - name: timezone
           in: query
           schema:
             type: string
-          description: Date or RFC 3339 date-time. Must be paired with end.
-        - name: end
-          in: query
-          schema:
-            type: string
-          description: Exclusive date or date-time boundary. Must be paired with start.
+          description: IANA timezone used to convert the calendar window to UTC for timed events. Defaults to the family timezone.
         - name: attendeeId
           in: query
           schema:
@@ -792,7 +803,7 @@ paths:
       tags: [Tasks]
       summary: List family tasks
       operationId: listFamilyTasks
-      x-homemew-status: planned
+      x-homemew-status: implemented
       parameters:
         - name: status
           in: query
@@ -804,12 +815,12 @@ paths:
           schema:
             type: string
           description: HomeMew user ID or `me`.
-        - name: dueFrom
+        - name: dueDateFrom
           in: query
           schema:
             type: string
             format: date
-        - name: dueTo
+        - name: dueDateTo
           in: query
           schema:
             type: string
@@ -844,7 +855,7 @@ paths:
       tags: [Tasks]
       summary: Create a task
       operationId: createTask
-      x-homemew-status: planned
+      x-homemew-status: implemented
       requestBody:
         required: true
         content:
@@ -872,7 +883,7 @@ paths:
       tags: [Tasks]
       summary: Get a task
       operationId: getTask
-      x-homemew-status: planned
+      x-homemew-status: implemented
       responses:
         '200':
           description: Task details
@@ -890,7 +901,7 @@ paths:
       tags: [Tasks]
       summary: Update task content and assignees
       operationId: updateTask
-      x-homemew-status: planned
+      x-homemew-status: implemented
       requestBody:
         required: true
         content:
@@ -918,7 +929,7 @@ paths:
       tags: [Tasks]
       summary: Soft-delete a task
       operationId: deleteTask
-      x-homemew-status: planned
+      x-homemew-status: implemented
       parameters:
         - $ref: '#/components/parameters/Version'
       responses:
@@ -940,7 +951,7 @@ paths:
       tags: [Tasks]
       summary: Complete a task
       operationId: completeTask
-      x-homemew-status: planned
+      x-homemew-status: implemented
       requestBody:
         required: true
         content:
@@ -970,7 +981,7 @@ paths:
       tags: [Tasks]
       summary: Reopen a completed or cancelled task
       operationId: reopenTask
-      x-homemew-status: planned
+      x-homemew-status: implemented
       requestBody:
         required: true
         content:
@@ -1178,9 +1189,9 @@ components:
           uniqueItems: true
           items: { $ref: '#/components/schemas/SystemPermission' }
         createdBy: { $ref: '#/components/schemas/ActorRef' }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-        lastUsedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { $ref: '#/components/schemas/UtcDateTime' }
+        updatedAt: { $ref: '#/components/schemas/UtcDateTime' }
+        lastUsedAt: { $ref: '#/components/schemas/NullableUtcDateTime' }
     CreateIntegrationRequest:
       type: object
       required: [name, permissions]
@@ -1225,10 +1236,10 @@ components:
         type: { type: string, enum: [oauth_client_secret, api_token] }
         suffix: { type: string }
         status: { type: string, enum: [active, revoked] }
-        expiresAt: { type: [string, 'null'], format: date-time }
-        lastUsedAt: { type: [string, 'null'], format: date-time }
-        createdAt: { type: string, format: date-time }
-        revokedAt: { type: [string, 'null'], format: date-time }
+        expiresAt: { $ref: '#/components/schemas/NullableUtcDateTime' }
+        lastUsedAt: { $ref: '#/components/schemas/NullableUtcDateTime' }
+        createdAt: { $ref: '#/components/schemas/UtcDateTime' }
+        revokedAt: { $ref: '#/components/schemas/NullableUtcDateTime' }
     CredentialListResponse:
       type: object
       required: [data]
@@ -1427,8 +1438,7 @@ components:
           required: [createdAt]
           properties:
             createdAt:
-              type: string
-              format: date-time
+              $ref: '#/components/schemas/UtcDateTime'
     CreateFamilyResponse:
       type: object
       required: [data]
@@ -1459,8 +1469,7 @@ components:
         memberCount:
           type: integer
         createdAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
     FamilyDetailResponse:
       type: object
       required: [data]
@@ -1500,8 +1509,7 @@ components:
         role:
           $ref: '#/components/schemas/FamilyRole'
         joinedAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
     FamilyMemberListResponse:
       type: object
       required: [data]
@@ -1561,8 +1569,7 @@ components:
         joinPath:
           type: string
         expiresAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
         maxUses:
           type: integer
         usedCount:
@@ -1582,8 +1589,7 @@ components:
         status:
           $ref: '#/components/schemas/InviteStatus'
         expiresAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
         maxUses:
           type: integer
         usedCount:
@@ -1591,8 +1597,7 @@ components:
         createdBy:
           type: string
         createdAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
     InviteListResponse:
       type: object
       required: [data]
@@ -1627,8 +1632,7 @@ components:
                 memberCount:
                   type: integer
             expiresAt:
-              type: string
-              format: date-time
+              $ref: '#/components/schemas/UtcDateTime'
             canJoin:
               type: boolean
     JoinFamilyResponse:
@@ -1646,8 +1650,7 @@ components:
             role:
               const: member
             joinedAt:
-              type: string
-              format: date-time
+              $ref: '#/components/schemas/UtcDateTime'
     PersonRef:
       type: object
       required: [userId, displayName]
@@ -1662,9 +1665,22 @@ components:
     EventStatus:
       type: string
       enum: [active, cancelled]
+    UtcDateTime:
+      type: string
+      format: date-time
+      pattern: 'Z$'
+      description: RFC 3339 UTC instant. Core returns canonical millisecond precision.
+    NullableUtcDateTime:
+      oneOf:
+        - $ref: '#/components/schemas/UtcDateTime'
+        - type: 'null'
     Event:
+      oneOf:
+        - $ref: '#/components/schemas/TimedEvent'
+        - $ref: '#/components/schemas/AllDayEvent'
+    EventCommon:
       type: object
-      required: [id, familyId, summary, description, start, end, isAllDay, timezone, location, status, attendees, createdBy, updatedBy, version, createdAt, updatedAt]
+      required: [id, familyId, summary, description, location, status, attendees, createdBy, updatedBy, version, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -1674,17 +1690,6 @@ components:
           type: string
         description:
           type: [string, 'null']
-        start:
-          type: string
-          description: RFC 3339 date-time for timed events; YYYY-MM-DD for all-day events.
-        end:
-          type: string
-          description: Exclusive end for all-day events.
-        isAllDay:
-          type: boolean
-        timezone:
-          type: string
-          examples: [Asia/Shanghai]
         location:
           type: [string, 'null']
         status:
@@ -1701,15 +1706,50 @@ components:
           type: integer
           minimum: 1
         createdAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
         updatedAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
+    TimedEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventCommon'
+        - type: object
+          required: [isAllDay, startAt, endAt, startTimezone, endTimezone]
+          properties:
+            isAllDay:
+              const: false
+            startAt:
+              $ref: '#/components/schemas/UtcDateTime'
+            endAt:
+              $ref: '#/components/schemas/UtcDateTime'
+            startTimezone:
+              type: [string, 'null']
+              description: Optional IANA timezone used only to display the start instant.
+            endTimezone:
+              type: [string, 'null']
+              description: Optional IANA timezone used only to display the end instant.
+      unevaluatedProperties: false
+    AllDayEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventCommon'
+        - type: object
+          required: [isAllDay, startDate, endDateExclusive]
+          properties:
+            isAllDay:
+              const: true
+            startDate:
+              type: string
+              format: date
+            endDateExclusive:
+              type: string
+              format: date
+      unevaluatedProperties: false
     CreateEventRequest:
+      oneOf:
+        - $ref: '#/components/schemas/CreateTimedEventRequest'
+        - $ref: '#/components/schemas/CreateAllDayEventRequest'
+    CreateEventCommon:
       type: object
-      required: [summary, start, end, isAllDay, timezone]
-      additionalProperties: false
+      required: [summary]
       properties:
         summary:
           type: string
@@ -1718,14 +1758,6 @@ components:
         description:
           type: [string, 'null']
           maxLength: 5000
-        start:
-          type: string
-        end:
-          type: string
-        isAllDay:
-          type: boolean
-        timezone:
-          type: string
         attendeeIds:
           type: array
           uniqueItems: true
@@ -1734,11 +1766,45 @@ components:
             type: string
         location:
           type: [string, 'null']
+    CreateTimedEventRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateEventCommon'
+        - type: object
+          required: [isAllDay, startAt, endAt]
+          properties:
+            isAllDay:
+              const: false
+            startAt:
+              $ref: '#/components/schemas/UtcDateTime'
+            endAt:
+              $ref: '#/components/schemas/UtcDateTime'
+            startTimezone:
+              type: [string, 'null']
+            endTimezone:
+              type: [string, 'null']
+      unevaluatedProperties: false
+    CreateAllDayEventRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateEventCommon'
+        - type: object
+          required: [isAllDay, startDate, endDateExclusive]
+          properties:
+            isAllDay:
+              const: true
+            startDate:
+              type: string
+              format: date
+            endDateExclusive:
+              type: string
+              format: date
+      unevaluatedProperties: false
     UpdateEventRequest:
+      oneOf:
+        - $ref: '#/components/schemas/UpdateEventCommonRequest'
+        - $ref: '#/components/schemas/UpdateTimedEventRequest'
+        - $ref: '#/components/schemas/UpdateAllDayEventRequest'
+    UpdateEventCommonProperties:
       type: object
-      required: [version]
-      minProperties: 2
-      additionalProperties: false
       properties:
         summary:
           type: string
@@ -1747,14 +1813,6 @@ components:
         description:
           type: [string, 'null']
           maxLength: 5000
-        start:
-          type: string
-        end:
-          type: string
-        isAllDay:
-          type: boolean
-        timezone:
-          type: string
         attendeeIds:
           type: array
           uniqueItems: true
@@ -1766,6 +1824,55 @@ components:
         version:
           type: integer
           minimum: 1
+    UpdateEventCommonRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdateEventCommonProperties'
+        - type: object
+          required: [version]
+          minProperties: 2
+      unevaluatedProperties: false
+    UpdateTimedEventRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdateEventCommonProperties'
+        - type: object
+          required: [version]
+          properties:
+            isAllDay:
+              const: false
+            startAt:
+              $ref: '#/components/schemas/UtcDateTime'
+            endAt:
+              $ref: '#/components/schemas/UtcDateTime'
+            startTimezone:
+              type: [string, 'null']
+            endTimezone:
+              type: [string, 'null']
+          anyOf:
+            - required: [isAllDay]
+            - required: [startAt]
+            - required: [endAt]
+            - required: [startTimezone]
+            - required: [endTimezone]
+      unevaluatedProperties: false
+    UpdateAllDayEventRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdateEventCommonProperties'
+        - type: object
+          required: [version]
+          properties:
+            isAllDay:
+              const: true
+            startDate:
+              type: string
+              format: date
+            endDateExclusive:
+              type: string
+              format: date
+          anyOf:
+            - required: [isAllDay]
+            - required: [startDate]
+            - required: [endDateExclusive]
+      unevaluatedProperties: false
     EventResponse:
       type: object
       required: [data]
@@ -1791,7 +1898,7 @@ components:
       enum: [pending, completed, cancelled]
     Task:
       type: object
-      required: [id, familyId, name, description, due, status, assignees, completedAt, completedBy, createdBy, updatedBy, version, createdAt, updatedAt]
+      required: [id, familyId, name, description, dueDate, status, assignees, completedAt, completedBy, createdBy, updatedBy, version, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -1801,7 +1908,7 @@ components:
           type: string
         description:
           type: [string, 'null']
-        due:
+        dueDate:
           type: [string, 'null']
           format: date
         status:
@@ -1811,8 +1918,7 @@ components:
           items:
             $ref: '#/components/schemas/PersonRef'
         completedAt:
-          type: [string, 'null']
-          format: date-time
+          $ref: '#/components/schemas/NullableUtcDateTime'
         completedBy:
           oneOf:
             - $ref: '#/components/schemas/ActorRef'
@@ -1825,11 +1931,9 @@ components:
           type: integer
           minimum: 1
         createdAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
         updatedAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
     CreateTaskRequest:
       type: object
       required: [name]
@@ -1842,7 +1946,7 @@ components:
         description:
           type: [string, 'null']
           maxLength: 5000
-        due:
+        dueDate:
           type: [string, 'null']
           format: date
         assigneeIds:
@@ -1864,7 +1968,7 @@ components:
         description:
           type: [string, 'null']
           maxLength: 5000
-        due:
+        dueDate:
           type: [string, 'null']
           format: date
         assigneeIds:
@@ -1932,8 +2036,7 @@ components:
           type: string
           enum: [wechat_miniprogram, wecom, admin, other]
         createdAt:
-          type: string
-          format: date-time
+          $ref: '#/components/schemas/UtcDateTime'
     InternalUserResponse:
       type: object
       required: [data]
