@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { bindings, createFamily, createUser, makeSystemToken, request } from "./helpers";
 
+const eventWindow = "startDate=2026-07-01&endDateExclusive=2026-08-01";
+
 async function createIntegration(familyId: string, token: string, permissions = ["family:read", "events:read", "events:write", "tasks:read", "tasks:write"]) {
   return request(`/api/v1/families/${familyId}/integrations`, token, {
     method: "POST",
@@ -83,7 +85,7 @@ describe("external system integrations", () => {
 
     const event = await request(`/api/v1/families/${family.id}/events`, access.access_token, {
       method: "POST",
-      body: JSON.stringify({ summary: "系统日程", start: "2026-07-25", end: "2026-07-26", isAllDay: true, timezone: "Asia/Shanghai", attendeeIds: [] }),
+      body: JSON.stringify({ summary: "系统日程", startDate: "2026-07-25", endDateExclusive: "2026-07-26", isAllDay: true, attendeeIds: [] }),
     });
     expect(event.status).toBe(201);
     expect((await event.json<any>()).data.createdBy).toMatchObject({ type: "system", id: integration.id, name: "家庭 n8n" });
@@ -93,7 +95,7 @@ describe("external system integrations", () => {
     const family = await createFamily();
     const integration = (await (await createIntegration(family.id, family.admin.token)).json<any>()).data;
     const patData = (await (await request(`/api/v1/families/${family.id}/integrations/${integration.id}/api-tokens`, family.admin.token, { method: "POST", body: "{}" })).json<any>()).data;
-    const me = await request(`/api/v1/families/${family.id}/events?attendeeId=me`, patData.token);
+    const me = await request(`/api/v1/families/${family.id}/events?${eventWindow}&attendeeId=me`, patData.token);
     expect(me.status).toBe(400);
     expect((await me.json<any>()).error.code).toBe("INVALID_FILTER");
 
@@ -103,7 +105,7 @@ describe("external system integrations", () => {
     });
     const denied = await request(`/api/v1/families/${family.id}/events`, patData.token, {
       method: "POST",
-      body: JSON.stringify({ summary: "No", start: "2026-07-25", end: "2026-07-26", isAllDay: true, timezone: "Asia/Shanghai" }),
+      body: JSON.stringify({ summary: "No", startDate: "2026-07-25", endDateExclusive: "2026-07-26", isAllDay: true }),
     });
     expect(denied.status).toBe(403);
     expect((await denied.json<any>()).error.code).toBe("SYSTEM_PERMISSION_DENIED");
@@ -123,7 +125,7 @@ describe("external system integrations", () => {
     });
     expect(oauth.status).toBe(200);
     const accessToken = (await oauth.json<any>()).access_token;
-    expect((await request(`/api/v1/families/${family.id}/events`, accessToken)).status).toBe(200);
+    expect((await request(`/api/v1/families/${family.id}/events?${eventWindow}`, accessToken)).status).toBe(200);
 
     expect((await request(`/api/v1/families/${family.id}/integrations/${integration.id}/credentials/${secret.id}`, family.admin.token, { method: "DELETE" })).status).toBe(204);
     const revoked = await request(`/api/v1/families/${family.id}/events`, accessToken);
@@ -176,5 +178,36 @@ describe("external system integrations", () => {
     const response=await request(`/api/v1/families/${family.id}/events`,forged);
     expect(response.status).toBe(401);
     expect((await response.json<any>()).error.code).toBe("UNAUTHORIZED");
+  });
+
+  it("stores integration mutation and usage timestamps as canonical UTC", async () => {
+    const family = await createFamily();
+    const integration = (await (await createIntegration(family.id, family.admin.token)).json<any>()).data;
+    const token = (await (await request(
+      `/api/v1/families/${family.id}/integrations/${integration.id}/api-tokens`,
+      family.admin.token,
+      { method: "POST", body: "{}" },
+    )).json<any>()).data;
+    await request(`/api/v1/families/${family.id}/events?${eventWindow}`, token.token);
+    await request(
+      `/api/v1/families/${family.id}/integrations/${integration.id}`,
+      family.admin.token,
+      { method: "PATCH", body: JSON.stringify({ description: "updated" }) },
+    );
+    const identity = await bindings.DB.prepare(
+      "SELECT updated_at,last_used_at FROM system_identities WHERE id=?",
+    ).bind(integration.id).first<any>();
+    const credential = await bindings.DB.prepare(
+      "SELECT last_used_at FROM system_credentials WHERE id=?",
+    ).bind(token.id).first<any>();
+    for (const value of [
+      identity.updated_at,
+      identity.last_used_at,
+      credential.last_used_at,
+    ]) {
+      expect(value).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+      );
+    }
   });
 });

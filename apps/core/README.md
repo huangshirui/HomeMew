@@ -7,9 +7,10 @@ must include `sub`, `type`, `iss=homemew-identity`, `aud`, `iat`, and `exp`.
 User tokens use `type=user` and `aud=homemew-core`; internal service tokens use
 `type=service`, `aud=homemew-core-internal`, and the `internal` scope.
 
-Each family has an IANA `timezone`, defaulting to `Asia/Shanghai`. Date-only
-`start` and `end` values on event list queries are interpreted as midnight in
-the family's timezone.
+Each family has an IANA `timezone`, defaulting to `Asia/Shanghai`. It is used as
+the fallback viewing timezone and as the default display metadata for timed
+event endpoints. Every concrete instant is stored and returned as canonical
+RFC 3339 UTC; date-only event and task fields are never converted to UTC.
 
 Core 是部署到 Cloudflare Workers 的 Hono API，使用 D1 binding `DB` 和 R2 binding `AVATARS`。
 
@@ -85,17 +86,18 @@ PATCH  /api/v1/families/{familyId}/events/{eventId}
 DELETE /api/v1/families/{familyId}/events/{eventId}?version=2
 ```
 
-定时日程的 `start`、`end` 必须包含 UTC offset；Core 以 UTC 保存并按记录的 IANA `timezone` 返回。全天日程使用严格的 `YYYY-MM-DD`，结束日期不包含在日程内。列表的 `start/end` 范围采用 `[start, end)` 重叠查询，必须成对传入，单次最大 366 天；支持 `attendeeId=me`、`status`、`limit` 和不透明 `cursor`。
+定时日程使用规范 UTC `startAt/endAt`；可空的 `startTimezone/endTimezone` 只用于显示，不参与服务端计算。创建时省略某个端点时区会使用家庭时区，显式 `null` 则保留为空。全天日程使用 `startDate/endDateExclusive`，两类字段不能混用。列表必须传 `startDate/endDateExclusive`，可选 `timezone` 指定查看日历的时区，单次最大 366 天。
 
 创建示例：
 
 ```json
 {
   "summary": "足球训练",
-  "start": "2026-07-25T16:00:00+08:00",
-  "end": "2026-07-25T18:00:00+08:00",
+  "startAt": "2026-07-25T08:00:00.000Z",
+  "endAt": "2026-07-25T10:00:00.000Z",
   "isAllDay": false,
-  "timezone": "Asia/Shanghai",
+  "startTimezone": "Asia/Shanghai",
+  "endTimezone": "Asia/Shanghai",
   "attendeeIds": ["usr_KK"],
   "location": "浦东足球公园"
 }
@@ -113,7 +115,7 @@ POST   /api/v1/families/{familyId}/tasks/{taskId}/complete
 POST   /api/v1/families/{familyId}/tasks/{taskId}/reopen
 ```
 
-`due` 只接受 `YYYY-MM-DD` 或 `null`。列表默认只返回 `pending`，支持多个 `status`、`assigneeId=me`、`dueFrom`、`dueTo`、`includeNoDue`、四种 `sort`、`limit` 和不透明 `cursor`；按截止日期排序时无截止日期始终在最后。
+`dueDate` 只接受 `YYYY-MM-DD` 或 `null`。列表默认只返回 `pending`，支持多个 `status`、`assigneeId=me`、`dueDateFrom`、`dueDateTo`、`includeNoDue`、四种 `sort`、`limit` 和不透明 `cursor`；按截止日期排序时无截止日期始终在最后。
 
 所有日程和待办接口都要求当前 JWT 用户是目标家庭的 active 成员。指定的参与人或负责人也必须是该家庭的 active 成员。PATCH、DELETE、complete 和 reopen 使用客户端读到的 `version`；版本过期返回对应的 `*_VERSION_CONFLICT`。DELETE 是软删除，普通读取不会返回已删除记录。
 
@@ -129,6 +131,7 @@ corepack pnpm --filter @homemew/core dev
 - `0003_create_event_task_schema.sql` 创建日程、参与人、待办和负责人表。
 - `0004_user_avatar_key.sql` 删除用户任意头像 URL 字段并增加 `avatar_key`。
 - `0006_family_avatar_key.sql` 删除家庭任意头像 URL 字段、增加 `avatar_key`，并将 schema version 更新为 `6`。
+- `0008_unify_time_semantics.sql` 清空 Demo 业务数据并以规范 UTC 时间列重建 schema，将版本更新为 `8`。
 
 已有环境升级后必须在部署新版 Worker 前应用 migration。
 

@@ -2,98 +2,256 @@ import { describe, expect, it } from "vitest";
 import { bindings, createFamily, createUser, request } from "./helpers";
 
 async function createEvent(familyId: string, token: string, input: Record<string, unknown>) {
-  return request(`/api/v1/families/${familyId}/events`, token, { method: "POST", body: JSON.stringify(input) });
+  return request(`/api/v1/families/${familyId}/events`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
+const timedInput = {
+  summary: "Timed event",
+  isAllDay: false,
+  startAt: "2026-08-01T01:00:00Z",
+  endAt: "2026-08-01T03:00:00.000Z",
+  attendeeIds: [] as string[],
+};
+
 describe("family event API", () => {
-  it("creates and reads timed and all-day events with attendees", async () => {
-    const family = await createFamily("Events");
-    const timed = await createEvent(family.id, family.admin.token, {
-      summary: " 足球训练 ", description: "带水", start: "2026-07-25T16:00:00+08:00",
-      end: "2026-07-25T18:00:00+08:00", isAllDay: false, timezone: "Asia/Shanghai",
-      attendeeIds: [family.admin.id], location: "浦东足球公园",
+  it("stores and returns canonical UTC while defaulting omitted display zones", async () => {
+    const admin = await createUser("Tokyo admin");
+    const family = (await (await request("/api/v1/families", admin.token, {
+      method: "POST",
+      body: JSON.stringify({ name: "Tokyo family", timezone: "Asia/Tokyo" }),
+    })).json<any>()).data;
+
+    const response = await createEvent(family.id, admin.token, {
+      ...timedInput,
+      attendeeIds: [admin.id],
     });
-    expect(timed.status).toBe(201);
-    const body = await timed.json<any>();
-    expect(body.data).toMatchObject({ summary: "足球训练", start: "2026-07-25T16:00:00+08:00", version: 1 });
-    expect(body.data.attendees).toHaveLength(1);
-    const stored = await bindings.DB.prepare("SELECT start_at, start_date FROM events WHERE id = ?").bind(body.data.id).first<any>();
-    expect(stored).toMatchObject({ start_at: "2026-07-25T08:00:00.000Z", start_date: null });
+    expect(response.status, await response.clone().text()).toBe(201);
+    const event = (await response.json<any>()).data;
+    expect(event).toMatchObject({
+      isAllDay: false,
+      startAt: "2026-08-01T01:00:00.000Z",
+      endAt: "2026-08-01T03:00:00.000Z",
+      startTimezone: "Asia/Tokyo",
+      endTimezone: "Asia/Tokyo",
+      version: 1,
+    });
+    expect(event).not.toHaveProperty("start");
+    expect(event).not.toHaveProperty("timezone");
+    expect(event.attendees).toHaveLength(1);
+
+    const stored = await bindings.DB.prepare(
+      "SELECT start_at, end_at, start_date, start_timezone, end_timezone FROM events WHERE id=?",
+    ).bind(event.id).first<any>();
+    expect(stored).toMatchObject({
+      start_at: "2026-08-01T01:00:00.000Z",
+      end_at: "2026-08-01T03:00:00.000Z",
+      start_date: null,
+      start_timezone: "Asia/Tokyo",
+      end_timezone: "Asia/Tokyo",
+    });
+  });
+
+  it("supports independent nullable display zones and date-only all-day events", async () => {
+    const family = await createFamily("Event shapes");
+    const timed = await createEvent(family.id, family.admin.token, {
+      ...timedInput,
+      startTimezone: "Asia/Tokyo",
+      endTimezone: null,
+    });
+    expect((await timed.json<any>()).data).toMatchObject({
+      startTimezone: "Asia/Tokyo",
+      endTimezone: null,
+    });
 
     const allDay = await createEvent(family.id, family.admin.token, {
-      summary: "学校暑假", start: "2026-07-25", end: "2026-07-26", isAllDay: true,
-      timezone: "Asia/Shanghai", attendeeIds: [],
+      summary: "Europe trip",
+      isAllDay: true,
+      startDate: "2026-08-01",
+      endDateExclusive: "2026-08-13",
+      attendeeIds: [],
     });
-    expect(allDay.status).toBe(201);
-    expect((await allDay.json<any>()).data.start).toBe("2026-07-25");
-
-    const detail = await request(`/api/v1/families/${family.id}/events/${body.data.id}`, family.admin.token);
-    expect(detail.status).toBe(200);
-    expect((await detail.json<any>()).data.createdBy).toMatchObject({ type: "user", id: family.admin.id });
+    expect(allDay.status, await allDay.clone().text()).toBe(201);
+    const event = (await allDay.json<any>()).data;
+    expect(event).toMatchObject({
+      isAllDay: true,
+      startDate: "2026-08-01",
+      endDateExclusive: "2026-08-13",
+    });
+    expect(event).not.toHaveProperty("startAt");
+    expect(event).not.toHaveProperty("startTimezone");
   });
 
-  it("validates event times, family membership, and attendees", async () => {
-    const family = await createFamily("Validation");
-    const outsider = await createUser("Outsider");
-    const input = { summary: "Event", start: "2026-07-25T16:00:00+08:00", end: "2026-07-25T18:00:00+08:00", isAllDay: false, timezone: "Asia/Shanghai", attendeeIds: [] };
-    expect((await createEvent(family.id, outsider.token, input)).status).toBe(403);
-    const badAttendee = await createEvent(family.id, family.admin.token, { ...input, attendeeIds: [outsider.id] });
-    expect((await badAttendee.json<any>()).error.code).toBe("ATTENDEE_NOT_FAMILY_MEMBER");
-    const duplicate = await createEvent(family.id, family.admin.token, { ...input, attendeeIds: [family.admin.id, family.admin.id] });
-    expect((await duplicate.json<any>()).error.code).toBe("DUPLICATE_ATTENDEE");
-    expect((await createEvent(family.id, family.admin.token, { ...input, timezone: "Mars/Olympus" })).status).toBe(400);
-    expect((await createEvent(family.id, family.admin.token, { ...input, end: input.start })).status).toBe(400);
-  });
+  it("rejects offsets, mixed shapes, old fields, invalid zones, and invalid ranges", async () => {
+    const family = await createFamily("Event validation");
+    const offset = await createEvent(family.id, family.admin.token, {
+      ...timedInput,
+      startAt: "2026-08-01T10:00:00+09:00",
+    });
+    expect((await offset.json<any>()).error.code).toBe("INVALID_REQUEST");
 
-  it("updates with optimistic locking, replaces attendees, and soft deletes", async () => {
-    const family = await createFamily("Mutation");
-    const response = await createEvent(family.id, family.admin.token, { summary: "Original", start: "2026-07-25", end: "2026-07-26", isAllDay: true, timezone: "Asia/Shanghai", attendeeIds: [] });
-    const event = (await response.json<any>()).data;
-    const updated = await request(`/api/v1/families/${family.id}/events/${event.id}`, family.admin.token, { method: "PATCH", body: JSON.stringify({ summary: "Updated", attendeeIds: [family.admin.id], version: 1 }) });
-    expect((await updated.json<any>()).data).toMatchObject({ summary: "Updated", version: 2 });
-    const conflict = await request(`/api/v1/families/${family.id}/events/${event.id}`, family.admin.token, { method: "PATCH", body: JSON.stringify({ summary: "Stale", version: 1 }) });
-    expect((await conflict.json<any>()).error.code).toBe("EVENT_VERSION_CONFLICT");
-    const deleted = await request(`/api/v1/families/${family.id}/events/${event.id}?version=2`, family.admin.token, { method: "DELETE" });
-    expect(deleted.status).toBe(204);
-    expect((await request(`/api/v1/families/${family.id}/events/${event.id}`, family.admin.token)).status).toBe(404);
-  });
-
-  it("lists overlapping events with attendee me and cursor pagination", async () => {
-    const family = await createFamily("Listing");
-    for (const [summary, start, end] of [["A", "2026-07-24T23:00:00+08:00", "2026-07-25T01:00:00+08:00"], ["B", "2026-07-25T10:00:00+08:00", "2026-07-25T11:00:00+08:00"]]) {
-      await createEvent(family.id, family.admin.token, { summary, start, end, isAllDay: false, timezone: "Asia/Shanghai", attendeeIds: [family.admin.id] });
+    for (const input of [
+      { ...timedInput, startDate: "2026-08-01" },
+      { ...timedInput, start: timedInput.startAt, end: timedInput.endAt },
+      { ...timedInput, startTimezone: "Mars/Olympus" },
+      { ...timedInput, endAt: timedInput.startAt },
+      {
+        summary: "All day with zone",
+        isAllDay: true,
+        startDate: "2026-08-01",
+        endDateExclusive: "2026-08-02",
+        startTimezone: "Asia/Shanghai",
+      },
+    ]) {
+      expect((await createEvent(family.id, family.admin.token, input)).status).toBe(400);
     }
-    const first = await request(`/api/v1/families/${family.id}/events?start=2026-07-25&end=2026-07-26&attendeeId=me&limit=1`, family.admin.token);
+  });
+
+  it("updates display zones and requires a complete shape when switching type", async () => {
+    const family = await createFamily("Event updates");
+    const created = (await (await createEvent(family.id, family.admin.token, timedInput)).json<any>()).data;
+
+    const cleared = await request(`/api/v1/families/${family.id}/events/${created.id}`, family.admin.token, {
+      method: "PATCH",
+      body: JSON.stringify({ startTimezone: null, endTimezone: "Europe/Paris", version: 1 }),
+    });
+    expect((await cleared.json<any>()).data).toMatchObject({
+      startTimezone: null,
+      endTimezone: "Europe/Paris",
+      version: 2,
+    });
+
+    const incompleteSwitch = await request(`/api/v1/families/${family.id}/events/${created.id}`, family.admin.token, {
+      method: "PATCH",
+      body: JSON.stringify({ isAllDay: true, version: 2 }),
+    });
+    expect(incompleteSwitch.status).toBe(400);
+
+    const switched = await request(`/api/v1/families/${family.id}/events/${created.id}`, family.admin.token, {
+      method: "PATCH",
+      body: JSON.stringify({
+        isAllDay: true,
+        startDate: "2026-08-01",
+        endDateExclusive: "2026-08-02",
+        version: 2,
+      }),
+    });
+    const event = (await switched.json<any>()).data;
+    expect(event).toMatchObject({ isAllDay: true, startDate: "2026-08-01", version: 3 });
+    expect(event).not.toHaveProperty("startTimezone");
+  });
+
+  it("rejects a PATCH that only supplies the optimistic concurrency version", async () => {
+    const family = await createFamily("Event empty patch");
+    const created = (await (await createEvent(
+      family.id,
+      family.admin.token,
+      timedInput,
+    )).json<any>()).data;
+
+    const response = await request(
+      `/api/v1/families/${family.id}/events/${created.id}`,
+      family.admin.token,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ version: created.version }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json<any>()).error.code).toBe("INVALID_REQUEST");
+  });
+
+  it("requires a date window and queries timed events in the requested viewing timezone", async () => {
+    const family = await createFamily("Event queries");
+    await createEvent(family.id, family.admin.token, {
+      ...timedInput,
+      summary: "Tokyo early morning",
+      startAt: "2026-07-31T15:30:00Z",
+      endAt: "2026-07-31T16:00:00Z",
+      attendeeIds: [family.admin.id],
+    });
+
+    expect((await request(`/api/v1/families/${family.id}/events`, family.admin.token)).status).toBe(400);
+    expect((await request(
+      `/api/v1/families/${family.id}/events?startDate=2026-08-01`,
+      family.admin.token,
+    )).status).toBe(400);
+
+    const response = await request(
+      `/api/v1/families/${family.id}/events?startDate=2026-08-01&endDateExclusive=2026-08-02&timezone=Asia/Tokyo&attendeeId=me`,
+      family.admin.token,
+    );
+    expect(response.status, await response.clone().text()).toBe(200);
+    expect((await response.json<any>()).data.items.map((item: any) => item.summary))
+      .toContain("Tokyo early morning");
+  });
+
+  it("paginates overlapping timed and all-day events with half-open ranges", async () => {
+    const family = await createFamily("Event pagination");
+    await createEvent(family.id, family.admin.token, {
+      ...timedInput,
+      summary: "Timed",
+      attendeeIds: [family.admin.id],
+    });
+    await createEvent(family.id, family.admin.token, {
+      summary: "All day",
+      isAllDay: true,
+      startDate: "2026-08-01",
+      endDateExclusive: "2026-08-03",
+      attendeeIds: [family.admin.id],
+    });
+
+    const query = `startDate=2026-08-01&endDateExclusive=2026-08-02&attendeeId=me&limit=1`;
+    const first = await request(`/api/v1/families/${family.id}/events?${query}`, family.admin.token);
     const page1 = await first.json<any>();
     expect(page1.data.items).toHaveLength(1);
     expect(page1.data.nextCursor).toBeTypeOf("string");
-    const second = await request(`/api/v1/families/${family.id}/events?start=2026-07-25&end=2026-07-26&attendeeId=me&limit=1&cursor=${encodeURIComponent(page1.data.nextCursor)}`, family.admin.token);
+    const second = await request(
+      `/api/v1/families/${family.id}/events?${query}&cursor=${encodeURIComponent(page1.data.nextCursor)}`,
+      family.admin.token,
+    );
     expect((await second.json<any>()).data.items).toHaveLength(1);
   });
 
-  it("uses the Shanghai calendar date for the default range", async () => {
-    const family = await createFamily("Default Range");
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
-    const [year, month, day] = today.split("-").map(Number);
-    const futureDate = new Date(Date.UTC(year, month - 1, day + 29)).toISOString().slice(0, 10);
-    const start = new Date(`${futureDate}T12:00:00+08:00`);
-    const end = new Date(start.getTime() + 3_600_000);
+  it("handles DST viewing windows and enforces the 366-day limit", async () => {
+    const family = await createFamily("DST queries");
     await createEvent(family.id, family.admin.token, {
-      summary: "Near range end", start: start.toISOString(), end: end.toISOString(), isAllDay: false,
-      timezone: "Asia/Shanghai", attendeeIds: [],
+      ...timedInput,
+      summary: "Before DST jump",
+      startAt: "2026-03-08T06:30:00Z",
+      endAt: "2026-03-08T07:30:00Z",
     });
-    const response = await request(`/api/v1/families/${family.id}/events`, family.admin.token);
-    expect((await response.json<any>()).data.items.map((item: any) => item.summary)).toContain("Near range end");
+    await createEvent(family.id, family.admin.token, {
+      ...timedInput,
+      summary: "At exclusive end",
+      startAt: "2026-03-09T04:00:00Z",
+      endAt: "2026-03-09T05:00:00Z",
+    });
+    const response = await request(
+      `/api/v1/families/${family.id}/events?startDate=2026-03-08&endDateExclusive=2026-03-09&timezone=America/New_York`,
+      family.admin.token,
+    );
+    expect((await response.json<any>()).data.items.map((item: any) => item.summary))
+      .toEqual(["Before DST jump"]);
+
+    const tooWide = await request(
+      `/api/v1/families/${family.id}/events?startDate=2026-01-01&endDateExclusive=2027-01-03`,
+      family.admin.token,
+    );
+    expect(tooWide.status).toBe(400);
   });
 
-  it("interprets timed query boundaries in the family timezone", async () => {
-    const admin = await createUser("Tokyo Event Admin");
-    const family = (await (await request("/api/v1/families", admin.token, { method: "POST", body: JSON.stringify({ name: "Tokyo Events", timezone: "Asia/Tokyo" }) })).json<any>()).data;
-    await createEvent(family.id, admin.token, {
-      summary: "Tokyo midnight", start: "2026-07-25T00:30:00+09:00", end: "2026-07-25T01:00:00+09:00",
-      isAllDay: false, timezone: "Asia/Tokyo", attendeeIds: [],
+  it("keeps family authorization and attendee validation", async () => {
+    const family = await createFamily("Event access");
+    const outsider = await createUser("Event outsider");
+    expect((await createEvent(family.id, outsider.token, timedInput)).status).toBe(403);
+    const response = await createEvent(family.id, family.admin.token, {
+      ...timedInput,
+      attendeeIds: [outsider.id],
     });
-    const response = await request(`/api/v1/families/${family.id}/events?start=2026-07-25&end=2026-07-26`, admin.token);
-    expect((await response.json<any>()).data.items.map((item: any) => item.summary)).toContain("Tokyo midnight");
+    expect((await response.json<any>()).error.code).toBe("ATTENDEE_NOT_FAMILY_MEMBER");
   });
 });

@@ -1,5 +1,7 @@
+import { normalizeDateTimes } from "./time";
+
 export function success<T>(data: T): { data: T } {
-  return { data };
+  return { data: normalizeDateTimes(data) };
 }
 
 export function failure(

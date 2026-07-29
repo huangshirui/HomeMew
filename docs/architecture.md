@@ -260,11 +260,12 @@ Writes must not be blindly retried unless idempotency is supported.
 
 ## 9. Time semantics
 
-- Timed events use RFC 3339 date-time values with explicit offset and retain an IANA timezone.
-- Core may normalize instants to UTC internally.
-- All-day events use date-only half-open ranges: `[start, end)`.
-- Task `due` is date-only and follows household calendar semantics; it is not a timestamp.
-- Every family has an IANA default timezone, initially `Asia/Shanghai` unless selected at creation. Date-only event query bounds are interpreted in that family timezone.
+- Every concrete instant stored or returned by Core uses canonical RFC 3339 UTC with a `Z` suffix. Internal JWT, OAuth, and rate-limit epoch seconds remain valid absolute-time representations.
+- Timed events use UTC `startAt` and `endAt`. Optional `startTimezone` and `endTimezone` are display metadata only and never affect duration, ordering, overlap, or conflict calculations.
+- All-day events use the date-only half-open range `[startDate, endDateExclusive)` and are never converted to timestamps.
+- Task `dueDate` is date-only and follows household calendar semantics; it is not a timestamp.
+- Event list requests provide a date window and may provide an IANA viewing timezone. Core uses that timezone only to derive UTC bounds for timed events and compares all-day events directly by date.
+- Every family has an IANA default timezone, initially `Asia/Shanghai`. It is the fallback viewing timezone and the default display metadata for omitted timed-event endpoint timezones; changing it does not rewrite existing events.
 
 ## 10. Concurrency and deletion
 

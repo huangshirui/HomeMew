@@ -277,4 +277,19 @@ describe("user and family API", () => {
     const list = await request("/api/v1/me/families", admin.token);
     expect((await list.json<any>()).data.items[0].timezone).toBe("Asia/Tokyo");
   });
+
+  it("stores mutation audit timestamps as canonical UTC", async () => {
+    const user = await createUser("UTC profile");
+    const response = await request("/api/v1/me", user.token, {
+      method: "PATCH",
+      body: JSON.stringify({ displayName: "UTC profile updated" }),
+    });
+    expect(response.status).toBe(200);
+    const row = await bindings.DB.prepare(
+      "SELECT updated_at FROM users WHERE id=?",
+    ).bind(user.id).first<{ updated_at: string }>();
+    expect(row?.updated_at).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
+  });
 });

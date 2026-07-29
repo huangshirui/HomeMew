@@ -73,7 +73,7 @@ export function registerBusinessRoutes(app: App): void {
     const displayName = input.displayName === undefined ? undefined : requireString(input.displayName, "displayName");
     if (displayName === undefined) throw new ApiError("INVALID_REQUEST", "No supported fields supplied", 400);
 
-    await c.env.DB.prepare("UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    await c.env.DB.prepare("UPDATE users SET display_name=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?")
       .bind(displayName, id)
       .run();
     const row = await activeUser(c.env, id);
@@ -87,7 +87,7 @@ export function registerBusinessRoutes(app: App): void {
     const stored = await storeAvatar(c.env, id, file);
 
     try {
-      await c.env.DB.prepare("UPDATE users SET avatar_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      await c.env.DB.prepare("UPDATE users SET avatar_key=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?")
         .bind(stored.key, id)
         .run();
     } catch (error) {
@@ -152,7 +152,7 @@ export function registerBusinessRoutes(app: App): void {
     if (Object.keys(input).some((field) => !["name", "timezone"].includes(field)) || (name === undefined && familyTimezone === undefined)) {
       throw new ApiError("INVALID_REQUEST", "Only name and timezone may be supplied", 400);
     }
-    await c.env.DB.prepare("UPDATE families SET name = COALESCE(?, name), timezone = COALESCE(?, timezone), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    await c.env.DB.prepare("UPDATE families SET name=COALESCE(?,name),timezone=COALESCE(?,timezone),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?")
       .bind(name ?? null, familyTimezone ?? null, familyId)
       .run();
     const row = await c.env.DB.prepare("SELECT * FROM families WHERE id = ?").bind(familyId).first<any>();
@@ -171,7 +171,7 @@ export function registerBusinessRoutes(app: App): void {
     const stored = await storeFamilyAvatar(c.env, familyId, file);
 
     try {
-      await c.env.DB.prepare("UPDATE families SET avatar_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      await c.env.DB.prepare("UPDATE families SET avatar_key=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?")
         .bind(stored.key, familyId)
         .run();
     } catch (error) {
@@ -205,7 +205,7 @@ export function registerBusinessRoutes(app: App): void {
     const targetMember = await membership(c.env, familyId, target);
     const input = await body(c);
     if (!["admin", "member"].includes(input.role as string)) throw new ApiError("INVALID_REQUEST", "role is invalid", 400);
-    const result = await c.env.DB.prepare(`UPDATE family_members SET role=?, updated_at=CURRENT_TIMESTAMP
+    const result = await c.env.DB.prepare(`UPDATE family_members SET role=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
       WHERE family_id=? AND user_id=? AND status='active'
       AND (?!='member' OR role!='admin' OR EXISTS (
         SELECT 1 FROM family_members other WHERE other.family_id=? AND other.status='active' AND other.role='admin' AND other.user_id!=?
@@ -221,7 +221,7 @@ export function registerBusinessRoutes(app: App): void {
       if (actor === target) throw new ApiError("CANNOT_REMOVE_SELF", "Use the leave endpoint to leave a family", 409);
     }
     const targetMember = await membership(c.env, familyId, target);
-    const result = await c.env.DB.prepare(`UPDATE family_members SET status='removed', removed_at=CURRENT_TIMESTAMP, removed_by=?, updated_at=CURRENT_TIMESTAMP
+    const result = await c.env.DB.prepare(`UPDATE family_members SET status='removed',removed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),removed_by=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
       WHERE family_id=? AND user_id=? AND status='active'
       AND (role!='admin' OR EXISTS (
         SELECT 1 FROM family_members other WHERE other.family_id=? AND other.status='active' AND other.role='admin' AND other.user_id!=?
@@ -262,7 +262,7 @@ export function registerBusinessRoutes(app: App): void {
     const userId = c.get("currentUserId");
     await activeUser(c.env, userId);
     await admin(c.env, familyId, userId);
-    const result = await c.env.DB.prepare("UPDATE family_invites SET status = 'revoked', revoked_by = ?, revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND family_id = ?").bind(userId, c.req.param("inviteId"), familyId).run();
+    const result = await c.env.DB.prepare("UPDATE family_invites SET status='revoked',revoked_by=?,revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND family_id=?").bind(userId, c.req.param("inviteId"), familyId).run();
     if (!result.meta.changes) throw new ApiError("INVITE_NOT_FOUND", "Invite not found", 404);
     return c.body(null, 204);
   });
@@ -299,11 +299,11 @@ export function registerBusinessRoutes(app: App): void {
     const joinedAt = new Date().toISOString();
     const redemptionId = createId("ired");
     const memberStatement = existing
-      ? c.env.DB.prepare("UPDATE family_members SET role='member',status='active',joined_at=?,removed_at=NULL,removed_by=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS (SELECT 1 FROM family_invite_redemptions WHERE id=?)").bind(joinedAt, existing.id, redemptionId)
+      ? c.env.DB.prepare("UPDATE family_members SET role='member',status='active',joined_at=?,removed_at=NULL,removed_by=NULL,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND EXISTS (SELECT 1 FROM family_invite_redemptions WHERE id=?)").bind(joinedAt, existing.id, redemptionId)
       : c.env.DB.prepare("INSERT INTO family_members (id,family_id,user_id,role,joined_at) SELECT ?,?,?, 'member',? WHERE EXISTS (SELECT 1 FROM family_invite_redemptions WHERE id=?)").bind(createId("fmem"), invite.family_id, userId, joinedAt, redemptionId);
     const redemption = c.env.DB.prepare(`INSERT INTO family_invite_redemptions (id,invite_id,family_id,user_id)
       SELECT ?,i.id,i.family_id,? FROM family_invites i JOIN families f ON f.id=i.family_id
-      WHERE i.id=? AND i.status='active' AND i.used_count<i.max_uses AND datetime(i.expires_at)>CURRENT_TIMESTAMP AND f.status='active'
+      WHERE i.id=? AND i.status='active' AND i.used_count<i.max_uses AND julianday(i.expires_at)>julianday('now') AND f.status='active'
       AND (SELECT COUNT(*) FROM family_members WHERE family_id=i.family_id AND status='active')<8
       AND NOT EXISTS (SELECT 1 FROM family_members WHERE family_id=i.family_id AND user_id=? AND status='active')`)
       .bind(redemptionId, userId, invite.id, userId);
