@@ -1,84 +1,166 @@
 /**
- * 日期 / 时区安全工具。
- *
- * 两类字段分开处理，避免跨时区显示错乱：
- * - 纯日期字段（YYYY-MM-DD，如全天日程、截止日期）：绝不经过 `new Date('YYYY-MM-DD')`，
- *   否则 JavaScript 会按 UTC 解析，在负时区（如美国）显示成前一天。统一用 parseDateOnly 拆分年月日。
- * - 带时间字段：按家庭 timezone 转换为 UTC ISO，再展示时按同一时区还原。
+ * Time-point values are UTC instants. Date-only values never pass through UTC.
  */
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-/**
- * 将 'YYYY-MM-DD' 解析为「本地零点」的 Date（按年月日构造，不走 UTC 解析）。
- * 仅用于纯日期字段的展示与天数运算。
- */
-export function parseDateOnly(dateStr: string): Date {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
-  if (!m) return new Date(dateStr);
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-}
-
-/** Date -> 'YYYY-MM-DD'（本地年月日）。 */
-export function formatDateOnly(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** 对纯日期字符串做加减天数，返回 'YYYY-MM-DD'（不经过 UTC 解析）。 */
-export function addDaysToDateOnly(dateStr: string, n: number): string {
-  const d = parseDateOnly(dateStr);
-  d.setDate(d.getDate() + n);
-  return formatDateOnly(d);
-}
-
-/**
- * 计算某个 UTC 瞬间在指定 IANA 时区下的偏移（分钟，东区为正）。
- * 依赖 Intl.DateTimeFormat 的 timeZone 能力；不可用时回退东八区。
- */
-function tzOffsetMinutes(utcDate: Date, timeZone: string): number {
+function isValidTimeZone(timeZone: string | null | undefined): timeZone is string {
+  if (!timeZone) return false;
   try {
-    const dtf = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hour12: false,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    const parts = dtf.formatToParts(utcDate);
-    const map: Record<string, number> = {};
-    parts.forEach((p) => {
-      if (p.type !== 'literal') map[p.type] = Number(p.value);
-    });
-    let hour = map.hour;
-    if (hour === 24) hour = 0;
-    const asUTC = Date.UTC(map.year, map.month - 1, map.day, hour, map.minute, map.second);
-    return Math.round((asUTC - utcDate.getTime()) / 60000);
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date(0));
+    return true;
   } catch {
-    // Intl 不可用（部分低版本机型）：回退东八区
-    return 8 * 60;
+    return false;
   }
 }
 
-/**
- * 将「指定时区的墙上时间」转换为 UTC ISO 字符串。
- * @param date 'YYYY-MM-DD'
- * @param time 'HH:mm'
- * @param timeZone IANA 时区，如 'Asia/Shanghai'
- */
-export function zonedDateTimeToIso(date: string, time: string, timeZone: string): string {
-  const [y, mo, d] = date.split('-').map(Number);
-  const [h, mi] = time.split(':').map(Number);
-  // 先按该墙上时间当作 UTC，再用时区偏移校正回真正的 UTC。
-  const guessUtc = Date.UTC(y, mo - 1, d, h, mi, 0);
-  const offset1 = tzOffsetMinutes(new Date(guessUtc), timeZone);
-  const actualUtc = guessUtc - offset1 * 60000;
-  // 跨 DST 边界时二次校正
-  const offset2 = tzOffsetMinutes(new Date(actualUtc), timeZone);
-  const finalUtc = offset2 === offset1 ? actualUtc : guessUtc - offset2 * 60000;
-  return new Date(finalUtc).toISOString();
+export function resolveDeviceTimeZone(
+  deviceTimeZone?: string,
+  familyTimeZone?: string,
+): string {
+  if (isValidTimeZone(deviceTimeZone)) return deviceTimeZone;
+  if (isValidTimeZone(familyTimeZone)) return familyTimeZone;
+  return 'Asia/Shanghai';
+}
+
+export function getSystemTimeZone(familyTimeZone?: string): string {
+  let deviceTimeZone: string | undefined;
+  try {
+    deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    deviceTimeZone = undefined;
+  }
+  return resolveDeviceTimeZone(deviceTimeZone, familyTimeZone);
+}
+
+export function parseDateOnly(dateStr: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match) return new Date(Number.NaN);
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+export function formatDateOnly(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function addDaysToDateOnly(dateStr: string, days: number): string {
+  const date = parseDateOnly(dateStr);
+  date.setDate(date.getDate() + days);
+  return formatDateOnly(date);
+}
+
+export type ZonedDateTimeParts = {
+  date: string;
+  time: string;
+};
+
+export function formatInstantInTimeZone(
+  instant: string,
+  timeZone: string,
+): ZonedDateTimeParts {
+  if (!isValidTimeZone(timeZone)) {
+    throw new Error(`Invalid IANA timezone: ${timeZone}`);
+  }
+  const value = new Date(instant);
+  if (Number.isNaN(value.getTime())) {
+    throw new Error(`Invalid UTC instant: ${instant}`);
+  }
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(value);
+  const get = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find(part => part.type === type)?.value || '';
+  const hour = get('hour') === '24' ? '00' : get('hour');
+  return {
+    date: `${get('year')}-${get('month')}-${get('day')}`,
+    time: `${hour}:${get('minute')}`,
+  };
+}
+
+function timeZoneOffsetMinutes(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant);
+  const values: Record<string, number> = {};
+  for (const part of parts) {
+    if (part.type !== 'literal') values[part.type] = Number(part.value);
+  }
+  const hour = values.hour === 24 ? 0 : values.hour;
+  const representedAsUtc = Date.UTC(
+    values.year,
+    values.month - 1,
+    values.day,
+    hour,
+    values.minute,
+    values.second,
+  );
+  return Math.round((representedAsUtc - instant.getTime()) / 60_000);
+}
+
+export function getWallTimeCandidates(
+  date: string,
+  time: string,
+  timeZone: string,
+): string[] {
+  if (
+    !isValidTimeZone(timeZone)
+    || !/^\d{4}-\d{2}-\d{2}$/.test(date)
+    || !/^\d{2}:\d{2}$/.test(time)
+  ) {
+    return [];
+  }
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  if (
+    month < 1 || month > 12 || day < 1 || day > 31
+    || hour < 0 || hour > 23 || minute < 0 || minute > 59
+  ) {
+    return [];
+  }
+  const wallClockAsUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const offsets = new Set<number>();
+  for (let deltaHours = -36; deltaHours <= 36; deltaHours += 6) {
+    offsets.add(
+      timeZoneOffsetMinutes(
+        new Date(wallClockAsUtc + deltaHours * 3_600_000),
+        timeZone,
+      ),
+    );
+  }
+  return [...offsets]
+    .map(offset => new Date(wallClockAsUtc - offset * 60_000))
+    .filter(candidate => {
+      const roundTrip = formatInstantInTimeZone(candidate.toISOString(), timeZone);
+      return roundTrip.date === date && roundTrip.time === time;
+    })
+    .map(candidate => candidate.toISOString())
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .sort();
+}
+
+export function zonedDateTimeToIso(
+  date: string,
+  time: string,
+  timeZone: string,
+): string {
+  const candidates = getWallTimeCandidates(date, time, timeZone);
+  if (candidates.length === 0) {
+    throw new Error('The selected local time does not exist in this timezone');
+  }
+  return candidates[0];
 }

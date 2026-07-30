@@ -23,7 +23,14 @@ import {
  */
 export async function listTasks(
   familyId: string,
-  params?: { status?: 'pending' | 'completed'; assigneeId?: string },
+  params?: {
+    status?: 'pending' | 'completed';
+    assigneeId?: string;
+    dueDateFrom?: string;
+    dueDateTo?: string;
+    includeNoDue?: boolean;
+    sort?: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc';
+  },
 ): Promise<Task[]> {
   const items: Task[] = [];
   let cursor: string | null = null;
@@ -33,6 +40,12 @@ export async function listTasks(
     const query: Record<string, string> = { limit: '100' };
     if (params?.status) query.status = params.status;
     if (params?.assigneeId) query.assigneeId = params.assigneeId;
+    if (params?.dueDateFrom) query.dueDateFrom = params.dueDateFrom;
+    if (params?.dueDateTo) query.dueDateTo = params.dueDateTo;
+    if (params?.includeNoDue !== undefined) {
+      query.includeNoDue = String(params.includeNoDue);
+    }
+    if (params?.sort) query.sort = params.sort;
     if (cursor) query.cursor = cursor;
 
     const qs = '?' + Object.entries(query)

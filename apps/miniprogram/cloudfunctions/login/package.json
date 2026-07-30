@@ -4,7 +4,7 @@
   "description": "HomeMew 登录云函数：获取 openid、映射身份、创建用户、签发 JWT",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test identity.test.js"
   },
   "author": "",
   "license": "ISC",

@@ -22,6 +22,7 @@
 const cloud = require('wx-server-sdk');
 const jwt = require('jsonwebtoken');
 const https = require('https');
+const { resolveIdentity } = require('./identity');
 
 cloud.init({
   env: cloud.DYNAMIC_CURRENT_ENV,
@@ -91,39 +92,17 @@ exports.main = async (event, context) => {
     const mappingRes = await mappingCollection.where({ openid }).limit(1).get();
     const existingMapping = mappingRes.data.length > 0 ? mappingRes.data[0] : null;
 
-    let userId = existingMapping?.homemewUserId;
-    let isNewUser = false;
+    const identity = await resolveIdentity({
+      openid,
+      existingMapping,
+      verifyUser: verifyCoreUser,
+      createUser: createCoreUser,
+      addMapping: data => mappingCollection.add({ data }),
+      updateMapping: ({ mappingId, data }) => mappingCollection.doc(mappingId).update({ data }),
+    });
+    const { userId, isNewUser } = identity;
 
-    // Step 3: 如果没有映射，创建 Core 用户
-    if (!userId) {
-      console.log('[Login] No existing mapping, creating new user...');
-      userId = await createCoreUser(openid);
-      isNewUser = true;
-
-      // Step 4: 保存身份映射
-      await mappingCollection.add({
-        data: {
-          openid,
-          homemewUserId: userId,
-          provider: 'wechat_miniprogram',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      });
-
-      console.log('[Login] New user created and mapped:', userId);
-    } else {
-      console.log('[Login] Existing user found:', userId);
-
-      // 更新最后登录时间
-      await mappingCollection.doc(existingMapping._id).update({
-        data: {
-          updatedAt: new Date().toISOString(),
-        },
-      });
-    }
-
-    // Step 5: 签发 JWT
+    // Step 3: 签发 JWT
     const token = signJwt(userId);
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRE_HOURS * 60 * 60 * 1000).toISOString();
 
@@ -150,6 +129,21 @@ exports.main = async (event, context) => {
 /**
  * 调用 Core API 创建内部用户
  */
+async function verifyCoreUser(userId) {
+  const { statusCode, data } = await requestCore({
+    method: 'GET',
+    path: '/api/v1/me',
+    token: signJwt(userId),
+  });
+  if (statusCode === 200) return true;
+  if (statusCode === 404 && data?.error?.code === 'USER_NOT_FOUND') return false;
+
+  const error = new Error(data?.error?.message || `Core user verification failed (${statusCode})`);
+  error.code = data?.error?.code || 'CORE_USER_VERIFICATION_FAILED';
+  error.statusCode = statusCode;
+  throw error;
+}
+
 async function createCoreUser(openid) {
   // 动态签发短期 internal JWT，不再依赖静态 INTERNAL_TOKEN 环境变量
   const internalToken = signInternalJwt();

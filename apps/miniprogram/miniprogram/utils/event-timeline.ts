@@ -1,8 +1,8 @@
 /**
  * 日程时间线纯工具函数（自包含、无 wx / 无相对导入，可在 Node 中单测）。
  *
- * 时区约定：Core 返回的 start/end 已是家庭时区的墙钟字符串（含 offset），
- * 这里全部按字符串片段处理日期与时间，不经过 new Date() 的设备时区解析。
+ * 时区约定：定时事件使用 UTC 时间点，并按起点显示时区归组；
+ * 显示时区元数据为 null 时由调用方提供设备时区。
  * 纯日期字符串仅在需要「星期 / 月历网格」时按年月日构造本地 Date，
  * 绝不使用 new Date('YYYY-MM-DD')（会被按 UTC 解析）。
  */
@@ -31,11 +31,17 @@ export function addDaysYmd(dateStr: string, n: number): string {
 }
 
 /** 与 Core Event 对齐的最小字段集（避免该纯模块依赖完整类型文件之外的东西） */
-export interface TimelineEventLike {
-  start: string;
-  end: string;
-  isAllDay: boolean;
-}
+export type TimelineEventLike =
+  | {
+      isAllDay: true;
+      startDate: string;
+      endDateExclusive: string;
+    }
+  | {
+      isAllDay: false;
+      startAt: string;
+      startTimezone: string | null;
+    };
 
 export type DayCell = {
   date: string;
@@ -94,10 +100,11 @@ export function eventDaysInRange(
   e: TimelineEventLike,
   rangeStart: string,
   rangeEnd: string,
+  deviceTimeZone: string,
 ): string[] {
   if (e.isAllDay) {
-    const startDay = e.start.slice(0, 10);
-    const endDay = e.end.slice(0, 10);
+    const startDay = e.startDate;
+    const endDay = e.endDateExclusive;
     const days: string[] = [];
     let cur = maxYmd(startDay, rangeStart);
     const stop = minYmd(endDay, rangeEnd);
@@ -111,8 +118,20 @@ export function eventDaysInRange(
     }
     return days;
   }
-  const day = e.start.slice(0, 10);
+  const day = instantDateInTimeZone(e.startAt, e.startTimezone || deviceTimeZone);
   return day >= rangeStart && day < rangeEnd ? [day] : [];
+}
+
+function instantDateInTimeZone(instant: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(instant));
+  const get = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find(part => part.type === type)?.value || '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
 /** 构建 6x7 月历矩阵 */

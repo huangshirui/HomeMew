@@ -26,9 +26,20 @@ import {
   parseDateOnly,
   formatDateOnly,
   addDaysToDateOnly,
-  zonedDateTimeToIso,
+  formatInstantInTimeZone,
+  getSystemTimeZone,
+  getWallTimeCandidates,
+  buildTimeZoneOptions,
+  searchTimeZoneOptions,
+  timeZoneLabel,
 } from '../../utils/index';
-import { Event, FamilyMember, CreateEventRequest, UpdateEventRequest } from '../../types/index';
+import type { TimeZoneOption } from '../../utils/index';
+import {
+  Event,
+  FamilyMember,
+  CreateEventRequest,
+  UpdateEventRequest,
+} from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 
 type MemberOption = {
@@ -49,8 +60,18 @@ Page({
     loaded: false,
     loadError: false,
     submitting: false,
-    /** 家庭时区（IANA），用于带时间日程的正确转换 */
-    timezone: 'Asia/Shanghai',
+    deviceTimezone: 'Asia/Shanghai',
+    startTimezone: 'Asia/Shanghai',
+    endTimezone: 'Asia/Shanghai',
+    startTimezoneMetadata: 'Asia/Shanghai' as string | null,
+    endTimezoneMetadata: 'Asia/Shanghai' as string | null,
+    startTimezoneLabel: '上海',
+    endTimezoneLabel: '上海',
+    timezoneTarget: 'start' as 'start' | 'end',
+    timezoneQuery: '',
+    timezoneOptions: [] as TimeZoneOption[],
+    filteredTimezoneOptions: [] as TimeZoneOption[],
+    showTimezoneSheet: false,
     members: [] as MemberOption[],
     summary: '',
     description: '',
@@ -85,7 +106,7 @@ Page({
       startDate: initialDate,
       endDate: initialDate,
       minDate: '1970-01-01',
-      timezone: resolveFamilyTimezone(familyId),
+      ...initialTimeZoneState(familyId),
     });
     wx.setNavigationBarTitle({
       title: options?.id ? '编辑日程' : '添加日程',
@@ -155,18 +176,33 @@ Page({
     let endDateStr: string;
     let startTimeStr = '09:00';
     let endTimeStr = '10:00';
+    let startTimezone = this.data.deviceTimezone;
+    let endTimezone = this.data.deviceTimezone;
+    let startTimezoneMetadata: string | null = this.data.deviceTimezone;
+    let endTimezoneMetadata: string | null = this.data.deviceTimezone;
     if (event.isAllDay) {
-      // 全天：start / end 为纯日期，按天解析（不走 UTC），end 为不包含式，显示时回退一天
-      startDateStr = formatDateOnly(parseDateOnly(event.start));
-      endDateStr = addDaysToDateOnly(formatDateOnly(parseDateOnly(event.end)), -1);
+      startDateStr = formatDateOnly(parseDateOnly(event.startDate));
+      endDateStr = addDaysToDateOnly(event.endDateExclusive, -1);
     } else {
-      const start = new Date(event.start);
-      const end = new Date(event.end);
-      startDateStr = formatYmd(start);
-      endDateStr = formatYmd(end);
-      startTimeStr = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
-      endTimeStr = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+      startTimezoneMetadata = event.startTimezone;
+      endTimezoneMetadata = event.endTimezone;
+      startTimezone = event.startTimezone || this.data.deviceTimezone;
+      endTimezone = event.endTimezone || this.data.deviceTimezone;
+      const start = formatInstantInTimeZone(event.startAt, startTimezone);
+      const end = formatInstantInTimeZone(event.endAt, endTimezone);
+      startDateStr = start.date;
+      endDateStr = end.date;
+      startTimeStr = start.time;
+      endTimeStr = end.time;
     }
+    const timezoneOptions = buildTimeZoneOptions([
+      startTimezone,
+      endTimezone,
+      startTimezoneMetadata,
+      endTimezoneMetadata,
+      this.data.deviceTimezone,
+      resolveFamilyTimezone(this.data.familyId),
+    ]);
     this.setData({
       summary: event.summary,
       description: event.description || '',
@@ -175,6 +211,14 @@ Page({
       endDate: endDateStr,
       startTime: startTimeStr,
       endTime: endTimeStr,
+      startTimezone,
+      endTimezone,
+      startTimezoneMetadata,
+      endTimezoneMetadata,
+      startTimezoneLabel: timeZoneLabel(startTimezone),
+      endTimezoneLabel: timeZoneLabel(endTimezone),
+      timezoneOptions,
+      filteredTimezoneOptions: timezoneOptions,
       location: event.location || '',
       version: event.version,
       members: members.map(m => ({
@@ -203,7 +247,16 @@ Page({
   },
 
   onAllDayChange(e: WechatMiniprogram.SwitchChange): void {
-    this.setData({ isAllDay: e.detail.value });
+    const isAllDay = e.detail.value;
+    this.setData(isAllDay ? { isAllDay } : {
+      isAllDay,
+      startTimezone: this.data.deviceTimezone,
+      endTimezone: this.data.deviceTimezone,
+      startTimezoneMetadata: this.data.deviceTimezone,
+      endTimezoneMetadata: this.data.deviceTimezone,
+      startTimezoneLabel: timeZoneLabel(this.data.deviceTimezone),
+      endTimezoneLabel: timeZoneLabel(this.data.deviceTimezone),
+    });
     this.refreshDerived();
   },
 
@@ -235,6 +288,51 @@ Page({
   onEndTimeChange(e: WechatMiniprogram.PickerChange): void {
     this.setData({ endTime: e.detail.value as string });
     this.refreshDerived();
+  },
+
+  onOpenTimezone(e: WechatMiniprogram.TouchEvent): void {
+    const target = e.currentTarget.dataset.target as 'start' | 'end';
+    this.setData({
+      timezoneTarget: target,
+      timezoneQuery: '',
+      filteredTimezoneOptions: this.data.timezoneOptions,
+      showTimezoneSheet: true,
+    });
+  },
+
+  onCloseTimezone(): void {
+    this.setData({ showTimezoneSheet: false, timezoneQuery: '' });
+  },
+
+  onTimezoneSearch(e: WechatMiniprogram.Input): void {
+    const timezoneQuery = e.detail.value;
+    this.setData({
+      timezoneQuery,
+      filteredTimezoneOptions: searchTimeZoneOptions(
+        this.data.timezoneOptions,
+        timezoneQuery,
+      ),
+    });
+  },
+
+  onSelectTimezone(e: WechatMiniprogram.TouchEvent): void {
+    const timezone = e.currentTarget.dataset.id as string;
+    if (!timezone) return;
+    if (this.data.timezoneTarget === 'start') {
+      this.setData({
+        startTimezone: timezone,
+        startTimezoneMetadata: timezone,
+        startTimezoneLabel: timeZoneLabel(timezone),
+        showTimezoneSheet: false,
+      });
+    } else {
+      this.setData({
+        endTimezone: timezone,
+        endTimezoneMetadata: timezone,
+        endTimezoneLabel: timeZoneLabel(timezone),
+        showTimezoneSheet: false,
+      });
+    }
   },
 
   onMemberToggle(e: WechatMiniprogram.TouchEvent): void {
@@ -283,38 +381,55 @@ Page({
       showError('结束日期不能早于开始日期');
       return;
     }
-    const timezone = this.data.timezone || 'Asia/Shanghai';
-    let startIso = '';
-    let endIso = '';
+    const attendeeIds = this.data.members.filter(m => m.selected).map(m => m.userId);
+    const common = {
+      summary,
+      description: this.data.description.trim() || null,
+      attendeeIds,
+      location: this.data.location.trim() || null,
+    };
+    let payload: CreateEventRequest;
     if (this.data.isAllDay) {
       // 全天：使用纯日期，end 为不包含式（显示的最后一天 +1）
-      startIso = this.data.startDate;
-      endIso = addDaysToDateOnly(this.data.endDate, 1);
+      payload = {
+        ...common,
+        isAllDay: true,
+        startDate: this.data.startDate,
+        endDateExclusive: addDaysToDateOnly(this.data.endDate, 1),
+      };
     } else {
       if (!/^\d{1,2}:\d{2}$/.test(this.data.startTime) || !/^\d{1,2}:\d{2}$/.test(this.data.endTime)) {
         showError('请输入有效的时间');
         return;
       }
       // 按家庭时区把墙上时间转换为 UTC ISO，避免非东八区家庭产生偏移
-      startIso = zonedDateTimeToIso(this.data.startDate, this.data.startTime, timezone);
-      endIso = zonedDateTimeToIso(this.data.endDate, this.data.endTime, timezone);
+      const startCandidates = getWallTimeCandidates(
+        this.data.startDate,
+        this.data.startTime,
+        this.data.startTimezone,
+      );
+      const endCandidates = getWallTimeCandidates(
+        this.data.endDate,
+        this.data.endTime,
+        this.data.endTimezone,
+      );
+      const startIso = await chooseWallTimeCandidate('开始时间', startCandidates, this.data.startTimezone);
+      if (!startIso) return;
+      const endIso = await chooseWallTimeCandidate('结束时间', endCandidates, this.data.endTimezone);
+      if (!endIso) return;
       if (new Date(endIso).getTime() <= new Date(startIso).getTime()) {
         showError('结束时间必须晚于开始时间');
         return;
       }
+      payload = {
+        ...common,
+        isAllDay: false,
+        startAt: startIso,
+        endAt: endIso,
+        startTimezone: this.data.startTimezoneMetadata,
+        endTimezone: this.data.endTimezoneMetadata,
+      };
     }
-
-    const attendeeIds = this.data.members.filter(m => m.selected).map(m => m.userId);
-    const payload: CreateEventRequest = {
-      summary,
-      description: this.data.description.trim() || null,
-      start: startIso,
-      end: endIso,
-      isAllDay: this.data.isAllDay,
-      timezone,
-      attendeeIds,
-      location: this.data.location.trim() || null,
-    };
 
     this.setData({ submitting: true });
     showLoading(this.data.mode === 'edit' ? '保存中...' : '创建中...');
@@ -356,6 +471,54 @@ function pad(n: number): string {
 }
 
 /** 根据 familyId 解析家庭时区（优先当前家庭，其次家庭列表，最后回退东八区） */
+function initialTimeZoneState(familyId: string): {
+  deviceTimezone: string;
+  startTimezone: string;
+  endTimezone: string;
+  startTimezoneMetadata: string;
+  endTimezoneMetadata: string;
+  startTimezoneLabel: string;
+  endTimezoneLabel: string;
+  timezoneOptions: TimeZoneOption[];
+  filteredTimezoneOptions: TimeZoneOption[];
+} {
+  const familyTimezone = resolveFamilyTimezone(familyId);
+  const deviceTimezone = getSystemTimeZone(familyTimezone);
+  const options = buildTimeZoneOptions([deviceTimezone, familyTimezone]);
+  return {
+    deviceTimezone,
+    startTimezone: deviceTimezone,
+    endTimezone: deviceTimezone,
+    startTimezoneMetadata: deviceTimezone,
+    endTimezoneMetadata: deviceTimezone,
+    startTimezoneLabel: timeZoneLabel(deviceTimezone),
+    endTimezoneLabel: timeZoneLabel(deviceTimezone),
+    timezoneOptions: options,
+    filteredTimezoneOptions: options,
+  };
+}
+
+async function chooseWallTimeCandidate(
+  label: string,
+  candidates: string[],
+  timezone: string,
+): Promise<string | null> {
+  if (candidates.length === 0) {
+    showError(`${label}在 ${timezone} 中不存在，请更换时间`);
+    return null;
+  }
+  if (candidates.length === 1) return candidates[0];
+  try {
+    const result = await wx.showActionSheet({
+      alertText: `${label}在夏令时切换中出现两次，请选择`,
+      itemList: [`第一次 ${candidates[0]}`, `第二次 ${candidates[1]}`],
+    });
+    return candidates[result.tapIndex] || null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveFamilyTimezone(familyId: string): string {
   const current = currentFamilyStore.value;
   if (current && current.id === familyId && current.timezone) {

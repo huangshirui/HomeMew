@@ -14,8 +14,9 @@ import {
 
 /** 事件列表查询参数（时间窗口 + 窗口内游标） */
 export interface ListEventsParams {
-  start?: string;
-  end?: string;
+  startDate: string;
+  endDateExclusive: string;
+  timezone: string;
   attendeeId?: string;
   status?: 'active' | 'cancelled';
   cursor?: string;
@@ -33,21 +34,24 @@ export interface EventsPage {
  *
  * GET /api/v1/families/{familyId}/events
  *
- * @param params.start 起始时间（日期 YYYY-MM-DD 或 RFC 3339），与 end 配对
- * @param params.end 结束时间（不包含），与 start 配对
+ * @param params.startDate 日历查询窗口起始日期
+ * @param params.endDateExclusive 日历查询窗口结束日期（不包含）
  * @param params.attendeeId 仅看指定参与人；传 'me' 表示仅看自己
- * @param params.cursor 窗口内翻页游标（仅在同一 start/end 窗口内有效）
+ * @param params.cursor 窗口内翻页游标（仅在同一日期窗口内有效）
  */
 export function fetchEventsPage(
   familyId: string,
-  params?: ListEventsParams,
+  params: ListEventsParams,
 ): Promise<EventsPage> {
-  const query: Record<string, string> = { limit: String(params?.limit ?? 100) };
-  if (params?.start) query.start = params.start;
-  if (params?.end) query.end = params.end;
-  if (params?.attendeeId) query.attendeeId = params.attendeeId;
-  if (params?.status) query.status = params.status;
-  if (params?.cursor) query.cursor = params.cursor;
+  const query: Record<string, string> = {
+    startDate: params.startDate,
+    endDateExclusive: params.endDateExclusive,
+    timezone: params.timezone,
+    limit: String(params.limit ?? 100),
+  };
+  if (params.attendeeId) query.attendeeId = params.attendeeId;
+  if (params.status) query.status = params.status;
+  if (params.cursor) query.cursor = params.cursor;
 
   const qs = '?' + Object.entries(query)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
@@ -64,7 +68,7 @@ export function fetchEventsPage(
  */
 export async function listEvents(
   familyId: string,
-  params?: Omit<ListEventsParams, 'cursor' | 'limit'>,
+  params: Omit<ListEventsParams, 'cursor' | 'limit'>,
 ): Promise<Event[]> {
   const items: Event[] = [];
   let cursor: string | undefined;

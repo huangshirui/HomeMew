@@ -19,9 +19,13 @@ import {
   parseDateOnly,
   formatDateOnly,
   addDaysToDateOnly,
+  formatInstantInTimeZone,
+  getSystemTimeZone,
+  timeZoneLabel,
 } from '../../utils/index';
 import { Event } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
+import { currentFamilyStore, familiesStore } from '../../stores/index';
 
 Page({
   data: {
@@ -83,18 +87,27 @@ Page({
     let dateText = '';
     let timeText = '';
     if (isAllDay) {
-      // 全天：start / end 为纯日期，按天解析（不走 UTC），end 为不包含式，显示回退一天
-      const startStr = formatDateOnly(parseDateOnly(event.start));
-      const inclusiveEndStr = addDaysToDateOnly(formatDateOnly(parseDateOnly(event.end)), -1);
+      const startStr = formatDateOnly(parseDateOnly(event.startDate));
+      const inclusiveEndStr = addDaysToDateOnly(event.endDateExclusive, -1);
       dateText = startStr === inclusiveEndStr
         ? formatDate(startStr, 'date')
         : `${formatDate(startStr, 'date')} 至 ${formatDate(inclusiveEndStr, 'date')}`;
       timeText = '全天';
     } else {
-      const start = new Date(event.start);
-      const end = new Date(event.end);
-      dateText = formatDate(event.start, 'date');
-      timeText = `${pad(start.getHours())}:${pad(start.getMinutes())} - ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+      const familyTimeZone =
+        currentFamilyStore.value?.timezone
+        || familiesStore.value.find(family => family.id === this.data.familyId)?.timezone;
+      const deviceTimeZone = getSystemTimeZone(familyTimeZone);
+      const startZone = event.startTimezone || deviceTimeZone;
+      const endZone = event.endTimezone || deviceTimeZone;
+      const start = formatInstantInTimeZone(event.startAt, startZone);
+      const end = formatInstantInTimeZone(event.endAt, endZone);
+      dateText = start.date === end.date
+        ? start.date
+        : `${start.date} 至 ${end.date}`;
+      timeText = startZone === endZone
+        ? `${start.time} - ${end.time}`
+        : `${timeZoneLabel(startZone)} ${start.time} → ${timeZoneLabel(endZone)} ${end.time}`;
     }
     const attendees = event.attendees || [];
     this.setData({
@@ -151,7 +164,3 @@ Page({
     }
   },
 });
-
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
-}
