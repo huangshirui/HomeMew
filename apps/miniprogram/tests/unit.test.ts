@@ -27,6 +27,15 @@ import {
   eventDaysInRange,
   buildCalendarMatrix,
 } from '../miniprogram/utils/event-timeline.ts';
+import {
+  formatInstantInTimeZone,
+  getWallTimeCandidates,
+  resolveDeviceTimeZone,
+} from '../miniprogram/utils/datetime.ts';
+import {
+  buildTimeZoneOptions,
+  searchTimeZoneOptions,
+} from '../miniprogram/utils/timezones.ts';
 
 const FUTURE = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 const SOON = new Date(Date.now() + 60 * 1000).toISOString();
@@ -184,40 +193,58 @@ test('date labels: month / date / weekday', () => {
   assert.equal(weekLabelOf('2026-07-27'), '\u5468\u4e00');
 });
 
-test('eventDaysInRange: normal event appears only on start day (wall-clock string)', () => {
+test('eventDaysInRange: timed event uses endpoint display timezone for its start day', () => {
   const e = {
-    start: '2026-07-27T16:00:00+08:00',
-    end: '2026-07-27T18:00:00+08:00',
-    isAllDay: false,
+    startAt: '2026-07-27T15:30:00.000Z',
+    endAt: '2026-07-27T17:00:00.000Z',
+    startTimezone: 'Asia/Tokyo',
+    endTimezone: 'Europe/Paris',
+    isAllDay: false as const,
   };
-  assert.deepEqual(eventDaysInRange(e, '2026-07-01', '2026-08-01'), ['2026-07-27']);
-  // out of range does not appear
-  assert.deepEqual(eventDaysInRange(e, '2026-08-01', '2026-09-01'), []);
+  assert.deepEqual(
+    eventDaysInRange(e, '2026-07-01', '2026-08-01', 'Asia/Shanghai'),
+    ['2026-07-28'],
+  );
 });
 
 test('eventDaysInRange: all-day event covers each day and end is exclusive', () => {
-  const e = { start: '2026-07-27', end: '2026-07-30', isAllDay: true };
+  const e = {
+    startDate: '2026-07-27',
+    endDateExclusive: '2026-07-30',
+    isAllDay: true as const,
+  };
   assert.deepEqual(
-    eventDaysInRange(e, '2026-07-01', '2026-08-01'),
+    eventDaysInRange(e, '2026-07-01', '2026-08-01', 'Asia/Shanghai'),
     ['2026-07-27', '2026-07-28', '2026-07-29'],
   );
 });
 
 test('eventDaysInRange: cross-window all-day event is clipped (adjacent windows dedup by id)', () => {
-  const e = { start: '2026-07-29', end: '2026-08-03', isAllDay: true };
+  const e = {
+    startDate: '2026-07-29',
+    endDateExclusive: '2026-08-03',
+    isAllDay: true as const,
+  };
   assert.deepEqual(
-    eventDaysInRange(e, '2026-07-01', '2026-08-01'),
+    eventDaysInRange(e, '2026-07-01', '2026-08-01', 'Asia/Shanghai'),
     ['2026-07-29', '2026-07-30', '2026-07-31'],
   );
   assert.deepEqual(
-    eventDaysInRange(e, '2026-08-01', '2026-09-01'),
+    eventDaysInRange(e, '2026-08-01', '2026-09-01', 'Asia/Shanghai'),
     ['2026-08-01', '2026-08-02'],
   );
 });
 
 test('eventDaysInRange: malformed end <= start still shows start day', () => {
-  const e = { start: '2026-07-27', end: '2026-07-27', isAllDay: true };
-  assert.deepEqual(eventDaysInRange(e, '2026-07-01', '2026-08-01'), ['2026-07-27']);
+  const e = {
+    startDate: '2026-07-27',
+    endDateExclusive: '2026-07-27',
+    isAllDay: true as const,
+  };
+  assert.deepEqual(
+    eventDaysInRange(e, '2026-07-01', '2026-08-01', 'Asia/Shanghai'),
+    ['2026-07-27'],
+  );
 });
 
 test('buildCalendarMatrix: 6x7 grid, today and dots correct', () => {
@@ -266,4 +293,92 @@ test('registered page files (.ts / .wxml) all exist', () => {
     assert.ok(existsSync(tsFile), `missing page script: ${p}.ts`);
     assert.ok(existsSync(wxmlFile), `missing page template: ${p}.wxml`);
   }
+});
+
+// ============ 9. Core v8 time contract ============
+test('Core DTOs use discriminated event shapes and dueDate without legacy fields', () => {
+  const source = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/types/index.ts'),
+    'utf-8',
+  );
+  assert.match(source, /startAt:\s*string/);
+  assert.match(source, /endDateExclusive:\s*string/);
+  assert.match(source, /startTimezone:\s*string\s*\|\s*null/);
+  assert.match(source, /dueDate:\s*string\s*\|\s*null/);
+  assert.doesNotMatch(source, /^\s+start:\s*string/m);
+  assert.doesNotMatch(source, /^\s+due:\s*string\s*\|\s*null/m);
+});
+
+test('event service requires the new date window and viewer timezone query', () => {
+  const source = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/services/events.ts'),
+    'utf-8',
+  );
+  assert.match(source, /startDate:\s*string/);
+  assert.match(source, /endDateExclusive:\s*string/);
+  assert.match(source, /timezone:\s*string/);
+  assert.doesNotMatch(source, /query\.start\s*=/);
+  assert.doesNotMatch(source, /query\.end\s*=/);
+});
+
+test('formatInstantInTimeZone formats a UTC instant in endpoint-local time', () => {
+  assert.deepEqual(
+    formatInstantInTimeZone('2026-08-01T01:00:00.000Z', 'Asia/Tokyo'),
+    { date: '2026-08-01', time: '10:00' },
+  );
+  assert.deepEqual(
+    formatInstantInTimeZone('2026-08-01T16:00:00.000Z', 'Europe/Paris'),
+    { date: '2026-08-01', time: '18:00' },
+  );
+});
+
+test('getWallTimeCandidates rejects DST gaps and exposes both repeated instants', () => {
+  assert.deepEqual(
+    getWallTimeCandidates('2026-03-08', '02:30', 'America/New_York'),
+    [],
+  );
+  assert.deepEqual(
+    getWallTimeCandidates('2026-11-01', '01:30', 'America/New_York'),
+    ['2026-11-01T05:30:00.000Z', '2026-11-01T06:30:00.000Z'],
+  );
+});
+
+test('resolveDeviceTimeZone follows device, family, Shanghai fallback order', () => {
+  assert.equal(resolveDeviceTimeZone('Asia/Tokyo', 'Europe/Paris'), 'Asia/Tokyo');
+  assert.equal(resolveDeviceTimeZone('Invalid/Zone', 'Europe/Paris'), 'Europe/Paris');
+  assert.equal(resolveDeviceTimeZone(undefined, 'Invalid/Zone'), 'Asia/Shanghai');
+});
+
+test('timezone options prioritize dynamic zones and search by city or IANA id', () => {
+  const options = buildTimeZoneOptions([
+    'Pacific/Chatham',
+    'Asia/Shanghai',
+    'Pacific/Chatham',
+  ]);
+  assert.equal(options[0].id, 'Pacific/Chatham');
+  assert.equal(options.filter(option => option.id === 'Pacific/Chatham').length, 1);
+  assert.equal(searchTimeZoneOptions(options, '东京')[0].id, 'Asia/Tokyo');
+  assert.equal(searchTimeZoneOptions(options, 'Europe/Paris')[0].id, 'Europe/Paris');
+});
+
+test('event editor preserves nullable timezone metadata and task dates use family timezone', () => {
+  const eventEditor = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/pages/events/edit.ts'),
+    'utf-8',
+  );
+  const taskList = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/pages/tasks/tasks.ts'),
+    'utf-8',
+  );
+  assert.match(eventEditor, /startTimezoneMetadata\s*=\s*event\.startTimezone/);
+  assert.match(eventEditor, /this\.setData\(\{[\s\S]*?startTimezoneMetadata,[\s\S]*?endTimezoneMetadata,/);
+  assert.match(eventEditor, /startTimezone:\s*this\.data\.startTimezoneMetadata/);
+  assert.match(taskList, /currentFamilyStore\.value\?\.timezone/);
+  assert.match(taskList, /formatInstantInTimeZone\(new Date\(\)\.toISOString\(\), familyTimezone\)\.date/);
+  const home = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/pages/home/home.ts'),
+    'utf-8',
+  );
+  assert.match(home, /mapTaskHome\(t, today, tomorrow\)/);
+  assert.match(home, /taskDueLabel\(t, today, tomorrow\)/);
 });

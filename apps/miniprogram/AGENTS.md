@@ -230,8 +230,8 @@ Follow these domain rules when the event routes become implemented:
 - `summary` is required;
 - attendees are selected by HomeMew `userId` and must be active family members;
 - an event may have no attendees;
-- timed events use explicit timezone-aware datetimes and an IANA timezone;
-- all-day events use date values;
+- timed events use UTC `startAt`/`endAt`; nullable endpoint IANA timezones are display metadata;
+- all-day events use `startDate`/`endDateExclusive` date values and never undergo timezone conversion;
 - all-day event end dates are exclusive in the API;
 - the UI may display inclusive dates but must convert them correctly before submission;
 - edits and deletes use the contract's version field to prevent silent concurrent overwrites;
@@ -245,7 +245,7 @@ Follow these domain rules when the task routes become implemented:
 
 - a task belongs to exactly one family;
 - `name` is required;
-- `due` is nullable and has date-only granularity;
+- `dueDate` is nullable and has date-only granularity;
 - assignees are selected by HomeMew `userId` and must be active family members;
 - a task may have no assignees and then represents a shared family task;
 - the task has one overall status, not one completion status per assignee;

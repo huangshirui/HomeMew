@@ -206,4 +206,15 @@ export {
   formatDateOnly,
   addDaysToDateOnly,
   zonedDateTimeToIso,
+  formatInstantInTimeZone,
+  getWallTimeCandidates,
+  getSystemTimeZone,
+  resolveDeviceTimeZone,
 } from './datetime';
+
+export {
+  buildTimeZoneOptions,
+  searchTimeZoneOptions,
+  timeZoneLabel,
+} from './timezones';
+export type { TimeZoneOption } from './timezones';

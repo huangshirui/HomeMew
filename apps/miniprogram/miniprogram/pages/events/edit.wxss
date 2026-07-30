@@ -190,3 +190,80 @@
 .footer-btn {
   flex: 1;
 }
+
+.timezone-value {
+  max-width: 440rpx;
+  color: var(--color-text-secondary);
+  font-size: 26rpx;
+  text-align: right;
+}
+
+.timezone-mask {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.timezone-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  padding: 28rpx 28rpx 0;
+  border-radius: 28rpx 28rpx 0 0;
+  background: var(--color-bg-white);
+}
+
+.timezone-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.timezone-sheet-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.timezone-sheet-close {
+  color: var(--color-primary);
+  font-size: 28rpx;
+}
+
+.timezone-search {
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  background: var(--color-bg);
+  font-size: 28rpx;
+}
+
+.timezone-list {
+  height: 620rpx;
+  margin-top: 16rpx;
+}
+
+.timezone-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  padding: 22rpx 4rpx;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.timezone-option-label {
+  color: var(--color-text-primary);
+  font-size: 29rpx;
+}
+
+.timezone-option-id {
+  color: var(--color-text-secondary);
+  font-size: 24rpx;
+}

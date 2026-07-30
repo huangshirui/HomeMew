@@ -13,7 +13,13 @@
 import { listTasks, completeTask, reopenTask } from '../../services/tasks';
 import { currentFamilyStore } from '../../stores/index';
 import { consumeDirty, markDirty, subscribe } from '../../stores/dirty';
-import { showError, showSuccess, getErrorMessage, isVersionConflict } from '../../utils/index';
+import {
+  showError,
+  showSuccess,
+  getErrorMessage,
+  isVersionConflict,
+  formatInstantInTimeZone,
+} from '../../utils/index';
 import { Task } from '../../types/index';
 
 type TabType = 'pending' | 'completed';
@@ -22,7 +28,7 @@ type TaskView = {
   id: string;
   name: string;
   status: 'pending' | 'completed';
-  due: string | null;
+  dueDate: string | null;
   dueText: string;
   isOverdue: boolean;
   assigneeText: string;
@@ -144,16 +150,22 @@ Page({
   },
 
   mapTasks(tasks: Task[]): TaskView[] {
-    const today = formatYmd(new Date());
+    const familyTimezone = currentFamilyStore.value?.timezone || 'Asia/Shanghai';
+    const today = formatInstantInTimeZone(new Date().toISOString(), familyTimezone).date;
     return tasks.map(t => {
-      const isOverdue = t.status === 'pending' && !!t.due && (t.due as string) < today;
-      const dueText = formatDueText(t.due, t.status as 'pending' | 'completed', today);
+      const isOverdue =
+        t.status === 'pending' && !!t.dueDate && t.dueDate < today;
+      const dueText = formatDueText(
+        t.dueDate,
+        t.status as 'pending' | 'completed',
+        today,
+      );
       const assigneeText = formatAssignees((t.assignees || []).map(a => a.displayName));
       return {
         id: t.id,
         name: t.name,
         status: t.status as 'pending' | 'completed',
-        due: t.due,
+        dueDate: t.dueDate,
         dueText,
         isOverdue,
         assigneeText,
@@ -264,14 +276,6 @@ Page({
 
 /* ----------------- 工具函数 ----------------- */
 
-function formatYmd(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
-}
-
 /** 负责人折叠：超过 2 人显示「A、B 等N人」 */
 function formatAssignees(names: string[]): string {
   if (names.length === 0) return '';
@@ -285,10 +289,14 @@ function formatAssignees(names: string[]): string {
  * - 今天到期 / 明天到期
  * - 其他：M月D日
  */
-function formatDueText(due: string | null, status: 'pending' | 'completed', today: string): string {
-  if (!due) return '';
-  const dueDate = new Date(`${due}T00:00:00`);
-  if (isNaN(dueDate.getTime())) return due;
+function formatDueText(
+  dueDateValue: string | null,
+  status: 'pending' | 'completed',
+  today: string,
+): string {
+  if (!dueDateValue) return '';
+  const dueDate = new Date(`${dueDateValue}T00:00:00`);
+  if (isNaN(dueDate.getTime())) return dueDateValue;
 
   const month = dueDate.getMonth() + 1;
   const day = dueDate.getDate();

@@ -12,8 +12,8 @@
  * - Core 是重叠查询，跨窗口多日事件会重复返回，统一按 event id 去重；
  * - 前后各 365 天为浏览上限，显示「已加载到最早 / 最晚」。
  *
- * 时区：Core 返回的 start/end 已是家庭时区的墙钟字符串（含 offset），
- * 分组与时间展示直接取字符串片段，不经过 new Date() 的设备时区解析。
+ * 时区：Core 返回规范 UTC 时间点；端点时区元数据优先用于显示，
+ * 元数据为 null 时回退设备时区。全天事件只做纯日期运算。
  */
 
 import { fetchEventsPage } from '../../services/events';
@@ -32,6 +32,9 @@ import {
   formatDateOnly,
   addDaysToDateOnly,
   safeAvatarUrl,
+  formatInstantInTimeZone,
+  getSystemTimeZone,
+  timeZoneLabel,
 } from '../../utils/index';
 import {
   DayCell,
@@ -166,6 +169,7 @@ Page({
   _calTouchY: 0,
   // 脏标记订阅句柄
   _dirtyUnsubscribe: null as (() => void) | null,
+  _deviceTimeZone: 'Asia/Shanghai',
 
   onLoad(options: { date?: string; familyId?: string; attendee?: string }): void {
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
@@ -177,6 +181,7 @@ Page({
       ? options.date
       : todayYmd();
     const uid = userStore.value?.id || '';
+    this._deviceTimeZone = getSystemTimeZone(currentFamilyStore.value?.timezone);
     // 带 attendee=me 参数进入时仅本次生效，不覆盖持久化选择
     const scope: EventsScope = options?.attendee === 'me'
       ? 'me'
@@ -230,6 +235,7 @@ Page({
     const scope = loadEventsScope(familyId, uid);
     this._members = [];
     this._dotCache = {};
+    this._deviceTimeZone = getSystemTimeZone(currentFamilyStore.value?.timezone);
     this.setData({
       familyId,
       noFamily: false,
@@ -370,11 +376,14 @@ Page({
     const familyId = this.data.familyId;
     const attendeeId = this.attendeeParam();
     const items: Event[] = [];
+    const queryStart = addDaysToDateOnly(start, -2);
+    const queryEnd = addDaysToDateOnly(end, 2);
     let cursor: string | undefined;
     for (let page = 0; page < MAX_PAGES_PER_WINDOW; page++) {
       const data = await fetchEventsPage(familyId, {
-        start,
-        end,
+        startDate: queryStart,
+        endDateExclusive: queryEnd,
+        timezone: this._deviceTimeZone,
         ...(attendeeId ? { attendeeId } : {}),
         ...(cursor ? { cursor } : {}),
         limit: 100,
@@ -580,10 +589,16 @@ Page({
     Object.keys(this._events).forEach(id => {
       const e = this._events[id];
       total += 1;
-      eventDaysInRange(e, rs, re).forEach(d => {
+      eventDaysInRange(e, rs, re, this._deviceTimeZone).forEach(d => {
         if (!byDate[d]) byDate[d] = [];
         // 全天排最前（sortKey '!'），普通日程按开始时间升序
-        byDate[d].push({ e, sortKey: e.isAllDay ? '!' : e.start.slice(11, 16) });
+        const sortKey = e.isAllDay
+          ? '!'
+          : formatInstantInTimeZone(
+              e.startAt,
+              e.startTimezone || this._deviceTimeZone,
+            ).time;
+        byDate[d].push({ e, sortKey });
       });
     });
     // 占位日期（今天 / 锚点 / 点选日期）：无日程也保留分组，便于定位
@@ -612,8 +627,22 @@ Page({
   },
 
   toItemView(e: Event): EventItemView {
-    // 直接取墙钟字符串片段，避免设备时区 ≠ 家庭时区时展示错乱
-    const timeText = e.isAllDay ? '' : `${e.start.slice(11, 16)}–${e.end.slice(11, 16)}`;
+    let timeText = '';
+    if (!e.isAllDay) {
+      const startZone = e.startTimezone || this._deviceTimeZone;
+      const endZone = e.endTimezone || this._deviceTimeZone;
+      const start = formatInstantInTimeZone(e.startAt, startZone);
+      const end = formatInstantInTimeZone(e.endAt, endZone);
+      if (startZone === endZone) {
+        timeText = start.date === end.date
+          ? `${start.time}–${end.time}`
+          : `${start.date} ${start.time} → ${end.date} ${end.time}`;
+      } else {
+        const startText = `${timeZoneLabel(startZone)} ${start.date === end.date ? '' : `${start.date} `}${start.time}`;
+        const endText = `${timeZoneLabel(endZone)} ${start.date === end.date ? '' : `${end.date} `}${end.time}`;
+        timeText = `${startText} → ${endText}`;
+      }
+    }
     const names = e.attendees.map(a => a.displayName);
     const nameText = names.length === 0
       ? ''
@@ -823,7 +852,12 @@ Page({
     if (monthStart >= this._rangeStart && monthEnd <= this._rangeEnd) {
       const set = new Set<string>();
       Object.keys(this._events).forEach(id => {
-        eventDaysInRange(this._events[id], monthStart, monthEnd).forEach(d => set.add(d));
+        eventDaysInRange(
+          this._events[id],
+          monthStart,
+          monthEnd,
+          this._deviceTimeZone,
+        ).forEach(d => set.add(d));
       });
       dates = Array.from(set);
     } else {
@@ -839,7 +873,12 @@ Page({
           if (familyId !== this.data.familyId) return;
           const set = new Set<string>();
           events.forEach(e => {
-            eventDaysInRange(e, monthStart, monthEnd).forEach(d => set.add(d));
+            eventDaysInRange(
+              e,
+              monthStart,
+              monthEnd,
+              this._deviceTimeZone,
+            ).forEach(d => set.add(d));
           });
           dates = Array.from(set);
           this._dotCache[cacheKey] = dates;

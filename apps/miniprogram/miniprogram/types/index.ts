@@ -212,15 +212,11 @@ export interface Actor {
   avatarUrl: string | null;
 }
 
-export interface Event {
+export interface EventCommon {
   id: string;
   familyId: string;
   summary: string;
   description: string | null;
-  start: string;
-  end: string;
-  isAllDay: boolean;
-  timezone: string;
   location: string | null;
   status: EventStatus;
   attendees: PersonRef[];
@@ -231,31 +227,88 @@ export interface Event {
   updatedAt: string;
 }
 
+export interface TimedEvent extends EventCommon {
+  isAllDay: false;
+  startAt: string;
+  endAt: string;
+  startTimezone: string | null;
+  endTimezone: string | null;
+}
+
+export interface AllDayEvent extends EventCommon {
+  isAllDay: true;
+  startDate: string;
+  endDateExclusive: string;
+}
+
+export type Event = TimedEvent | AllDayEvent;
+
 export interface EventResponse extends ApiEnvelope<Event> {}
 export interface EventListResponse extends PaginatedResponse<Event> {}
 
-export interface CreateEventRequest {
+export interface EventWriteCommon {
   summary: string;
   description?: string | null;
-  start: string;
-  end: string;
-  isAllDay: boolean;
-  timezone: string;
   attendeeIds?: string[];
   location?: string | null;
 }
 
-export interface UpdateEventRequest {
+export interface CreateTimedEventRequest extends EventWriteCommon {
+  isAllDay: false;
+  startAt: string;
+  endAt: string;
+  startTimezone?: string | null;
+  endTimezone?: string | null;
+  startDate?: never;
+  endDateExclusive?: never;
+}
+
+export interface CreateAllDayEventRequest extends EventWriteCommon {
+  isAllDay: true;
+  startDate: string;
+  endDateExclusive: string;
+  startAt?: never;
+  endAt?: never;
+  startTimezone?: never;
+  endTimezone?: never;
+}
+
+export type CreateEventRequest = CreateTimedEventRequest | CreateAllDayEventRequest;
+
+export interface EventUpdateFields {
   summary?: string;
   description?: string | null;
-  start?: string;
-  end?: string;
-  isAllDay?: boolean;
-  timezone?: string;
   attendeeIds?: string[];
   location?: string | null;
-  version: number;
 }
+
+type RequireAtLeastOne<T> = {
+  [K in keyof T]-?: Required<Pick<T, K>> & Partial<Omit<T, K>>;
+}[keyof T];
+
+interface TimedEventUpdateFields extends EventUpdateFields {
+  isAllDay?: false;
+  startAt?: string;
+  endAt?: string;
+  startTimezone?: string | null;
+  endTimezone?: string | null;
+  startDate?: never;
+  endDateExclusive?: never;
+}
+
+interface AllDayEventUpdateFields extends EventUpdateFields {
+  isAllDay?: true;
+  startDate?: string;
+  endDateExclusive?: string;
+  startAt?: never;
+  endAt?: never;
+  startTimezone?: never;
+  endTimezone?: never;
+}
+
+export type UpdateTimedEventRequest = { version: number } & RequireAtLeastOne<TimedEventUpdateFields>;
+export type UpdateAllDayEventRequest = { version: number } & RequireAtLeastOne<AllDayEventUpdateFields>;
+export type UpdateEventRequest = UpdateTimedEventRequest | UpdateAllDayEventRequest;
 
 // ==================== 待办相关 ====================
 
@@ -266,7 +319,7 @@ export interface Task {
   familyId: string;
   name: string;
   description: string | null;
-  due: string | null;
+  dueDate: string | null;
   status: TaskStatus;
   assignees: PersonRef[];
   completedAt: string | null;
@@ -284,17 +337,18 @@ export interface TaskListResponse extends PaginatedResponse<Task> {}
 export interface CreateTaskRequest {
   name: string;
   description?: string | null;
-  due?: string | null;
+  dueDate?: string | null;
   assigneeIds?: string[];
 }
 
-export interface UpdateTaskRequest {
+interface TaskUpdateFields {
   name?: string;
   description?: string | null;
-  due?: string | null;
+  dueDate?: string | null;
   assigneeIds?: string[];
-  version: number;
 }
+
+export type UpdateTaskRequest = { version: number } & RequireAtLeastOne<TaskUpdateFields>;
 
 export interface VersionActionRequest {
   version: number;

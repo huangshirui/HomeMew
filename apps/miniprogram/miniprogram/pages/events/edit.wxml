@@ -74,6 +74,20 @@
             </view>
           </view>
         </picker>
+        <view class="field-row" data-target="start" bindtap="onOpenTimezone">
+          <text class="field-label">起点时区</text>
+          <view class="field-value">
+            <text class="timezone-value">{{startTimezoneLabel}} · {{startTimezone}}</text>
+            <text class="field-arrow">›</text>
+          </view>
+        </view>
+        <view class="field-row" data-target="end" bindtap="onOpenTimezone">
+          <text class="field-label">终点时区</text>
+          <view class="field-value">
+            <text class="timezone-value">{{endTimezoneLabel}} · {{endTimezone}}</text>
+            <text class="field-arrow">›</text>
+          </view>
+        </view>
       </block>
 
       <view wx:else class="time-hint">
@@ -152,5 +166,32 @@
     >
       {{submitting ? '保存中...' : (mode === 'edit' ? '保存' : '创建')}}
     </button>
+  </view>
+
+  <view wx:if="{{showTimezoneSheet}}" class="timezone-mask" bindtap="onCloseTimezone"></view>
+  <view wx:if="{{showTimezoneSheet}}" class="timezone-sheet safe-area-bottom">
+    <view class="timezone-sheet-header">
+      <text class="timezone-sheet-title">选择{{timezoneTarget === 'start' ? '起点' : '终点'}}时区</text>
+      <text class="timezone-sheet-close" bindtap="onCloseTimezone">完成</text>
+    </view>
+    <input
+      class="timezone-search"
+      value="{{timezoneQuery}}"
+      bindinput="onTimezoneSearch"
+      placeholder="搜索城市或 IANA 时区"
+      confirm-type="search"
+    />
+    <scroll-view class="timezone-list" scroll-y>
+      <view
+        wx:for="{{filteredTimezoneOptions}}"
+        wx:key="id"
+        class="timezone-option"
+        data-id="{{item.id}}"
+        bindtap="onSelectTimezone"
+      >
+        <text class="timezone-option-label">{{item.label}}</text>
+        <text class="timezone-option-id">{{item.id}}</text>
+      </view>
+    </scroll-view>
   </view>
 </view>

@@ -45,7 +45,7 @@ Page({
     members: [] as MemberOption[],
     name: '',
     description: '',
-    due: '',
+    dueDate: '',
     /** 视图用派生 */
     dueText: '请选择截止日期',
     /** picker 最小日期 */
@@ -134,7 +134,7 @@ Page({
     this.setData({
       name: task.name,
       description: task.description || '',
-      due: task.due || '',
+      dueDate: task.dueDate || '',
       version: task.version,
       members: members.map(m => ({
         userId: m.userId,
@@ -158,12 +158,12 @@ Page({
   },
 
   onDueChange(e: WechatMiniprogram.PickerChange): void {
-    this.setData({ due: e.detail.value as string });
+    this.setData({ dueDate: e.detail.value as string });
     this.refreshDerived();
   },
 
   onClearDue(): void {
-    this.setData({ due: '' });
+    this.setData({ dueDate: '' });
     this.refreshDerived();
   },
 
@@ -184,10 +184,10 @@ Page({
   /* ----------------- 派生展示文本 ----------------- */
 
   refreshDerived(): void {
-    const { due } = this.data;
+    const { dueDate } = this.data;
     let dueText = '请选择截止日期（选填）';
-    if (due) {
-      dueText = due;
+    if (dueDate) {
+      dueText = dueDate;
     }
     this.setData({ dueText });
   },
@@ -208,7 +208,7 @@ Page({
     const payload: CreateTaskRequest = {
       name,
       description: this.data.description.trim() || null,
-      due: this.data.due || null,
+      dueDate: this.data.dueDate || null,
       assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
     };
 

@@ -117,10 +117,17 @@ n8n 服务 Token
 ```json
 {
   "accessToken": "eyJ...",
-  "expiresAt": "2026-07-21T18:00:00+08:00",
+  "expiresAt": "2026-07-21T10:00:00.000Z",
   "isNewUser": true
 }
 ```
+
+已有身份映射登录时，云函数会先使用用户 JWT 请求 `GET /api/v1/me`。只有 Core 明确返回
+`404/USER_NOT_FOUND` 时才重建 Core 用户并原位更新映射；401、403、超时和 5xx 均作为登录
+错误返回，避免因临时故障创建重复用户。
+
+定时日程统一提交规范 UTC `startAt/endAt`，`startTimezone/endTimezone` 仅作为端点显示元数据；
+全天日程只提交 `startDate/endDateExclusive`。待办截止日期使用纯日期 `dueDate`。
 
 ## 4.2 获取用户信息
 
@@ -617,7 +624,7 @@ POST /api/v1/families/{familyId}/invites/{inviteId}/revoke
 调用：
 
 ```http
-GET /api/v1/families/{familyId}/events
+GET /api/v1/families/{familyId}/events?startDate=2026-07-01&endDateExclusive=2026-08-01&timezone=Asia%2FShanghai
 ```
 
 第一版建议提供两种展示：
@@ -644,7 +651,7 @@ GET /api/v1/families/{familyId}/events
 只看我的日程：
 
 ```http
-GET /api/v1/families/{familyId}/events?attendeeId=me
+GET /api/v1/families/{familyId}/events?startDate=2026-07-01&endDateExclusive=2026-08-01&timezone=Asia%2FShanghai&attendeeId=me
 ```
 
 ## 9.2 日程卡片
@@ -707,10 +714,11 @@ GET /api/v1/families/{familyId}/events/{eventId}
 {
   "summary": "足球训练",
   "description": "携带水杯和训练服",
-  "start": "2026-07-25T16:00:00+08:00",
-  "end": "2026-07-25T18:00:00+08:00",
+  "startAt": "2026-07-25T08:00:00.000Z",
+  "endAt": "2026-07-25T10:00:00.000Z",
   "isAllDay": false,
-  "timezone": "Asia/Shanghai",
+  "startTimezone": "Asia/Shanghai",
+  "endTimezone": "Asia/Shanghai",
   "attendeeIds": [
     "usr_KK",
     "usr_DAD"
@@ -741,9 +749,9 @@ POST /api/v1/families/{familyId}/events
 
 ```json
 {
-  "start": "2026-07-25",
-  "end": "2026-07-28",
-  "isAllDay": true
+  "isAllDay": true,
+  "startDate": "2026-07-25",
+  "endDateExclusive": "2026-07-28"
 }
 ```
 
@@ -863,7 +871,7 @@ GET /api/v1/families/{familyId}/tasks?assigneeId=me
 
 ```text
 status = pending
-且 due < 今天
+且 dueDate < 今天
 ```
 
 不需要单独存储 `overdue` 状态。
@@ -885,7 +893,7 @@ status = pending
 {
   "name": "购买足球鞋",
   "description": "周末比赛前购买",
-  "due": "2026-07-25",
+  "dueDate": "2026-07-25",
   "assigneeIds": [
     "usr_DAD"
   ]
@@ -934,7 +942,7 @@ PATCH /api/v1/families/{familyId}/tasks/{taskId}
 ```json
 {
   "name": "购买新足球鞋",
-  "due": "2026-07-26",
+  "dueDate": "2026-07-26",
   "assigneeIds": [
     "usr_DAD",
     "usr_KK"

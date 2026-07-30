@@ -28,7 +28,7 @@ Page({
     /** 视图层使用的派生字段 */
     name: '',
     description: '',
-    due: '' as string | null,
+    dueDate: '' as string | null,
     dueText: '无',
     status: '' as 'pending' | 'completed' | 'cancelled',
     statusText: '',
@@ -81,7 +81,8 @@ Page({
   applyTask(task: Task): void {
     const assignees = task.assignees || [];
     const today = formatYmd(new Date());
-    const isOverdue = task.status === 'pending' && task.due ? task.due < today : false;
+    const isOverdue =
+      task.status === 'pending' && task.dueDate ? task.dueDate < today : false;
 
     let statusText = '';
     switch (task.status) {
@@ -100,8 +101,8 @@ Page({
       task,
       name: task.name,
       description: task.description || '',
-      due: task.due,
-      dueText: task.due ? formatDate(task.due, 'date') : '无',
+      dueDate: task.dueDate,
+      dueText: task.dueDate ? formatDate(task.dueDate, 'date') : '无',
       status: task.status,
       statusText,
       assigneeNames: assignees.length ? assignees.map(a => a.displayName).join('、') : '未指定（家庭公共待办）',

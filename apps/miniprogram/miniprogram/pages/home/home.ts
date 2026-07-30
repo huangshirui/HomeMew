@@ -30,8 +30,12 @@ import {
   getErrorMessage,
   isVersionConflict,
   formatDate,
-  parseDateOnly,
+  addDaysToDateOnly,
+  formatInstantInTimeZone,
+  getSystemTimeZone,
+  timeZoneLabel,
 } from '../../utils/index';
+import { eventDaysInRange } from '../../utils/event-timeline';
 import { consumeAnyDirty, markDirty, subscribe } from '../../stores/dirty';
 import { listEvents } from '../../services/events';
 import { listTasks, completeTask } from '../../services/tasks';
@@ -57,7 +61,7 @@ type TaskHomeView = {
   id: string;
   name: string;
   status: 'pending' | 'completed';
-  due: string | null;
+  dueDate: string | null;
   dueText: string;
   isOverdue: boolean;
   assigneeText: string;
@@ -246,10 +250,18 @@ Page({
       const today = new Date();
       const start = formatYmd(today);
       const end = formatYmd(addDays(today, 1));
-      const events = await listEvents(familyId, { start, end, status: 'active' });
+      const deviceTimeZone = getSystemTimeZone(this.data.currentFamily?.timezone);
+      const events = await listEvents(familyId, {
+        startDate: addDaysToDateOnly(start, -2),
+        endDateExclusive: addDaysToDateOnly(end, 2),
+        timezone: deviceTimeZone,
+        status: 'active',
+      });
       if (this.data.currentFamily?.id !== familyId) return;
 
-      this._todayEvents = events;
+      this._todayEvents = events.filter(event =>
+        eventDaysInRange(event, start, end, deviceTimeZone).length > 0,
+      );
       this.setData({ eventsLoading: false, eventsRefreshing: false });
       this.recompute();
     } catch (e) {
@@ -291,14 +303,18 @@ Page({
 
   /** 由原始数据派生所有展示字段：列表、计数、副标题、紧急提醒 */
   recompute(): void {
-    const today = formatYmd(new Date());
-    const tomorrow = formatYmd(addDays(new Date(), 1));
+    const familyTimezone = this.data.currentFamily?.timezone || 'Asia/Shanghai';
+    const today = formatInstantInTimeZone(new Date().toISOString(), familyTimezone).date;
+    const tomorrow = addDaysToDateOnly(today, 1);
 
-    const todayEvents = this._todayEvents.map(mapTodayEvent);
+    const deviceTimeZone = getSystemTimeZone(this.data.currentFamily?.timezone);
+    const todayEvents = this._todayEvents.map(event =>
+      mapTodayEvent(event, deviceTimeZone),
+    );
     const pendingTasks = [...this._pendingTasks]
       .sort((a, b) => taskDueRank(a, today, tomorrow) - taskDueRank(b, today, tomorrow))
       .map((t) => {
-        const v = mapTaskHome(t, today);
+        const v = mapTaskHome(t, today, tomorrow);
         v.completing = this._completingIds.has(t.id);
         return v;
       });
@@ -465,13 +481,14 @@ function formatTodayDate(): string {
   return `${d.getMonth() + 1}月${d.getDate()}日 · ${week}`;
 }
 
-function mapTodayEvent(e: Event): TodayEventView {
-  // 全天日程 start 为纯日期，按天解析（不走 UTC），否则负时区会偏移一天
-  const start = e.isAllDay ? parseDateOnly(e.start) : new Date(e.start);
+function mapTodayEvent(e: Event, deviceTimeZone: string): TodayEventView {
   let timeText = '全天';
   if (!e.isAllDay) {
-    const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-    timeText = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+    const startZone = e.startTimezone || deviceTimeZone;
+    const start = formatInstantInTimeZone(e.startAt, startZone);
+    timeText = e.startTimezone
+      ? `${timeZoneLabel(startZone)} ${start.time}`
+      : start.time;
   }
   return { id: e.id, summary: e.summary, timeText, isAllDay: e.isAllDay };
 }
@@ -479,30 +496,30 @@ function mapTodayEvent(e: Event): TodayEventView {
 /** 待办截止优先级：已逾期(0) > 今天(1) > 明天(2) > 其他有截止(3) > 无截止(4) */
 function taskDueRank(t: Task, today: string, tomorrow: string): number {
   if (t.status !== 'pending') return 99;
-  if (!t.due) return 4;
-  if (t.due < today) return 0;
-  if (t.due === today) return 1;
-  if (t.due === tomorrow) return 2;
+  if (!t.dueDate) return 4;
+  if (t.dueDate < today) return 0;
+  if (t.dueDate === today) return 1;
+  if (t.dueDate === tomorrow) return 2;
   return 3;
 }
 
 function taskDueLabel(t: Task, today: string, tomorrow: string): string {
-  if (!t.due) return (t.assignees || []).map((a) => a.displayName).join('、');
-  if (t.due < today) return '已逾期';
-  if (t.due === today) return '今天';
-  if (t.due === tomorrow) return '明天';
-  return formatDate(t.due, 'date');
+  if (!t.dueDate) return (t.assignees || []).map((a) => a.displayName).join('、');
+  if (t.dueDate < today) return '已逾期';
+  if (t.dueDate === today) return '今天';
+  if (t.dueDate === tomorrow) return '明天';
+  return formatDate(t.dueDate, 'date');
 }
 
-function mapTaskHome(t: Task, today: string): TaskHomeView {
-  const isOverdue = t.status === 'pending' && !!t.due && t.due < today;
+function mapTaskHome(t: Task, today: string, tomorrow: string): TaskHomeView {
+  const isOverdue = t.status === 'pending' && !!t.dueDate && t.dueDate < today;
   const assigneeText = (t.assignees || []).map((a) => a.displayName).join('、');
   return {
     id: t.id,
     name: t.name,
     status: t.status as 'pending' | 'completed',
-    due: t.due,
-    dueText: taskDueLabel(t, today, formatYmd(addDays(new Date(), 1))),
+    dueDate: t.dueDate,
+    dueText: taskDueLabel(t, today, tomorrow),
     isOverdue,
     assigneeText,
     version: t.version,
@@ -516,7 +533,7 @@ function findUrgentEvent(events: Event[]): { id: string; summary: string; minute
   let best: { id: string; summary: string; minutes: number } | null = null;
   for (const e of events) {
     if (e.isAllDay) continue;
-    const start = new Date(e.start).getTime();
+    const start = new Date(e.startAt).getTime();
     const diff = start - now;
     if (diff >= 0 && diff <= 30 * 60000) {
       const minutes = Math.max(1, Math.round(diff / 60000));
