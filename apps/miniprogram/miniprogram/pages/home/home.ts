@@ -260,7 +260,13 @@ Page({
       if (this.data.currentFamily?.id !== familyId) return;
 
       this._todayEvents = events.filter(event =>
-        eventDaysInRange(event, start, end, deviceTimeZone).length > 0,
+        eventDaysInRange(
+          event,
+          start,
+          end,
+          deviceTimeZone,
+          (instant, tz) => formatInstantInTimeZone(instant, tz).date,
+        ).length > 0,
       );
       this.setData({ eventsLoading: false, eventsRefreshing: false });
       this.recompute();

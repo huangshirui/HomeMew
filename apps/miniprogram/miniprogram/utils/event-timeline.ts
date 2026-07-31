@@ -3,6 +3,9 @@
  *
  * 时区约定：定时事件使用 UTC 时间点，并按起点显示时区归组；
  * 显示时区元数据为 null 时由调用方提供设备时区。
+ * 定时事件的「时间点 → 时区日期」换算由调用方注入（小程序页面注入
+ * utils/datetime.formatInstantInTimeZone，避免真机缺 ICU 时 Intl 抛错）；
+ * 未注入时使用带守卫的 Intl 默认实现（Node 单测环境 ICU 完整，结果精确）。
  * 纯日期字符串仅在需要「星期 / 月历网格」时按年月日构造本地 Date，
  * 绝不使用 new Date('YYYY-MM-DD')（会被按 UTC 解析）。
  */
@@ -91,16 +94,24 @@ export function weekLabelOf(dateStr: string): string {
   return `周${WEEK_CN[toLocalDate(dateStr).getDay()]}`;
 }
 
+/** 「UTC 时间点 → 指定时区墙钟日期 YYYY-MM-DD」换算函数 */
+export type InstantToZonedDate = (instant: string, timeZone: string) => string;
+
 /**
  * 事件在 [rangeStart, rangeEnd) 内占据的日期。
  * - 全天日程：start..end（end 不包含），在覆盖的每一天都出现；
- * - 普通日程：仅开始日（取墙钟字符串日期片段，不做时区换算）。
+ * - 普通日程：仅开始日，按起点显示时区换算。
+ *
+ * @param instantToZonedDate 定时事件的时区换算函数。小程序页面必须注入
+ *   基于 utils/datetime.formatInstantInTimeZone 的实现（静态偏移表优先，
+ *   真机可靠）；缺省实现带 Intl 守卫，仅保证不抛错，供 Node 单测使用。
  */
 export function eventDaysInRange(
   e: TimelineEventLike,
   rangeStart: string,
   rangeEnd: string,
   deviceTimeZone: string,
+  instantToZonedDate: InstantToZonedDate = instantDateInTimeZone,
 ): string[] {
   if (e.isAllDay) {
     const startDay = e.startDate;
@@ -118,20 +129,37 @@ export function eventDaysInRange(
     }
     return days;
   }
-  const day = instantDateInTimeZone(e.startAt, e.startTimezone || deviceTimeZone);
+  const day = instantToZonedDate(e.startAt, e.startTimezone || deviceTimeZone);
   return day >= rangeStart && day < rangeEnd ? [day] : [];
 }
 
+/**
+ * 缺省换算实现：仅供未注入 instantToZonedDate 时兜底（Node 单测环境）。
+ *
+ * 真机微信运行时常缺 ICU 时区库，`Intl.DateTimeFormat` 的 `timeZone` 选项
+ * 可能直接抛错（即线上报的「Intl 不存在」），因此这里全程守卫 + try/catch，
+ * 失败时退回设备本地日期，绝不让列表构建整体崩溃。
+ * 小程序页面不应依赖本兜底，而应注入 utils/datetime.formatInstantInTimeZone。
+ */
 function instantDateInTimeZone(instant: string, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date(instant));
-  const get = (type: Intl.DateTimeFormatPartTypes): string =>
-    parts.find(part => part.type === type)?.value || '';
-  return `${get('year')}-${get('month')}-${get('day')}`;
+  const value = new Date(instant);
+  if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(value);
+      const get = (type: string): string =>
+        parts.find(part => part.type === type)?.value || '';
+      const day = `${get('year')}-${get('month')}-${get('day')}`;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
+    } catch {
+      // 落入设备本地日期兜底
+    }
+  }
+  return toYmd(value);
 }
 
 /** 构建 6x7 月历矩阵 */

@@ -52,6 +52,10 @@ import { Event, FamilyMember } from '../../types/index';
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
+/** 注入 eventDaysInRange 的时区换算：走 datetime 静态偏移表方案，真机不依赖 Intl */
+const instantDate = (instant: string, timeZone: string): string =>
+  formatInstantInTimeZone(instant, timeZone).date;
+
 /** 初始窗口：过去 7 天 + 未来 30 天 */
 const INIT_BACK_DAYS = 7;
 const INIT_FWD_DAYS = 30;
@@ -589,7 +593,7 @@ Page({
     Object.keys(this._events).forEach(id => {
       const e = this._events[id];
       total += 1;
-      eventDaysInRange(e, rs, re, this._deviceTimeZone).forEach(d => {
+      eventDaysInRange(e, rs, re, this._deviceTimeZone, instantDate).forEach(d => {
         if (!byDate[d]) byDate[d] = [];
         // 全天排最前（sortKey '!'），普通日程按开始时间升序
         const sortKey = e.isAllDay
@@ -857,6 +861,7 @@ Page({
           monthStart,
           monthEnd,
           this._deviceTimeZone,
+          instantDate,
         ).forEach(d => set.add(d));
       });
       dates = Array.from(set);
@@ -878,6 +883,7 @@ Page({
               monthStart,
               monthEnd,
               this._deviceTimeZone,
+              instantDate,
             ).forEach(d => set.add(d));
           });
           dates = Array.from(set);
