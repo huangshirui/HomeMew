@@ -640,6 +640,15 @@ POST /api/v1/families/{familyId}/invites/{inviteId}/revoke
 GET /api/v1/families/{familyId}/events?startDate=2026-07-01&endDateExclusive=2026-08-01&timezone=Asia%2FShanghai
 ```
 
+`timezone` 是「查看时区」：Core 用它把 `startDate/endDateExclusive` 换算成 UTC 查询窗口。
+客户端必须使用同一个查看时区决定「日程属于哪一天」——包括列表分组、月历圆点和首页
+「今天」判断。日程自身的 `startTimezone/endTimezone` 只是端点地点时区元数据
+（例如航班出发地 / 到达地），只能作为详情与卡片上的时间标签，绝不能参与归组，
+否则同一条日程会被分到 Core 查询窗口以外的另一天。
+
+由于查询窗口与归组窗口语义一致，请求不得再前后额外扩几天；
+「当前范围无日程」的判断也只统计真正落在范围内、能被展示的日程。
+
 第一版建议提供两种展示：
 
 ```text

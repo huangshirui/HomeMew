@@ -97,17 +97,27 @@ Page({
       const familyTimeZone =
         currentFamilyStore.value?.timezone
         || familiesStore.value.find(family => family.id === this.data.familyId)?.timezone;
-      const deviceTimeZone = getSystemTimeZone(familyTimeZone);
-      const startZone = event.startTimezone || deviceTimeZone;
-      const endZone = event.endTimezone || deviceTimeZone;
-      const start = formatInstantInTimeZone(event.startAt, startZone);
-      const end = formatInstantInTimeZone(event.endAt, endZone);
+      // 日期与主时间使用查看时区，与日程列表的归组保持一致
+      const viewingTimezone = getSystemTimeZone(familyTimeZone);
+      const start = formatInstantInTimeZone(event.startAt, viewingTimezone);
+      const end = formatInstantInTimeZone(event.endAt, viewingTimezone);
       dateText = start.date === end.date
         ? start.date
         : `${start.date} 至 ${end.date}`;
-      timeText = startZone === endZone
-        ? `${start.time} - ${end.time}`
-        : `${timeZoneLabel(startZone)} ${start.time} → ${timeZoneLabel(endZone)} ${end.time}`;
+      timeText = `${start.time} - ${end.time}`;
+      // 端点地点时区（如航班出发地 / 到达地）仅作为附加标签展示
+      const startZone = event.startTimezone;
+      const endZone = event.endTimezone;
+      if (
+        (startZone && startZone !== viewingTimezone)
+        || (endZone && endZone !== viewingTimezone)
+      ) {
+        const originZone = startZone || viewingTimezone;
+        const arrivalZone = endZone || viewingTimezone;
+        const atOrigin = formatInstantInTimeZone(event.startAt, originZone);
+        const atArrival = formatInstantInTimeZone(event.endAt, arrivalZone);
+        timeText += ` · ${timeZoneLabel(originZone)} ${atOrigin.time} → ${timeZoneLabel(arrivalZone)} ${atArrival.time}`;
+      }
     }
     const attendees = event.attendees || [];
     this.setData({

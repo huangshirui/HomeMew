@@ -193,7 +193,7 @@ test('date labels: month / date / weekday', () => {
   assert.equal(weekLabelOf('2026-07-27'), '\u5468\u4e00');
 });
 
-test('eventDaysInRange: timed event uses endpoint display timezone for its start day', () => {
+test('eventDaysInRange: timed event is grouped by the viewing timezone', () => {
   const e = {
     startAt: '2026-07-27T15:30:00.000Z',
     endAt: '2026-07-27T17:00:00.000Z',
@@ -201,9 +201,84 @@ test('eventDaysInRange: timed event uses endpoint display timezone for its start
     endTimezone: 'Europe/Paris',
     isAllDay: false as const,
   };
+  // Shanghai viewer: 2026-07-27 23:30 -> 2026-07-28 01:00 local.
+  // The endpoint timezone metadata (Tokyo/Paris) is ignored; the viewing
+  // timezone decides the day. Overlap semantics puts it on both 27 and 28.
   assert.deepEqual(
     eventDaysInRange(e, '2026-07-01', '2026-08-01', 'Asia/Shanghai'),
+    ['2026-07-27', '2026-07-28'],
+  );
+  // Tokyo viewer: 2026-07-28 00:30 -> 02:00 local -> the 28th only
+  assert.deepEqual(
+    eventDaysInRange(e, '2026-07-01', '2026-08-01', 'Asia/Tokyo'),
     ['2026-07-28'],
+  );
+});
+
+test('eventDaysInRange: endpoint timezone metadata never overrides the viewing day', () => {
+  // Los Angeles Aug 1 18:00 == Shanghai Aug 2 09:00.
+  // Core returns it inside the LA Aug 1 window, so the client must agree.
+  const e = {
+    startAt: '2026-08-02T01:00:00.000Z',
+    endAt: '2026-08-02T02:00:00.000Z',
+    startTimezone: 'Asia/Shanghai',
+    endTimezone: 'Asia/Shanghai',
+    isAllDay: false as const,
+  };
+  assert.deepEqual(
+    eventDaysInRange(e, '2026-08-01', '2026-08-02', 'America/Los_Angeles'),
+    ['2026-08-01'],
+  );
+});
+
+test('eventDaysInRange: cross-midnight timed event spans both overlapping days', () => {
+  // LA 7/31 22:00 -> 8/1 02:00 (PDT, UTC-7): starts before midnight, ends after.
+  const e = {
+    startAt: '2026-08-01T05:00:00.000Z',
+    endAt: '2026-08-01T09:00:00.000Z',
+    startTimezone: 'America/Los_Angeles',
+    endTimezone: 'America/Los_Angeles',
+    isAllDay: false as const,
+  };
+  // Full window: appears on both 7/31 and 8/1.
+  assert.deepEqual(
+    eventDaysInRange(e, '2026-07-01', '2026-09-01', 'America/Los_Angeles'),
+    ['2026-07-31', '2026-08-01'],
+  );
+});
+
+test('eventDaysInRange: cross-midnight timed event is not dropped when its start day is outside the loaded window', () => {
+  // Same event as above, but the loaded window only covers August.
+  // Old logic grouped by start day only (7/31) and dropped it; the overlap-aware
+  // logic must keep it on 8/1 where it actually overlaps.
+  const e = {
+    startAt: '2026-08-01T05:00:00.000Z',
+    endAt: '2026-08-01T09:00:00.000Z',
+    startTimezone: 'America/Los_Angeles',
+    endTimezone: 'America/Los_Angeles',
+    isAllDay: false as const,
+  };
+  assert.deepEqual(
+    eventDaysInRange(e, '2026-08-01', '2026-08-31', 'America/Los_Angeles'),
+    ['2026-08-01'],
+  );
+});
+
+test('eventDaysInRange: multi-day timed event fills every overlapping day', () => {
+  // LA 8/1 09:00 -> 8/4 18:00: spans four calendar days in LA.
+  const e = {
+    startAt: '2026-08-01T16:00:00.000Z',
+    endAt: '2026-08-05T01:00:00.000Z',
+    isAllDay: false as const,
+  };
+  assert.deepEqual(
+    eventDaysInRange(e, '2026-07-01', '2026-09-01', 'America/Los_Angeles'),
+    ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-04'],
+  );
+  // Clipped to a narrower window: only the overlapping slice remains.
+  assert.deepEqual(
+    eventDaysInRange(e, '2026-08-02', '2026-08-03', 'America/Los_Angeles'),
+    ['2026-08-02'],
   );
 });
 
@@ -359,6 +434,31 @@ test('timezone options prioritize dynamic zones and search by city or IANA id', 
   assert.equal(options.filter(option => option.id === 'Pacific/Chatham').length, 1);
   assert.equal(searchTimeZoneOptions(options, '东京')[0].id, 'Asia/Tokyo');
   assert.equal(searchTimeZoneOptions(options, 'Europe/Paris')[0].id, 'Europe/Paris');
+});
+
+test('grouping uses the viewing timezone only, and query windows are not padded', () => {
+  const timeline = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/utils/event-timeline.ts'),
+    'utf-8',
+  );
+  const events = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/pages/events/events.ts'),
+    'utf-8',
+  );
+  const home = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/pages/home/home.ts'),
+    'utf-8',
+  );
+  // the pure grouping module must never read endpoint timezone metadata
+  assert.doesNotMatch(timeline, /e\.startTimezone/);
+  assert.match(timeline, /instantToZonedDate\(e\.startAt, viewingTimezone\)/);
+  // list query and grouping share one viewing timezone, with no +-2 day padding
+  assert.match(events, /timezone: this\._viewingTimezone/);
+  assert.match(events, /eventDaysInRange\(e, rs, re, this\._viewingTimezone/);
+  assert.doesNotMatch(events, /queryStart|queryEnd/);
+  assert.match(home, /timezone: viewingTimezone/);
+  assert.doesNotMatch(home, /addDaysToDateOnly\(start, -2\)/);
+  assert.doesNotMatch(home, /addDaysToDateOnly\(end, 2\)/);
 });
 
 test('event editor preserves nullable timezone metadata and task dates use family timezone', () => {

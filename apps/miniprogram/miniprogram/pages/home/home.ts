@@ -237,7 +237,13 @@ Page({
     });
   },
 
-  /** 加载今日日程（今天 00:00 ～ 明天 00:00） */
+  /**
+   * 加载今日日程。
+   *
+   * 「今天」由查看时区（设备时区，无效时回退家庭时区）决定：同一个时区既作为
+   * 列表接口的 `timezone` 查询参数，也用于本地过滤，因此查询窗口无需前后扩展，
+   * Core 返回的就是这一天的日程。事件的 startTimezone 只是地点时区标签。
+   */
   async loadTodayEvents(familyId: string): Promise<void> {
     // 已有数据时进入非破坏性「后台刷新」态，保留旧列表继续展示，避免整块闪现「加载中」
     const hasOld = this.data.todayEvents.length > 0;
@@ -247,14 +253,13 @@ Page({
       eventsError: false,
     });
     try {
-      const today = new Date();
-      const start = formatYmd(today);
-      const end = formatYmd(addDays(today, 1));
-      const deviceTimeZone = getSystemTimeZone(this.data.currentFamily?.timezone);
+      const viewingTimezone = getSystemTimeZone(this.data.currentFamily?.timezone);
+      const start = formatInstantInTimeZone(new Date().toISOString(), viewingTimezone).date;
+      const end = addDaysToDateOnly(start, 1);
       const events = await listEvents(familyId, {
-        startDate: addDaysToDateOnly(start, -2),
-        endDateExclusive: addDaysToDateOnly(end, 2),
-        timezone: deviceTimeZone,
+        startDate: start,
+        endDateExclusive: end,
+        timezone: viewingTimezone,
         status: 'active',
       });
       if (this.data.currentFamily?.id !== familyId) return;
@@ -264,7 +269,7 @@ Page({
           event,
           start,
           end,
-          deviceTimeZone,
+          viewingTimezone,
           (instant, tz) => formatInstantInTimeZone(instant, tz).date,
         ).length > 0,
       );
@@ -309,13 +314,15 @@ Page({
 
   /** 由原始数据派生所有展示字段：列表、计数、副标题、紧急提醒 */
   recompute(): void {
+    // 待办截止日期是家庭时区下的纯日期
     const familyTimezone = this.data.currentFamily?.timezone || 'Asia/Shanghai';
     const today = formatInstantInTimeZone(new Date().toISOString(), familyTimezone).date;
     const tomorrow = addDaysToDateOnly(today, 1);
 
-    const deviceTimeZone = getSystemTimeZone(this.data.currentFamily?.timezone);
+    // 日程展示使用与筛选一致的查看时区
+    const viewingTimezone = getSystemTimeZone(this.data.currentFamily?.timezone);
     const todayEvents = this._todayEvents.map(event =>
-      mapTodayEvent(event, deviceTimeZone),
+      mapTodayEvent(event, viewingTimezone),
     );
     const pendingTasks = [...this._pendingTasks]
       .sort((a, b) => taskDueRank(a, today, tomorrow) - taskDueRank(b, today, tomorrow))
@@ -459,17 +466,6 @@ Page({
 
 /* ----------------- 工具函数 ----------------- */
 
-function formatYmd(d: Date): string {
-  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-
 function truncateName(name: string, max = 8): string {
   return name.length > max ? `${name.slice(0, max)}…` : name;
 }
@@ -487,14 +483,18 @@ function formatTodayDate(): string {
   return `${d.getMonth() + 1}月${d.getDate()}日 · ${week}`;
 }
 
-function mapTodayEvent(e: Event, deviceTimeZone: string): TodayEventView {
+/**
+ * 主时间使用查看时区（与「今天」的判断一致）；
+ * startTimezone 只有在与查看时区不同时才作为地点时区标签补充展示。
+ */
+function mapTodayEvent(e: Event, viewingTimezone: string): TodayEventView {
   let timeText = '全天';
   if (!e.isAllDay) {
-    const startZone = e.startTimezone || deviceTimeZone;
-    const start = formatInstantInTimeZone(e.startAt, startZone);
-    timeText = e.startTimezone
-      ? `${timeZoneLabel(startZone)} ${start.time}`
-      : start.time;
+    timeText = formatInstantInTimeZone(e.startAt, viewingTimezone).time;
+    if (e.startTimezone && e.startTimezone !== viewingTimezone) {
+      const atOrigin = formatInstantInTimeZone(e.startAt, e.startTimezone);
+      timeText = `${timeText}（${timeZoneLabel(e.startTimezone)} ${atOrigin.time}）`;
+    }
   }
   return { id: e.id, summary: e.summary, timeText, isAllDay: e.isAllDay };
 }

@@ -1,8 +1,15 @@
 /**
  * 日程时间线纯工具函数（自包含、无 wx / 无相对导入，可在 Node 中单测）。
  *
- * 时区约定：定时事件使用 UTC 时间点，并按起点显示时区归组；
- * 显示时区元数据为 null 时由调用方提供设备时区。
+ * 时区约定：定时事件使用 UTC 时间点，一律按「查看时区」（viewingTimezone）归组，
+ * 与列表接口 `timezone` 查询参数保持同一语义——即 Core 用来把
+ * `startDate/endDateExclusive` 换算成 UTC 查询窗口的时区。定时事件按「与窗口
+ * 重叠的每一天」归组（含跨午夜 / 跨天），与 Core 列表接口的重叠返回语义
+ * （start_at < windowEnd && end_at > windowStart）保持一致，否则跨天的定时事件
+ * 会在窗口左边界被漏掉。
+ * 事件自身的 `startTimezone/endTimezone` 只是端点地点时区元数据（例如航班出发地 /
+ * 到达地），仅用于详情与卡片上的时间标签，绝不参与「属于哪一天」的判断，
+ * 否则会与 Core 的窗口语义冲突（同一事件在客户端被分到窗口外的另一天）。
  * 定时事件的「时间点 → 时区日期」换算由调用方注入（小程序页面注入
  * utils/datetime.formatInstantInTimeZone，避免真机缺 ICU 时 Intl 抛错）；
  * 未注入时使用带守卫的 Intl 默认实现（Node 单测环境 ICU 完整，结果精确）。
@@ -43,7 +50,7 @@ export type TimelineEventLike =
   | {
       isAllDay: false;
       startAt: string;
-      startTimezone: string | null;
+      endAt: string;
     };
 
 export type DayCell = {
@@ -100,8 +107,13 @@ export type InstantToZonedDate = (instant: string, timeZone: string) => string;
 /**
  * 事件在 [rangeStart, rangeEnd) 内占据的日期。
  * - 全天日程：start..end（end 不包含），在覆盖的每一天都出现；
- * - 普通日程：仅开始日，按起点显示时区换算。
+ * - 普通日程：按 viewingTimezone（查看时区）换算后，凡是事件区间
+ *   [startAt, endAt) 与那一天重叠的日期都出现（含跨午夜 / 跨天的事件），
+ *   与 Core 列表接口的重叠返回语义一致，避免跨天事件在窗口边界被漏掉。
  *
+ * @param viewingTimezone 查看日历所用的时区，必须与列表接口 `timezone` 查询
+ *   参数完全一致，否则归组结果会落在 Core 查询窗口之外。事件的
+ *   `startTimezone/endTimezone` 不参与本函数的任何判断。
  * @param instantToZonedDate 定时事件的时区换算函数。小程序页面必须注入
  *   基于 utils/datetime.formatInstantInTimeZone 的实现（静态偏移表优先，
  *   真机可靠）；缺省实现带 Intl 守卫，仅保证不抛错，供 Node 单测使用。
@@ -110,7 +122,7 @@ export function eventDaysInRange(
   e: TimelineEventLike,
   rangeStart: string,
   rangeEnd: string,
-  deviceTimeZone: string,
+  viewingTimezone: string,
   instantToZonedDate: InstantToZonedDate = instantDateInTimeZone,
 ): string[] {
   if (e.isAllDay) {
@@ -129,8 +141,26 @@ export function eventDaysInRange(
     }
     return days;
   }
-  const day = instantToZonedDate(e.startAt, e.startTimezone || deviceTimeZone);
-  return day >= rangeStart && day < rangeEnd ? [day] : [];
+  const startDay = instantToZonedDate(e.startAt, viewingTimezone);
+  // 退化数据（缺失 endAt）：回退为仅开始日，保持旧行为
+  if (!e.endAt) {
+    return startDay >= rangeStart && startDay < rangeEnd ? [startDay] : [];
+  }
+  const endDay = instantToZonedDate(e.endAt, viewingTimezone);
+  // 定时事件按「与窗口重叠的每一天」归组：从 startDay 铺到 endDay（含端点），
+  // 再截断到 [rangeStart, rangeEnd)。跨午夜 / 跨天事件会落在多天。
+  const days: string[] = [];
+  let cur = maxYmd(startDay, rangeStart);
+  const last = minYmd(endDay, addDaysYmd(rangeEnd, -1));
+  while (cur <= last) {
+    days.push(cur);
+    cur = addDaysYmd(cur, 1);
+  }
+  // 异常数据（endAt <= startAt，即 endDay < startDay）：至少显示开始日
+  if (days.length === 0 && startDay >= rangeStart && startDay < rangeEnd) {
+    days.push(startDay);
+  }
+  return days;
 }
 
 /**

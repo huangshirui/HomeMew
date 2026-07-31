@@ -12,8 +12,11 @@
  * - Core 是重叠查询，跨窗口多日事件会重复返回，统一按 event id 去重；
  * - 前后各 365 天为浏览上限，显示「已加载到最早 / 最晚」。
  *
- * 时区：Core 返回规范 UTC 时间点；端点时区元数据优先用于显示，
- * 元数据为 null 时回退设备时区。全天事件只做纯日期运算。
+ * 时区：本页有唯一的「查看时区」viewingTimezone（设备时区，缺失时回退家庭时区）。
+ * 它既是列表接口 `timezone` 查询参数，也是列表归组、月历圆点、「今天」判断的唯一依据，
+ * 保证客户端分到的日期与 Core 的查询窗口完全一致。
+ * 事件的 startTimezone/endTimezone 只是端点地点时区元数据（如航班出发地 / 到达地），
+ * 仅用于卡片与详情上的时间标签，不参与归组。全天事件只做纯日期运算。
  */
 
 import { fetchEventsPage } from '../../services/events';
@@ -55,6 +58,12 @@ const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 /** 注入 eventDaysInRange 的时区换算：走 datetime 静态偏移表方案，真机不依赖 Intl */
 const instantDate = (instant: string, timeZone: string): string =>
   formatInstantInTimeZone(instant, timeZone).date;
+
+/**
+ * 当前查看时区，由页面在解析出 _viewingTimezone 后同步过来，
+ * 保证 todayYmd() 的「今天」与列表归组落在同一个时区。
+ */
+let viewingTimezoneForToday = '';
 
 /** 初始窗口：过去 7 天 + 未来 30 天 */
 const INIT_BACK_DAYS = 7;
@@ -173,7 +182,8 @@ Page({
   _calTouchY: 0,
   // 脏标记订阅句柄
   _dirtyUnsubscribe: null as (() => void) | null,
-  _deviceTimeZone: 'Asia/Shanghai',
+  /** 查看时区：请求参数与列表归组共用同一个值 */
+  _viewingTimezone: 'Asia/Shanghai',
 
   onLoad(options: { date?: string; familyId?: string; attendee?: string }): void {
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
@@ -181,11 +191,12 @@ Page({
       this.setData({ loaded: true, noFamily: true });
       return;
     }
+    // 查看时区必须先解析：todayYmd() 依赖它
+    this._resolveViewingTimezone();
     const anchor = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date)
       ? options.date
       : todayYmd();
     const uid = userStore.value?.id || '';
-    this._deviceTimeZone = getSystemTimeZone(currentFamilyStore.value?.timezone);
     // 带 attendee=me 参数进入时仅本次生效，不覆盖持久化选择
     const scope: EventsScope = options?.attendee === 'me'
       ? 'me'
@@ -239,7 +250,7 @@ Page({
     const scope = loadEventsScope(familyId, uid);
     this._members = [];
     this._dotCache = {};
-    this._deviceTimeZone = getSystemTimeZone(currentFamilyStore.value?.timezone);
+    this._resolveViewingTimezone();
     this.setData({
       familyId,
       noFamily: false,
@@ -251,6 +262,15 @@ Page({
     });
     this.loadMembers();
     this.initialLoad(todayYmd());
+  },
+
+  /**
+   * 解析本页唯一的查看时区：设备时区优先，无效时回退家庭时区。
+   * 请求参数、列表归组、月历圆点、「今天」判断全部使用这一个值。
+   */
+  _resolveViewingTimezone(): void {
+    this._viewingTimezone = getSystemTimeZone(currentFamilyStore.value?.timezone);
+    viewingTimezoneForToday = this._viewingTimezone;
   },
 
   _subscribeDirty(): void {
@@ -375,19 +395,22 @@ Page({
 
   /* ---------------- 数据加载 ---------------- */
 
-  /** 拉满一个时间窗口内的所有分页（窗口内游标） */
+  /**
+   * 拉满一个时间窗口内的所有分页（窗口内游标）。
+   *
+   * 查询窗口与归组窗口完全一致：两者都以 _viewingTimezone 解释日期，
+   * 因此无需再前后各扩几天来「兜底」——那样只会引入窗口外的事件。
+   */
   async loadWindow(start: string, end: string): Promise<Event[]> {
     const familyId = this.data.familyId;
     const attendeeId = this.attendeeParam();
     const items: Event[] = [];
-    const queryStart = addDaysToDateOnly(start, -2);
-    const queryEnd = addDaysToDateOnly(end, 2);
     let cursor: string | undefined;
     for (let page = 0; page < MAX_PAGES_PER_WINDOW; page++) {
       const data = await fetchEventsPage(familyId, {
-        startDate: queryStart,
-        endDateExclusive: queryEnd,
-        timezone: this._deviceTimeZone,
+        startDate: start,
+        endDateExclusive: end,
+        timezone: this._viewingTimezone,
         ...(attendeeId ? { attendeeId } : {}),
         ...(cursor ? { cursor } : {}),
         limit: 100,
@@ -589,22 +612,22 @@ Page({
     const rs = this._rangeStart;
     const re = this._rangeEnd;
     const byDate: Record<string, { e: Event; sortKey: string }[]> = {};
-    let total = 0;
+    // total 只统计真正落在已加载范围内、能被展示的事件，
+    // 否则会出现「没有任何分组但 total > 0」——列表既无内容也不显示空状态。
+    const shownIds = new Set<string>();
     Object.keys(this._events).forEach(id => {
       const e = this._events[id];
-      total += 1;
-      eventDaysInRange(e, rs, re, this._deviceTimeZone, instantDate).forEach(d => {
+      eventDaysInRange(e, rs, re, this._viewingTimezone, instantDate).forEach(d => {
         if (!byDate[d]) byDate[d] = [];
-        // 全天排最前（sortKey '!'），普通日程按开始时间升序
+        shownIds.add(e.id);
+        // 全天排最前（sortKey '!'），普通日程按查看时区的开始时间升序
         const sortKey = e.isAllDay
           ? '!'
-          : formatInstantInTimeZone(
-              e.startAt,
-              e.startTimezone || this._deviceTimeZone,
-            ).time;
+          : formatInstantInTimeZone(e.startAt, this._viewingTimezone).time;
         byDate[d].push({ e, sortKey });
       });
     });
+    const total = shownIds.size;
     // 占位日期（今天 / 锚点 / 点选日期）：无日程也保留分组，便于定位
     this._placeholderDates.forEach(d => {
       if (d >= rs && d < re && !byDate[d]) byDate[d] = [];
@@ -633,19 +656,16 @@ Page({
   toItemView(e: Event): EventItemView {
     let timeText = '';
     if (!e.isAllDay) {
-      const startZone = e.startTimezone || this._deviceTimeZone;
-      const endZone = e.endTimezone || this._deviceTimeZone;
-      const start = formatInstantInTimeZone(e.startAt, startZone);
-      const end = formatInstantInTimeZone(e.endAt, endZone);
-      if (startZone === endZone) {
-        timeText = start.date === end.date
-          ? `${start.time}–${end.time}`
-          : `${start.date} ${start.time} → ${end.date} ${end.time}`;
-      } else {
-        const startText = `${timeZoneLabel(startZone)} ${start.date === end.date ? '' : `${start.date} `}${start.time}`;
-        const endText = `${timeZoneLabel(endZone)} ${start.date === end.date ? '' : `${end.date} `}${end.time}`;
-        timeText = `${startText} → ${endText}`;
-      }
+      // 主时间一律用查看时区，与分组所在的那一天保持一致
+      const view = this._viewingTimezone;
+      const start = formatInstantInTimeZone(e.startAt, view);
+      const end = formatInstantInTimeZone(e.endAt, view);
+      timeText = start.date === end.date
+        ? `${start.time}–${end.time}`
+        : `${start.date} ${start.time} → ${end.date} ${end.time}`;
+      // 端点地点时区（如航班出发地 / 到达地）仅作为附加标签
+      const hint = endpointZoneHint(e, view);
+      if (hint) timeText = `${timeText} · ${hint}`;
     }
     const names = e.attendees.map(a => a.displayName);
     const nameText = names.length === 0
@@ -860,7 +880,7 @@ Page({
           this._events[id],
           monthStart,
           monthEnd,
-          this._deviceTimeZone,
+          this._viewingTimezone,
           instantDate,
         ).forEach(d => set.add(d));
       });
@@ -882,7 +902,7 @@ Page({
               e,
               monthStart,
               monthEnd,
-              this._deviceTimeZone,
+              this._viewingTimezone,
               instantDate,
             ).forEach(d => set.add(d));
           });
@@ -970,6 +990,31 @@ Page({
 
 /* ----------------- 工具函数 ----------------- */
 
+/** 查看时区下的「今天」；查看时区尚未解析时退回设备本地日期 */
 function todayYmd(): string {
+  if (viewingTimezoneForToday) {
+    return instantDate(new Date().toISOString(), viewingTimezoneForToday);
+  }
   return formatDateOnly(new Date());
+}
+
+/**
+ * 端点地点时区标签，例如「上海 09:00 → 巴黎 18:00」。
+ *
+ * 仅当事件带有端点时区元数据且与查看时区不同才展示；
+ * 它是纯展示信息，不参与任何日期归组。
+ */
+function endpointZoneHint(
+  e: Extract<Event, { isAllDay: false }>,
+  viewingTimezone: string,
+): string {
+  const startZone = e.startTimezone;
+  const endZone = e.endTimezone;
+  const startDiffers = !!startZone && startZone !== viewingTimezone;
+  const endDiffers = !!endZone && endZone !== viewingTimezone;
+  if (!startDiffers && !endDiffers) return '';
+  const zoneOf = (zone: string | null): string => zone || viewingTimezone;
+  const startText = `${timeZoneLabel(zoneOf(startZone))} ${formatInstantInTimeZone(e.startAt, zoneOf(startZone)).time}`;
+  const endText = `${timeZoneLabel(zoneOf(endZone))} ${formatInstantInTimeZone(e.endAt, zoneOf(endZone)).time}`;
+  return `${startText} → ${endText}`;
 }
