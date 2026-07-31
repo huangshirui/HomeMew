@@ -11,9 +11,6 @@
       "disablePlugins": [],
       "outputPath": ""
     },
-    "useCompilerPlugins": [
-      "typescript"
-    ],
     "minifyWXML": true,
     "condition": false
   },

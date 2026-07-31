@@ -125,7 +125,7 @@ Page({
   onAbout(): void {
     wx.showModal({
       title: '关于家事喵',
-      content: '家事喵 v1.0.0\n\n你的家庭事务小助手\n\n帮助家庭成员共同管理日程与待办，让家务协作更轻松。',
+      content: '家事喵 v1.2.0\n\n你的家庭事务小助手\n\n帮助家庭成员共同管理日程与待办，让家务协作更轻松。',
       showCancel: false,
       confirmText: '知道了',
     });

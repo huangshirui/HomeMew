@@ -1,15 +1,18 @@
 {
   "name": "login",
   "version": "1.0.0",
+  "private": true,
   "description": "HomeMew 登录云函数：获取 openid、映射身份、创建用户、签发 JWT",
   "main": "index.js",
+  "engines": {
+    "node": ">=16"
+  },
   "scripts": {
     "test": "node --test identity.test.js"
   },
-  "author": "",
-  "license": "ISC",
+  "license": "UNLICENSED",
   "dependencies": {
-    "jsonwebtoken": "^9.0.2",
-    "wx-server-sdk": "~2.6.3"
+    "jsonwebtoken": "9.0.2",
+    "wx-server-sdk": "2.6.3"
   }
 }

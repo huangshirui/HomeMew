@@ -8,8 +8,8 @@
     "forceConsistentCasingInFileNames": true,
     "lib": ["ES2017"],
     "types": ["miniprogram-api-typings"],
-    "outDir": "./dist",
     "rootDir": ".",
+    "noEmit": false,
     "paths": {
       "@/*": ["./*"]
     }

@@ -31,7 +31,7 @@
     <!-- 空状态 -->
     <view wx:else class="empty">
       <text class="empty-title">尚未接入外部系统</text>
-      <text class="empty-desc">可将 n8n、Agent、Home Assistant 或其他应用连接到本家庭。</text>
+      <text class="empty-desc">可将 n8n、Agent或其他应用连接到本家庭。</text>
     </view>
 
     <view class="footer">

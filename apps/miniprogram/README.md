@@ -2,6 +2,19 @@
 
 # HomeMew 家事喵微信小程序需求
 
+## 本地开发与构建
+
+本项目用本地 `tsc` 将 TypeScript 预编译为 `miniprogram/**/*.js`，微信开发者工具直接加载 `.js`（不依赖工具内置 SWC 编译器，避免其缺失 `@swc/runtime` 辅助模块导致的白屏问题）。在 `apps/miniprogram/` 目录下：
+
+```bash
+npm install        # 安装 typescript 与 miniprogram-api-typings
+npm run typecheck  # 仅类型检查（tsc --noEmit）
+npm run build      # 编译 miniprogram/**/*.ts -> miniprogram/**/*.js
+npm run watch      # 监听改动并自动重新编译
+```
+
+每次修改 `.ts` 后需重新 `npm run build`（或保持 `npm run watch` 常驻），再在开发者工具中预览。编译产物 `*.js` / `*.js.map` 已被 git 忽略，请勿提交。
+
 ## 1. 产品定位
 
 家事喵微信小程序是 HomeMew 面向家庭成员的主要图形化操作端。

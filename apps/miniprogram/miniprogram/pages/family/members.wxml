@@ -19,10 +19,10 @@
       <view class="member-info">
         <view class="member-top">
           <text class="member-name">{{item.displayName}}</text>
-          <text class="member-role {{item.role === 'admin' ? 'role-admin' : ''}}">
+          <view class="member-role {{item.role === 'admin' ? 'role-admin' : ''}}">
             {{item.role === 'admin' ? '管理员' : '成员'}}
-          </text>
-          <text wx:if="{{item.isSelf}}" class="self-tag">我</text>
+          </view>
+          <view wx:if="{{item.isSelf}}" class="self-tag">我</view>
         </view>
         <text class="member-sub">加入于 {{item.joinedAtText}}</text>
       </view>

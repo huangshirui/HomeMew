@@ -337,6 +337,34 @@ The current `apps/miniprogram` directory may still be a placeholder. When initia
 - build and type-check commands;
 - how to run or test cloud functions.
 
+## Local development and build
+
+TypeScript is compiled locally with `tsc` (NOT the developer tool's built-in
+SWC "summer" compiler, which is known to drop `@swc/runtime` helpers and
+white-screen async pages in some tool versions). `tsc` emits native ES2017
+`async/await` (no `@swc/runtime` / `tslib` helpers), so the compiled `.js`
+runs identically in the simulator and on real devices.
+
+From `apps/miniprogram/`:
+
+```bash
+npm install              # install typescript + miniprogram-api-typings
+npm run typecheck        # type-check only, no emit (tsc --noEmit)
+npm run build            # compile miniprogram/**/*.ts -> miniprogram/**/*.js
+npm run watch            # recompile on change (keep running while editing)
+```
+
+- `miniprogram/tsconfig.json` has `target: ES2017`, `module: CommonJS`,
+  `noEmit: false`; `.js` files are emitted next to their `.ts` source.
+- `project.config.json` does NOT set `useCompilerPlugins`; the developer tool
+  loads the precompiled `.js` directly.
+- Generated `miniprogram/**/*.js` and `*.js.map` are git-ignored (see repo
+  root `.gitignore`). Never commit compiled `.js`.
+- After editing `.ts`, re-run `npm run build` (or keep `npm run watch` running)
+  before previewing in the developer tool.
+- Cloud functions under `cloudfunctions/` are deployed separately; see each
+  function's `package.json` for its install/deploy steps.
+
 ## Change discipline
 
 When a Mini Program task reveals that the Core contract is missing or unsuitable:
