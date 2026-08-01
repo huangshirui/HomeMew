@@ -40,5 +40,17 @@ const findRawDateTimes=(value,path=[])=>{
 findRawDateTimes(document);
 if(rawDateTimes.length)throw new Error(`All date-time schemas must use UtcDateTime: ${rawDateTimes.join(", ")}`);
 if(!schemas.Task.required.includes("dueDate")||schemas.Task.properties.due)throw new Error("Task must expose dueDate and not due");
+for(const path of [
+  "/api/v1/families/{familyId}/day-records",
+  "/api/v1/families/{familyId}/day-records/{dayRecordId}",
+  "/api/v1/families/{familyId}/day-records/{dayRecordId}/occurrences",
+  "/api/v1/families/{familyId}/day-records/{dayRecordId}/archive",
+  "/api/v1/families/{familyId}/day-records/{dayRecordId}/restore",
+])if(!document.paths[path])throw new Error(`Missing day record path: ${path}`);
+if(schemas.DayRecord?.oneOf?.length!==3)throw new Error("DayRecord must be an elapsed/countdown/cycle oneOf");
+if(schemas.CreateDayRecordRequest?.oneOf?.length!==3)throw new Error("CreateDayRecordRequest must be an elapsed/countdown/cycle oneOf");
+for(const permission of ["day-records:read","day-records:write"]){
+  if(!schemas.SystemPermission.enum.includes(permission))throw new Error(`Missing system permission: ${permission}`);
+}
 
 console.log(`OpenAPI valid: ${Object.keys(document.paths).length} paths, ${refs.length} references`);

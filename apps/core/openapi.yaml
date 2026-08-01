@@ -24,6 +24,7 @@ tags:
   - name: Invitations
   - name: Events
   - name: Tasks
+  - name: Day Records
   - name: Integrations
   - name: OAuth
   - name: Internal
@@ -1003,6 +1004,212 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /api/v1/families/{familyId}/day-records:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+    get:
+      tags: [Day Records]
+      summary: List day records
+      operationId: listDayRecords
+      x-homemew-status: implemented
+      parameters:
+        - name: kind
+          in: query
+          schema: { type: string }
+          description: Comma-separated elapsed, countdown, and cycle kinds. Defaults to all kinds.
+        - name: status
+          in: query
+          schema: { type: string, default: active }
+          description: Comma-separated active and archived statuses.
+        - name: subjectUserId
+          in: query
+          schema: { type: string }
+          description: Active family member ID or `me`; `me` is unavailable to system principals.
+        - name: attentionOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [attention, date_asc, date_desc, created_desc, updated_desc]
+            default: attention
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Day record page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DayRecordListResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Day Records]
+      summary: Create a day record
+      operationId: createDayRecord
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDayRecordRequest' }
+      responses:
+        '201':
+          description: Created day record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DayRecordResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/families/{familyId}/day-records/{dayRecordId}:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/DayRecordId'
+    get:
+      tags: [Day Records]
+      summary: Get a day record
+      operationId: getDayRecord
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Day record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DayRecordResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Day Records]
+      summary: Update an active day record
+      operationId: updateDayRecord
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateDayRecordRequest' }
+      responses:
+        '200':
+          description: Updated day record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DayRecordResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Day Records]
+      summary: Soft-delete a day record
+      operationId: deleteDayRecord
+      x-homemew-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '204': { description: Day record deleted }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/families/{familyId}/day-records/{dayRecordId}/occurrences:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/DayRecordId'
+    get:
+      tags: [Day Records]
+      summary: List day record occurrences newest first
+      operationId: listDayRecordOccurrences
+      x-homemew-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Occurrence page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DayRecordOccurrenceListResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Day Records]
+      summary: Record a new elapsed or cycle occurrence
+      operationId: createDayRecordOccurrence
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDayRecordOccurrenceRequest' }
+      responses:
+        '201':
+          description: Occurrence recorded and day record advanced
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateDayRecordOccurrenceResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/families/{familyId}/day-records/{dayRecordId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/DayRecordId'
+    post:
+      tags: [Day Records]
+      summary: Archive an active day record
+      operationId: archiveDayRecord
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VersionActionRequest' }
+      responses:
+        '200':
+          description: Archived day record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DayRecordResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/families/{familyId}/day-records/{dayRecordId}/restore:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/DayRecordId'
+    post:
+      tags: [Day Records]
+      summary: Restore an archived day record
+      operationId: restoreDayRecord
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VersionActionRequest' }
+      responses:
+        '200':
+          description: Restored day record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DayRecordResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /api/v1/internal/users:
     post:
       tags: [Internal]
@@ -1101,6 +1308,13 @@ components:
       schema:
         type: string
         pattern: '^tsk_'
+    DayRecordId:
+      name: dayRecordId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^day_'
     Version:
       name: version
       in: query
@@ -1167,7 +1381,7 @@ components:
   schemas:
     SystemPermission:
       type: string
-      enum: [family:read, events:read, events:write, tasks:read, tasks:write]
+      enum: [family:read, events:read, events:write, tasks:read, tasks:write, day-records:read, day-records:write]
     ActorRef:
       type: object
       required: [type, id, name, avatarUrl]
@@ -1980,6 +2194,233 @@ components:
         version:
           type: integer
           minimum: 1
+    DayRecordStatus:
+      type: string
+      enum: [active, archived]
+    DayAttentionLevel:
+      type: string
+      enum: [none, info, warning, critical]
+    DayComputedCommon:
+      type: object
+      required: [today, state, attentionLevel, isAttentionRequired]
+      properties:
+        today: { type: string, format: date }
+        state:
+          type: string
+          enum: [normal, threshold_reached, future, upcoming, today, past, due, overdue]
+        attentionLevel: { $ref: '#/components/schemas/DayAttentionLevel' }
+        isAttentionRequired: { type: boolean }
+    ElapsedDayComputed:
+      allOf:
+        - $ref: '#/components/schemas/DayComputedCommon'
+        - type: object
+          required: [elapsedDays, remainingDays]
+          properties:
+            elapsedDays: { type: integer, minimum: 0 }
+            remainingDays: { type: [integer, 'null'] }
+    CountdownDayComputed:
+      allOf:
+        - $ref: '#/components/schemas/DayComputedCommon'
+        - type: object
+          required: [remainingDays]
+          properties:
+            remainingDays: { type: integer }
+    CycleDayComputed:
+      allOf:
+        - $ref: '#/components/schemas/DayComputedCommon'
+        - type: object
+          required: [elapsedDays, remainingDays, progressRatio]
+          properties:
+            elapsedDays: { type: integer, minimum: 0 }
+            remainingDays: { type: integer }
+            progressRatio: { type: number, minimum: 0 }
+    DayRecordCommon:
+      type: object
+      required: [id, familyId, name, description, subject, icon, status, version, createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        id: { type: string, pattern: '^day_' }
+        familyId: { type: string, pattern: '^fam_' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        subject:
+          oneOf:
+            - $ref: '#/components/schemas/PersonRef'
+            - type: 'null'
+        icon: { type: [string, 'null'], maxLength: 50 }
+        status: { $ref: '#/components/schemas/DayRecordStatus' }
+        version: { type: integer, minimum: 1 }
+        createdBy: { $ref: '#/components/schemas/ActorRef' }
+        updatedBy: { $ref: '#/components/schemas/ActorRef' }
+        createdAt: { $ref: '#/components/schemas/UtcDateTime' }
+        updatedAt: { $ref: '#/components/schemas/UtcDateTime' }
+    DayRecord:
+      oneOf:
+        - $ref: '#/components/schemas/ElapsedDayRecord'
+        - $ref: '#/components/schemas/CountdownDayRecord'
+        - $ref: '#/components/schemas/CycleDayRecord'
+      discriminator:
+        propertyName: kind
+        mapping:
+          elapsed: '#/components/schemas/ElapsedDayRecord'
+          countdown: '#/components/schemas/CountdownDayRecord'
+          cycle: '#/components/schemas/CycleDayRecord'
+    ElapsedDayRecord:
+      allOf:
+        - $ref: '#/components/schemas/DayRecordCommon'
+        - type: object
+          required: [kind, anchorDate, attentionAfterDays, computed]
+          properties:
+            kind: { const: elapsed }
+            anchorDate: { type: string, format: date }
+            attentionAfterDays: { type: [integer, 'null'], minimum: 1, maximum: 3650 }
+            computed: { $ref: '#/components/schemas/ElapsedDayComputed' }
+      unevaluatedProperties: false
+    CountdownDayRecord:
+      allOf:
+        - $ref: '#/components/schemas/DayRecordCommon'
+        - type: object
+          required: [kind, anchorDate, attentionBeforeDays, computed]
+          properties:
+            kind: { const: countdown }
+            anchorDate: { type: string, format: date }
+            attentionBeforeDays: { type: [integer, 'null'], minimum: 0, maximum: 3650 }
+            computed: { $ref: '#/components/schemas/CountdownDayComputed' }
+      unevaluatedProperties: false
+    CycleDayRecord:
+      allOf:
+        - $ref: '#/components/schemas/DayRecordCommon'
+        - type: object
+          required: [kind, anchorDate, cycleDays, nextDueDate, attentionBeforeDays, computed]
+          properties:
+            kind: { const: cycle }
+            anchorDate: { type: string, format: date }
+            cycleDays: { type: integer, minimum: 1, maximum: 3650 }
+            nextDueDate: { type: string, format: date, readOnly: true }
+            attentionBeforeDays: { type: [integer, 'null'], minimum: 0, maximum: 3650 }
+            computed: { $ref: '#/components/schemas/CycleDayComputed' }
+      unevaluatedProperties: false
+    CreateDayRecordCommon:
+      type: object
+      required: [name, kind, anchorDate]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        anchorDate: { type: string, format: date }
+        subjectUserId: { type: [string, 'null'], pattern: '^usr_' }
+        icon: { type: [string, 'null'], maxLength: 50 }
+    CreateDayRecordRequest:
+      oneOf:
+        - $ref: '#/components/schemas/CreateElapsedDayRecordRequest'
+        - $ref: '#/components/schemas/CreateCountdownDayRecordRequest'
+        - $ref: '#/components/schemas/CreateCycleDayRecordRequest'
+      discriminator:
+        propertyName: kind
+    CreateElapsedDayRecordRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateDayRecordCommon'
+        - type: object
+          required: [kind]
+          properties:
+            kind: { const: elapsed }
+            attentionAfterDays: { type: [integer, 'null'], minimum: 1, maximum: 3650, default: null }
+      unevaluatedProperties: false
+    CreateCountdownDayRecordRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateDayRecordCommon'
+        - type: object
+          required: [kind]
+          properties:
+            kind: { const: countdown }
+            attentionBeforeDays: { type: [integer, 'null'], minimum: 0, maximum: 3650, default: 30 }
+      unevaluatedProperties: false
+    CreateCycleDayRecordRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateDayRecordCommon'
+        - type: object
+          required: [kind, cycleDays]
+          properties:
+            kind: { const: cycle }
+            cycleDays: { type: integer, minimum: 1, maximum: 3650 }
+            attentionBeforeDays: { type: [integer, 'null'], minimum: 0, maximum: 3650, default: 7 }
+      unevaluatedProperties: false
+    UpdateDayRecordRequest:
+      type: object
+      required: [version]
+      minProperties: 2
+      additionalProperties: false
+      description: Fields that do not apply to the stored kind are rejected. Only countdown records accept anchorDate updates.
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        icon: { type: [string, 'null'], maxLength: 50 }
+        subjectUserId: { type: [string, 'null'], pattern: '^usr_' }
+        anchorDate: { type: string, format: date }
+        cycleDays: { type: integer, minimum: 1, maximum: 3650 }
+        attentionBeforeDays: { type: [integer, 'null'], minimum: 0, maximum: 3650 }
+        attentionAfterDays: { type: [integer, 'null'], minimum: 1, maximum: 3650 }
+        version: { type: integer, minimum: 1 }
+    DayRecordResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/DayRecord' }
+    DayRecordListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items, nextCursor]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/DayRecord' }
+            nextCursor: { type: [string, 'null'] }
+    DayRecordOccurrence:
+      type: object
+      required: [id, dayRecordId, occurredOn, note, source, intervalDays, recordedBy, createdAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: '^dyo_' }
+        dayRecordId: { type: string, pattern: '^day_' }
+        occurredOn: { type: string, format: date }
+        note: { type: [string, 'null'], maxLength: 1000 }
+        source: { type: string, enum: [initial, manual] }
+        intervalDays: { type: [integer, 'null'], minimum: 1 }
+        recordedBy: { $ref: '#/components/schemas/ActorRef' }
+        createdAt: { $ref: '#/components/schemas/UtcDateTime' }
+    DayRecordOccurrenceListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items, nextCursor]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/DayRecordOccurrence' }
+            nextCursor: { type: [string, 'null'] }
+    CreateDayRecordOccurrenceRequest:
+      type: object
+      required: [occurredOn, version]
+      additionalProperties: false
+      properties:
+        occurredOn: { type: string, format: date }
+        note: { type: [string, 'null'], maxLength: 1000 }
+        version: { type: integer, minimum: 1 }
+    CreateDayRecordOccurrenceResult:
+      type: object
+      required: [previousAnchorDate, intervalDays, record]
+      properties:
+        previousAnchorDate: { type: string, format: date }
+        intervalDays: { type: integer, minimum: 1 }
+        record: { $ref: '#/components/schemas/DayRecord' }
+    CreateDayRecordOccurrenceResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/CreateDayRecordOccurrenceResult' }
     VersionActionRequest:
       type: object
       required: [version]
