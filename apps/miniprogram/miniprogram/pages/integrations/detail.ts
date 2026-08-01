@@ -29,7 +29,9 @@ import {
   formatDate,
   timeAgo,
   summarizePermissions,
+  copyToClipboard,
 } from '../../utils/index';
+import { getCoreBaseUrl } from '../../services/config';
 import { Integration, IntegrationCredential } from '../../types/index';
 
 type CredentialView = IntegrationCredential & {
@@ -49,6 +51,8 @@ Page({
     familyId: '',
     integrationId: '',
     integration: null as Integration | null,
+    /** 家庭 API 地址（含 familyId，末尾无斜杠） */
+    familyApiUrl: '',
     credentials: [] as CredentialView[],
 
     // 派生展示字段
@@ -71,7 +75,11 @@ Page({
       setTimeout(() => wx.navigateBack(), 1200);
       return;
     }
-    this.setData({ familyId, integrationId });
+    this.setData({
+      familyId,
+      integrationId,
+      familyApiUrl: `${getCoreBaseUrl()}/api/v1/families/${familyId}`,
+    });
     this.loadAll();
 
     // 刚创建时引导生成凭证
@@ -149,6 +157,13 @@ Page({
     wx.navigateTo({
       url: `/pages/integrations/edit?familyId=${this.data.familyId}&id=${this.data.integrationId}`,
     });
+  },
+
+  /** 复制家庭 API 地址 */
+  onCopyApiUrl(e: WechatMiniprogram.TouchEvent): void {
+    const value = (e.currentTarget.dataset.value as string) || this.data.familyApiUrl;
+    if (!value) return;
+    copyToClipboard(value);
   },
 
   /** 启用 / 停用 */

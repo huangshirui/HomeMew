@@ -27,12 +27,12 @@ import {
   formatDateOnly,
   addDaysToDateOnly,
   formatInstantInTimeZone,
-  getSystemTimeZone,
   getWallTimeCandidates,
   buildTimeZoneOptions,
   searchTimeZoneOptions,
   timeZoneLabel,
 } from '../../utils/index';
+import { getViewingTimeZone } from '../../services/settings';
 import type { TimeZoneOption } from '../../utils/index';
 import {
   Event,
@@ -483,7 +483,8 @@ function initialTimeZoneState(familyId: string): {
   filteredTimezoneOptions: TimeZoneOption[];
 } {
   const familyTimezone = resolveFamilyTimezone(familyId);
-  const deviceTimezone = getSystemTimeZone(familyTimezone);
+  // 新建事件默认时区：跟随用户在「设置」中的时区偏好（指定时区 / 系统）
+  const deviceTimezone = getViewingTimeZone(familyTimezone);
   const options = buildTimeZoneOptions([deviceTimezone, familyTimezone]);
   return {
     deviceTimezone,

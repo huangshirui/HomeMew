@@ -20,6 +20,7 @@ import {
   isVersionConflict,
   formatInstantInTimeZone,
 } from '../../utils/index';
+import { getViewingTimeZone } from '../../services/settings';
 import { Task } from '../../types/index';
 
 type TabType = 'pending' | 'completed';
@@ -150,8 +151,9 @@ Page({
   },
 
   mapTasks(tasks: Task[]): TaskView[] {
-    const familyTimezone = currentFamilyStore.value?.timezone || 'Asia/Shanghai';
-    const today = formatInstantInTimeZone(new Date().toISOString(), familyTimezone).date;
+    // 「今天」边界跟随用户在「设置」中的时区偏好
+    const viewingTimezone = getViewingTimeZone(currentFamilyStore.value?.timezone);
+    const today = formatInstantInTimeZone(new Date().toISOString(), viewingTimezone).date;
     return tasks.map(t => {
       const isOverdue =
         t.status === 'pending' && !!t.dueDate && t.dueDate < today;

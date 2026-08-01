@@ -61,6 +61,10 @@
 
   <!-- 其他选项 -->
   <view class="section card">
+    <view class="menu-item" bindtap="onOpenSettings">
+      <text class="menu-text">设置</text>
+      <text class="arrow">›</text>
+    </view>
     <view class="menu-item" bindtap="onAbout">
       <text class="menu-text">关于家事喵</text>
       <text class="arrow">›</text>

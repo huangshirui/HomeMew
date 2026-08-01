@@ -121,6 +121,13 @@ Page({
     });
   },
 
+  /** 设置 */
+  onOpenSettings(): void {
+    wx.navigateTo({
+      url: '/pages/settings/settings',
+    });
+  },
+
   /** 关于 */
   onAbout(): void {
     wx.showModal({

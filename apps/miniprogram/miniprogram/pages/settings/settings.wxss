@@ -1,0 +1,179 @@
+/* 设置页样式 */
+
+.section {
+  padding: 0 8rpx;
+}
+
+.section-header {
+  padding: 20rpx 16rpx;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* 模式选择 */
+.mode-row {
+  display: flex;
+  gap: 16rpx;
+  padding: 20rpx 16rpx;
+}
+
+.mode-item {
+  flex: 1;
+  padding: 24rpx 20rpx;
+  border: 2rpx solid var(--color-border);
+  border-radius: 16rpx;
+  background-color: #ffffff;
+}
+
+.mode-active {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-tint);
+}
+
+.mode-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 8rpx;
+}
+
+.mode-desc {
+  display: block;
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+}
+
+/* 指定时区入口 */
+.tz-picker-entry {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 16rpx;
+  border-top: 2rpx solid var(--color-divider);
+}
+
+.tz-picker-label {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+.tz-picker-value {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.tz-picker-text {
+  font-size: 28rpx;
+  color: var(--color-primary);
+}
+
+.arrow {
+  font-size: 32rpx;
+  color: var(--color-text-hint);
+}
+
+/* 当前生效提示 */
+.tz-current {
+  padding: 16rpx 16rpx 24rpx;
+  border-top: 2rpx solid var(--color-divider);
+}
+
+.tz-current-text {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+/* 时区选择面板 */
+.picker-mask {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  z-index: 100;
+}
+
+.picker-sheet {
+  width: 100%;
+  height: 75vh;
+  background-color: #ffffff;
+  border-radius: 24rpx 24rpx 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.picker-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.picker-close {
+  font-size: 28rpx;
+  color: var(--color-primary);
+}
+
+.picker-search {
+  padding: 20rpx 32rpx;
+}
+
+.picker-search-input {
+  width: 100%;
+  height: 72rpx;
+  padding: 0 24rpx;
+  background-color: var(--color-border);
+  border-radius: 36rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+.picker-list {
+  flex: 1;
+  min-height: 0;
+  padding: 0 32rpx 32rpx;
+}
+
+.picker-option {
+  display: flex;
+  flex-direction: column;
+  padding: 24rpx 8rpx;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.picker-option-active {
+  background-color: var(--color-primary-tint);
+}
+
+.picker-option-label {
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+.picker-option-id {
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  margin-top: 4rpx;
+}
+
+.picker-empty {
+  padding: 48rpx 0;
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+}

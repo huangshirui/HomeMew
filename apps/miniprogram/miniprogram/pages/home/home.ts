@@ -32,9 +32,9 @@ import {
   formatDate,
   addDaysToDateOnly,
   formatInstantInTimeZone,
-  getSystemTimeZone,
   timeZoneLabel,
 } from '../../utils/index';
+import { getViewingTimeZone } from '../../services/settings';
 import { eventDaysInRange } from '../../utils/event-timeline';
 import { consumeAnyDirty, markDirty, subscribe } from '../../stores/dirty';
 import { listEvents } from '../../services/events';
@@ -253,7 +253,7 @@ Page({
       eventsError: false,
     });
     try {
-      const viewingTimezone = getSystemTimeZone(this.data.currentFamily?.timezone);
+      const viewingTimezone = getViewingTimeZone(this.data.currentFamily?.timezone);
       const start = formatInstantInTimeZone(new Date().toISOString(), viewingTimezone).date;
       const end = addDaysToDateOnly(start, 1);
       const events = await listEvents(familyId, {
@@ -319,8 +319,8 @@ Page({
     const today = formatInstantInTimeZone(new Date().toISOString(), familyTimezone).date;
     const tomorrow = addDaysToDateOnly(today, 1);
 
-    // 日程展示使用与筛选一致的查看时区
-    const viewingTimezone = getSystemTimeZone(this.data.currentFamily?.timezone);
+    // 日程展示使用与筛选一致的查看时区（跟随用户时区设置）
+    const viewingTimezone = getViewingTimeZone(this.data.currentFamily?.timezone);
     const todayEvents = this._todayEvents.map(event =>
       mapTodayEvent(event, viewingTimezone),
     );

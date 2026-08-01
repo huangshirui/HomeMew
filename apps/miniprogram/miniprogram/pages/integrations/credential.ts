@@ -20,6 +20,9 @@ Page({
     kind: '' as 'oauth' | 'api_token' | '',
     systemName: '',
 
+    // 家庭 API 地址（含 familyId，末尾无斜杠）
+    familyApiUrl: '',
+
     // OAuth 字段
     tokenUrl: '',
     grantType: 'Client Credentials',
@@ -27,14 +30,13 @@ Page({
     clientSecret: '',
 
     // API Token 字段
-    apiBaseUrl: '',
     authScheme: 'Bearer Token',
     token: '',
 
     loaded: false,
   },
 
-  onLoad(): void {
+  onLoad(options: { familyId?: string }): void {
     const payload = takeCredentialResult();
     if (!payload) {
       // 无缓冲数据（例如刷新或直接进入）：无法再次展示
@@ -42,16 +44,20 @@ Page({
       setTimeout(() => wx.navigateBack(), 1200);
       return;
     }
-    this.applyPayload(payload);
+    this.applyPayload(payload, options?.familyId);
   },
 
-  applyPayload(payload: CredentialResultPayload): void {
+  applyPayload(payload: CredentialResultPayload, familyId?: string): void {
     const base = getCoreBaseUrl();
+    // 家庭 API 根路径：所有 System 可访问的业务接口都以家庭路径为范围。
+    const familyApiUrl = familyId ? `${base}/api/v1/families/${familyId}` : '';
     if (payload.kind === 'oauth' && payload.clientSecret) {
       this.setData({
         kind: 'oauth',
         systemName: payload.systemName,
+        // OAuth 的 /oauth/token 不在家庭 API 路径下，需单独展示令牌地址
         tokenUrl: `${base}/oauth/token`,
+        familyApiUrl,
         clientId: payload.clientSecret.clientId,
         clientSecret: payload.clientSecret.clientSecret,
         loaded: true,
@@ -60,7 +66,7 @@ Page({
       this.setData({
         kind: 'api_token',
         systemName: payload.systemName,
-        apiBaseUrl: `${base}/api/v1`,
+        familyApiUrl,
         token: payload.apiToken.token,
         loaded: true,
       });
@@ -93,7 +99,7 @@ Page({
       ].join('\n');
     } else if (this.data.kind === 'api_token') {
       text = [
-        `API Base URL: ${this.data.apiBaseUrl}`,
+        `Family API Base URL: ${this.data.familyApiUrl}`,
         `Authentication: ${this.data.authScheme}`,
         `Token: ${this.data.token}`,
       ].join('\n');

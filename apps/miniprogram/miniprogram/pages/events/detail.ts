@@ -20,9 +20,9 @@ import {
   formatDateOnly,
   addDaysToDateOnly,
   formatInstantInTimeZone,
-  getSystemTimeZone,
   timeZoneLabel,
 } from '../../utils/index';
+import { getViewingTimeZone } from '../../services/settings';
 import { Event } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 import { currentFamilyStore, familiesStore } from '../../stores/index';
@@ -97,8 +97,8 @@ Page({
       const familyTimeZone =
         currentFamilyStore.value?.timezone
         || familiesStore.value.find(family => family.id === this.data.familyId)?.timezone;
-      // 日期与主时间使用查看时区，与日程列表的归组保持一致
-      const viewingTimezone = getSystemTimeZone(familyTimeZone);
+      // 日期与主时间使用查看时区（跟随用户时区设置），与日程列表的归组保持一致
+      const viewingTimezone = getViewingTimeZone(familyTimeZone);
       const start = formatInstantInTimeZone(event.startAt, viewingTimezone);
       const end = formatInstantInTimeZone(event.endAt, viewingTimezone);
       dateText = start.date === end.date

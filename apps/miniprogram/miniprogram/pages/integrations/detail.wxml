@@ -14,6 +14,18 @@
       <text wx:if="{{integration.description}}" class="hero-desc">{{integration.description}}</text>
     </view>
 
+    <!-- 家庭 API 地址 -->
+    <view class="card group">
+      <view class="api-url-row">
+        <view class="api-url-info">
+          <text class="api-url-label">家庭 API 地址</text>
+          <text class="api-url-value mono" selectable="true" user-select="true">{{familyApiUrl}}</text>
+        </view>
+        <text class="copy-btn" data-value="{{familyApiUrl}}" bindtap="onCopyApiUrl">复制</text>
+      </view>
+      <text class="api-url-hint">凭证创建后即可直接调用该地址下的资源（如 /events、/tasks），地址末尾无需加斜杠。</text>
+    </view>
+
     <!-- 基本信息 -->
     <view class="card">
       <view class="info-row">

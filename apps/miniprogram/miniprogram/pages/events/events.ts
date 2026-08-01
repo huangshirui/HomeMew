@@ -36,9 +36,9 @@ import {
   addDaysToDateOnly,
   safeAvatarUrl,
   formatInstantInTimeZone,
-  getSystemTimeZone,
   timeZoneLabel,
 } from '../../utils/index';
+import { getViewingTimeZone } from '../../services/settings';
 import {
   DayCell,
   maxYmd,
@@ -269,7 +269,8 @@ Page({
    * 请求参数、列表归组、月历圆点、「今天」判断全部使用这一个值。
    */
   _resolveViewingTimezone(): void {
-    this._viewingTimezone = getSystemTimeZone(currentFamilyStore.value?.timezone);
+    // 统一经设置获取查看时区（跟随系统时区 / 指定时区）
+    this._viewingTimezone = getViewingTimeZone(currentFamilyStore.value?.timezone);
     viewingTimezoneForToday = this._viewingTimezone;
   },
 
