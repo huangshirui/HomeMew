@@ -1,6 +1,6 @@
 import { ApiError } from "./errors";
 
-export type CursorResource = "events" | "tasks";
+export type CursorResource = "events" | "tasks" | "day-records" | "day-record-occurrences";
 export type CursorPayload = { v: 2; resource: CursorResource; sort: string; key: string | null; id: string; filter?: string };
 
 export function parseLimit(value: string | undefined): number {

@@ -47,7 +47,19 @@ describe("current schema", () => {
     ]);
     expect(familyColumns.results.map((column: { name: string }) => column.name)).toContain("avatar_key");
     expect(familyColumns.results.map((column: { name: string }) => column.name)).not.toContain("avatar_url");
-    expect(version?.value).toBe("8");
+    expect(version?.value).toBe("9");
+    const dayTables = await env.DB.prepare(
+      `SELECT name FROM sqlite_master WHERE type='table'
+       AND name IN ('day_records','day_record_occurrences') ORDER BY name`,
+    ).all<{ name: string }>();
+    expect(dayTables.results.map((row: { name: string }) => row.name)).toEqual([
+      "day_record_occurrences", "day_records",
+    ]);
+    const dayColumns = await env.DB.prepare("PRAGMA table_info('day_records')").all<{ name: string }>();
+    expect(dayColumns.results.map((column: { name: string }) => column.name)).toEqual(expect.arrayContaining([
+      "anchor_date", "cycle_days", "next_due_date", "subject_user_id", "mutation_token",
+      "created_by_type", "created_by_id", "updated_by_type", "updated_by_id",
+    ]));
     const integrationTables = await env.DB.prepare(
       `SELECT name FROM sqlite_master WHERE type='table'
        AND name IN ('system_identities','family_system_access','system_credentials','oauth_rate_limits')
@@ -84,5 +96,7 @@ describe("current schema", () => {
     expect(createId("tsk")).toMatch(/^tsk_/);
     expect(createId("sys")).toMatch(/^sys_/);
     expect(createId("crd")).toMatch(/^crd_/);
+    expect(createId("day")).toMatch(/^day_/);
+    expect(createId("dyo")).toMatch(/^dyo_/);
   });
 });

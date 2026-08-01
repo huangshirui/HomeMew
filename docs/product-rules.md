@@ -181,7 +181,22 @@ The first version has one task-level completion state. It does not track complet
 - Attachments and comments
 - Per-assignee completion
 
-## 7. Notifications
+## 7. Day records
+
+- A day record is one of `elapsed`, `countdown`, or `cycle`; its kind cannot be changed.
+- `anchorDate` is date-only. It means the latest occurrence for elapsed/cycle and the target date for countdown.
+- Elapsed and cycle anchors cannot be later than today in the family's IANA timezone. Countdown targets may be in the past.
+- Creating elapsed or cycle also creates an initial occurrence. Countdown records have no occurrence history.
+- A manual occurrence must be later than the current anchor and no later than the family's today. It atomically advances the anchor, audit actor, and version.
+- Cycle `nextDueDate` is maintained only by Core as `anchorDate + cycleDays`.
+- Reminder thresholds may be null. Countdown today/past and cycle due/overdue still require attention without an advance threshold.
+- Past countdowns remain critical until a household member archives them.
+- Any active member may read, create, edit, record, archive, restore, and soft-delete day records. Archived records are read-only except for restore and delete.
+- `subjectUserId`, when set or changed, must be an active member of the same family; historical references remain after membership removal.
+- External systems use `day-records:read` and `day-records:write`; write requires read, and systems cannot use `subjectUserId=me`.
+- Day records are lightweight time state, not household asset files. Models, costs, attachments, mileage triggers, and maintenance projects are out of scope.
+
+## 8. Notifications
 
 - Notifications are separate business records from events and tasks.
 - A notification may reference an event or task as its source.
@@ -191,7 +206,7 @@ The first version has one task-level completion state. It does not track complet
 - Notification deep links never bypass normal family authorization.
 - Reminder configuration details are not yet part of the approved event/task MVP contract.
 
-## 8. Mini Program behavior
+## 9. Mini Program behavior
 
 - Login and external identity mapping occur through trusted WeChat Cloud Functions.
 - After login, normal business API calls go directly from the Mini Program to Core with a short-lived user token.
@@ -201,32 +216,33 @@ The first version has one task-level completion state. It does not track complet
 - On startup, the client refreshes the family list and confirms that the cached current family is still accessible.
 - Invitation links, event links, and task links require login and a fresh Core authorization check.
 
-## 9. Agent and n8n behavior
+## 10. Agent and n8n behavior
 
 - A user-initiated Agent action calls the normal business API under that user's HomeMew identity.
 - A scheduled or system maintenance job calls a dedicated internal endpoint under a service identity.
 - Service APIs are added only for system operations without a meaningful household actor; they do not duplicate every user API.
 - Core owns business cleanup rules. n8n should trigger or consume controlled operations instead of directly editing D1 or implementing deletion rules independently.
 
-## 10. Validation and consistency
+## 11. Validation and consistency
 
-- IDs are opaque strings with domain prefixes such as `usr_`, `fam_`, `evt_`, and `tsk_`.
+- IDs are opaque strings with domain prefixes such as `usr_`, `fam_`, `evt_`, `tsk_`, `day_`, and `dyo_`.
 - Attendee and assignee arrays contain unique user IDs.
 - Creation/update of a parent record and its attendee/assignee relations is atomic.
 - Resources requested under `/families/{familyId}/...` must be constrained to the same `familyId` in database queries.
 - API responses use `{ "data": ... }`; errors use `{ "error": { "code", "message", "requestId" } }`.
 - All responses return `x-request-id`.
 
-## 11. External systems
+## 12. External systems
 
 - Only an active family administrator may create, edit, disable, delete, or
   rotate credentials for an external system.
 - An external system belongs to one family, is not a member, and cannot manage
   users, members, invitations, family settings, or avatars.
 - Available permissions are `family:read`, `events:read`, `events:write`,
-  `tasks:read`, and `tasks:write`; write requires the matching read permission.
-- Systems use the same event and task resources as users. `attendeeId=me` and
-  `assigneeId=me` are invalid for systems.
+  `tasks:read`, `tasks:write`, `day-records:read`, and `day-records:write`;
+  write requires the matching read permission.
+- Systems use the same event, task, and day-record resources as users.
+  `attendeeId=me`, `assigneeId=me`, and `subjectUserId=me` are invalid for systems.
 - Client secrets and API tokens are returned only at creation. Multiple active
   credentials may coexist for rotation; revocation is immediate.
 - Deleting an integration is a soft deletion and does not delete events or

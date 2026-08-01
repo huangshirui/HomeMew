@@ -307,7 +307,7 @@ lists. Active family administrators manage integrations through the implemented
 `/api/v1/families/{familyId}/integrations` contract.
 
 Core resolves user JWTs, OAuth system JWTs, and `hmw_pat_` API tokens into one
-Principal used by the shared family, event, and task routes. System OAuth JWTs
+Principal used by the shared family, event, task, and day-record routes. System OAuth JWTs
 are issued only by `POST /oauth/token`, use `aud=homemew-core`, live for one
 hour, and identify their originating credential. Core checks the credential,
 integration, family grant, token scope, and current database permissions on
@@ -318,3 +318,17 @@ Internal `service` identities remain limited to internal endpoints.
 Secrets are generated and handled only by Core. The Mini Program may receive a
 new secret from an administrator API once for display, but must not persist it.
 Core stores only credential hashes and redacted suffixes.
+
+## 14. Day records
+
+Day records are lightweight household date state owned by Core. They cover an
+elapsed date, a future or past countdown target, or a repeating cycle with an
+occurrence history. They do not model asset specifications, costs, attachments,
+vehicle mileage, or maintenance projects; those belong to a future household
+assets domain.
+
+Every day record is family-scoped and uses date-only values interpreted against
+the family's current IANA timezone. Core derives attention state at request time
+and stores a cycle's indexed next due date. User and external-system principals
+share the same routes through `day-records:read/write`; internal service tokens
+do not gain access to family routes.

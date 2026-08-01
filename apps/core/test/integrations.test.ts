@@ -39,8 +39,42 @@ describe("external system integrations", () => {
     const bad = await createIntegration(family.id, family.admin.token, ["events:write"]);
     expect(bad.status).toBe(400);
     expect((await bad.json<any>()).error.code).toBe("INVALID_PERMISSIONS");
+    const badDayRecords = await createIntegration(family.id, family.admin.token, ["day-records:write"]);
+    expect(badDayRecords.status).toBe(400);
+    expect((await badDayRecords.json<any>()).error.code).toBe("INVALID_PERMISSIONS");
     const outsider = await createIntegration(family.id, member.token);
     expect(outsider.status).toBe(403);
+  });
+
+  it("uses day record scopes on shared routes and applies revocation immediately", async () => {
+    const family = await createFamily("System day records");
+    const integrationResponse = await createIntegration(family.id, family.admin.token, ["day-records:read", "day-records:write"]);
+    expect(integrationResponse.status, await integrationResponse.clone().text()).toBe(201);
+    const integration = (await integrationResponse.json<any>()).data;
+    const pat = (await (await request(`/api/v1/families/${family.id}/integrations/${integration.id}/api-tokens`, family.admin.token, { method: "POST", body: "{}" })).json<any>()).data.token;
+    const current = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+    const created = await request(`/api/v1/families/${family.id}/day-records`, pat, {
+      method: "POST", body: JSON.stringify({ name: "系统倒计时", kind: "countdown", anchorDate: current }),
+    });
+    expect(created.status, await created.clone().text()).toBe(201);
+    expect((await created.json<any>()).data.createdBy).toMatchObject({ type: "system", id: integration.id });
+    const me = await request(`/api/v1/families/${family.id}/day-records?subjectUserId=me`, pat);
+    expect(me.status).toBe(400);
+    expect((await me.json<any>()).error.code).toBe("INVALID_FILTER");
+
+    await request(`/api/v1/families/${family.id}/integrations/${integration.id}`, family.admin.token, {
+      method: "PATCH", body: JSON.stringify({ permissions: ["day-records:read"] }),
+    });
+    expect((await request(`/api/v1/families/${family.id}/day-records`, pat)).status).toBe(200);
+    expect((await request(`/api/v1/families/${family.id}/day-records`, pat, {
+      method: "POST", body: JSON.stringify({ name: "Denied", kind: "countdown", anchorDate: current }),
+    })).status).toBe(403);
+
+    await request(`/api/v1/families/${family.id}/integrations/${integration.id}`, family.admin.token, {
+      method: "PATCH", body: JSON.stringify({ permissions: [] }),
+    });
+    expect((await request(`/api/v1/families/${family.id}/day-records`, pat)).status).toBe(403);
   });
 
   it("creates one-time API tokens and OAuth client secrets", async () => {

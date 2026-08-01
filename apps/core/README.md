@@ -119,6 +119,18 @@ POST   /api/v1/families/{familyId}/tasks/{taskId}/reopen
 
 所有日程和待办接口都要求当前 JWT 用户是目标家庭的 active 成员。指定的参与人或负责人也必须是该家庭的 active 成员。PATCH、DELETE、complete 和 reopen 使用客户端读到的 `version`；版本过期返回对应的 `*_VERSION_CONFLICT`。DELETE 是软删除，普通读取不会返回已删除记录。
 
+### 日子
+
+```http
+GET|POST   /api/v1/families/{familyId}/day-records
+GET|PATCH|DELETE /api/v1/families/{familyId}/day-records/{dayRecordId}
+GET|POST   /api/v1/families/{familyId}/day-records/{dayRecordId}/occurrences
+POST       /api/v1/families/{familyId}/day-records/{dayRecordId}/archive
+POST       /api/v1/families/{familyId}/day-records/{dayRecordId}/restore
+```
+
+“日子”只记录轻量日期状态：已经过去多久、目标日期倒计时和定期处理周期。复杂家庭物品档案不属于该领域。日期计算以家庭 IANA 时区下的今天为准；elapsed/cycle 的每次 occurrence 必须晚于当前 anchor 且不晚于今天。cycle 的 `nextDueDate` 由 Core 计算，客户端不能写入。归档后记录只读，但仍可恢复或软删除。
+
 ## 本地 D1 与 R2
 
 ```powershell
@@ -132,6 +144,7 @@ corepack pnpm --filter @homemew/core dev
 - `0004_user_avatar_key.sql` 删除用户任意头像 URL 字段并增加 `avatar_key`。
 - `0006_family_avatar_key.sql` 删除家庭任意头像 URL 字段、增加 `avatar_key`，并将 schema version 更新为 `6`。
 - `0008_unify_time_semantics.sql` 清空 Demo 业务数据并以规范 UTC 时间列重建 schema，将版本更新为 `8`。
+- `0009_create_day_records.sql` 创建日子和 occurrence 历史表，将版本更新为 `9`。
 
 已有环境升级后必须在部署新版 Worker 前应用 migration。
 
@@ -197,9 +210,9 @@ n8n 使用 OAuth2 API credential、Client Credentials、Header/Basic
 authentication 和上述 Token URL。简单客户端也可以发送
 `Authorization: Bearer hmw_pat_xxxxx`。
 
-系统继续调用普通家庭、日程和待办 API。权限为 `family:read`、
-`events:read/write`、`tasks:read/write`。系统不是家庭成员，不能使用
-`attendeeId=me` 或 `assigneeId=me`。停用或删除系统、修改权限、吊销来源
+系统继续调用普通家庭、日程、待办和日子 API。权限为 `family:read`、
+`events:read/write`、`tasks:read/write`、`day-records:read/write`。系统不是家庭成员，不能使用
+`attendeeId=me`、`assigneeId=me` 或 `subjectUserId=me`。停用或删除系统、修改权限、吊销来源
 凭证都会立即影响后续请求。
 
 远程 migration 必须先于 Worker 部署。

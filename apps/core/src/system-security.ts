@@ -1,7 +1,7 @@
 import type { Bindings } from "./env";
 import { ApiError } from "./errors";
 
-export const SYSTEM_PERMISSIONS = ["family:read", "events:read", "events:write", "tasks:read", "tasks:write"] as const;
+export const SYSTEM_PERMISSIONS = ["family:read", "events:read", "events:write", "tasks:read", "tasks:write", "day-records:read", "day-records:write"] as const;
 export type SystemPermission = typeof SYSTEM_PERMISSIONS[number];
 
 export function parsePermissions(value: unknown): SystemPermission[] {
@@ -9,7 +9,7 @@ export function parsePermissions(value: unknown): SystemPermission[] {
     throw new ApiError("INVALID_PERMISSIONS", "permissions must be a unique array", 400);
   }
   const permissions = SYSTEM_PERMISSIONS.filter((permission) => value.includes(permission));
-  if (permissions.length !== value.length || (permissions.includes("events:write") && !permissions.includes("events:read")) || (permissions.includes("tasks:write") && !permissions.includes("tasks:read"))) {
+  if (permissions.length !== value.length || (permissions.includes("events:write") && !permissions.includes("events:read")) || (permissions.includes("tasks:write") && !permissions.includes("tasks:read")) || (permissions.includes("day-records:write") && !permissions.includes("day-records:read"))) {
     throw new ApiError("INVALID_PERMISSIONS", "permissions are invalid", 400);
   }
   return permissions;
