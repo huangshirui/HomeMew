@@ -10,7 +10,7 @@
     "dev": "pnpm --filter @homemew/core dev",
     "test": "pnpm --filter @homemew/core test",
     "typecheck": "pnpm --filter @homemew/core typecheck",
-    "typecheck:miniprogram": "tsc --noEmit -p apps/miniprogram/miniprogram/tsconfig.json",
+    "typecheck:miniprogram": "pnpm --filter homemew-miniprogram typecheck",
     "build": "pnpm --filter @homemew/core build",
     "check": "pnpm typecheck:miniprogram && pnpm --filter @homemew/core contract && pnpm test && pnpm typecheck && pnpm build"
   },

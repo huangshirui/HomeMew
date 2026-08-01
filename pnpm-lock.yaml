@@ -40,6 +40,15 @@ importers:
         specifier: ^2.9.0
         version: 2.9.0
 
+  apps/miniprogram:
+    devDependencies:
+      miniprogram-api-typings:
+        specifier: ^3.12.0
+        version: 3.12.3
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
 packages:
 
   '@cloudflare/kv-asset-handler@0.5.0':
@@ -720,6 +729,9 @@ packages:
     resolution: {integrity: sha512-3kKXwRUObJsnBYPBgR0NiNZYKF/yv8GFyha1cx2EeAEraxNODgRVcyeRo+F1ok1tg5Mg7iUpOWSkknQTHuFhwA==}
     engines: {node: '>=22.0.0'}
     hasBin: true
+
+  miniprogram-api-typings@3.12.3:
+    resolution: {integrity: sha512-o7bOfrU28MEMCBWo83nXv0ROQSBFxJcfCl4f2wTYqah64ipC5RGqLJfvWJTWhlQt2ECVwspSzM8LgvnfMo7TEQ==}
 
   miniprogram-api-typings@5.2.1:
     resolution: {integrity: sha512-fbB2hapWx/vaXN4olDJEIS+OOkCjHlHLX0WG74XUJqhm0VJ8dpleBdgagHATjEpcbcH2z7AV8PjpwYp9dylfYA==}
@@ -1459,6 +1471,8 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  miniprogram-api-typings@3.12.3: {}
 
   miniprogram-api-typings@5.2.1: {}
 
