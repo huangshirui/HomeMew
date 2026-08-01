@@ -11,6 +11,7 @@ coverage/
 worker-configuration.d.ts
 *.log
 .pnpm-store/
+.corepack/
 
 # tsc 预编译产物（微信小程序用 tsc 把 TS 编译为同目录 .js，见 apps/miniprogram/package.json）
 apps/miniprogram/miniprogram/**/*.js
