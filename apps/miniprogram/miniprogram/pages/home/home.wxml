@@ -12,8 +12,8 @@
         <text class="greeting-subtitle">{{greetingSubtitle}}</text>
       </view>
 
-      <!-- 当前家庭切换入口 -->
-      <view class="family-switch" bindtap="onSwitchFamily">
+      <!-- 当前家庭切换入口（仅在多于一个家庭时显示） -->
+      <view wx:if="{{canSwitch}}" class="family-switch" bindtap="onSwitchFamily">
         <image
           class="family-switch-avatar"
           src="{{currentFamily.avatarUrl || '/assets/images/default-family.png'}}"
