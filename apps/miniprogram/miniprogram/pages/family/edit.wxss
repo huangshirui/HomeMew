@@ -43,6 +43,11 @@
   color: var(--color-text-primary);
 }
 
+.field-control {
+  display: block;
+  margin: 0 -28rpx -32rpx;
+}
+
 .save-btn {
   margin-top: 40rpx;
 }

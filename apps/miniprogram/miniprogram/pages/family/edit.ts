@@ -35,6 +35,9 @@ Page({
     uploading: false,
     saving: false,
     loaded: false,
+    timezoneValue: 'Asia/Shanghai',
+    originalTimezone: 'Asia/Shanghai',
+    preferredTimeZones: [] as string[],
   },
 
   onLoad(options: { familyId?: string }): void {
@@ -55,6 +58,9 @@ Page({
         name: detail.name,
         nameDraft: detail.name,
         avatarUrl: detail.avatarUrl || '/assets/images/default-family.png',
+        timezoneValue: detail.timezone,
+        originalTimezone: detail.timezone,
+        preferredTimeZones: [detail.timezone],
         loaded: true,
       });
     } catch (error: unknown) {
@@ -67,6 +73,13 @@ Page({
 
   onNameInput(e: WechatMiniprogram.Input): void {
     this.setData({ nameDraft: e.detail.value });
+  },
+
+  /** 时区选择组件回调：写入 IANA 时区 id */
+  onTimezoneSelect(e: WechatMiniprogram.CustomEvent<{ value: string }>): void {
+    const value = e.detail.value;
+    if (!value) return;
+    this.setData({ timezoneValue: value });
   },
 
   async onChooseAvatar(): Promise<void> {
@@ -114,17 +127,25 @@ Page({
     showLoading('保存中...');
     try {
       let updatedName = this.data.name;
+      const patch: { name?: string; timezone?: string } = {};
       if (name !== this.data.name) {
-        await updateFamily(this.data.familyId, { name });
+        patch.name = name;
         updatedName = name;
       }
+      if (this.data.timezoneValue !== (this.data as { originalTimezone?: string }).originalTimezone) {
+        patch.timezone = this.data.timezoneValue;
+      }
 
-      // 同步当前家庭 store 的名称（保持角色不变）
+      if (Object.keys(patch).length > 0) {
+        await updateFamily(this.data.familyId, patch);
+      }
+
+      // 同步当前家庭 store 的名称与时区（保持角色不变）
       const current = currentFamilyStore.value;
       if (current && current.id === this.data.familyId) {
-        setCurrentFamily({ ...current, name: updatedName });
+        setCurrentFamily({ ...current, name: updatedName, timezone: this.data.timezoneValue });
       }
-      // 刷新家庭列表确保列表项名称一致
+      // 刷新家庭列表确保列表项名称与时区一致
       await loadFamilies();
 
       hideLoading();

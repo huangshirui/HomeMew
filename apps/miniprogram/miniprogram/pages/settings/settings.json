@@ -1,1 +1,6 @@
-{"navigationBarTitleText": "设置"}
+{
+  "navigationBarTitleText": "设置",
+  "usingComponents": {
+    "timezone-picker": "/components/timezone-picker/index"
+  }
+}

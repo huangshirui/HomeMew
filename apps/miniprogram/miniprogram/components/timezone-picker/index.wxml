@@ -1,0 +1,41 @@
+<!-- 时区选择组件：入口 + 带搜索的选择面板 -->
+
+<view class="tz-picker-entry" bindtap="onOpenPicker">
+  <text class="tz-picker-label">{{label || '请选择时区'}}</text>
+  <view class="tz-picker-value">
+    <text class="tz-picker-text">{{value || ''}}</text>
+    <text class="arrow">›</text>
+  </view>
+</view>
+
+<view wx:if="{{pickerVisible}}" class="picker-mask" bindtap="onClosePicker">
+  <view class="picker-sheet" catchtap="noop">
+    <view class="picker-header">
+      <text class="picker-title">选择时区</text>
+      <text class="picker-close" bindtap="onClosePicker">关闭</text>
+    </view>
+    <view class="picker-search">
+      <input
+        class="picker-search-input"
+        placeholder="搜索城市或时区，如 上海 / Tokyo"
+        value="{{searchKeyword}}"
+        bindinput="onSearchInput"
+      />
+    </view>
+    <scroll-view class="picker-list" scroll-y>
+      <view
+        wx:for="{{filteredOptions}}"
+        wx:key="id"
+        class="picker-option {{value === item.id ? 'picker-option-active' : ''}}"
+        bindtap="onSelectTimeZone"
+        data-id="{{item.id}}"
+      >
+        <text class="picker-option-label">{{item.label}}</text>
+        <text class="picker-option-id">{{item.id}}</text>
+      </view>
+      <view wx:if="{{filteredOptions.length === 0}}" class="picker-empty">
+        <text>没有匹配的时区</text>
+      </view>
+    </scroll-view>
+  </view>
+</view>

@@ -56,6 +56,43 @@ function readFileAsArrayBuffer(filePath: string): Promise<ArrayBuffer> {
   });
 }
 
+/**
+ * 上传前把图片压缩到不超过 `maxWidth` 像素宽，并降低质量。
+ *
+ * 头像 / 家庭封面在 UI 上展示尺寸很小（通常 80–160px），直接上传高分辨率
+ * 原片会浪费带宽和 R2 存储。`wx.compressImage` 在本地处理，不消耗额外网络。
+ *
+ * 压缩后扩展名固定为 jpg（微信压缩输出 jpg），透明背景会转成白底——头像与
+ * 封面均无透明需求，可接受。若压缩 API 不可用（极旧基础库），则回退到原图。
+ */
+const UPLOAD_MAX_WIDTH = 512;
+const UPLOAD_COMPRESS_QUALITY = 80;
+
+function compressImageForUpload(tempFilePath: string): Promise<string> {
+  return new Promise((resolve) => {
+    if (typeof wx.compressImage !== 'function') {
+      resolve(tempFilePath);
+      return;
+    }
+    wx.compressImage({
+      src: tempFilePath,
+      quality: UPLOAD_COMPRESS_QUALITY,
+      compressedWidth: UPLOAD_MAX_WIDTH,
+      success: (res) => {
+        const out = res.tempFilePath || tempFilePath;
+        // 微信 compressImage 输出恒为 jpg；若返回路径缺少可识别扩展名，
+        // 补上 .jpg 以保证上传时的 Content-Type 正确。
+        if (!/\.(jpg|jpeg|png|webp)(?:\?.*)?$/i.test(out)) {
+          resolve(`${out}.jpg`);
+        } else {
+          resolve(out);
+        }
+      },
+      fail: () => resolve(tempFilePath),
+    });
+  });
+}
+
 function randomBoundary(): string {
   return `----HomeMewBoundary${Date.now()}${Math.floor(Math.random() * 1e9)}`;
 }
@@ -125,31 +162,33 @@ function uploadOnceTo(
   token: string,
 ): Promise<WechatMiniprogram.RequestSuccessCallbackResult> {
   return new Promise((resolve, reject) => {
-    const boundary = randomBoundary();
-    const filename = `avatar.${guessExtension(tempFilePath)}`;
-    const mime = guessMime(tempFilePath);
+    compressImageForUpload(tempFilePath)
+      .then((compressedPath) => {
+        const boundary = randomBoundary();
+        const filename = `avatar.${guessExtension(compressedPath)}`;
+        const mime = guessMime(compressedPath);
 
-    readFileAsArrayBuffer(tempFilePath)
-      .then((buffer) => {
-        const body = buildMultipartBody(buffer, filename, mime, boundary);
-        wx.request({
-          url,
-          method: 'PUT',
-          data: body,
-          header: {
-            Authorization: `Bearer ${token}`,
-            'x-request-id': generateRequestId(),
-            'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          },
-          timeout: UPLOAD_TIMEOUT,
-          success: resolve,
-          fail(err) {
-            const errMsg = String((err as { errMsg?: string })?.errMsg || '');
-            const isTimeout = errMsg.includes('timeout');
-            reject(
-              new AppError(isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR', isTimeout ? '头像上传超时，请重试' : '网络请求失败，请检查网络连接'),
-            );
-          },
+        return readFileAsArrayBuffer(compressedPath).then((buffer) => {
+          const body = buildMultipartBody(buffer, filename, mime, boundary);
+          wx.request({
+            url,
+            method: 'PUT',
+            data: body,
+            header: {
+              Authorization: `Bearer ${token}`,
+              'x-request-id': generateRequestId(),
+              'Content-Type': `multipart/form-data; boundary=${boundary}`,
+            },
+            timeout: UPLOAD_TIMEOUT,
+            success: resolve,
+            fail(err) {
+              const errMsg = String((err as { errMsg?: string })?.errMsg || '');
+              const isTimeout = errMsg.includes('timeout');
+              reject(
+                new AppError(isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR', isTimeout ? '头像上传超时，请重试' : '网络请求失败，请检查网络连接'),
+              );
+            },
+          });
         });
       })
       .catch(reject);

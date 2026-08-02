@@ -25,51 +25,20 @@
       </view>
     </view>
 
-    <!-- 指定时区时的选择入口 -->
-    <view wx:if="{{mode === 'custom'}}" class="tz-picker-entry" bindtap="onOpenPicker">
-      <text class="tz-picker-label">当前指定</text>
-      <view class="tz-picker-value">
-        <text class="tz-picker-text">{{displayTimeZone || '请选择时区'}}</text>
-        <text class="arrow">›</text>
-      </view>
+    <!-- 指定时区时的选择入口（与家庭时区共用 timezone-picker 组件） -->
+    <view wx:if="{{mode === 'custom'}}" class="tz-field">
+      <text class="tz-field-label">当前指定时区</text>
+      <timezone-picker
+        class="tz-field-control"
+        value="{{customTimeZone}}"
+        preferred="{{preferredTimeZones}}"
+        bind:select="onTimezoneSelect"
+      />
     </view>
 
     <!-- 当前生效提示 -->
     <view class="tz-current">
       <text class="tz-current-text">当前展示时区：{{displayTimeZone || '未指定'}}</text>
     </view>
-  </view>
-</view>
-
-<!-- 时区选择面板 -->
-<view wx:if="{{pickerVisible}}" class="picker-mask" bindtap="onClosePicker">
-  <view class="picker-sheet" catchtap="noop">
-    <view class="picker-header">
-      <text class="picker-title">选择时区</text>
-      <text class="picker-close" bindtap="onClosePicker">关闭</text>
-    </view>
-    <view class="picker-search">
-      <input
-        class="picker-search-input"
-        placeholder="搜索城市或时区，如 上海 / Tokyo"
-        value="{{searchKeyword}}"
-        bindinput="onSearchInput"
-      />
-    </view>
-    <scroll-view class="picker-list" scroll-y>
-      <view
-        wx:for="{{filteredOptions}}"
-        wx:key="id"
-        class="picker-option {{customTimeZone === item.id ? 'picker-option-active' : ''}}"
-        bindtap="onSelectTimeZone"
-        data-id="{{item.id}}"
-      >
-        <text class="picker-option-label">{{item.label}}</text>
-        <text class="picker-option-id">{{item.id}}</text>
-      </view>
-      <view wx:if="{{filteredOptions.length === 0}}" class="picker-empty">
-        <text>没有匹配的时区</text>
-      </view>
-    </scroll-view>
   </view>
 </view>

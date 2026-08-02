@@ -14,7 +14,6 @@ import {
   resolveDisplayTimeZone,
   TimeZonePreference,
 } from '../../services/settings';
-import { buildTimeZoneOptions, searchTimeZoneOptions, TimeZoneOption } from '../../utils/index';
 
 Page({
   data: {
@@ -22,12 +21,8 @@ Page({
     customTimeZone: '',
     systemTimeZone: '',
     displayTimeZone: '',
-
-    // 时区选择面板
-    pickerVisible: false,
-    searchKeyword: '',
-    allOptions: [] as TimeZoneOption[],
-    filteredOptions: [] as TimeZoneOption[],
+    /** 优先展示家庭/系统时区，交给 timezone-picker 组件处理 */
+    preferredTimeZones: [] as string[],
   },
 
   onLoad(): void {
@@ -38,7 +33,7 @@ Page({
       customTimeZone: pref.customTimeZone,
       systemTimeZone: systemTz,
       displayTimeZone: resolveDisplayTimeZone(pref),
-      allOptions: buildTimeZoneOptions([pref.customTimeZone, systemTz]),
+      preferredTimeZones: [pref.customTimeZone, systemTz].filter(Boolean) as string[],
     });
   },
 
@@ -58,42 +53,11 @@ Page({
     this.persistAndRefresh();
   },
 
-  /** 打开时区选择面板 */
-  onOpenPicker(): void {
-    if (this.data.mode !== 'custom') return;
-    this.setData({
-      pickerVisible: true,
-      searchKeyword: '',
-      filteredOptions: this.data.allOptions,
-    });
-  },
-
-  onClosePicker(): void {
-    this.setData({ pickerVisible: false });
-  },
-
-  /** 阻止面板内点击冒泡到遮罩 */
-  noop(): void {
-    // 仅用于 catchtap，阻止事件冒泡
-  },
-
-  onSearchInput(e: WechatMiniprogram.Input): void {
-    const keyword = (e.detail.value as string) || '';
-    this.setData({
-      searchKeyword: keyword,
-      filteredOptions: searchTimeZoneOptions(this.data.allOptions, keyword),
-    });
-  },
-
-  /** 选择一个特定时区 */
-  onSelectTimeZone(e: WechatMiniprogram.TouchEvent): void {
-    const id = e.currentTarget.dataset.id as string;
+  /** 时区选择组件回调：更新指定的时区 */
+  onTimezoneSelect(e: WechatMiniprogram.CustomEvent<{ value: string }>): void {
+    const id = e.detail.value;
     if (!id) return;
-    this.setData({
-      customTimeZone: id,
-      pickerVisible: false,
-      displayTimeZone: id,
-    });
+    this.setData({ customTimeZone: id, displayTimeZone: id });
     this.persistAndRefresh();
   },
 

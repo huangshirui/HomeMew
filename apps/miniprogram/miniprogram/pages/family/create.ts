@@ -21,16 +21,28 @@ import {
 } from '../../utils/index';
 import { CreateFamilyResult } from '../../types/index';
 
+/** 创建家庭时使用的默认时区，与 Core 默认值一致。 */
+const DEFAULT_TIMEZONE = 'Asia/Shanghai';
+
 Page({
   data: {
     name: '',
     avatarUrl: '/assets/images/default-family.png',
     avatarTempPath: '' as string,
     submitting: false,
+    timezoneValue: DEFAULT_TIMEZONE,
+    preferredTimeZones: [DEFAULT_TIMEZONE],
   },
 
   onNameInput(e: WechatMiniprogram.Input): void {
     this.setData({ name: e.detail.value });
+  },
+
+  /** 时区选择组件回调：写入 IANA 时区 id */
+  onTimezoneSelect(e: WechatMiniprogram.CustomEvent<{ value: string }>): void {
+    const value = e.detail.value;
+    if (!value) return;
+    this.setData({ timezoneValue: value });
   },
 
   async onChooseAvatar(): Promise<void> {
@@ -67,7 +79,7 @@ Page({
     this.setData({ submitting: true });
     showLoading('正在创建...');
     try {
-      const created: CreateFamilyResult = await createFamily({ name });
+      const created: CreateFamilyResult = await createFamily({ name, timezone: this.data.timezoneValue });
 
       // 若用户选择了图片，创建成功后补充上传家庭头像
       if (this.data.avatarTempPath) {

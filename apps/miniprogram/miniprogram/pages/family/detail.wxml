@@ -9,6 +9,7 @@
     />
     <text class="family-name">{{detail.name}}</text>
     <text class="family-sub">{{detail.memberCount}} 位成员 · {{detail.currentUserRole === 'admin' ? '管理员' : '成员'}}</text>
+    <text class="family-sub">家庭时区：{{detail.timezone}}</text>
 
     <view wx:if="{{detail.currentUserRole === 'admin'}}" class="edit-profile-btn" bindtap="onEditProfile">
       <text class="edit-profile-text">编辑家庭资料</text>

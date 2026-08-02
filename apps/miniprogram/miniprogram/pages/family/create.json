@@ -1,1 +1,6 @@
-{ "navigationBarTitleText": "创建家庭" }
+{
+  "navigationBarTitleText": "创建家庭",
+  "usingComponents": {
+    "timezone-picker": "/components/timezone-picker/index"
+  }
+}

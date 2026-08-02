@@ -44,14 +44,14 @@ function dynamicOption(id: string): TimeZoneOption {
 }
 
 export function buildTimeZoneOptions(preferred: Array<string | null | undefined>): TimeZoneOption[] {
-  const byId = new Map(COMMON_TIME_ZONES.map(option => [option.id, option]));
+  const byId = new Map(COMMON_TIME_ZONES.map((option) => [option.id, option]));
   const result: TimeZoneOption[] = [];
   for (const id of preferred) {
-    if (!id || result.some(option => option.id === id)) continue;
+    if (!id || result.some((option) => option.id === id)) continue;
     result.push(byId.get(id) || dynamicOption(id));
   }
   for (const option of COMMON_TIME_ZONES) {
-    if (!result.some(existing => existing.id === option.id)) result.push(option);
+    if (!result.some((existing) => existing.id === option.id)) result.push(option);
   }
   return result;
 }
@@ -62,14 +62,29 @@ export function searchTimeZoneOptions(
 ): TimeZoneOption[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return options;
-  return options.filter(option =>
-    option.id.toLowerCase().includes(needle)
-    || option.label.toLowerCase().includes(needle)
-    || option.keywords.toLowerCase().includes(needle),
+  return options.filter(
+    (option) =>
+      option.id.toLowerCase().includes(needle) ||
+      option.label.toLowerCase().includes(needle) ||
+      option.keywords.toLowerCase().includes(needle),
   );
 }
 
 export function timeZoneLabel(timeZone: string): string {
-  return COMMON_TIME_ZONES.find(option => option.id === timeZone)?.label
-    || dynamicOption(timeZone).label;
+  return COMMON_TIME_ZONES.find((option) => option.id === timeZone)?.label || dynamicOption(timeZone).label;
+}
+
+/** 创建家庭时使用的默认时区。 */
+export const DEFAULT_TIMEZONE = 'Asia/Shanghai';
+
+/** 常用时区选择器用的扁平列表（仅 id + label，供 picker 展示）。 */
+export const COMMON_TIMEZONES: { value: string; label: string }[] = COMMON_TIME_ZONES.map(
+  (option) => ({ value: option.id, label: option.label }),
+);
+
+/** 给定 IANA 时区，返回其在 COMMON_TIMEZONES 中的下标，找不到时回退到上海。 */
+export function timezoneIndex(value: string): number {
+  const idx = COMMON_TIMEZONES.findIndex((t) => t.value === value);
+  if (idx >= 0) return idx;
+  return COMMON_TIMEZONES.findIndex((t) => t.value === DEFAULT_TIMEZONE);
 }

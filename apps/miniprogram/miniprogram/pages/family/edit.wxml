@@ -25,6 +25,17 @@
         maxlength="20"
       />
     </view>
+
+    <!-- 家庭时区（与设备时区选择使用同一组件） -->
+    <view class="field">
+      <text class="field-label">家庭时区</text>
+      <timezone-picker
+        class="field-control"
+        value="{{timezoneValue}}"
+        preferred="{{preferredTimeZones}}"
+        bind:select="onTimezoneSelect"
+      />
+    </view>
   </view>
 
   <button
