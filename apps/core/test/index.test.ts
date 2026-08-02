@@ -29,7 +29,7 @@ describe("HomeMew Core API", () => {
       data: {
         status: "ok",
         database: "available",
-        schemaVersion: "9",
+        schemaVersion: "10",
       },
     });
   });

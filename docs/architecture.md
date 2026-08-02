@@ -36,6 +36,7 @@ Responsibilities:
 - Invitations
 - Events and attendees
 - Tasks and assignees
+- Wishes, ownership, claiming, and fulfillment state
 - Notifications and delivery state when implemented
 - Authorization based on HomeMew identity and family membership
 - Validation, business rules, audit fields, and optimistic concurrency
@@ -332,3 +333,20 @@ the family's current IANA timezone. Core derives attention state at request time
 and stores a cycle's indexed next due date. User and external-system principals
 share the same routes through `day-records:read/write`; internal service tokens
 do not gain access to family routes.
+
+## 15. Wishes
+
+Wishes are personal intentions shared inside a family. Core owns wish content,
+ownership, claiming, fulfillment, archival, optimistic concurrency, and soft
+deletion. A wish remains distinct from a task: claiming expresses a household
+member's intent to help, but does not create an assignee or execution plan.
+
+Wish routes accept only user principals who are active members of the family.
+The authenticated user is always the owner of a newly created wish, and Core
+never trusts a client-supplied owner ID. External systems and internal services
+do not access this domain in the first version; a user-initiated Agent action
+must preserve the user's identity and call the normal family route.
+
+Membership removal releases unfinished claims as part of the same Core
+operation. Owner and fulfillment references remain historical data after a
+member leaves, consistent with other family-scoped audit references.

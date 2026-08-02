@@ -221,12 +221,21 @@ export function registerBusinessRoutes(app: App): void {
       if (actor === target) throw new ApiError("CANNOT_REMOVE_SELF", "Use the leave endpoint to leave a family", 409);
     }
     const targetMember = await membership(c.env, familyId, target);
-    const result = await c.env.DB.prepare(`UPDATE family_members SET status='removed',removed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),removed_by=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    const removedAt = new Date().toISOString();
+    const results = await c.env.DB.batch([c.env.DB.prepare(`UPDATE family_members SET status='removed',removed_at=?,removed_by=?,updated_at=?
       WHERE family_id=? AND user_id=? AND status='active'
       AND (role!='admin' OR EXISTS (
         SELECT 1 FROM family_members other WHERE other.family_id=? AND other.status='active' AND other.role='admin' AND other.user_id!=?
-      ))`).bind(selfLeave ? target : actor, familyId, target, familyId, target).run();
-    if (!result.meta.changes && targetMember.role === "admin") throw new ApiError("LAST_ADMIN_CANNOT_BE_REMOVED", "The last administrator cannot leave or be removed", 409);
+      ))`).bind(removedAt, selfLeave ? target : actor, removedAt, familyId, target, familyId, target),
+      c.env.DB.prepare(`UPDATE wishes SET
+        status=CASE WHEN status='claimed' THEN 'open' ELSE status END,
+        archived_from_status=CASE WHEN status='archived' AND archived_from_status='claimed' THEN 'open' ELSE archived_from_status END,
+        claimant_user_id=NULL,claimed_at=NULL,updated_by_type='user',updated_by_id=?,updated_at=?,version=version+1
+        WHERE family_id=? AND claimant_user_id=? AND deleted_at IS NULL
+        AND EXISTS (SELECT 1 FROM family_members WHERE family_id=? AND user_id=? AND status='removed' AND removed_at=?)`)
+        .bind(actor, removedAt, familyId, target, familyId, target, removedAt),
+    ]);
+    if (!results[0].meta.changes && targetMember.role === "admin") throw new ApiError("LAST_ADMIN_CANNOT_BE_REMOVED", "The last administrator cannot leave or be removed", 409);
     return c.body(null, 204);
   }
 

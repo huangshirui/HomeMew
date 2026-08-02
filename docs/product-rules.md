@@ -196,7 +196,20 @@ The first version has one task-level completion state. It does not track complet
 - External systems use `day-records:read` and `day-records:write`; write requires read, and systems cannot use `subjectUserId=me`.
 - Day records are lightweight time state, not household asset files. Models, costs, attachments, mileage triggers, and maintenance projects are out of scope.
 
-## 8. Notifications
+## 8. Wishes
+
+- A wish belongs to the active family member who creates it. Clients cannot create a wish for another member.
+- Every active family member may read the family's wishes. System and service principals cannot use wish routes in the first version.
+- Wish content is a title, optional description, and optional date-only `desiredDate`. A wish is not a task and does not imply an execution deadline.
+- The lifecycle is `open`, `claimed`, `fulfilled`, or `archived`. One wish has at most one current claimant, whose identity is visible to every family member.
+- A member cannot claim their own wish. Only the current claimant may release a claim. The owner or current claimant may mark it fulfilled.
+- Only the owner may edit, reopen, archive, restore, or soft-delete the wish. Reopening clears claim and fulfillment state.
+- Archiving retains the previous lifecycle state. Restore returns to that state, except a claim held by a removed member restores as `open`.
+- Removing or leaving the family immediately releases that member's unfinished claims and increments affected wish versions. Historical owner and fulfiller references remain.
+- Every mutation uses optimistic concurrency. Archived wishes are read-only except for restore and soft deletion.
+- Images, product links, budgets, comments, multiple claimants, and automatic task creation are outside the first version.
+
+## 9. Notifications
 
 - Notifications are separate business records from events and tasks.
 - A notification may reference an event or task as its source.
@@ -206,7 +219,7 @@ The first version has one task-level completion state. It does not track complet
 - Notification deep links never bypass normal family authorization.
 - Reminder configuration details are not yet part of the approved event/task MVP contract.
 
-## 9. Mini Program behavior
+## 10. Mini Program behavior
 
 - Login and external identity mapping occur through trusted WeChat Cloud Functions.
 - After login, normal business API calls go directly from the Mini Program to Core with a short-lived user token.
@@ -216,23 +229,23 @@ The first version has one task-level completion state. It does not track complet
 - On startup, the client refreshes the family list and confirms that the cached current family is still accessible.
 - Invitation links, event links, and task links require login and a fresh Core authorization check.
 
-## 10. Agent and n8n behavior
+## 11. Agent and n8n behavior
 
 - A user-initiated Agent action calls the normal business API under that user's HomeMew identity.
 - A scheduled or system maintenance job calls a dedicated internal endpoint under a service identity.
 - Service APIs are added only for system operations without a meaningful household actor; they do not duplicate every user API.
 - Core owns business cleanup rules. n8n should trigger or consume controlled operations instead of directly editing D1 or implementing deletion rules independently.
 
-## 11. Validation and consistency
+## 12. Validation and consistency
 
-- IDs are opaque strings with domain prefixes such as `usr_`, `fam_`, `evt_`, `tsk_`, `day_`, and `dyo_`.
+- IDs are opaque strings with domain prefixes such as `usr_`, `fam_`, `evt_`, `tsk_`, `day_`, `dyo_`, and `wsh_`.
 - Attendee and assignee arrays contain unique user IDs.
 - Creation/update of a parent record and its attendee/assignee relations is atomic.
 - Resources requested under `/families/{familyId}/...` must be constrained to the same `familyId` in database queries.
 - API responses use `{ "data": ... }`; errors use `{ "error": { "code", "message", "requestId" } }`.
 - All responses return `x-request-id`.
 
-## 12. External systems
+## 13. External systems
 
 - Only an active family administrator may create, edit, disable, delete, or
   rotate credentials for an external system.
