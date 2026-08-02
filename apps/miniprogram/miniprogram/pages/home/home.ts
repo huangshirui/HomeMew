@@ -36,7 +36,9 @@ import {
 } from '../../utils/index';
 import { getViewingTimeZone } from '../../services/settings';
 import { eventDaysInRange } from '../../utils/event-timeline';
+import { isEventEnded, isEventOngoing, eventDisplayRank } from '../../utils/event-status';
 import { consumeAnyDirty, markDirty, subscribe } from '../../stores/dirty';
+import { loadEventsScope } from '../../stores/events-scope';
 import { listEvents } from '../../services/events';
 import { listTasks, completeTask } from '../../services/tasks';
 import { Event, Task, FamilyRole } from '../../types/index';
@@ -55,6 +57,8 @@ type TodayEventView = {
   summary: string;
   timeText: string;
   isAllDay: boolean;
+  isEnded: boolean;
+  isOngoing: boolean;
 };
 
 type TaskHomeView = {
@@ -115,8 +119,12 @@ Page({
   _familyUnsubscribe: null as (() => void) | null,
   _familiesUnsubscribe: null as (() => void) | null,
   _dirtyUnsubscribe: null as (() => void) | null,
+  /** 每分钟本地重算定时器（只重算展示态，不重新拉后台） */
+  _tickTimer: null as ReturnType<typeof setInterval> | null,
+  /** 上次重算得到的「已结束 / 进行中」指纹，用于跳过无变化的 setData */
+  _statusFingerprint: '' as string,
 
-  /** 页面显示：刷新问候 + 订阅状态 */
+  /** 页面显示：刷新问候 + 订阅状态 + 启动每分钟本地重算 */
   onShow(): void {
     this.getTabBar()?.setData({ selected: 0 });
     this.refreshGreeting();
@@ -150,12 +158,34 @@ Page({
     });
 
     this._subscribeDirty();
+    this._startTick();
   },
 
   onHide(): void {
     if (this._userUnsubscribe) this._userUnsubscribe();
     if (this._familyUnsubscribe) this._familyUnsubscribe();
     if (this._familiesUnsubscribe) this._familiesUnsubscribe();
+    this._stopTick();
+  },
+
+  onUnload(): void {
+    this._stopTick();
+  },
+
+  /** 启动每分钟本地重算：仅用已缓存数据重算「进行中/已结束」等展示态，不请求后台 */
+  _startTick(): void {
+    if (this._tickTimer) return;
+    // 立即重算一次：从后台返回 / 切回 tab 时，缓存的展示态可能已在页面不可见期间发生
+    // 进行中→已结束等变化，应立刻反映，而不是等下一个 60 秒 tick。
+    this.recompute();
+    this._tickTimer = setInterval(() => this.recompute(), 60 * 1000);
+  },
+
+  _stopTick(): void {
+    if (this._tickTimer) {
+      clearInterval(this._tickTimer);
+      this._tickTimer = null;
+    }
   },
 
   _subscribeDirty(): void {
@@ -256,11 +286,15 @@ Page({
       const viewingTimezone = getViewingTimeZone(this.data.currentFamily?.timezone);
       const start = formatInstantInTimeZone(new Date().toISOString(), viewingTimezone).date;
       const end = addDaysToDateOnly(start, 1);
+      // 跟随日程页的「成员日历范围」偏好：all 不传、me 传 'me'、其他传成员 userId
+      const scope = loadEventsScope(familyId, userStore.value?.id || '');
+      const attendeeId = scope === 'all' || scope === 'me' ? (scope === 'me' ? 'me' : undefined) : scope;
       const events = await listEvents(familyId, {
         startDate: start,
         endDateExclusive: end,
         timezone: viewingTimezone,
         status: 'active',
+        ...(attendeeId ? { attendeeId } : {}),
       });
       if (this.data.currentFamily?.id !== familyId) return;
 
@@ -321,9 +355,13 @@ Page({
 
     // 日程展示使用与筛选一致的查看时区（跟随用户时区设置）
     const viewingTimezone = getViewingTimeZone(this.data.currentFamily?.timezone);
-    const todayEvents = this._todayEvents.map(event =>
-      mapTodayEvent(event, viewingTimezone),
-    );
+    const now = Date.now();
+    // 已结束的日程不再在首页「今天安排」展示；剩余按开始时间升序（全天优先，
+    // 即将开始/正在进行排前，已结束排后），让最该关注的排在前面。
+    const todayEvents = [...this._todayEvents]
+      .filter(event => !(isEventEnded(event, now)))
+      .sort((a, b) => eventDisplayRank(a, b, now))
+      .map(event => mapTodayEvent(event, viewingTimezone, now));
     const pendingTasks = [...this._pendingTasks]
       .sort((a, b) => taskDueRank(a, today, tomorrow) - taskDueRank(b, today, tomorrow))
       .map((t) => {
@@ -332,13 +370,22 @@ Page({
         return v;
       });
 
-    const todayEventCount = this._todayEvents.length;
+    const todayEventCount = todayEvents.length;
     const pendingTaskCount = this._pendingTasks.length;
     const overdueCount = pendingTasks.filter((t) => t.isOverdue).length;
     const urgent = findUrgentEvent(this._todayEvents);
 
+    const fingerprint =
+      todayEvents.map((e) => `${e.id}:${e.isEnded ? 1 : 0}:${e.isOngoing ? 1 : 0}`).join('|') +
+      '#' +
+      pendingTasks.map((t) => `${t.id}:${t.isOverdue ? 1 : 0}:${t.completing ? 1 : 0}`).join('|');
+    // 每分钟重算时：若「进行中 / 已结束 / 逾期 / 提交中」展示态都没有变化，跳过 setData，
+    // 避免列表无谓闪动；计数与副标题也随指纹一并稳定。
+    if (fingerprint === this._statusFingerprint) return;
+    this._statusFingerprint = fingerprint;
+
     this.setData({
-      todayEvents: todayEvents.slice(0, HOME_LIMIT),
+      todayEvents: todayEvents,
       todayEventCount,
       pendingTasks: pendingTasks.slice(0, HOME_LIMIT),
       pendingTaskCount,
@@ -487,7 +534,7 @@ function formatTodayDate(): string {
  * 主时间使用查看时区（与「今天」的判断一致）；
  * startTimezone 只有在与查看时区不同时才作为地点时区标签补充展示。
  */
-function mapTodayEvent(e: Event, viewingTimezone: string): TodayEventView {
+function mapTodayEvent(e: Event, viewingTimezone: string, now: number): TodayEventView {
   let timeText = '全天';
   if (!e.isAllDay) {
     timeText = formatInstantInTimeZone(e.startAt, viewingTimezone).time;
@@ -496,7 +543,10 @@ function mapTodayEvent(e: Event, viewingTimezone: string): TodayEventView {
       timeText = `${timeText}（${timeZoneLabel(e.startTimezone)} ${atOrigin.time}）`;
     }
   }
-  return { id: e.id, summary: e.summary, timeText, isAllDay: e.isAllDay };
+  // 已结束 / 进行中：复用纯函数模块（与日程页同一套判据）
+  const isEnded = isEventEnded(e, now);
+  const isOngoing = isEventOngoing(e, now);
+  return { id: e.id, summary: e.summary, timeText, isAllDay: e.isAllDay, isEnded, isOngoing };
 }
 
 /** 待办截止优先级：已逾期(0) > 今天(1) > 明天(2) > 其他有截止(3) > 无截止(4) */

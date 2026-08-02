@@ -178,6 +178,45 @@
   white-space: nowrap;
 }
 
+/* 已过期的日程：视觉弱化并置灰，已在逻辑层过滤不展示 */
+.event-item.event-ended .event-time {
+  color: var(--home-secondary);
+}
+
+.event-item.event-ended .event-summary {
+  color: var(--home-secondary);
+}
+
+.event-ended-tag {
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  font-size: 20rpx;
+  color: var(--home-secondary);
+  background-color: #f0f2f1;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+/* 进行中的日程：仅字体高亮（不使用背景色/描边），标签保留 */
+.event-item.event-ongoing .event-time {
+  color: var(--home-primary);
+}
+
+.event-item.event-ongoing .event-summary {
+  color: var(--home-primary);
+  font-weight: 600;
+}
+
+.event-ongoing-tag {
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  font-size: 20rpx;
+  color: #ffffff;
+  background-color: var(--home-primary);
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+}
+
 /* 待办提醒列表 */
 .task-list {
   padding-top: 8rpx;

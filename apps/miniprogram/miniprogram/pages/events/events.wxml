@@ -160,7 +160,7 @@
               wx:for="{{item.items}}"
               wx:for-item="ev"
               wx:key="id"
-              class="event-card"
+              class="event-card {{ev.isEnded ? 'event-ended' : ''}}"
               data-id="{{ev.id}}"
               bindtap="onEventTap"
             >

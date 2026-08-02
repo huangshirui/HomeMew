@@ -36,6 +36,7 @@ import {
   buildTimeZoneOptions,
   searchTimeZoneOptions,
 } from '../miniprogram/utils/timezones.ts';
+import { isEventEnded, isEventOngoing, eventDisplayRank } from '../miniprogram/utils/event-status.ts';
 
 const FUTURE = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 const SOON = new Date(Date.now() + 60 * 1000).toISOString();
@@ -481,4 +482,92 @@ test('event editor preserves nullable timezone metadata and task dates use famil
   );
   assert.match(home, /mapTaskHome\(t, today, tomorrow\)/);
   assert.match(home, /taskDueLabel\(t, today, tomorrow\)/);
+});
+
+// ============ 10. 日程状态派生（已结束 / 进行中 / 排序） ============
+// 这些判据是首页「今天安排」与日程页置灰共用的单一来源，必须稳定。
+const T = (iso: string) => new Date(iso).getTime();
+
+test('isEventEnded: 非全天且 endAt 早于 now 才算已结束', () => {
+  const ended = { isAllDay: false, startAt: '2026-07-27T01:00:00.000Z', endAt: '2026-07-27T02:00:00.000Z' } as Event;
+  const ongoing = { isAllDay: false, startAt: '2026-07-27T01:00:00.000Z', endAt: '2099-01-01T00:00:00.000Z' } as Event;
+  assert.equal(isEventEnded(ended, T('2026-07-27T03:00:00.000Z')), true);
+  assert.equal(isEventEnded(ongoing, T('2026-07-27T03:00:00.000Z')), false);
+});
+
+test('isEventEnded: 全天事件 endDateExclusive 早于今天才视为已结束', () => {
+  // endExclusive=2026-07-29 表示覆盖 27、28 两天，29 当天已结束
+  const ongoingAllDay = { isAllDay: true, startDate: '2026-07-27', endDateExclusive: '2026-07-29' } as Event;
+  const endedAllDay = { isAllDay: true, startDate: '2026-07-25', endDateExclusive: '2026-07-27' } as Event;
+  // 2026-07-28 当天：endExclusive(29) > 今天 → 未结束
+  assert.equal(isEventEnded(ongoingAllDay, T('2026-07-28T12:00:00.000Z')), false);
+  // 2026-07-28 当天：endExclusive(27) <= 今天 → 已结束（置灰）
+  assert.equal(isEventEnded(endedAllDay, T('2026-07-28T12:00:00.000Z')), true);
+});
+
+test('isEventEnded: 缺少 endAt 的非全天事件不视为已结束', () => {
+  const noEnd = { isAllDay: false, startAt: '2026-07-27T01:00:00.000Z' } as Event;
+  assert.equal(isEventEnded(noEnd, T('2026-07-27T03:00:00.000Z')), false);
+});
+
+test('isEventOngoing: startAt<=now<endAt 且非全天才算进行中', () => {
+  const ongoing = { isAllDay: false, startAt: '2026-07-27T01:00:00.000Z', endAt: '2026-07-27T02:00:00.000Z' } as Event;
+  const before = { isAllDay: false, startAt: '2026-07-27T01:00:00.000Z', endAt: '2026-07-27T02:00:00.000Z' } as Event;
+  const after = { isAllDay: false, startAt: '2026-07-27T01:00:00.000Z', endAt: '2026-07-27T02:00:00.000Z' } as Event;
+  const allDay = { isAllDay: true, startDate: '2026-07-27', endDateExclusive: '2026-07-28' } as Event;
+  assert.equal(isEventOngoing(ongoing, T('2026-07-27T01:30:00.000Z')), true);
+  assert.equal(isEventOngoing(before, T('2026-07-27T00:30:00.000Z')), false);
+  assert.equal(isEventOngoing(after, T('2026-07-27T03:00:00.000Z')), false);
+  assert.equal(isEventOngoing(allDay, T('2026-07-27T12:00:00.000Z')), false);
+});
+
+test('eventDisplayRank: 已结束沉底，未结束按开始时间升序', () => {
+  const now = T('2026-07-27T12:00:00.000Z');
+  const endedEarly = { isAllDay: false, startAt: '2026-07-27T01:00:00.000Z', endAt: '2026-07-27T02:00:00.000Z' } as Event;
+  const liveEarly = { isAllDay: false, startAt: '2026-07-27T08:00:00.000Z', endAt: '2026-07-27T09:00:00.000Z' } as Event;
+  const liveLater = { isAllDay: false, startAt: '2026-07-27T10:00:00.000Z', endAt: '2026-07-27T13:00:00.000Z' } as Event;
+  const allDay = { isAllDay: true, startDate: '2026-07-27', endDateExclusive: '2026-07-28' } as Event;
+  const sorted = [endedEarly, liveLater, allDay, liveEarly]
+    .sort((a, b) => eventDisplayRank(a, b, now))
+    .map(e => (e.isAllDay ? 'allDay' : e.startAt));
+  // 全天(0) < liveLater(10，end 13 未结束) < endedEarly(end 02 已沉底) < liveEarly(end 09 已沉底)
+  assert.deepEqual(sorted, ['allDay', '2026-07-27T10:00:00.000Z', '2026-07-27T01:00:00.000Z', '2026-07-27T08:00:00.000Z']);
+});
+
+test('首页与日程页共用同一套 event-status 判据（无重复内联实现）', () => {
+  const home = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/pages/home/home.ts'),
+    'utf-8',
+  );
+  const events = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/pages/events/events.ts'),
+    'utf-8',
+  );
+  assert.match(home, /from '\.\.\/\.\.\/utils\/event-status'/);
+  assert.match(home, /isEventEnded\(e, now\)/);
+  assert.match(home, /isEventOngoing\(e, now\)/);
+  assert.match(events, /from '\.\.\/\.\.\/utils\/event-status'/);
+  assert.match(events, /isEventEnded\(e, now\)/);
+  // 内联的重复计算不应再存在
+  assert.doesNotMatch(home, /!e\.isAllDay && !!e\.endAt && new Date\(e\.endAt\)\.getTime\(\) < now/);
+  assert.doesNotMatch(events, /!e\.isAllDay && !!e\.endAt && new Date\(e\.endAt\)\.getTime\(\) < now/);
+});
+
+test('首页今天安排：已结束日程被过滤、全量展示（不 slice 到 3 条）', () => {
+  const home = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/pages/home/home.ts'),
+    'utf-8',
+  );
+  // recompute 应先 filter 掉已结束再展示，且 todayEvents 不再被 HOME_LIMIT 截断
+  assert.match(home, /\.filter\(event => !\(isEventEnded\(event, now\)\)\)/);
+  assert.doesNotMatch(home, /todayEvents: todayEvents\.slice\(0, HOME_LIMIT\)/);
+  assert.match(home, /todayEvents: todayEvents,/);
+});
+
+test('日程页卡片对 isEnded 事件加 event-ended 类（置灰）', () => {
+  const wxml = readFileSync(
+    path.resolve(import.meta.dirname, '../miniprogram/pages/events/events.wxml'),
+    'utf-8',
+  );
+  assert.match(wxml, /event-card \{\{ev\.isEnded \? 'event-ended' : ''\}\}/);
 });

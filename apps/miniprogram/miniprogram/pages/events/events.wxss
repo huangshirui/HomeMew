@@ -405,6 +405,31 @@ page {
   white-space: nowrap;
 }
 
+/* 已结束的日程：整卡置灰弱化，但仍保留展示 */
+.event-card.event-ended {
+  background-color: #f5f6f5;
+  box-shadow: none;
+}
+
+.event-card.event-ended .event-accent {
+  background-color: var(--color-text-hint);
+}
+
+.event-card.event-ended .event-time,
+.event-card.event-ended .event-title,
+.event-card.event-ended .event-meta {
+  color: var(--color-text-hint);
+}
+
+.event-card.event-ended .event-title {
+  font-weight: 500;
+}
+
+.event-card.event-ended .event-allday-tag {
+  color: #ffffff;
+  background-color: var(--color-text-hint);
+}
+
 /* 底部留白：避免被悬浮按钮 / 自定义 TabBar 遮挡 */
 .timeline-bottom-space {
   height: calc(180rpx + env(safe-area-inset-bottom));

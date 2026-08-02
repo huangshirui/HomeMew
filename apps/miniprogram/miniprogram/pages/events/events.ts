@@ -22,7 +22,7 @@
 import { fetchEventsPage } from '../../services/events';
 import { listFamilyMembers } from '../../services/families';
 import { currentFamilyStore, userStore } from '../../stores/index';
-import { consumeDirty, subscribe } from '../../stores/dirty';
+import { consumeDirty, markDirty, subscribe } from '../../stores/dirty';
 import {
   loadEventsScope,
   saveEventsScope,
@@ -52,6 +52,7 @@ import {
   pad2 as pad,
 } from '../../utils/event-timeline';
 import { Event, FamilyMember } from '../../types/index';
+import { isEventEnded } from '../../utils/event-status';
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -85,6 +86,8 @@ type EventItemView = {
   timeText: string;
   /** "KK、天宝 · 奥体中心" */
   metaText: string;
+  /** 非全天且结束时刻早于当前，视为已结束（置灰展示） */
+  isEnded: boolean;
 };
 
 type DaySection = {
@@ -182,6 +185,10 @@ Page({
   _calTouchY: 0,
   // 脏标记订阅句柄
   _dirtyUnsubscribe: null as (() => void) | null,
+  /** 每分钟本地重算定时器（只重算展示态，不重新拉后台） */
+  _tickTimer: null as ReturnType<typeof setInterval> | null,
+  /** 上次重算得到的 isEnded 指纹，用于跳过无变化的 setData */
+  _endedFingerprint: '' as string,
   /** 查看时区：请求参数与列表归组共用同一个值 */
   _viewingTimezone: 'Asia/Shanghai',
 
@@ -234,14 +241,48 @@ Page({
     if (this.data.loaded && !this.data.noFamily && consumeDirty('events')) {
       this.refreshLoadedRange();
     }
+    this._startTick();
   },
 
   onHide(): void {
     this._unsubscribeDirty();
+    this._stopTick();
   },
 
   onUnload(): void {
     this._unsubscribeDirty();
+    this._stopTick();
+  },
+
+  /** 启动每分钟本地重算：仅用已缓存事件重算「已结束」等展示态，不请求后台 */
+  _startTick(): void {
+    if (this._tickTimer) return;
+    // 立即重算一次：从详情页返回 / 切回 tab 时，缓存的展示态可能已在页面不可见期间
+    // 发生变化，应立刻反映，而不是等下一个 60 秒 tick。
+    this.recomputeSections();
+    this._tickTimer = setInterval(() => this.recomputeSections(), 60 * 1000);
+  },
+
+  _stopTick(): void {
+    if (this._tickTimer) {
+      clearInterval(this._tickTimer);
+      this._tickTimer = null;
+    }
+  },
+
+  /**
+   * 每分钟本地重算：基于已缓存的 _events 重建 sections（主要是 isEnded 置灰态），
+   * 不调用任何后台接口。与 refreshLoadedRange 区分开——后者会重新拉取后台数据。
+   */
+  recomputeSections(): void {
+    if (!this.data.loaded || this.data.noFamily) return;
+    const { sections } = this.buildSections();
+    const fingerprint = sections
+      .map(s => s.items.map(i => `${i.id}:${i.isEnded ? 1 : 0}`).join(','))
+      .join('|');
+    if (fingerprint === this._endedFingerprint) return;
+    this._endedFingerprint = fingerprint;
+    this._applySections({});
   },
 
   /** 家庭变化后完全重置（范围偏好按新家庭恢复） */
@@ -320,6 +361,8 @@ Page({
     saveEventsScope(this.data.familyId, uid, 'me');
     this._dotCache = {};
     this.setData({ scope: 'me', scopeLabel: this.labelForScope('me') });
+    // 成员范围变化：通知首页「今天安排」以新范围重新拉取
+    markDirty('events');
     this.initialLoad(todayYmd());
   },
 
@@ -391,6 +434,7 @@ Page({
       calendarExpanded: false,
     });
     // 切换成员后回到今天并重新加载
+    markDirty('events');
     this.initialLoad(todayYmd());
   },
 
@@ -598,6 +642,10 @@ Page({
   /** 由 _events 派生 sections 并 setData（可附带其它字段），随后重新测量分组位置 */
   _applySections(extra: Record<string, unknown>): Promise<void> {
     const { sections, total } = this.buildSections();
+    // 后台数据已变更，刷新指纹基线，避免下一分钟误判「无变化」而跳过本次派生
+    this._endedFingerprint = sections
+      .map(s => s.items.map(i => `${i.id}:${i.isEnded ? 1 : 0}`).join(','))
+      .join('|');
     return new Promise<void>(resolve => {
       this.setData(
         { sections, isEmpty: total === 0, ...extra } as never,
@@ -612,6 +660,7 @@ Page({
   buildSections(): { sections: DaySection[]; total: number } {
     const rs = this._rangeStart;
     const re = this._rangeEnd;
+    const now = Date.now();
     const byDate: Record<string, { e: Event; sortKey: string }[]> = {};
     // total 只统计真正落在已加载范围内、能被展示的事件，
     // 否则会出现「没有任何分组但 total > 0」——列表既无内容也不显示空状态。
@@ -640,7 +689,7 @@ Page({
       .map(date => {
         const items = byDate[date]
           .sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0))
-          .map(({ e }) => this.toItemView(e));
+          .map(({ e }) => this.toItemView(e, now));
         return {
           id: `sec-${date}`,
           date,
@@ -654,7 +703,7 @@ Page({
     return { sections, total };
   },
 
-  toItemView(e: Event): EventItemView {
+  toItemView(e: Event, now: number): EventItemView {
     let timeText = '';
     if (!e.isAllDay) {
       // 主时间一律用查看时区，与分组所在的那一天保持一致
@@ -677,12 +726,15 @@ Page({
     const parts: string[] = [];
     if (nameText) parts.push(nameText);
     if (e.location) parts.push(e.location);
+    // 已结束：复用纯函数模块（与首页同一套判据）
+    const isEnded = isEventEnded(e, now);
     return {
       id: e.id,
       summary: e.summary,
       isAllDay: e.isAllDay,
       timeText,
       metaText: parts.join(' · '),
+      isEnded,
     };
   },
 
