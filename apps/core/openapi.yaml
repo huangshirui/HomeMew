@@ -25,6 +25,7 @@ tags:
   - name: Events
   - name: Tasks
   - name: Day Records
+  - name: Wishes
   - name: Integrations
   - name: OAuth
   - name: Internal
@@ -1210,6 +1211,174 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/families/{familyId}/wishes:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+    get:
+      tags: [Wishes]
+      summary: List family wishes
+      operationId: listWishes
+      description: Available only to active user principals who belong to the family.
+      x-homemew-status: implemented
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, default: 'open,claimed,fulfilled' }
+          description: Comma-separated open, claimed, fulfilled, and archived statuses.
+        - name: ownerUserId
+          in: query
+          schema: { type: string }
+          description: A user ID or `me`.
+        - name: claimantUserId
+          in: query
+          schema: { type: string }
+          description: A user ID or `me`.
+        - name: desiredFrom
+          in: query
+          schema: { type: string, format: date }
+        - name: desiredTo
+          in: query
+          schema: { type: string, format: date }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [default, desired_asc, created_desc, updated_desc], default: default }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Wish page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WishListResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Wishes]
+      summary: Add the current member's wish
+      operationId: createWish
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWishRequest' }
+      responses:
+        '201':
+          description: Created wish
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WishResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/families/{familyId}/wishes/{wishId}:
+    parameters:
+      - $ref: '#/components/parameters/FamilyId'
+      - $ref: '#/components/parameters/WishId'
+    get:
+      tags: [Wishes]
+      summary: Get a wish
+      operationId: getWish
+      x-homemew-status: implemented
+      responses:
+        '200':
+          description: Wish
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WishResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Wishes]
+      summary: Update a wish owned by the current member
+      operationId: updateWish
+      x-homemew-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWishRequest' }
+      responses:
+        '200':
+          description: Updated wish
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WishResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Wishes]
+      summary: Soft-delete a wish owned by the current member
+      operationId: deleteWish
+      x-homemew-status: implemented
+      parameters:
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '204': { description: Wish deleted }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/families/{familyId}/wishes/{wishId}/claim:
+    post:
+      tags: [Wishes]
+      summary: Claim another member's open wish
+      operationId: claimWish
+      x-homemew-status: implemented
+      parameters: [{ $ref: '#/components/parameters/FamilyId' }, { $ref: '#/components/parameters/WishId' }]
+      requestBody: { $ref: '#/components/requestBodies/VersionAction' }
+      responses: { '200': { $ref: '#/components/responses/WishResult' }, '400': { $ref: '#/components/responses/InvalidRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /api/v1/families/{familyId}/wishes/{wishId}/unclaim:
+    post:
+      tags: [Wishes]
+      summary: Release the current member's claim
+      operationId: unclaimWish
+      x-homemew-status: implemented
+      parameters: [{ $ref: '#/components/parameters/FamilyId' }, { $ref: '#/components/parameters/WishId' }]
+      requestBody: { $ref: '#/components/requestBodies/VersionAction' }
+      responses: { '200': { $ref: '#/components/responses/WishResult' }, '400': { $ref: '#/components/responses/InvalidRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /api/v1/families/{familyId}/wishes/{wishId}/fulfill:
+    post:
+      tags: [Wishes]
+      summary: Mark a wish fulfilled as its owner or claimant
+      operationId: fulfillWish
+      x-homemew-status: implemented
+      parameters: [{ $ref: '#/components/parameters/FamilyId' }, { $ref: '#/components/parameters/WishId' }]
+      requestBody: { $ref: '#/components/requestBodies/VersionAction' }
+      responses: { '200': { $ref: '#/components/responses/WishResult' }, '400': { $ref: '#/components/responses/InvalidRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /api/v1/families/{familyId}/wishes/{wishId}/reopen:
+    post:
+      tags: [Wishes]
+      summary: Reopen the current member's fulfilled wish
+      operationId: reopenWish
+      x-homemew-status: implemented
+      parameters: [{ $ref: '#/components/parameters/FamilyId' }, { $ref: '#/components/parameters/WishId' }]
+      requestBody: { $ref: '#/components/requestBodies/VersionAction' }
+      responses: { '200': { $ref: '#/components/responses/WishResult' }, '400': { $ref: '#/components/responses/InvalidRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /api/v1/families/{familyId}/wishes/{wishId}/archive:
+    post:
+      tags: [Wishes]
+      summary: Archive the current member's wish
+      operationId: archiveWish
+      x-homemew-status: implemented
+      parameters: [{ $ref: '#/components/parameters/FamilyId' }, { $ref: '#/components/parameters/WishId' }]
+      requestBody: { $ref: '#/components/requestBodies/VersionAction' }
+      responses: { '200': { $ref: '#/components/responses/WishResult' }, '400': { $ref: '#/components/responses/InvalidRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /api/v1/families/{familyId}/wishes/{wishId}/restore:
+    post:
+      tags: [Wishes]
+      summary: Restore the current member's archived wish
+      operationId: restoreWish
+      x-homemew-status: implemented
+      parameters: [{ $ref: '#/components/parameters/FamilyId' }, { $ref: '#/components/parameters/WishId' }]
+      requestBody: { $ref: '#/components/requestBodies/VersionAction' }
+      responses: { '200': { $ref: '#/components/responses/WishResult' }, '400': { $ref: '#/components/responses/InvalidRequest' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /api/v1/internal/users:
     post:
       tags: [Internal]
@@ -1315,6 +1484,13 @@ components:
       schema:
         type: string
         pattern: '^day_'
+    WishId:
+      name: wishId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^wsh_'
     Version:
       name: version
       in: query
@@ -1336,6 +1512,11 @@ components:
       schema:
         type: string
   responses:
+    WishResult:
+      description: Updated wish
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/WishResponse' }
     OAuthError:
       description: OAuth protocol error
       content:
@@ -1378,6 +1559,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+  requestBodies:
+    VersionAction:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/VersionActionRequest' }
   schemas:
     SystemPermission:
       type: string
@@ -2429,6 +2616,67 @@ components:
         version:
           type: integer
           minimum: 1
+    WishStatus:
+      type: string
+      enum: [open, claimed, fulfilled, archived]
+    Wish:
+      type: object
+      additionalProperties: false
+      required: [id, familyId, title, description, desiredDate, status, owner, claimant, claimedAt, fulfilledBy, fulfilledAt, createdBy, updatedBy, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, pattern: '^wsh_' }
+        familyId: { type: string, pattern: '^fam_' }
+        title: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        desiredDate: { type: [string, 'null'], format: date }
+        status: { $ref: '#/components/schemas/WishStatus' }
+        owner: { $ref: '#/components/schemas/PersonRef' }
+        claimant:
+          oneOf: [{ $ref: '#/components/schemas/PersonRef' }, { type: 'null' }]
+        claimedAt: { $ref: '#/components/schemas/NullableUtcDateTime' }
+        fulfilledBy:
+          oneOf: [{ $ref: '#/components/schemas/PersonRef' }, { type: 'null' }]
+        fulfilledAt: { $ref: '#/components/schemas/NullableUtcDateTime' }
+        createdBy: { $ref: '#/components/schemas/ActorRef' }
+        updatedBy: { $ref: '#/components/schemas/ActorRef' }
+        version: { type: integer, minimum: 1 }
+        createdAt: { $ref: '#/components/schemas/UtcDateTime' }
+        updatedAt: { $ref: '#/components/schemas/UtcDateTime' }
+    CreateWishRequest:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        desiredDate: { type: [string, 'null'], format: date }
+    UpdateWishRequest:
+      type: object
+      additionalProperties: false
+      required: [version]
+      minProperties: 2
+      properties:
+        title: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        desiredDate: { type: [string, 'null'], format: date }
+        version: { type: integer, minimum: 1 }
+    WishResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Wish' }
+    WishListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [items, nextCursor]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Wish' }
+            nextCursor: { type: [string, 'null'] }
     TaskResponse:
       type: object
       required: [data]

@@ -8,6 +8,7 @@ import { registerEventRoutes } from "./events";
 import { registerTaskRoutes } from "./tasks";
 import { registerIntegrationRoutes } from "./integrations";
 import { registerDayRecordRoutes } from "./day-records";
+import { registerWishRoutes } from "./wishes";
 
 type AppEnv = {
   Bindings: Bindings;
@@ -94,6 +95,7 @@ export function createApp(
   registerEventRoutes(app);
   registerTaskRoutes(app);
   registerDayRecordRoutes(app);
+  registerWishRoutes(app);
 
   app.notFound((context) => {
     return context.json(

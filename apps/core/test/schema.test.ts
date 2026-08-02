@@ -47,7 +47,16 @@ describe("current schema", () => {
     ]);
     expect(familyColumns.results.map((column: { name: string }) => column.name)).toContain("avatar_key");
     expect(familyColumns.results.map((column: { name: string }) => column.name)).not.toContain("avatar_url");
-    expect(version?.value).toBe("9");
+    expect(version?.value).toBe("10");
+    const wishTables = await env.DB.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='wishes'",
+    ).all<{ name: string }>();
+    expect(wishTables.results.map((row: { name: string }) => row.name)).toEqual(["wishes"]);
+    const wishColumns = await env.DB.prepare("PRAGMA table_info('wishes')").all<{ name: string }>();
+    expect(wishColumns.results.map((column: { name: string }) => column.name)).toEqual(expect.arrayContaining([
+      "owner_user_id", "desired_date", "claimant_user_id", "claimed_at", "fulfilled_by_user_id",
+      "fulfilled_at", "archived_from_status", "created_by_type", "updated_by_type", "version", "deleted_at",
+    ]));
     const dayTables = await env.DB.prepare(
       `SELECT name FROM sqlite_master WHERE type='table'
        AND name IN ('day_records','day_record_occurrences') ORDER BY name`,
@@ -98,5 +107,6 @@ describe("current schema", () => {
     expect(createId("crd")).toMatch(/^crd_/);
     expect(createId("day")).toMatch(/^day_/);
     expect(createId("dyo")).toMatch(/^dyo_/);
+    expect(createId("wsh")).toMatch(/^wsh_/);
   });
 });

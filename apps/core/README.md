@@ -187,6 +187,39 @@ GET /api/v1/families/{familyId}/day-records
 
 外部系统复用相同 API，分别需要 `day-records:read` 和 `day-records:write`；write 权限必须同时包含 read。系统身份不能使用 `subjectUserId=me`。完整字段、响应结构和错误响应以 `apps/core/openapi.yaml` 为准。
 
+### 许愿池
+
+许愿池用于收集家庭成员自己的愿望，并让其他成员认领、帮助实现。它不是待办清单：认领只表达“我来帮你实现”，不会自动创建任务或负责人。
+
+```http
+GET    /api/v1/families/{familyId}/wishes
+POST   /api/v1/families/{familyId}/wishes
+GET    /api/v1/families/{familyId}/wishes/{wishId}
+PATCH  /api/v1/families/{familyId}/wishes/{wishId}
+DELETE /api/v1/families/{familyId}/wishes/{wishId}?version=3
+
+POST   /api/v1/families/{familyId}/wishes/{wishId}/claim
+POST   /api/v1/families/{familyId}/wishes/{wishId}/unclaim
+POST   /api/v1/families/{familyId}/wishes/{wishId}/fulfill
+POST   /api/v1/families/{familyId}/wishes/{wishId}/reopen
+POST   /api/v1/families/{familyId}/wishes/{wishId}/archive
+POST   /api/v1/families/{familyId}/wishes/{wishId}/restore
+```
+
+创建愿望时 owner 固定为当前登录成员，不能替其他人许愿：
+
+```json
+{
+  "title": "一起去看海",
+  "description": "找一个周末全家出发",
+  "desiredDate": "2026-10-01"
+}
+```
+
+愿望按 `open → claimed → fulfilled` 流转，也可以归档和恢复。一个愿望最多由一名其他家庭成员认领，认领人对全家公开；愿望本人可直接标记实现。只有愿望本人可以修改内容、重新打开、归档、恢复或软删除，认领人只能放弃自己的认领或标记实现。所有写操作均提交读取到的 `version`。
+
+列表默认不含 archived，支持 `status`、`ownerUserId=me`、`claimantUserId=me`、`desiredFrom`、`desiredTo`、`sort`、`limit` 和 `cursor`。只有 active 家庭成员的用户身份可以访问；system 和 service 身份不能访问许愿池。成员退出或被移除时，其未完成认领会自动释放，但 owner 和实现人的历史引用继续保留。完整契约和错误响应以 `apps/core/openapi.yaml` 为准。
+
 ## 本地 D1 与 R2
 
 ```powershell
@@ -201,6 +234,7 @@ corepack pnpm --filter @homemew/core dev
 - `0006_family_avatar_key.sql` 删除家庭任意头像 URL 字段、增加 `avatar_key`，并将 schema version 更新为 `6`。
 - `0008_unify_time_semantics.sql` 清空 Demo 业务数据并以规范 UTC 时间列重建 schema，将版本更新为 `8`。
 - `0009_create_day_records.sql` 创建日子和 occurrence 历史表，将版本更新为 `9`。
+- `0010_create_wishes.sql` 创建许愿池表，将版本更新为 `10`。
 
 已有环境升级后必须在部署新版 Worker 前应用 migration。
 
