@@ -121,15 +121,71 @@ POST   /api/v1/families/{familyId}/tasks/{taskId}/reopen
 
 ### 日子
 
+“日子”用于记录轻量的家庭时间状态，而不是复杂资产档案：
+
+- `elapsed`：从最近一次发生或开始日期计算已经过去多少天，例如上次理发、开始健身。
+- `countdown`：计算距离目标日期还有多少天；目标日期过去后仍保留并持续提醒，直到归档。
+- `cycle`：记录最近一次处理日期和建议周期，例如换滤芯、宠物驱虫；Core 自动计算下一次到期日。
+
+物品型号、费用、附件、车辆里程和维修项目不属于“日子”，后续由家庭物品领域承载。
+
+#### API
+
 ```http
-GET|POST   /api/v1/families/{familyId}/day-records
-GET|PATCH|DELETE /api/v1/families/{familyId}/day-records/{dayRecordId}
-GET|POST   /api/v1/families/{familyId}/day-records/{dayRecordId}/occurrences
-POST       /api/v1/families/{familyId}/day-records/{dayRecordId}/archive
-POST       /api/v1/families/{familyId}/day-records/{dayRecordId}/restore
+GET    /api/v1/families/{familyId}/day-records
+POST   /api/v1/families/{familyId}/day-records
+GET    /api/v1/families/{familyId}/day-records/{dayRecordId}
+PATCH  /api/v1/families/{familyId}/day-records/{dayRecordId}
+DELETE /api/v1/families/{familyId}/day-records/{dayRecordId}?version=3
+
+GET    /api/v1/families/{familyId}/day-records/{dayRecordId}/occurrences
+POST   /api/v1/families/{familyId}/day-records/{dayRecordId}/occurrences
+POST   /api/v1/families/{familyId}/day-records/{dayRecordId}/archive
+POST   /api/v1/families/{familyId}/day-records/{dayRecordId}/restore
 ```
 
-“日子”只记录轻量日期状态：已经过去多久、目标日期倒计时和定期处理周期。复杂家庭物品档案不属于该领域。日期计算以家庭 IANA 时区下的今天为准；elapsed/cycle 的每次 occurrence 必须晚于当前 anchor 且不晚于今天。cycle 的 `nextDueDate` 由 Core 计算，客户端不能写入。归档后记录只读，但仍可恢复或软删除。
+创建示例：
+
+```json
+{
+  "name": "清理滤水器",
+  "kind": "cycle",
+  "anchorDate": "2026-05-02",
+  "cycleDays": 90,
+  "attentionBeforeDays": 7,
+  "subjectUserId": null
+}
+```
+
+响应按 `kind` 使用判别联合，只返回该类型适用的字段。每条记录同时包含 `computed`：家庭时区下的 `today`、已过或剩余天数、状态、关注级别及 `isAttentionRequired`。cycle 还返回未截断的 `progressRatio` 和只读 `nextDueDate`。
+
+日期和状态规则：
+
+- 所有日期均为 `YYYY-MM-DD`，Core 先根据家庭 IANA 时区确定“今天”，再进行纯日期运算。
+- elapsed/cycle 的初始 `anchorDate` 不能晚于今天；countdown 允许未来、当天或过去的目标日期。
+- 创建 elapsed/cycle 时会原子写入一条 `initial` occurrence；countdown 没有 occurrence 历史。
+- 新 occurrence 必须满足 `当前 anchorDate < occurredOn <= 今天`，成功后更新 anchor、cycle 下一到期日、actor 和 `version`。
+- 提醒阈值显式传 `null` 可关闭提前提醒，但 countdown 当天/过期、cycle 到期/过期仍需关注。
+- archived 记录只读，只允许查询、恢复或软删除。
+
+列表默认查询 active 记录并按关注优先级排序，支持：
+
+```http
+GET /api/v1/families/{familyId}/day-records
+  ?kind=elapsed,countdown,cycle
+  &status=active
+  &subjectUserId=me
+  &attentionOnly=true
+  &sort=attention
+  &limit=20
+  &cursor=...
+```
+
+其他排序为 `date_asc`、`date_desc`、`created_desc`、`updated_desc`。cursor 与筛选条件及家庭当天日期绑定，不能跨查询条件或跨家庭日期午夜复用。
+
+所有 active 家庭成员均可读写日子。PATCH、DELETE、occurrence、archive 和 restore 使用客户端读到的 `version` 做乐观并发控制；DELETE 为软删除。`subjectUserId` 在创建或修改时必须是同一家庭的 active member，成员退出后历史引用仍保留。
+
+外部系统复用相同 API，分别需要 `day-records:read` 和 `day-records:write`；write 权限必须同时包含 read。系统身份不能使用 `subjectUserId=me`。完整字段、响应结构和错误响应以 `apps/core/openapi.yaml` 为准。
 
 ## 本地 D1 与 R2
 
