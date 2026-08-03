@@ -1,0 +1,97 @@
+/* 愿望创建 / 编辑页样式 */
+
+.container {
+  padding-bottom: 0;
+}
+
+/* 表单字段 */
+.field-row {
+  display: flex;
+  align-items: center;
+  min-height: 96rpx;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-row.column {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 20rpx 0;
+}
+
+.field-label {
+  width: 240rpx;
+  flex-shrink: 0;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+.field-input {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+  height: 60rpx;
+  text-align: right;
+}
+
+.field-textarea {
+  width: 100%;
+  margin-top: 16rpx;
+  min-height: 120rpx;
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
+.field-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+}
+
+.field-text {
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+.field-arrow {
+  font-size: 32rpx;
+  color: #cccccc;
+}
+
+.field-hint {
+  padding: 12rpx 0 4rpx;
+}
+
+.hint-text {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+/* 底部固定操作栏 */
+.footer-spacer {
+  height: 180rpx;
+}
+
+.footer-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 20rpx;
+  padding: 16rpx 24rpx;
+  background-color: var(--color-bg-white);
+  border-top: 2rpx solid var(--color-divider);
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.04);
+  z-index: 20;
+}
+
+.footer-btn {
+  flex: 1;
+}

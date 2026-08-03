@@ -43,11 +43,16 @@
   display: flex;
   align-items: center;
   background: rgba(255, 255, 255, 0.22);
-  padding: 10rpx 18rpx 10rpx 10rpx;
+  padding: 8rpx 16rpx 8rpx 8rpx;
   border-radius: 40rpx;
   flex-shrink: 0;
   margin-left: 16rpx;
   max-width: 240rpx;
+}
+
+.family-switch.single {
+  padding: 6rpx;
+  max-width: 60rpx;
 }
 
 .family-switch-avatar {
@@ -73,69 +78,163 @@
   color: #ffffff;
 }
 
-/* 统计卡片 */
-.stat-row {
-  display: flex;
-  gap: 22rpx;
-  margin-bottom: 22rpx;
+/* 需要关注：横向滚动卡片（大卡片容器，无左侧竖线装饰） */
+.attention-section {
+  padding-bottom: 12rpx;
 }
 
-.stat-card {
-  flex: 1;
-  background: var(--home-card);
-  border-radius: 26rpx;
-  padding: 30rpx 28rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
-}
-
-.stat-num {
-  font-size: 52rpx;
-  font-weight: 700;
-  color: var(--home-primary);
-  line-height: 1.1;
-}
-
-.stat-label {
-  font-size: 26rpx;
-  color: var(--home-secondary);
+.attention-scroll {
+  white-space: nowrap;
+  width: 100%;
   margin-top: 8rpx;
 }
 
-/* 紧急提醒 */
-.urgent-banner {
+/* 子卡：宽度约 46%，两张完整 + 露出下一张一小部分 */
+.attn-card {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: top;
+  width: 46%;
+  min-height: 200rpx;
+  white-space: normal;
+  background: var(--home-primary-tint);
+  border-radius: 20rpx;
+  padding: 24rpx 20rpx;
+  margin-right: 16rpx;
+  box-sizing: border-box;
+}
+
+.attn-card:first-child {
+  margin-left: 0;
+}
+
+.attn-card:last-child {
+  margin-right: 24rpx;
+}
+
+/* 第一行：图标 + 名称 */
+.attn-card-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 22rpx 28rpx;
-  border-radius: 22rpx;
-  margin-bottom: 22rpx;
-  font-size: 26rpx;
 }
 
-.urgent-event {
-  background: #FFF4E5;
-  color: #B26A00;
-}
-
-.urgent-overdue {
-  background: #FDECEC;
-  color: var(--home-danger);
-}
-
-.urgent-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.urgent-arrow {
-  margin-left: 12rpx;
-  font-size: 30rpx;
+.attn-card-icon-wrap {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  background: var(--home-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 14rpx;
   flex-shrink: 0;
 }
+
+.attn-card-icon {
+  font-size: 32rpx;
+}
+
+.attn-card-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--home-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 日子类主行：高亮数字 + 单位 */
+.attn-line-main {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 26rpx;
+  color: var(--home-secondary);
+  line-height: 1.4;
+}
+
+.attn-num {
+  color: var(--home-info);
+  font-weight: 700;
+  font-size: 36rpx;
+  margin-right: 4rpx;
+}
+
+/* 日子类底部补充文案 */
+.attn-line-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: var(--home-hint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attn-line-sub.attn-anchor {
+  color: var(--home-secondary);
+}
+
+/* 周期进度条 */
+.attn-progress {
+  margin-top: 12rpx;
+  height: 10rpx;
+  background: rgba(67, 160, 71, 0.14);
+  border-radius: 5rpx;
+  overflow: hidden;
+}
+
+.attn-progress-fill {
+  height: 100%;
+  background: var(--home-primary);
+  border-radius: 5rpx;
+}
+
+/* 非日子类（逾期/紧急）：简洁两行 */
+.attn-line-simple {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: var(--home-secondary);
+  line-height: 1.4;
+}
+
+/* 级别配色：图标底色 + 高亮数字 */
+.attn-card-icon-wrap.attention-critical {
+  background: #fdecec;
+}
+.attn-card.attention-critical .attn-num {
+  color: var(--home-danger);
+}
+.attn-card.attention-critical .attn-line-simple {
+  color: var(--home-danger);
+}
+.attn-progress-fill.attention-critical {
+  background: var(--home-danger);
+}
+
+.attn-card-icon-wrap.attention-warning {
+  background: #fff4e5;
+}
+.attn-card.attention-warning .attn-num {
+  color: var(--home-warning);
+}
+.attn-card.attention-warning .attn-line-simple {
+  color: var(--home-warning);
+}
+.attn-progress-fill.attention-warning {
+  background: var(--home-warning);
+}
+
+.attn-card.attention-info .attn-num {
+  color: var(--home-info);
+}
+.attn-progress-fill.attention-info {
+  background: var(--home-info);
+}
+
+/* 统计卡片（已按需求删除，保留占位注释） */
+
+/* 紧急提醒（已按需求删除，聚合进「需要关注」横向卡片） */
 
 /* 栏目卡片 */
 .card.section {
@@ -339,4 +438,52 @@
 .fab-cancel {
   color: var(--home-secondary);
   background: #f0f2f1;
+}
+
+/* 常用工具 */
+.tools-section {
+  margin-top: 22rpx;
+}
+
+.tools-row {
+  display: flex;
+  gap: 18rpx;
+  padding-top: 8rpx;
+}
+
+.tool-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: var(--home-primary-tint);
+  border-radius: 22rpx;
+  padding: 26rpx 24rpx;
+}
+
+.tool-emoji {
+  font-size: 44rpx;
+  margin-right: 18rpx;
+  flex-shrink: 0;
+}
+
+.tool-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tool-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--home-text);
+}
+
+.tool-desc {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--home-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

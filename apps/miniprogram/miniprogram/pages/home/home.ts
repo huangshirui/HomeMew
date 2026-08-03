@@ -1,18 +1,16 @@
 /**
  * 首页 —— 今天的家庭工作台
  *
- * 打开后马上知道：
- * - 今天有什么安排（今日日程）
- * - 还有什么没做（待办提醒）
+ * 首页顺序（见需求「四、首页最终结构」）：
+ *   欢迎卡 → 需要关注 → 今天安排 → 待办提醒 → 常用工具
  *
- * 设计目标（见需求）：
- * - 不再展示独立的家庭资料卡 / 快速操作卡；
- * - 当前家庭以欢迎卡右上角的小入口呈现，点击切换；
- * - 悬浮「＋」提供快速新建日程 / 待办；
- * - 条件式紧急提醒只在确需关注时出现；
- * - 空状态提供直接创建入口。
- *
- * 家庭管理（成员 / 邀请 / 创建加入 / 资料编辑 / 外部系统）统一收归「我的」。
+ * 设计目标：
+ * - 删除两个统计数字卡片；
+ * - 删除原单条 urgent banner，紧急日程并入「需要关注」横向卡片；
+ * - 欢迎卡右上角始终显示当前家庭（单家庭只显示头像、多家庭显示下拉箭头）；
+ * - 「需要关注」横向滚动聚合：日子关注项 + 逾期待办汇总卡 + 紧急日程卡；
+ * - 没有关注项时整个「需要关注」区域隐藏；
+ * - 家庭管理统一收归「我的」，首页只展示常用工具入口。
  */
 
 import {
@@ -37,10 +35,13 @@ import {
 import { getViewingTimeZone } from '../../services/settings';
 import { eventDaysInRange } from '../../utils/event-timeline';
 import { isEventEnded, isEventOngoing, eventDisplayRank } from '../../utils/event-status';
-import { consumeAnyDirty, markDirty, subscribe } from '../../stores/dirty';
+import { consumeAnyDirty, consumeDirtyDomains, markDirty, subscribe } from '../../stores/dirty';
 import { loadEventsScope } from '../../stores/events-scope';
 import { listEvents } from '../../services/events';
 import { listTasks, completeTask } from '../../services/tasks';
+import { listAttentionDayRecords } from '../../services/day-records';
+import { mapDayRecordView, DayRecordView } from '../../utils/day-record-view';
+import { DayRecordKind } from '../../types/index';
 import { Event, Task, FamilyRole } from '../../types/index';
 
 type FamilyView = {
@@ -73,15 +74,49 @@ type TaskHomeView = {
   completing: boolean;
 };
 
-type UrgentReminder = {
-  type: 'event' | 'overdue';
-  text: string;
-  action: 'event' | 'tasks';
+/** 「需要关注」横向卡片（聚合日子 / 逾期待办 / 紧急日程） */
+type AttentionCard = {
+  /** 卡片内部类型，决定渲染与跳转 */
+  kind: 'day' | 'overdue-tasks' | 'urgent-event';
   id: string;
+  /** 主文案（标题），如「清理滤水器」「待办已逾期」「足球训练」 */
+  title: string;
+  /** 次文案，非日子类使用（如「有 3 件事情需要处理」） */
+  desc: string;
+  /** 左侧图标 */
+  icon: string;
+  /** 关注级别，用于排序与配色 */
+  level: 'critical' | 'warning' | 'info' | 'none';
+  /** 点击跳转目标 */
+  navigate: 'day' | 'tasks' | 'event';
+  /** 跳转用的资源 id（day / event 使用） */
+  targetId: string;
+
+  /** 日子类专属字段（kind === 'day' 时填充） */
+  /** 日子子类型：elapsed（生活记录）/ countdown（倒计时）/ cycle（周期事项），决定卡片布局 */
+  dayType?: 'elapsed' | 'countdown' | 'cycle';
+  /** 高亮数字，如 86 / 4 / -3（已过去天数用负数区分，渲染时加「已过去」前缀） */
+  dayNumber?: string;
+  /** 数字后的单位文案，如「天」「天到期」 */
+  dayUnit?: string;
+  /** 底部补充文字，如「已达到提醒时间」「2026年8月19日」「还有 4 天到期」 */
+  daySubText?: string;
+  /** 周期进度百分比（0~100）；非 cycle 为 null */
+  dayProgress?: number | null;
 };
 
 /** 首页每个模块最多展示的条目数，超出由「查看全部」进入对应 Tab */
 const HOME_LIMIT = 3;
+
+/** 关注级别排序权重：critical → warning → info → none */
+function attentionLevelRank(level: string): number {
+  switch (level) {
+    case 'critical': return 0;
+    case 'warning': return 1;
+    case 'info': return 2;
+    default: return 3;
+  }
+}
 
 Page({
   data: {
@@ -100,7 +135,7 @@ Page({
     pendingTasks: [] as TaskHomeView[],
     pendingTaskCount: 0,
 
-    urgentReminder: null as UrgentReminder | null,
+    attentionCards: [] as AttentionCard[],
 
     eventsLoading: false,
     eventsRefreshing: false,
@@ -108,6 +143,10 @@ Page({
     tasksLoading: false,
     tasksRefreshing: false,
     tasksError: false,
+
+    attentionDays: [] as DayRecordView[],
+    daysLoading: false,
+    daysError: false,
   },
 
   // 原始列表（不参与渲染，仅用于派生视图与排序）
@@ -131,9 +170,12 @@ Page({
 
     const storeFamilyId = currentFamilyStore.value?.id || '';
     const shownFamilyId = this.data.currentFamily?.id || '';
-    // 首次加载、家庭在其他页被切换过、或数据被标记变更（新建/完成/删除后返回）时重新拉取；
+    // 首页只消费自己关心的域（events / tasks / days），不消费 wishes，
+    // 避免愿望的变更导致首页全量重新请求。
+    const dirty = consumeDirtyDomains(['events', 'tasks', 'days']);
+    // 首次加载、家庭在其他页被切换过、或关心的域被标记变更（新建/完成/删除后返回）时重新拉取；
     // 普通切换 tab 不重复请求。
-    if (!this.data.loaded || (storeFamilyId && storeFamilyId !== shownFamilyId) || consumeAnyDirty()) {
+    if (!this.data.loaded || (storeFamilyId && storeFamilyId !== shownFamilyId) || dirty.size > 0) {
       this.loadData();
     }
 
@@ -195,6 +237,7 @@ Page({
       if (!cf || !this.data.loaded) return;
       if (domain === 'tasks') this.loadTasks(cf.id);
       else if (domain === 'events') this.loadTodayEvents(cf.id);
+      else if (domain === 'days') this.loadAttentionDays(cf.id);
     });
   },
 
@@ -238,6 +281,7 @@ Page({
       if (current) {
         this.loadTodayEvents(current.id);
         this.loadTasks(current.id);
+        this.loadAttentionDays(current.id);
       }
     } catch (e) {
       console.error('[Home] Load data failed:', e);
@@ -346,7 +390,69 @@ Page({
     if (this.data.currentFamily) this.loadTasks(this.data.currentFamily.id);
   },
 
-  /** 由原始数据派生所有展示字段：列表、计数、副标题、紧急提醒 */
+  /**
+   * 加载「需要关注」的日子（全部关注项，由服务层分页拉全）。
+   * 关注状态完全来自 Core 的 computed，本页不重新判断。
+   */
+  async loadAttentionDays(familyId: string): Promise<void> {
+    const hasOld = this.data.attentionDays.length > 0;
+    this.setData({
+      daysLoading: !hasOld,
+      daysError: false,
+    });
+    try {
+      const records = await listAttentionDayRecords(familyId);
+      if (this.data.currentFamily?.id !== familyId) return;
+      this.setData({
+        attentionDays: records.map(mapDayRecordView),
+        daysLoading: false,
+      });
+    } catch (e) {
+      console.error('[Home] Load attention days failed:', e);
+      if (this.data.currentFamily?.id !== familyId) return;
+      this.setData({ daysLoading: false, daysError: true });
+    }
+  },
+
+  onRetryDays(): void {
+    if (this.data.currentFamily) this.loadAttentionDays(this.data.currentFamily.id);
+  },
+
+  /** 点击「需要关注」的横向卡片进入对应页面（见 onAttentionCardTap） */
+
+  /** 查看全部日子 */
+  onViewDays(): void {
+    if (!this.data.currentFamily) return;
+    wx.navigateTo({
+      url: `/pages/days/list?familyId=${this.data.currentFamily.id}`,
+    });
+  },
+
+  /** 查看许愿池 */
+  onViewWishes(): void {
+    if (!this.data.currentFamily) return;
+    wx.navigateTo({
+      url: `/pages/wishes/list?familyId=${this.data.currentFamily.id}`,
+    });
+  },
+
+  /** 新建日子 */
+  onCreateDay(): void {
+    if (!this.data.currentFamily) return;
+    wx.navigateTo({
+      url: `/pages/days/edit?familyId=${this.data.currentFamily.id}`,
+    });
+  },
+
+  /** 新建愿望 */
+  onCreateWish(): void {
+    if (!this.data.currentFamily) return;
+    wx.navigateTo({
+      url: `/pages/wishes/edit?familyId=${this.data.currentFamily.id}`,
+    });
+  },
+
+  /** 由原始数据派生所有展示字段：列表、计数、副标题、需要关注卡片 */
   recompute(): void {
     // 待办截止日期是家庭时区下的纯日期
     const familyTimezone = this.data.currentFamily?.timezone || 'Asia/Shanghai';
@@ -375,11 +481,20 @@ Page({
     const overdueCount = pendingTasks.filter((t) => t.isOverdue).length;
     const urgent = findUrgentEvent(this._todayEvents);
 
+    // 构建「需要关注」横向卡片（聚合日子关注项 + 逾期待办汇总 + 紧急日程）
+    const attentionCards = buildAttentionCards(
+      this.data.attentionDays,
+      overdueCount,
+      urgent,
+    );
+
     const fingerprint =
       todayEvents.map((e) => `${e.id}:${e.isEnded ? 1 : 0}:${e.isOngoing ? 1 : 0}`).join('|') +
       '#' +
-      pendingTasks.map((t) => `${t.id}:${t.isOverdue ? 1 : 0}:${t.completing ? 1 : 0}`).join('|');
-    // 每分钟重算时：若「进行中 / 已结束 / 逾期 / 提交中」展示态都没有变化，跳过 setData，
+      pendingTasks.map((t) => `${t.id}:${t.isOverdue ? 1 : 0}:${t.completing ? 1 : 0}`).join('|') +
+      '#' +
+      attentionCards.map((c) => `${c.kind}:${c.id}:${c.level}`).join('|');
+    // 每分钟重算时：若「进行中 / 已结束 / 逾期 / 提交中 / 关注卡」展示态都没有变化，跳过 setData，
     // 避免列表无谓闪动；计数与副标题也随指纹一并稳定。
     if (fingerprint === this._statusFingerprint) return;
     this._statusFingerprint = fingerprint;
@@ -389,8 +504,8 @@ Page({
       todayEventCount,
       pendingTasks: pendingTasks.slice(0, HOME_LIMIT),
       pendingTaskCount,
-      greetingSubtitle: buildSubtitle(todayEventCount, pendingTaskCount, overdueCount, urgent),
-      urgentReminder: buildUrgent(urgent, overdueCount),
+      attentionCards,
+      greetingSubtitle: buildSubtitle(todayEventCount, pendingTaskCount, attentionCards.length),
     });
   },
 
@@ -445,14 +560,18 @@ Page({
     }
   },
 
-  /** 点击紧急提醒：进入对应内容 */
-  onUrgentTap(e: WechatMiniprogram.TouchEvent): void {
-    const { action, id } = e.currentTarget.dataset as { action: string; id: string };
-    if (action === 'event' && id && this.data.currentFamily) {
+  /** 点击「需要关注」横向卡片：根据卡片类型进入对应页面 */
+  onAttentionCardTap(e: WechatMiniprogram.TouchEvent): void {
+    const { navigate, id } = e.currentTarget.dataset as { navigate: string; id: string };
+    if (navigate === 'day' && id && this.data.currentFamily) {
+      wx.navigateTo({
+        url: `/pages/days/detail?id=${id}&familyId=${this.data.currentFamily.id}`,
+      });
+    } else if (navigate === 'event' && id && this.data.currentFamily) {
       wx.navigateTo({
         url: `/pages/events/detail?id=${id}&familyId=${this.data.currentFamily.id}`,
       });
-    } else if (action === 'tasks') {
+    } else if (navigate === 'tasks') {
       this.onViewTasks();
     }
   },
@@ -583,18 +702,30 @@ function mapTaskHome(t: Task, today: string, tomorrow: string): TaskHomeView {
   };
 }
 
-/** 找出 30 分钟内即将开始的日程（仅限非全天） */
-function findUrgentEvent(events: Event[]): { id: string; summary: string; minutes: number } | null {
+/**
+ * 找出应进入「需要关注」的紧急日程：
+ * - 正在进行中的非全天日程（优先）；
+ * - 否则 30 分钟内即将开始的非全天日程。
+ * 只取最近的一张。返回中 `ongoing` 标记是否正在进行。
+ */
+function findUrgentEvent(
+  events: Event[],
+): { id: string; summary: string; minutes: number; ongoing: boolean } | null {
   const now = Date.now();
-  let best: { id: string; summary: string; minutes: number } | null = null;
+  let best: { id: string; summary: string; minutes: number; ongoing: boolean } | null = null;
   for (const e of events) {
     if (e.isAllDay) continue;
+    // 正在进行中
+    if (isEventOngoing(e, now)) {
+      if (!best) best = { id: e.id, summary: e.summary, minutes: 0, ongoing: true };
+      continue;
+    }
     const start = new Date(e.startAt).getTime();
     const diff = start - now;
     if (diff >= 0 && diff <= 30 * 60000) {
       const minutes = Math.max(1, Math.round(diff / 60000));
-      if (!best || minutes < best.minutes) {
-        best = { id: e.id, summary: e.summary, minutes };
+      if (!best || !best.ongoing || minutes < best.minutes) {
+        best = { id: e.id, summary: e.summary, minutes, ongoing: false };
       }
     }
   }
@@ -604,35 +735,134 @@ function findUrgentEvent(events: Event[]): { id: string; summary: string; minute
 function buildSubtitle(
   todayEventCount: number,
   pendingTaskCount: number,
-  overdueCount: number,
-  urgent: { summary: string; minutes: number } | null,
+  attentionCount: number,
 ): string {
-  if (urgent) return `${urgent.summary}还有 ${urgent.minutes} 分钟开始`;
-  if (overdueCount > 0) return `有 ${overdueCount} 件待办已经逾期`;
-  if (todayEventCount > 0) return `今天有 ${todayEventCount} 个安排，记得按时参加`;
-  if (pendingTaskCount === 0) return '今天的待办已经全部完成啦';
+  // 有关注事项：今天有 X 个安排，Y 件事情需要关注
+  if (attentionCount > 0) {
+    return `今天有 ${todayEventCount} 个安排，${attentionCount} 件事情需要关注`;
+  }
+  // 无关注事项但有待办：今天有 X 个安排，还有 Y 件待办
+  if (pendingTaskCount > 0) {
+    return `今天有 ${todayEventCount} 个安排，还有 ${pendingTaskCount} 件待办`;
+  }
+  // 只有日程：今天有 X 个安排，记得按时参加
+  if (todayEventCount > 0) {
+    return `今天有 ${todayEventCount} 个安排，记得按时参加`;
+  }
+  // 全部为空：今天也要元气满满哦
   return '今天也要元气满满哦';
 }
 
-function buildUrgent(
-  urgent: { id: string; summary: string; minutes: number } | null,
+/**
+ * 聚合「需要关注」横向卡片：
+ *   A. 日子关注项（来自 Core computed，状态完全由后端决定）
+ *   B. 逾期待办（仅一张汇总卡）
+ *   C. 紧急日程（仅最近一张）
+ *
+ * 排序：critical → warning → info；同级按实际日期或发生时间升序。
+ */
+function buildAttentionCards(
+  dayViews: DayRecordView[],
   overdueCount: number,
-): UrgentReminder | null {
-  if (urgent) {
-    return {
-      type: 'event',
-      text: `⏰ ${urgent.summary}将在 ${urgent.minutes} 分钟后开始`,
-      action: 'event',
-      id: urgent.id,
-    };
+  urgent: { id: string; summary: string; minutes: number; ongoing: boolean } | null,
+): AttentionCard[] {
+  const cards: AttentionCard[] = [];
+
+  // A. 日子关注项
+  for (const d of dayViews) {
+    const dayFields = buildDayAttentionCard(d);
+    cards.push({
+      kind: 'day',
+      id: d.id,
+      title: d.name,
+      desc: '',
+      icon: d.icon,
+      level: (d.isAttentionRequired ? d.attentionLevel : 'info') as AttentionCard['level'],
+      navigate: 'day',
+      targetId: d.id,
+      ...dayFields,
+    });
   }
+
+  // B. 逾期待办汇总卡（仅一张）
   if (overdueCount > 0) {
+    cards.push({
+      kind: 'overdue-tasks',
+      id: 'overdue-tasks',
+      title: '待办已逾期',
+      desc: `有 ${overdueCount} 件事情需要处理`,
+      icon: '⚠️',
+      level: 'critical',
+      navigate: 'tasks',
+      targetId: '',
+    });
+  }
+
+  // C. 紧急日程（仅最近一张）
+  if (urgent) {
+    cards.push({
+      kind: 'urgent-event',
+      id: urgent.id,
+      title: urgent.summary,
+      desc: urgent.ongoing ? '正在进行中' : `还有 ${urgent.minutes} 分钟开始`,
+      icon: '⏰',
+      level: 'warning',
+      navigate: 'event',
+      targetId: urgent.id,
+    });
+  }
+
+  // 排序：关注级别升序；同级按标题稳定排序（避免频繁抖动）
+  return cards.sort((a, b) => {
+    const r = attentionLevelRank(a.level) - attentionLevelRank(b.level);
+    if (r !== 0) return r;
+    return a.title.localeCompare(b.title);
+  });
+}
+
+/**
+ * 从日子视图拆分出「需要关注」卡片的结构化字段：
+ * - 高亮数字（dayNumber）与单位（dayUnit）分离，便于 WXML 单独加粗高亮；
+ * - 不同 kind 给出不同布局与补充文案。
+ *
+ * 文案仍由 DayRecordView 的 primaryText / secondaryText 派生，不重新判断业务规则。
+ */
+function buildDayAttentionCard(d: DayRecordView): Partial<AttentionCard> {
+  const { primaryText, secondaryText, kind, progressRatio } = d;
+
+  // 从「已使用 86 天」「还有 4 天」等文案中提取首个数字
+  const numMatch = /^([^\d]*?)(\d+)(.*)$/.exec(primaryText);
+  const dayNumber = numMatch ? numMatch[2] : '';
+  const dayUnit = numMatch ? numMatch[3] : primaryText;
+
+  if (kind === 'cycle') {
+    const subText = secondaryText || '周期事项';
     return {
-      type: 'overdue',
-      text: `⚠ ${overdueCount} 件待办已经逾期`,
-      action: 'tasks',
-      id: '',
+      dayType: 'cycle',
+      dayNumber,
+      dayUnit,
+      daySubText: subText,
+      dayProgress: progressRatio != null ? Math.round(progressRatio * 100) : null,
     };
   }
-  return null;
+
+  if (kind === 'countdown') {
+    // countdown 的 secondaryText 是锚点日期（如「2026年8月19日」）
+    return {
+      dayType: 'countdown',
+      dayNumber,
+      dayUnit,
+      daySubText: secondaryText || '',
+      dayProgress: null,
+    };
+  }
+
+  // elapsed：secondaryText 可能是「已达到提醒时间」或空串
+  return {
+    dayType: 'elapsed',
+    dayNumber,
+    dayUnit,
+    daySubText: secondaryText || '生活记录',
+    dayProgress: null,
+  };
 }

@@ -354,6 +354,224 @@ export interface VersionActionRequest {
   version: number;
 }
 
+// ==================== 日子（Day Records）相关 ====================
+
+/** 日子种类：已过去多久 / 倒计时 / 周期事项 */
+export type DayRecordKind = 'elapsed' | 'countdown' | 'cycle';
+
+export type DayRecordStatus = 'active' | 'archived';
+
+/** 关注级别，由 Core 依据家庭时区计算 */
+export type DayAttentionLevel = 'none' | 'info' | 'warning' | 'critical';
+
+/**
+ * Core 计算出的展示状态。
+ * 小程序不重新判断关注状态，直接使用这里的值。
+ */
+export type DayComputedState =
+  | 'normal'
+  | 'threshold_reached'
+  | 'future'
+  | 'upcoming'
+  | 'today'
+  | 'past'
+  | 'due'
+  | 'overdue';
+
+export interface DayComputedCommon {
+  /** 家庭时区下的今天（YYYY-MM-DD） */
+  today: string;
+  state: DayComputedState;
+  attentionLevel: DayAttentionLevel;
+  isAttentionRequired: boolean;
+}
+
+export interface ElapsedDayComputed extends DayComputedCommon {
+  elapsedDays: number;
+  /** 未设置提醒阈值时为 null */
+  remainingDays: number | null;
+}
+
+export interface CountdownDayComputed extends DayComputedCommon {
+  remainingDays: number;
+}
+
+export interface CycleDayComputed extends DayComputedCommon {
+  elapsedDays: number;
+  remainingDays: number;
+  progressRatio: number;
+}
+
+export interface DayRecordCommon {
+  id: string;
+  familyId: string;
+  name: string;
+  description: string | null;
+  /** 关联对象；null 表示全家 */
+  subject: PersonRef | null;
+  icon: string | null;
+  status: DayRecordStatus;
+  version: number;
+  createdBy: Actor;
+  updatedBy: Actor;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ElapsedDayRecord extends DayRecordCommon {
+  kind: 'elapsed';
+  /** 最近一次发生日期；只能通过新增 occurrence 推进，不可 PATCH */
+  anchorDate: string;
+  attentionAfterDays: number | null;
+  computed: ElapsedDayComputed;
+}
+
+export interface CountdownDayRecord extends DayRecordCommon {
+  kind: 'countdown';
+  /** 目标日期；countdown 允许通过 PATCH 修改 */
+  anchorDate: string;
+  attentionBeforeDays: number | null;
+  computed: CountdownDayComputed;
+}
+
+export interface CycleDayRecord extends DayRecordCommon {
+  kind: 'cycle';
+  /** 上次处理日期；只能通过新增 occurrence 推进，不可 PATCH */
+  anchorDate: string;
+  cycleDays: number;
+  /** 只读，由 Core 计算 */
+  nextDueDate: string;
+  attentionBeforeDays: number | null;
+  computed: CycleDayComputed;
+}
+
+export type DayRecord = ElapsedDayRecord | CountdownDayRecord | CycleDayRecord;
+
+export interface DayRecordResponse extends ApiEnvelope<DayRecord> {}
+export interface DayRecordListResponse extends PaginatedResponse<DayRecord> {}
+
+interface CreateDayRecordCommon {
+  name: string;
+  description?: string | null;
+  anchorDate: string;
+  subjectUserId?: string | null;
+  icon?: string | null;
+}
+
+export interface CreateElapsedDayRecordRequest extends CreateDayRecordCommon {
+  kind: 'elapsed';
+  attentionAfterDays?: number | null;
+}
+
+export interface CreateCountdownDayRecordRequest extends CreateDayRecordCommon {
+  kind: 'countdown';
+  attentionBeforeDays?: number | null;
+}
+
+export interface CreateCycleDayRecordRequest extends CreateDayRecordCommon {
+  kind: 'cycle';
+  cycleDays: number;
+  attentionBeforeDays?: number | null;
+}
+
+export type CreateDayRecordRequest =
+  | CreateElapsedDayRecordRequest
+  | CreateCountdownDayRecordRequest
+  | CreateCycleDayRecordRequest;
+
+/**
+ * 更新日子。
+ *
+ * Core 会拒绝与所存 kind 不匹配的字段：
+ * - 只有 countdown 接受 anchorDate；
+ * - cycleDays / attentionBeforeDays 仅适用于 cycle 与 countdown；
+ * - attentionAfterDays 仅适用于 elapsed。
+ */
+interface DayRecordUpdateFields {
+  name?: string;
+  description?: string | null;
+  icon?: string | null;
+  subjectUserId?: string | null;
+  anchorDate?: string;
+  cycleDays?: number;
+  attentionBeforeDays?: number | null;
+  attentionAfterDays?: number | null;
+}
+
+export type UpdateDayRecordRequest = { version: number } & RequireAtLeastOne<DayRecordUpdateFields>;
+
+/** occurrence 来源：initial 为创建时的初始记录 */
+export type DayRecordOccurrenceSource = 'initial' | 'manual';
+
+export interface DayRecordOccurrence {
+  id: string;
+  dayRecordId: string;
+  occurredOn: string;
+  note: string | null;
+  source: DayRecordOccurrenceSource;
+  /** 与上一次记录的间隔天数；初始记录为 null */
+  intervalDays: number | null;
+  recordedBy: Actor;
+  createdAt: string;
+}
+
+export interface DayRecordOccurrenceListResponse extends PaginatedResponse<DayRecordOccurrence> {}
+
+export interface CreateDayRecordOccurrenceRequest {
+  occurredOn: string;
+  note?: string | null;
+  version: number;
+}
+
+export interface CreateDayRecordOccurrenceResult {
+  previousAnchorDate: string;
+  intervalDays: number;
+  /** 推进后的最新记录（含新 version），后续操作必须使用它 */
+  record: DayRecord;
+}
+
+// ==================== 许愿池（Wishes）相关 ====================
+
+export type WishStatus = 'open' | 'claimed' | 'fulfilled' | 'archived';
+
+export interface Wish {
+  id: string;
+  familyId: string;
+  title: string;
+  description: string | null;
+  /** 期望日期，纯日期，不做 UTC 转换 */
+  desiredDate: string | null;
+  status: WishStatus;
+  /** 许愿人，由 Core 设为创建者 */
+  owner: PersonRef;
+  claimant: PersonRef | null;
+  claimedAt: string | null;
+  fulfilledBy: PersonRef | null;
+  fulfilledAt: string | null;
+  createdBy: Actor;
+  updatedBy: Actor;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WishResponse extends ApiEnvelope<Wish> {}
+export interface WishListResponse extends PaginatedResponse<Wish> {}
+
+export interface CreateWishRequest {
+  title: string;
+  description?: string | null;
+  desiredDate?: string | null;
+}
+
+interface WishUpdateFields {
+  title?: string;
+  description?: string | null;
+  desiredDate?: string | null;
+}
+
+export type UpdateWishRequest = { version: number } & RequireAtLeastOne<WishUpdateFields>;
+
 // ==================== 外部系统（集成）相关 ====================
 
 /** 系统可被授予的权限（MVP 仅支持读写日程与待办、读取家庭信息） */

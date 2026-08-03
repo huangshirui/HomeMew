@@ -18,13 +18,15 @@
  *    期间的实时同步，也作为「万一某处漏写 markDirty」之外的一道实时兜底。
  */
 
-export type DirtyDomain = 'events' | 'tasks';
+export type DirtyDomain = 'events' | 'tasks' | 'days' | 'wishes';
 
 type DirtyListener = (domain: DirtyDomain) => void;
 
 const dirtyFlags: Record<DirtyDomain, boolean> = {
   events: false,
   tasks: false,
+  days: false,
+  wishes: false,
 };
 
 /** 当前订阅者集合；仅页面可见期间持有订阅，页面隐藏即移除，避免泄漏与误刷新 */
@@ -66,4 +68,21 @@ export function consumeAnyDirty(): boolean {
     }
   });
   return any;
+}
+
+/**
+ * 精确消费指定的若干个域，返回其中被标记过的域集合。
+ *
+ * 首页只展示日程、待办与「需要关注」的日子，不展示愿望精确数量，因此应使用本函数
+ * 只消费自己关心的域，避免其它域（如 wishes）的变更导致首页全量重新请求。
+ */
+export function consumeDirtyDomains(domains: DirtyDomain[]): Set<DirtyDomain> {
+  const consumed = new Set<DirtyDomain>();
+  domains.forEach((domain) => {
+    if (dirtyFlags[domain]) {
+      dirtyFlags[domain] = false;
+      consumed.add(domain);
+    }
+  });
+  return consumed;
 }

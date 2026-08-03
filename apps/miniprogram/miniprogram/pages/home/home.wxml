@@ -12,40 +12,79 @@
         <text class="greeting-subtitle">{{greetingSubtitle}}</text>
       </view>
 
-      <!-- 当前家庭切换入口（仅在多于一个家庭时显示） -->
-      <view wx:if="{{canSwitch}}" class="family-switch" bindtap="onSwitchFamily">
+      <!-- 当前家庭入口：始终显示；多家庭显示名称与下拉箭头，单家庭只显示头像 -->
+      <view class="family-switch {{canSwitch ? '' : 'single'}}" bindtap="onSwitchFamily">
         <image
           class="family-switch-avatar"
           src="{{currentFamily.avatarUrl || '/assets/images/default-family.png'}}"
           mode="aspectFill"
         />
-        <text class="family-switch-name">{{currentFamily.name}}</text>
-        <text class="family-switch-caret">▾</text>
+        <block wx:if="{{canSwitch}}">
+          <text class="family-switch-name">{{currentFamily.name}}</text>
+          <text class="family-switch-caret">▾</text>
+        </block>
       </view>
     </view>
 
-    <!-- 两个统计卡片 -->
-    <view class="stat-row">
-      <view class="stat-card" bindtap="onViewEvents">
-        <text class="stat-num">{{todayEventCount}}</text>
-        <text class="stat-label">今日日程</text>
+    <!-- 需要关注：横向滚动卡片（有内容时才显示） -->
+    <view wx:if="{{attentionCards.length > 0}}" class="card section attention-section">
+      <view class="section-header">
+        <text class="section-title">需要关注</text>
       </view>
-      <view class="stat-card" bindtap="onViewTasks">
-        <text class="stat-num">{{pendingTaskCount}}</text>
-        <text class="stat-label">待办任务</text>
-      </view>
-    </view>
 
-    <!-- 条件式紧急提醒 -->
-    <view
-      wx:if="{{urgentReminder}}"
-      class="urgent-banner urgent-{{urgentReminder.type}}"
-      data-action="{{urgentReminder.action}}"
-      data-id="{{urgentReminder.id}}"
-      bindtap="onUrgentTap"
-    >
-      <text class="urgent-text">{{urgentReminder.text}}</text>
-      <text class="urgent-arrow">›</text>
+      <scroll-view class="attention-scroll" scroll-x enable-flex>
+        <view
+          wx:for="{{attentionCards}}"
+          wx:key="id"
+          class="attn-card attn-{{item.kind}} attention-{{item.level}}"
+          data-navigate="{{item.navigate}}"
+          data-id="{{item.id}}"
+          bindtap="onAttentionCardTap"
+        >
+          <!-- 第一行：图标 + 名称 -->
+          <view class="attn-card-head">
+            <view class="attn-card-icon-wrap attention-{{item.level}}">
+              <text class="attn-card-icon">{{item.icon}}</text>
+            </view>
+            <text class="attn-card-name">{{item.title}}</text>
+          </view>
+
+          <!-- 日子类：按 kind 渲染不同子结构 -->
+          <block wx:if="{{item.kind === 'day'}}">
+            <!-- elapsed：三行（已记录天数 + 提醒状态） -->
+            <block wx:if="{{item.dayType === 'elapsed'}}">
+              <text class="attn-line-main">
+                <text class="attn-num">{{item.dayNumber}}</text>{{item.dayUnit}}
+              </text>
+              <text class="attn-line-sub">{{item.daySubText}}</text>
+            </block>
+
+            <!-- countdown：三行（剩余/已过天数 + 锚点日期） -->
+            <block wx:elif="{{item.dayType === 'countdown'}}">
+              <text class="attn-line-main">
+                <text class="attn-num">{{item.dayNumber}}</text>{{item.dayUnit}}
+              </text>
+              <text class="attn-line-sub attn-anchor">{{item.daySubText}}</text>
+            </block>
+
+            <!-- cycle：四行（已使用天数 + 进度条 + 到期信息） -->
+            <block wx:elif="{{item.dayType === 'cycle'}}">
+              <text class="attn-line-main">
+                <text class="attn-num">{{item.dayNumber}}</text>{{item.dayUnit}}
+              </text>
+              <view class="attn-progress" wx:if="{{item.dayProgress != null}}">
+                <view class="attn-progress-fill attention-{{item.level}}" style="width: {{item.dayProgress}}%"></view>
+              </view>
+              <text class="attn-line-sub">{{item.daySubText}}</text>
+            </block>
+          </block>
+
+          <!-- 非日子类（逾期/紧急）：简洁两行 -->
+          <block wx:else>
+            <text class="attn-line-simple">{{item.desc}}</text>
+          </block>
+        </view>
+      </scroll-view>
     </view>
 
     <!-- 今天安排 -->
@@ -128,6 +167,34 @@
       </view>
       <view wx:else class="empty-hint">
         <text class="empty-link" bindtap="onCreateTask">太棒了，待办已经清空！＋ 添加待办</text>
+      </view>
+    </view>
+
+    <!-- 日子关注项加载失败时的轻量提示（无关注卡时不展示空状态） -->
+    <view wx:if="{{daysError && attentionCards.length === 0}}" class="thin-error" bindtap="onRetryDays">
+      <text>关注信息更新失败，点击重试</text>
+    </view>
+
+    <!-- 常用工具 -->
+    <view class="card section tools-section">
+      <view class="section-header">
+        <text class="section-title">常用工具</text>
+      </view>
+      <view class="tools-row">
+        <view class="tool-card" bindtap="onViewDays">
+          <text class="tool-emoji">🗓️</text>
+          <view class="tool-body">
+            <text class="tool-title">日子</text>
+            <text class="tool-desc">记录倒计时与周期</text>
+          </view>
+        </view>
+        <view class="tool-card" bindtap="onViewWishes">
+          <text class="tool-emoji">🌟</text>
+          <view class="tool-body">
+            <text class="tool-title">许愿池</text>
+            <text class="tool-desc">看看家人的愿望</text>
+          </view>
+        </view>
       </view>
     </view>
   </block>

@@ -30,8 +30,8 @@ Component({
     actions: [
       { key: 'event', text: '新建日程', icon: '📅', path: '/pages/events/edit', disabled: false },
       { key: 'task', text: '新建待办', icon: '✓', path: '/pages/tasks/edit', disabled: false },
-      { key: 'day', text: '添加日子', icon: '⏱', path: '', disabled: true },
-      { key: 'wish', text: '添加愿望', icon: '⭐', path: '', disabled: true },
+      { key: 'day', text: '添加日子', icon: '⏱', path: '/pages/days/edit', disabled: false },
+      { key: 'wish', text: '添加愿望', icon: '⭐', path: '/pages/wishes/edit', disabled: false },
     ] as SheetAction[],
   },
 

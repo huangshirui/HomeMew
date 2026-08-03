@@ -1,0 +1,173 @@
+/* 日子列表页 */
+
+/* 顶部筛选 */
+.filter-bar {
+  white-space: nowrap;
+  margin-bottom: 20rpx;
+}
+
+.filter-inner {
+  display: inline-flex;
+  align-items: center;
+  padding: 4rpx 0;
+}
+
+.filter-chip {
+  flex-shrink: 0;
+  padding: 12rpx 30rpx;
+  margin-right: 16rpx;
+  border-radius: 32rpx;
+  background-color: #ffffff;
+  color: var(--color-text-secondary);
+  font-size: 26rpx;
+  line-height: 1.4;
+}
+
+.filter-chip.filter-active {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+/* 后台刷新提示 */
+.refresh-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 12rpx;
+}
+
+.refresh-text {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}
+
+/* 分组 */
+.group {
+  margin-bottom: 12rpx;
+}
+
+.group-title {
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+  padding: 12rpx 8rpx;
+}
+
+/* 日子卡片 */
+.day-card {
+  display: flex;
+  align-items: center;
+  background-color: var(--color-card);
+  border-radius: 26rpx;
+  padding: 26rpx 24rpx;
+  margin-bottom: 18rpx;
+  box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
+  border-left: 8rpx solid transparent;
+}
+
+.day-card.attention-info {
+  border-left-color: var(--color-info);
+}
+
+.day-card.attention-warning {
+  border-left-color: var(--color-warning);
+}
+
+.day-card.attention-critical {
+  border-left-color: var(--color-danger);
+}
+
+.day-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 20rpx;
+  background-color: var(--color-primary-tint);
+  font-size: 36rpx;
+  line-height: 72rpx;
+  text-align: center;
+  flex-shrink: 0;
+  margin-right: 20rpx;
+}
+
+.day-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.day-name-row {
+  display: flex;
+  align-items: center;
+}
+
+.day-name {
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 380rpx;
+}
+
+.day-subject {
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  font-size: 20rpx;
+  color: var(--color-primary);
+  background-color: var(--color-primary-tint);
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.day-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 10rpx;
+}
+
+.day-primary {
+  font-size: 26rpx;
+  color: var(--color-text-primary);
+}
+
+.day-secondary {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+  margin-left: 16rpx;
+}
+
+.day-card.attention-warning .day-secondary {
+  color: var(--color-warning);
+}
+
+.day-card.attention-critical .day-secondary {
+  color: var(--color-danger);
+}
+
+.day-arrow {
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  font-size: 34rpx;
+  color: var(--color-text-hint);
+}
+
+/* 加载更多 */
+.more-hint {
+  padding: 20rpx 0 8rpx;
+  text-align: center;
+}
+
+/* 页面内小型 FAB（二级页面无自定义 TabBar，需自带安全区处理） */
+.fab.fab-small {
+  width: 92rpx;
+  height: 92rpx;
+  line-height: 92rpx;
+  bottom: calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.fab-text-small {
+  font-size: 52rpx;
+  color: #ffffff;
+  font-weight: 300;
+  line-height: 1;
+}

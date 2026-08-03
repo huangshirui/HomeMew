@@ -1,0 +1,137 @@
+<!-- 日子列表页 -->
+<wxs module="dayHelper">
+module.exports.attentionClass = function (level, required) {
+  if (!required) return '';
+  return 'attention-' + level;
+};
+</wxs>
+
+<view class="container">
+  <!-- 无家庭引导 -->
+  <block wx:if="{{noFamily}}">
+    <view class="empty-state">
+      <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
+      <text class="empty-title">还没有家庭</text>
+      <text class="empty-desc">加入或创建家庭后，就可以记录家里的日子。</text>
+      <view class="empty-actions">
+        <button class="btn-primary" bindtap="onCreateFamily">创建家庭</button>
+        <button class="btn-outline" style="margin-top: 24rpx;" bindtap="onJoinFamily">加入家庭</button>
+      </view>
+    </view>
+  </block>
+
+  <block wx:else>
+    <!-- 顶部筛选 -->
+    <scroll-view class="filter-bar" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="filter-inner">
+        <view
+          wx:for="{{filters}}"
+          wx:key="key"
+          class="filter-chip {{activeFilter === item.key ? 'filter-active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onFilterTap"
+        >{{item.label}}</view>
+      </view>
+    </scroll-view>
+
+    <!-- 首次加载 -->
+    <view wx:if="{{firstLoading}}" class="loading-state">
+      <text class="loading-text">加载中...</text>
+    </view>
+
+    <!-- 加载失败 -->
+    <view wx:elif="{{loadError}}" class="load-error-state">
+      <text class="load-error-text">加载失败，请检查网络后重试</text>
+      <button class="btn-outline btn-sm" bindtap="onRetry">重新加载</button>
+    </view>
+
+    <block wx:else>
+      <!-- 后台刷新提示（保留旧数据，不遮挡） -->
+      <view wx:if="{{refreshing}}" class="refresh-hint">
+        <text class="inline-spin">↻</text>
+        <text class="refresh-text">正在更新</text>
+      </view>
+
+      <!-- 「全部」分组展示 -->
+      <block wx:if="{{useGroups && groups.length > 0}}">
+        <view wx:for="{{groups}}" wx:for-item="group" wx:key="key" class="group">
+          <view class="group-title">{{group.title}}</view>
+          <view
+            wx:for="{{group.items}}"
+            wx:key="id"
+            class="day-card {{dayHelper.attentionClass(item.attentionLevel, item.isAttentionRequired)}}"
+            data-id="{{item.id}}"
+            bindtap="onRecordTap"
+          >
+            <view class="day-icon">{{item.icon}}</view>
+            <view class="day-body">
+              <view class="day-name-row">
+                <text class="day-name">{{item.name}}</text>
+                <text wx:if="{{item.subjectName !== '全家'}}" class="day-subject">{{item.subjectName}}</text>
+              </view>
+              <view class="day-meta">
+                <text class="day-primary">{{item.primaryText}}</text>
+                <text wx:if="{{item.secondaryText}}" class="day-secondary">{{item.secondaryText}}</text>
+              </view>
+            </view>
+            <text class="day-arrow">›</text>
+          </view>
+        </view>
+      </block>
+
+      <!-- 平铺列表 -->
+      <block wx:elif="{{!useGroups && items.length > 0}}">
+        <view
+          wx:for="{{items}}"
+          wx:key="id"
+          class="day-card {{dayHelper.attentionClass(item.attentionLevel, item.isAttentionRequired)}}"
+          data-id="{{item.id}}"
+          bindtap="onRecordTap"
+        >
+          <view class="day-icon">{{item.icon}}</view>
+          <view class="day-body">
+            <view class="day-name-row">
+              <text class="day-name">{{item.name}}</text>
+              <text wx:if="{{item.subjectName !== '全家'}}" class="day-subject">{{item.subjectName}}</text>
+            </view>
+            <view class="day-meta">
+              <text class="day-primary">{{item.primaryText}}</text>
+              <text wx:if="{{item.secondaryText}}" class="day-secondary">{{item.secondaryText}}</text>
+            </view>
+          </view>
+          <text class="day-arrow">›</text>
+        </view>
+      </block>
+
+      <!-- 空状态 -->
+      <view wx:else class="empty-state">
+        <block wx:if="{{activeFilter === 'attention'}}">
+          <text class="empty-title">目前没有需要关注的日子</text>
+        </block>
+        <block wx:elif="{{activeFilter === 'archived'}}">
+          <text class="empty-title">还没有已归档的日子</text>
+        </block>
+        <block wx:else>
+          <text class="empty-title">还没有日子记录</text>
+          <text class="empty-desc">记录上次发生的事情、期待的重要日期和周期事项。</text>
+          <view class="empty-actions">
+            <button class="btn-primary" bindtap="onCreate">添加第一个日子</button>
+          </view>
+        </block>
+      </view>
+
+      <!-- 加载更多 -->
+      <view wx:if="{{loadingMore}}" class="more-hint">
+        <text class="empty-text">加载中...</text>
+      </view>
+      <view wx:elif="{{!hasMore && (items.length > 0 || groups.length > 0)}}" class="more-hint">
+        <text class="empty-text">没有更多了</text>
+      </view>
+    </block>
+
+    <!-- 页面内新增入口（二级页面不显示自定义 TabBar） -->
+    <view class="fab fab-small" bindtap="onCreate">
+      <text class="fab-text-small">＋</text>
+    </view>
+  </block>
+</view>

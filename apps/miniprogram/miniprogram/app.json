@@ -21,7 +21,13 @@
     "pages/integrations/list",
     "pages/integrations/edit",
     "pages/integrations/detail",
-    "pages/integrations/credential"
+    "pages/integrations/credential",
+    "pages/days/list",
+    "pages/days/detail",
+    "pages/days/edit",
+    "pages/wishes/list",
+    "pages/wishes/detail",
+    "pages/wishes/edit"
   ],
   "window": {
     "navigationBarBackgroundColor": "#43A047",

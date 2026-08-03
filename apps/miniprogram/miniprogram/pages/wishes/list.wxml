@@ -1,0 +1,122 @@
+<!-- 许愿池列表页 -->
+<view class="container">
+  <!-- 无家庭引导 -->
+  <block wx:if="{{noFamily}}">
+    <view class="empty-state">
+      <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
+      <text class="empty-title">还没有家庭</text>
+      <text class="empty-desc">加入或创建家庭后，就可以和家人互相实现愿望。</text>
+      <view class="empty-actions">
+        <button class="btn-primary" bindtap="onCreateFamily">创建家庭</button>
+        <button class="btn-outline" style="margin-top: 24rpx;" bindtap="onJoinFamily">加入家庭</button>
+      </view>
+    </view>
+  </block>
+
+  <block wx:else>
+    <!-- 顶部筛选 -->
+    <scroll-view class="filter-bar" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="filter-inner">
+        <view
+          wx:for="{{filters}}"
+          wx:key="key"
+          class="filter-chip {{activeFilter === item.key ? 'filter-active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onFilterTap"
+        >{{item.label}}</view>
+      </view>
+    </scroll-view>
+
+    <!-- 首次加载 -->
+    <view wx:if="{{firstLoading}}" class="loading-state">
+      <text class="loading-text">加载中...</text>
+    </view>
+
+    <!-- 加载失败 -->
+    <view wx:elif="{{loadError}}" class="load-error-state">
+      <text class="load-error-text">加载失败，请检查网络后重试</text>
+      <button class="btn-outline btn-sm" bindtap="onRetry">重新加载</button>
+    </view>
+
+    <block wx:else>
+      <view wx:if="{{refreshing}}" class="refresh-hint">
+        <text class="inline-spin">↻</text>
+        <text class="refresh-text">正在更新</text>
+      </view>
+
+      <block wx:if="{{items.length > 0}}">
+        <view
+          wx:for="{{items}}"
+          wx:key="id"
+          class="wish-card"
+          data-id="{{item.id}}"
+          bindtap="onWishTap"
+        >
+          <!-- 许愿人 + 状态 -->
+          <view class="wish-head">
+            <image class="wish-avatar" src="{{item.ownerAvatar}}" mode="aspectFill" />
+            <text class="wish-owner">{{item.ownerName}} 的愿望</text>
+            <text class="wish-status status-{{item.status}}">{{item.statusLabel}}</text>
+          </view>
+
+          <text class="wish-title">{{item.title}}</text>
+          <text wx:if="{{item.descriptionBrief}}" class="wish-desc">{{item.descriptionBrief}}</text>
+
+          <view wx:if="{{item.desiredDateText || item.claimText}}" class="wish-meta">
+            <text wx:if="{{item.desiredDateText}}" class="wish-date">{{item.desiredDateText}}</text>
+            <text wx:if="{{item.claimText}}" class="wish-claim">{{item.claimText}}</text>
+          </view>
+
+          <!-- 快速认领：catchtap 避免同时进入详情 -->
+          <view wx:if="{{item.canQuickClaim}}" class="wish-actions">
+            <button
+              class="btn-outline btn-sm claim-btn"
+              disabled="{{item.claiming}}"
+              data-id="{{item.id}}"
+              catchtap="onQuickClaim"
+            >{{item.claiming ? '处理中...' : '我来实现'}}</button>
+          </view>
+        </view>
+      </block>
+
+      <!-- 空状态 -->
+      <view wx:else class="empty-state">
+        <block wx:if="{{activeFilter === 'claimed'}}">
+          <text class="empty-title">你还没有认领家人的愿望</text>
+        </block>
+        <block wx:elif="{{activeFilter === 'fulfilled'}}">
+          <text class="empty-title">还没有已经实现的愿望</text>
+        </block>
+        <block wx:elif="{{activeFilter === 'archived'}}">
+          <text class="empty-title">还没有已归档的愿望</text>
+        </block>
+        <block wx:elif="{{activeFilter === 'mine'}}">
+          <text class="empty-title">你还没有许下愿望</text>
+          <view class="empty-actions">
+            <button class="btn-primary" bindtap="onCreate">许下第一个愿望</button>
+          </view>
+        </block>
+        <block wx:else>
+          <text class="empty-title">许愿池还是空的</text>
+          <text class="empty-desc">写下一个愿望，让家人一起帮你实现。</text>
+          <view class="empty-actions">
+            <button class="btn-primary" bindtap="onCreate">许下第一个愿望</button>
+          </view>
+        </block>
+      </view>
+
+      <!-- 加载更多 -->
+      <view wx:if="{{loadingMore}}" class="more-hint">
+        <text class="empty-text">加载中...</text>
+      </view>
+      <view wx:elif="{{!hasMore && items.length > 0}}" class="more-hint">
+        <text class="empty-text">没有更多了</text>
+      </view>
+    </block>
+
+    <!-- 页面内新增入口 -->
+    <view class="fab fab-small" bindtap="onCreate">
+      <text class="fab-text-small">＋</text>
+    </view>
+  </block>
+</view>

@@ -1,0 +1,179 @@
+/* 许愿池列表页 */
+
+/* 顶部筛选 */
+.filter-bar {
+  white-space: nowrap;
+  margin-bottom: 20rpx;
+}
+
+.filter-inner {
+  display: inline-flex;
+  align-items: center;
+  padding: 4rpx 0;
+}
+
+.filter-chip {
+  flex-shrink: 0;
+  padding: 12rpx 30rpx;
+  margin-right: 16rpx;
+  border-radius: 32rpx;
+  background-color: #ffffff;
+  color: var(--color-text-secondary);
+  font-size: 26rpx;
+  line-height: 1.4;
+}
+
+.filter-chip.filter-active {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+/* 后台刷新提示 */
+.refresh-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 12rpx;
+}
+
+.refresh-text {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}
+
+/* 愿望卡片 */
+.wish-card {
+  background-color: var(--color-card);
+  border-radius: 26rpx;
+  padding: 26rpx 24rpx;
+  margin-bottom: 18rpx;
+  box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
+  border-left: 8rpx solid var(--color-primary);
+}
+
+.wish-card.status-claimed {
+  border-left-color: var(--color-info);
+}
+
+.wish-card.status-fulfilled {
+  border-left-color: var(--color-success);
+}
+
+.wish-card.status-archived {
+  border-left-color: var(--color-hint);
+}
+
+.wish-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.wish-avatar {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background-color: var(--color-primary-tint);
+  flex-shrink: 0;
+  margin-right: 12rpx;
+}
+
+.wish-owner {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wish-status {
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
+  background-color: var(--color-primary-tint);
+  color: var(--color-primary);
+}
+
+.wish-status.status-claimed {
+  background-color: rgba(33, 150, 243, 0.12);
+  color: var(--color-info);
+}
+
+.wish-status.status-fulfilled {
+  background-color: rgba(76, 175, 80, 0.14);
+  color: var(--color-success);
+}
+
+.wish-status.status-archived {
+  background-color: rgba(158, 158, 158, 0.16);
+  color: var(--color-hint);
+}
+
+.wish-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.wish-desc {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.wish-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 16rpx;
+}
+
+.wish-date {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.wish-claim {
+  font-size: 24rpx;
+  color: var(--color-info);
+  margin-left: 16rpx;
+}
+
+.wish-actions {
+  margin-top: 18rpx;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.claim-btn {
+  min-width: 200rpx;
+}
+
+/* 加载更多 */
+.more-hint {
+  padding: 20rpx 0 8rpx;
+  text-align: center;
+}
+
+/* 页面内小型 FAB（二级页面无自定义 TabBar，需自带安全区处理） */
+.fab.fab-small {
+  width: 92rpx;
+  height: 92rpx;
+  line-height: 92rpx;
+  bottom: calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.fab-text-small {
+  font-size: 52rpx;
+  color: #ffffff;
+  font-weight: 300;
+  line-height: 1;
+}

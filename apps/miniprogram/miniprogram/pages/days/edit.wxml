@@ -1,0 +1,223 @@
+<!-- 日子创建 / 编辑页 -->
+<view class="container">
+  <!-- 加载失败 -->
+  <view wx:if="{{loadError}}" class="load-error-state">
+    <text class="load-error-text">加载失败</text>
+    <button class="btn-outline btn-sm" bindtap="onRetryLoad">重新加载</button>
+  </view>
+
+  <view wx:elif="{{!loaded}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 第一步：生活化类型选择（仅创建模式） -->
+  <block wx:elif="{{step === 'kind'}}">
+    <view class="kind-intro">想记录什么样的日子？</view>
+    <view
+      wx:for="{{kindChoices}}"
+      wx:key="kind"
+      class="kind-card"
+      data-kind="{{item.kind}}"
+      bindtap="onKindSelect"
+    >
+      <view class="kind-icon">{{item.icon}}</view>
+      <view class="kind-body">
+        <text class="kind-title">{{item.title}}</text>
+        <text class="kind-desc">{{item.desc}}</text>
+      </view>
+      <text class="kind-arrow">›</text>
+    </view>
+  </block>
+
+  <!-- 第二步：表单 -->
+  <block wx:else>
+    <!-- 名称 -->
+    <view class="card">
+      <view class="field-row">
+        <text class="field-label">名称</text>
+        <input
+          class="field-input"
+          value="{{name}}"
+          bindinput="onNameInput"
+          placeholder="{{kind === 'countdown' ? '例如：英国旅行' : '例如：清理滤水器'}}"
+          maxlength="100"
+        />
+      </view>
+    </view>
+
+    <!-- 日期 / 提醒设置 -->
+    <view class="card">
+      <!-- elapsed -->
+      <block wx:if="{{kind === 'elapsed'}}">
+        <picker
+          wx:if="{{mode === 'create'}}"
+          mode="date"
+          value="{{anchorDate}}"
+          end="{{familyToday}}"
+          bindchange="onAnchorDateChange"
+        >
+          <view class="field-row">
+            <text class="field-label">从哪一天开始计算</text>
+            <view class="field-value">
+              <text class="field-text">{{anchorDate}}</text>
+              <text class="field-arrow">›</text>
+            </view>
+          </view>
+        </picker>
+        <view wx:else class="field-row">
+          <text class="field-label">最近一次</text>
+          <text class="field-readonly">{{anchorDate}}</text>
+        </view>
+        <view wx:if="{{mode === 'edit'}}" class="field-hint">
+          <text class="hint-text">日期通过「今天又做了」更新</text>
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">超过多少天后提醒</text>
+          <input
+            class="field-input field-input-num"
+            type="number"
+            value="{{attentionAfterDays}}"
+            bindinput="onAttentionAfterInput"
+            placeholder="留空表示不提醒"
+          />
+        </view>
+      </block>
+
+      <!-- countdown -->
+      <block wx:elif="{{kind === 'countdown'}}">
+        <picker mode="date" value="{{anchorDate}}" bindchange="onAnchorDateChange">
+          <view class="field-row">
+            <text class="field-label">目标日期</text>
+            <view class="field-value">
+              <text class="field-text">{{anchorDate}}</text>
+              <text class="field-arrow">›</text>
+            </view>
+          </view>
+        </picker>
+        <view class="field-row">
+          <text class="field-label">提前多少天提醒</text>
+          <input
+            class="field-input field-input-num"
+            type="number"
+            value="{{attentionBeforeDays}}"
+            bindinput="onAttentionBeforeInput"
+            placeholder="留空表示不提醒"
+          />
+        </view>
+      </block>
+
+      <!-- cycle -->
+      <block wx:else>
+        <picker
+          wx:if="{{mode === 'create'}}"
+          mode="date"
+          value="{{anchorDate}}"
+          end="{{familyToday}}"
+          bindchange="onAnchorDateChange"
+        >
+          <view class="field-row">
+            <text class="field-label">上次处理日期</text>
+            <view class="field-value">
+              <text class="field-text">{{anchorDate}}</text>
+              <text class="field-arrow">›</text>
+            </view>
+          </view>
+        </picker>
+        <view wx:else class="field-row">
+          <text class="field-label">上次处理</text>
+          <text class="field-readonly">{{anchorDate}}</text>
+        </view>
+        <view wx:if="{{mode === 'edit'}}" class="field-hint">
+          <text class="hint-text">日期通过「今天已处理」更新</text>
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">建议周期天数</text>
+          <input
+            class="field-input field-input-num"
+            type="number"
+            value="{{cycleDays}}"
+            bindinput="onCycleDaysInput"
+            placeholder="例如：90"
+          />
+        </view>
+        <view class="field-row">
+          <text class="field-label">提前多少天提醒</text>
+          <input
+            class="field-input field-input-num"
+            type="number"
+            value="{{attentionBeforeDays}}"
+            bindinput="onAttentionBeforeInput"
+            placeholder="留空表示不提醒"
+          />
+        </view>
+      </block>
+    </view>
+
+    <!-- 关联对象 -->
+    <view class="card">
+      <view class="field-row" bindtap="onSubjectTap">
+        <text class="field-label">关联对象</text>
+        <view class="field-value">
+          <text class="field-text">{{subjectText}}</text>
+          <text class="field-arrow">›</text>
+        </view>
+      </view>
+      <view class="field-hint">
+        <text class="hint-text">不选择成员则视为全家</text>
+      </view>
+    </view>
+
+    <!-- 图标（内置 Emoji） -->
+    <view class="card">
+      <text class="field-label">图标</text>
+      <view class="icon-grid">
+        <view
+          wx:for="{{iconChoices}}"
+          wx:key="*this"
+          class="icon-cell {{icon === item ? 'icon-selected' : ''}}"
+          data-icon="{{item}}"
+          bindtap="onIconSelect"
+        >{{item}}</view>
+      </view>
+      <view class="field-hint">
+        <text class="hint-text">选填，再次点击可取消</text>
+      </view>
+    </view>
+
+    <!-- 说明 -->
+    <view class="card">
+      <view class="field-row column">
+        <text class="field-label">说明</text>
+        <textarea
+          class="field-textarea"
+          value="{{description}}"
+          bindinput="onDescriptionInput"
+          placeholder="选填"
+          maxlength="500"
+          auto-height
+        />
+      </view>
+    </view>
+
+    <view class="footer-spacer"></view>
+  </block>
+
+  <!-- 底部操作栏（仅表单步骤显示） -->
+  <view wx:if="{{loaded && !loadError && step === 'form'}}" class="footer-bar safe-area-bottom">
+    <button
+      wx:if="{{mode === 'create'}}"
+      class="btn-outline footer-btn"
+      bindtap="onBackToKind"
+    >上一步</button>
+    <button wx:else class="btn-outline footer-btn" bindtap="onCancel">取消</button>
+    <button
+      class="btn-primary footer-btn"
+      disabled="{{submitting}}"
+      bindtap="onSubmit"
+    >
+      {{submitting ? '保存中...' : (mode === 'edit' ? '保存' : '创建')}}
+    </button>
+  </view>
+</view>

@@ -30,6 +30,10 @@ page {
   --home-text: #222222;
   --home-secondary: #9299A3;
   --home-danger: #E85A5A;
+  --home-warning: #FF9800;
+  --home-info: #2196F3;
+  --home-hint: #A6ADB6;
+  --home-primary-tint: #EAF6EB;
 
   background-color: var(--color-bg);
   color: var(--color-text-primary);

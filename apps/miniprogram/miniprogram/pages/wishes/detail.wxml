@@ -1,0 +1,98 @@
+<!-- 愿望详情页 -->
+<view class="container">
+  <!-- 加载失败 -->
+  <view wx:if="{{loadError}}" class="load-error-state">
+    <text class="load-error-text">加载失败</text>
+    <button class="btn-outline btn-sm" bindtap="onRetry">重新加载</button>
+  </view>
+
+  <view wx:elif="{{!loaded}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- 头部：标题 + 状态 -->
+    <view class="hero status-{{status}}">
+      <view class="hero-top">
+        <text class="hero-title">{{title}}</text>
+        <text class="hero-status">{{statusLabel}}</text>
+      </view>
+      <view wx:if="{{claimText}}" class="hero-claim">{{claimText}}</view>
+    </view>
+
+    <!-- 信息 -->
+    <view class="card">
+      <view wx:for="{{metaRows}}" wx:key="label" class="meta-row">
+        <text class="meta-label">{{item.label}}</text>
+        <text class="meta-value">{{item.value}}</text>
+      </view>
+    </view>
+
+    <!-- 说明 -->
+    <view wx:if="{{description}}" class="card">
+      <text class="meta-label">愿望描述</text>
+      <text class="desc-text">{{description}}</text>
+    </view>
+
+    <!-- 主操作：认领 / 标记已实现 -->
+    <button
+      wx:if="{{canQuickClaim}}"
+      class="btn-primary main-btn"
+      disabled="{{submitting}}"
+      bindtap="onClaim"
+    >我来帮 TA 实现</button>
+
+    <button
+      wx:elif="{{isClaimant && status === 'claimed'}}"
+      class="btn-primary main-btn"
+      disabled="{{submitting}}"
+      bindtap="onFulfill"
+    >标记已实现</button>
+
+    <button
+      wx:elif="{{isOwner && status === 'open'}}"
+      class="btn-primary main-btn"
+      disabled="{{submitting}}"
+      bindtap="onClaim"
+    >自己实现</button>
+
+    <!-- 次级操作 -->
+    <view class="card actions-card">
+      <button
+        wx:if="{{status === 'open' || status === 'claimed' || status === 'fulfilled'}}"
+        class="btn-outline action-btn"
+        disabled="{{submitting}}"
+        bindtap="onEdit"
+      >编辑</button>
+      <button
+        wx:if="{{isClaimant && status === 'claimed'}}"
+        class="btn-outline action-btn"
+        disabled="{{submitting}}"
+        bindtap="onUnclaim"
+      >放弃认领</button>
+      <button
+        wx:if="{{isOwner && status === 'fulfilled'}}"
+        class="btn-outline action-btn"
+        disabled="{{submitting}}"
+        bindtap="onReopen"
+      >重新打开</button>
+      <button
+        wx:if="{{status === 'active' || status === 'open' || status === 'claimed' || status === 'fulfilled'}}"
+        class="btn-outline action-btn"
+        disabled="{{submitting}}"
+        bindtap="onArchive"
+      >归档</button>
+      <button
+        wx:if="{{status === 'archived'}}"
+        class="btn-outline action-btn"
+        disabled="{{submitting}}"
+        bindtap="onRestore"
+      >恢复</button>
+      <button
+        class="btn-outline danger action-btn"
+        disabled="{{submitting}}"
+        bindtap="onDelete"
+      >删除</button>
+    </view>
+  </block>
+</view>

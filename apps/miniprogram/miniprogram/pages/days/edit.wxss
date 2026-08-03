@@ -1,0 +1,188 @@
+/* 日子创建 / 编辑页样式 */
+
+/* 使用底部固定操作栏，无需为悬浮按钮预留底部留白 */
+.container {
+  padding-bottom: 0;
+}
+
+/* 类型选择 */
+.kind-intro {
+  font-size: 30rpx;
+  color: var(--color-text-secondary);
+  padding: 20rpx 8rpx 24rpx;
+}
+
+.kind-card {
+  display: flex;
+  align-items: center;
+  background-color: var(--color-card);
+  border-radius: 26rpx;
+  padding: 32rpx 28rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
+}
+
+.kind-icon {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 24rpx;
+  background-color: var(--color-primary-tint);
+  font-size: 40rpx;
+  line-height: 84rpx;
+  text-align: center;
+  flex-shrink: 0;
+  margin-right: 22rpx;
+}
+
+.kind-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.kind-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.kind-desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.kind-arrow {
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  font-size: 34rpx;
+  color: var(--color-text-hint);
+}
+
+/* 表单字段 */
+.field-row {
+  display: flex;
+  align-items: center;
+  min-height: 96rpx;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-row.column {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 20rpx 0;
+}
+
+.field-label {
+  width: 240rpx;
+  flex-shrink: 0;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+.field-input {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+  height: 60rpx;
+  text-align: right;
+}
+
+.field-input-num {
+  text-align: right;
+}
+
+.field-readonly {
+  flex: 1;
+  text-align: right;
+  font-size: 30rpx;
+  color: var(--color-text-secondary);
+}
+
+.field-textarea {
+  width: 100%;
+  margin-top: 16rpx;
+  min-height: 120rpx;
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
+.field-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+}
+
+.field-text {
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+.field-arrow {
+  font-size: 32rpx;
+  color: #cccccc;
+}
+
+.field-hint {
+  padding: 12rpx 0 4rpx;
+}
+
+.hint-text {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+/* 图标选择 */
+.icon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  padding-top: 20rpx;
+}
+
+.icon-cell {
+  width: 84rpx;
+  height: 84rpx;
+  line-height: 84rpx;
+  text-align: center;
+  font-size: 36rpx;
+  border-radius: 20rpx;
+  background-color: var(--color-bg);
+  border: 2rpx solid transparent;
+}
+
+.icon-cell.icon-selected {
+  background-color: var(--color-primary-tint);
+  border-color: var(--color-primary);
+}
+
+/* 底部固定操作栏 */
+.footer-spacer {
+  height: 180rpx;
+}
+
+.footer-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 20rpx;
+  padding: 16rpx 24rpx;
+  background-color: var(--color-bg-white);
+  border-top: 2rpx solid var(--color-divider);
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.04);
+  z-index: 20;
+}
+
+.footer-btn {
+  flex: 1;
+}

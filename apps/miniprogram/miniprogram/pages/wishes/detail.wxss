@@ -1,0 +1,121 @@
+/* 愿望详情页 */
+
+.hero {
+  background-color: var(--color-card);
+  border-radius: 30rpx;
+  padding: 36rpx 32rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
+  border-left: 10rpx solid var(--color-primary);
+}
+
+.hero.status-claimed {
+  border-left-color: var(--color-info);
+}
+
+.hero.status-fulfilled {
+  border-left-color: var(--color-success);
+}
+
+.hero.status-archived {
+  border-left-color: var(--color-hint);
+}
+
+.hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hero-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+  margin-right: 16rpx;
+}
+
+.hero-status {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
+  background-color: var(--color-primary-tint);
+  color: var(--color-primary);
+}
+
+.hero.hero.status-claimed .hero-status {
+  background-color: rgba(33, 150, 243, 0.12);
+  color: var(--color-info);
+}
+
+.hero.status-fulfilled .hero-status {
+  background-color: rgba(76, 175, 80, 0.14);
+  color: var(--color-success);
+}
+
+.hero.status-archived .hero-status {
+  background-color: rgba(158, 158, 158, 0.16);
+  color: var(--color-hint);
+}
+
+.hero-claim {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: var(--color-info);
+}
+
+/* 信息行 */
+.meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 84rpx;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.meta-row:last-child {
+  border-bottom: none;
+}
+
+.meta-label {
+  font-size: 28rpx;
+  color: var(--color-text-secondary);
+}
+
+.meta-value {
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  text-align: right;
+  margin-left: 24rpx;
+}
+
+.desc-text {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  line-height: 1.7;
+}
+
+/* 主操作按钮 */
+.main-btn {
+  margin-bottom: 22rpx;
+}
+
+/* 次级操作 */
+.actions-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18rpx;
+}
+
+.action-btn {
+  flex: 1;
+  min-width: 200rpx;
+  height: 78rpx;
+  line-height: 78rpx;
+  font-size: 28rpx;
+}
