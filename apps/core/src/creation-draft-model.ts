@@ -117,14 +117,14 @@ export const CREATION_DRAFT_JSON_SCHEMA = {
         "summary", "description", "isAllDay", "startDate", "endDate", "endDateExclusive",
         "startTime", "endTime", "startTimezone", "endTimezone", "location", "attendeeRefs",
       ], {
-        summary: nullableStringWithMax(200), description: nullableStringWithMax(5000), isAllDay: { type: ["boolean", "null"] },
+        summary: nullableStringWithMax(100), description: nullableStringWithMax(5000), isAllDay: { type: ["boolean", "null"] },
         startDate: nullableString, endDate: nullableString, endDateExclusive: nullableString,
         startTime: nullableString, endTime: nullableString, startTimezone: nullableString,
         endTimezone: nullableString, location: nullableStringWithMax(500),
         attendeeRefs: { type: "array", maxItems: 8, items: { type: "string" } },
       })),
       readySchema("task", closedObject(["name", "description", "dueDate", "assigneeRefs"], {
-        name: nullableStringWithMax(200), description: nullableStringWithMax(5000), dueDate: nullableString,
+        name: nullableStringWithMax(100), description: nullableStringWithMax(5000), dueDate: nullableString,
         assigneeRefs: { type: "array", maxItems: 8, items: { type: "string" } },
       })),
       readySchema("day_record", closedObject([
@@ -297,7 +297,7 @@ export function normalizeCreationDraftOutput(
     };
     const refs = stringArray(raw.attendeeRefs, 8);
     draft.attendeeIds = resolveMembers(refs, "attendeeIds", options.members, common.missingFields, common.warnings);
-    clearOverLimit(draft, "summary", 200, common.missingFields, common.warnings, true);
+    clearOverLimit(draft, "summary", 100, common.missingFields, common.warnings, true);
     clearOverLimit(draft, "description", 5000, common.missingFields, common.warnings);
     clearOverLimit(draft, "location", 500, common.missingFields, common.warnings);
     for (const field of ["startDate", "endDate", "endDateExclusive"]) clearInvalid(draft, field, validDate, common.missingFields, common.warnings, field === "startDate");
@@ -352,7 +352,7 @@ export function normalizeCreationDraftOutput(
       name: stringOrNull(raw.name), description: stringOrNull(raw.description), dueDate: stringOrNull(raw.dueDate),
       assigneeIds: resolveMembers(stringArray(raw.assigneeRefs, 8), "assigneeIds", options.members, common.missingFields, common.warnings),
     };
-    clearOverLimit(draft as unknown as Record<string, unknown>, "name", 200, common.missingFields, common.warnings, true);
+    clearOverLimit(draft as unknown as Record<string, unknown>, "name", 100, common.missingFields, common.warnings, true);
     clearOverLimit(draft as unknown as Record<string, unknown>, "description", 5000, common.missingFields, common.warnings);
     clearInvalid(draft as unknown as Record<string, unknown>, "dueDate", validDate, common.missingFields, common.warnings);
     if (!draft.name && !common.missingFields.includes("name")) common.missingFields.push("name");

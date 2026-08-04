@@ -72,19 +72,19 @@ describe("creation draft model normalization", () => {
 
   it("keeps exact string-limit boundaries for all draft kinds", () => {
     const event = normalizeCreationDraftOutput({ status: "ready", kind: "event", ...common, draft: {
-      summary: "s".repeat(200), description: "d".repeat(5000), isAllDay: true,
+      summary: "s".repeat(100), description: "d".repeat(5000), isAllDay: true,
       startDate: "2026-08-05", endDate: null, endDateExclusive: "2026-08-06",
       startTime: null, endTime: null, startTimezone: null, endTimezone: null,
       location: "l".repeat(500), attendeeRefs: [],
     } }, { members, familyToday: "2026-08-04" });
     expect(event).toMatchObject({ draft: {
-      summary: "s".repeat(200), description: "d".repeat(5000), location: "l".repeat(500),
+      summary: "s".repeat(100), description: "d".repeat(5000), location: "l".repeat(500),
     } });
 
     const task = normalizeCreationDraftOutput({ status: "ready", kind: "task", ...common,
-      draft: { name: "n".repeat(200), description: "d".repeat(5000), dueDate: null, assigneeRefs: [] },
+      draft: { name: "n".repeat(100), description: "d".repeat(5000), dueDate: null, assigneeRefs: [] },
     }, { members, familyToday: "2026-08-04" });
-    expect(task).toMatchObject({ draft: { name: "n".repeat(200), description: "d".repeat(5000) } });
+    expect(task).toMatchObject({ draft: { name: "n".repeat(100), description: "d".repeat(5000) } });
 
     const dayRecord = normalizeCreationDraftOutput({ status: "ready", kind: "day_record", ...common, draft: {
       dayRecordKind: "elapsed", name: "n".repeat(100), description: "d".repeat(5000),
@@ -103,7 +103,7 @@ describe("creation draft model normalization", () => {
 
   it("clears every over-limit inferred string with warnings and required missing fields", () => {
     const event = normalizeCreationDraftOutput({ status: "ready", kind: "event", ...common, draft: {
-      summary: "s".repeat(201), description: "d".repeat(5001), isAllDay: true,
+      summary: "s".repeat(101), description: "d".repeat(5001), isAllDay: true,
       startDate: "2026-08-05", endDate: null, endDateExclusive: "2026-08-06",
       startTime: null, endTime: null, startTimezone: null, endTimezone: null,
       location: "l".repeat(501), attendeeRefs: [],
@@ -112,19 +112,19 @@ describe("creation draft model normalization", () => {
       draft: { summary: null, description: null, location: null },
       missingFields: expect.arrayContaining(["summary"]),
       warnings: expect.arrayContaining([
-        { code: "INVALID_INFERRED_VALUE", field: "summary", value: "s".repeat(201) },
+        { code: "INVALID_INFERRED_VALUE", field: "summary", value: "s".repeat(101) },
         { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
         { code: "INVALID_INFERRED_VALUE", field: "location", value: "l".repeat(501) },
       ]),
     });
 
     const task = normalizeCreationDraftOutput({ status: "ready", kind: "task", ...common,
-      draft: { name: "n".repeat(201), description: "d".repeat(5001), dueDate: null, assigneeRefs: [] },
+      draft: { name: "n".repeat(101), description: "d".repeat(5001), dueDate: null, assigneeRefs: [] },
     }, { members, familyToday: "2026-08-04" });
     expect(task).toMatchObject({
       draft: { name: null, description: null }, missingFields: expect.arrayContaining(["name"]),
       warnings: expect.arrayContaining([
-        { code: "INVALID_INFERRED_VALUE", field: "name", value: "n".repeat(201) },
+        { code: "INVALID_INFERRED_VALUE", field: "name", value: "n".repeat(101) },
         { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
       ]),
     });
@@ -330,7 +330,7 @@ describe("creation draft model normalization", () => {
         code: "UNSUPPORTED_DETAIL", field: `modelField${index}`, value: null,
       })),
       draft: {
-        summary: "s".repeat(201), description: null, isAllDay: true,
+        summary: "s".repeat(101), description: null, isAllDay: true,
         startDate: "2026-08-05", endDate: null, endDateExclusive: "2026-08-06",
         startTime: null, endTime: null, startTimezone: null, endTimezone: null,
         location: null, attendeeRefs: [],
@@ -340,7 +340,7 @@ describe("creation draft model normalization", () => {
     expect(result.missingFields).toContain("summary");
     expect(result.warnings).toHaveLength(32);
     expect(result.warnings).toContainEqual({
-      code: "INVALID_INFERRED_VALUE", field: "summary", value: "s".repeat(201),
+      code: "INVALID_INFERRED_VALUE", field: "summary", value: "s".repeat(101),
     });
   });
 
@@ -359,11 +359,11 @@ describe("creation draft model normalization", () => {
     const variants = (CREATION_DRAFT_JSON_SCHEMA.schema.properties.result as { anyOf: Array<any> }).anyOf;
     expect(variants[0].properties.candidates).toMatchObject({ minItems: 2, maxItems: 4 });
     expect(variants[1].properties.draft.properties).toMatchObject({
-      summary: { maxLength: 200 }, description: { maxLength: 5000 }, location: { maxLength: 500 },
+      summary: { maxLength: 100 }, description: { maxLength: 5000 }, location: { maxLength: 500 },
       attendeeRefs: { maxItems: 8 },
     });
     expect(variants[2].properties.draft.properties).toMatchObject({
-      name: { maxLength: 200 }, description: { maxLength: 5000 }, assigneeRefs: { maxItems: 8 },
+      name: { maxLength: 100 }, description: { maxLength: 5000 }, assigneeRefs: { maxItems: 8 },
     });
     expect(variants[3].properties.draft.properties).toMatchObject({
       name: { maxLength: 100 }, description: { maxLength: 5000 }, icon: { maxLength: 50 },
