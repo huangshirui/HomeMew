@@ -13,7 +13,7 @@
     "AI_PROMPT_APPENDIX": ""
   },
   "secrets": {
-    "required": ["JWT_SECRET", "AI_API_KEY"]
+    "required": ["JWT_SECRET"]
   },
   "d1_databases": [
     {
