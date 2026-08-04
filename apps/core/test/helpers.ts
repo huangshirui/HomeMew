@@ -7,6 +7,11 @@ export const bindings: Bindings = {
   AVATARS: env.AVATARS,
   ASSETS_PUBLIC_URL: "https://assets.test.example",
   JWT_SECRET: jwtSecret,
+  AI_API_KEY: "test-ai-key",
+  AI_BASE_URL: "https://ai.test.example/v1",
+  AI_MODEL: "test-model",
+  AI_PROMPT_APPENDIX: "",
+  AI_RATE_LIMITER: { limit: async () => ({ success: true }) },
 };
 
 function encode(value: unknown): string {

@@ -53,4 +53,18 @@ for(const permission of ["day-records:read","day-records:write"]){
   if(!schemas.SystemPermission.enum.includes(permission))throw new Error(`Missing system permission: ${permission}`);
 }
 
+const creationDraftPath="/api/v1/families/{familyId}/creation-drafts/interpret";
+const creationDraftOperation=document.paths[creationDraftPath]?.post;
+if(creationDraftOperation?.["x-homemew-status"]!=="implemented")throw new Error("Creation draft interpretation must be implemented");
+if(creationDraftOperation?.responses?.["404"]?.$ref!=="#/components/responses/CreationDraftNotFound")throw new Error("Creation draft interpretation must document its 404 response");
+const creationDraftNotFoundCodes=schemas.CreationDraftNotFoundError?.properties?.error?.allOf?.[1]?.properties?.code?.enum;
+if(JSON.stringify(creationDraftNotFoundCodes)!==JSON.stringify(["USER_NOT_FOUND","FAMILY_NOT_FOUND"]))throw new Error("Creation draft 404 codes must match runtime");
+const creationDraftRequest=schemas.InterpretCreationDraftRequest;
+if(creationDraftRequest?.additionalProperties!==false||creationDraftRequest?.properties?.text?.pattern!=="\\S"||creationDraftRequest?.properties?.text?.maxLength!==undefined)throw new Error("Creation draft request must be closed and document validation after trimming text");
+const chooseKind=schemas.ChooseCreationKindDraft;
+if(chooseKind?.additionalProperties!==false||chooseKind?.properties?.status?.const!=="choose_kind"||chooseKind?.properties?.candidateKinds?.minItems!==2||chooseKind?.properties?.candidateKinds?.uniqueItems!==true)throw new Error("Creation draft choose_kind shape is invalid");
+if(schemas.CreationDraftResult?.oneOf?.length!==5)throw new Error("CreationDraftResult must contain choose_kind plus four ready variants");
+if(schemas.EventFormDraft?.properties?.summary?.maxLength!==100||schemas.TaskFormDraft?.properties?.name?.maxLength!==100)throw new Error("AI event/task draft titles must be capped at 100 characters");
+if(schemas.CreateEventCommon?.properties?.summary?.maxLength!==200||schemas.CreateTaskRequest?.properties?.name?.maxLength!==200)throw new Error("Existing event/task create title limits must remain unchanged");
+
 console.log(`OpenAPI valid: ${Object.keys(document.paths).length} paths, ${refs.length} references`);

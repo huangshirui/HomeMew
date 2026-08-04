@@ -262,3 +262,46 @@ The first version has one task-level completion state. It does not track complet
   tasks it created. Historical actor names remain available.
 - Event/task creation, update, completion, reopening, and deletion record the
   true `user` or `system` actor.
+
+## 14. AI creation drafts
+
+- Interpretation classifies text as `event`, `task`, `day_record`, or `wish`.
+  When the kind is genuinely ambiguous and the request has no `targetKind`, the
+  response is exactly `choose_kind` with two to four unique `candidateKinds`.
+  It contains no confidence score. After the user chooses, the client repeats
+  the request with the original text and that `targetKind`; a ready result must
+  use the requested kind.
+- A ready result contains the complete draft shape for exactly one kind,
+  `missingFields`, and `warnings`. `missingFields` names values that the client
+  must ask the user to supply or confirm. A nullable scalar set to `null` means
+  unknown, invalid, ambiguous, or inapplicable; Core and clients must not turn
+  it into an invented default. Arrays are always present and may be empty.
+- Member names are resolved only against active members of the requested
+  family. The provider sees display names with temporary request-scoped
+  references, not HomeMew user IDs. Duplicate display names must not be guessed:
+  even a unique temporary reference for a member whose display name is shared
+  is treated as ambiguous and omitted from the ID array. Each ambiguous or
+  unresolved reference produces `AMBIGUOUS_MEMBER` or `UNRESOLVED_MEMBER`, and
+  leaves the corresponding field missing for user review. Unambiguous resolved
+  IDs are de-duplicated.
+- Event draft dates and `HH:mm` times are local calendar values interpreted
+  in the request's `viewingTimezone`. Timed drafts keep start and end date/time
+  fields; all-day drafts use the half-open `startDate`/`endDateExclusive` range
+  and clear timed fields. Relative task due dates, day-record anchors, and wish
+  desired dates are interpreted in the family timezone and remain date-only.
+  Family-local today governs day-record rules. Invalid or impossible inferred
+  values become `null` with a warning; they are not silently shifted.
+- A local event wall time in a nonexistent spring-forward gap or ambiguous
+  fall-back fold cannot be represented unambiguously. Core clears the affected
+  `startTime` or `endTime`, adds that field to `missingFields`, and emits
+  `INVALID_INFERRED_VALUE`; it never shifts the time or chooses a fold
+  arbitrarily.
+- Interpretation is ephemeral and never creates, updates, or reserves a Core
+  record. The user must review the result and submit it through the existing
+  create endpoint, whose normal authorization and validation remain decisive.
+- The route is limited per authenticated user to 10 requests per 60 seconds.
+  Clients should correct `INVALID_REQUEST`; wait before
+  retrying `AI_RATE_LIMITED`; and present an explicit retry for provider
+  unavailable, invalid-response, or timeout errors. `AI_NOT_CONFIGURED` is an
+  operator condition. Core does not retry the provider automatically, and a
+  client must not turn an interpretation retry into a blind create retry.

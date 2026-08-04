@@ -4,6 +4,11 @@ export type Bindings = {
   ASSETS_PUBLIC_URL: string;
   CORS_ORIGINS?: string;
   JWT_SECRET: string;
+  AI_API_KEY?: string;
+  AI_BASE_URL?: string;
+  AI_MODEL?: string;
+  AI_PROMPT_APPENDIX?: string;
+  AI_RATE_LIMITER: RateLimit;
 };
 
 export type Variables = {
