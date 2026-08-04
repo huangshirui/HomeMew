@@ -11,6 +11,10 @@ const members = [
 ];
 
 const common = { missingFields: [], warnings: [] };
+const INVALID_MESSAGE = "Invalid inferred value was discarded.";
+const UNSUPPORTED_MESSAGE = "Unsupported field was discarded.";
+const AMBIGUOUS_MESSAGE = "The referenced member is ambiguous.";
+const UNRESOLVED_MESSAGE = "The referenced member could not be resolved.";
 
 describe("creation draft model normalization", () => {
   it("normalizes each supported ready draft kind", () => {
@@ -112,9 +116,9 @@ describe("creation draft model normalization", () => {
       draft: { summary: null, description: null, location: null },
       missingFields: expect.arrayContaining(["summary"]),
       warnings: expect.arrayContaining([
-        { code: "INVALID_INFERRED_VALUE", field: "summary", value: "s".repeat(101) },
-        { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
-        { code: "INVALID_INFERRED_VALUE", field: "location", value: "l".repeat(501) },
+        { code: "INVALID_INFERRED_VALUE", field: "summary", message: INVALID_MESSAGE },
+        { code: "INVALID_INFERRED_VALUE", field: "description", message: INVALID_MESSAGE },
+        { code: "INVALID_INFERRED_VALUE", field: "location", message: INVALID_MESSAGE },
       ]),
     });
 
@@ -124,8 +128,8 @@ describe("creation draft model normalization", () => {
     expect(task).toMatchObject({
       draft: { name: null, description: null }, missingFields: expect.arrayContaining(["name"]),
       warnings: expect.arrayContaining([
-        { code: "INVALID_INFERRED_VALUE", field: "name", value: "n".repeat(101) },
-        { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
+        { code: "INVALID_INFERRED_VALUE", field: "name", message: INVALID_MESSAGE },
+        { code: "INVALID_INFERRED_VALUE", field: "description", message: INVALID_MESSAGE },
       ]),
     });
 
@@ -137,9 +141,9 @@ describe("creation draft model normalization", () => {
     expect(dayRecord).toMatchObject({
       draft: { name: null, description: null, icon: null }, missingFields: expect.arrayContaining(["name"]),
       warnings: expect.arrayContaining([
-        { code: "INVALID_INFERRED_VALUE", field: "name", value: "n".repeat(101) },
-        { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
-        { code: "INVALID_INFERRED_VALUE", field: "icon", value: "i".repeat(51) },
+        { code: "INVALID_INFERRED_VALUE", field: "name", message: INVALID_MESSAGE },
+        { code: "INVALID_INFERRED_VALUE", field: "description", message: INVALID_MESSAGE },
+        { code: "INVALID_INFERRED_VALUE", field: "icon", message: INVALID_MESSAGE },
       ]),
     });
 
@@ -149,33 +153,34 @@ describe("creation draft model normalization", () => {
     expect(wish).toMatchObject({
       draft: { title: null, description: null }, missingFields: expect.arrayContaining(["title"]),
       warnings: expect.arrayContaining([
-        { code: "INVALID_INFERRED_VALUE", field: "title", value: "t".repeat(101) },
-        { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
+        { code: "INVALID_INFERRED_VALUE", field: "title", message: INVALID_MESSAGE },
+        { code: "INVALID_INFERRED_VALUE", field: "description", message: INVALID_MESSAGE },
       ]),
     });
   });
 
-  it("accepts choose_kind only with at least two unique supported candidates", () => {
+  it("emits the exact choose_kind shape with two to four unique supported kinds", () => {
     expect(normalizeCreationDraftOutput({
       status: "choose_kind",
-      candidates: [
-        { kind: "event", label: "Calendar event" },
-        { kind: "task", label: "Task" },
-        { kind: "event", label: "Duplicate" },
-      ],
-      missingFields: ["kind"], warnings: [],
+      candidateKinds: ["event", "task"],
     }, { members, familyToday: "2026-08-04" })).toEqual({
       status: "choose_kind",
-      candidates: [
-        { kind: "event", label: "Calendar event" },
-        { kind: "task", label: "Task" },
-      ],
-      missingFields: ["kind"], warnings: [],
+      candidateKinds: ["event", "task"],
     });
+    for (const candidateKinds of [
+      ["event"], ["event", "event"], ["event", "note"],
+    ]) expect(() => normalizeCreationDraftOutput({ status: "choose_kind", candidateKinds }, {
+      members, familyToday: "2026-08-04",
+    })).toThrow(CreationDraftInvalidResponseError);
+    expect(() => normalizeCreationDraftOutput({ status: "choose_kind", candidateKinds: ["event", "task"] }, {
+      members, familyToday: "2026-08-04", targetKind: "event",
+    })).toThrow(CreationDraftInvalidResponseError);
+
     expect(() => normalizeCreationDraftOutput({
-      status: "choose_kind", candidates: [{ kind: "event", label: "Event" }],
-      missingFields: [], warnings: [],
-    }, { members, familyToday: "2026-08-04", targetKind: "event" })).toThrow(CreationDraftInvalidResponseError);
+      status: "choose_kind",
+      candidates: [{ kind: "event", label: "Event" }, { kind: "task", label: "Task" }],
+      missingFields: ["kind"], warnings: [],
+    }, { members, familyToday: "2026-08-04" })).toThrow(CreationDraftInvalidResponseError);
 
     expect(() => normalizeCreationDraftOutput({
       status: "ready", kind: "wish", ...common,
@@ -195,8 +200,8 @@ describe("creation draft model normalization", () => {
       draft: { assigneeIds: ["usr_alice"] },
       missingFields: ["assigneeIds"],
       warnings: [
-        { code: "AMBIGUOUS_MEMBER", field: "assigneeIds", value: "m2" },
-        { code: "UNRESOLVED_MEMBER", field: "assigneeIds", value: "m3" },
+        { code: "AMBIGUOUS_MEMBER", field: "assigneeIds", message: AMBIGUOUS_MESSAGE },
+        { code: "UNRESOLVED_MEMBER", field: "assigneeIds", message: UNRESOLVED_MESSAGE },
       ],
     });
   });
@@ -211,6 +216,7 @@ describe("creation draft model normalization", () => {
         endTimezone: "Asia/Shanghai", location: null, attendeeRefs: [],
       },
     }, { members, familyToday: "2026-08-04" });
+    if (result.status !== "ready") throw new Error("expected ready event draft");
     expect(result).toMatchObject({
       draft: {
         startDate: null, endDate: null, endDateExclusive: null,
@@ -218,9 +224,9 @@ describe("creation draft model normalization", () => {
       },
     });
     expect(result.warnings).toEqual(expect.arrayContaining([
-      { code: "UNSUPPORTED_DETAIL", field: "endDate", value: "2026-08-05" },
-      { code: "UNSUPPORTED_DETAIL", field: "endTime", value: "10:00" },
-      { code: "UNSUPPORTED_DETAIL", field: "endTimezone", value: "Asia/Shanghai" },
+      { code: "UNSUPPORTED_DETAIL", field: "endDate", message: UNSUPPORTED_MESSAGE },
+      { code: "UNSUPPORTED_DETAIL", field: "endTime", message: UNSUPPORTED_MESSAGE },
+      { code: "UNSUPPORTED_DETAIL", field: "endTimezone", message: UNSUPPORTED_MESSAGE },
     ]));
     expect(result.missingFields).toEqual(expect.arrayContaining(["startDate", "endDateExclusive"]));
 
@@ -246,7 +252,7 @@ describe("creation draft model normalization", () => {
     }, { members, familyToday: "2026-03-07" });
     expect(nonexistentLocalTime).toMatchObject({
       draft: { startTime: null }, missingFields: expect.arrayContaining(["startTime"]),
-      warnings: expect.arrayContaining([{ code: "INVALID_INFERRED_VALUE", field: "startTime", value: "02:30" }]),
+      warnings: expect.arrayContaining([{ code: "INVALID_INFERRED_VALUE", field: "startTime", message: INVALID_MESSAGE }]),
     });
   });
 
@@ -259,6 +265,7 @@ describe("creation draft model normalization", () => {
         attentionAfterDays: 3, attentionBeforeDays: -1, cycleDays: 0,
       },
     }, { members, familyToday: "2026-08-04" });
+    if (result.status !== "ready") throw new Error("expected ready day-record draft");
     expect(result).toMatchObject({
       draft: {
         anchorDate: null, attentionAfterDays: null,
@@ -267,7 +274,7 @@ describe("creation draft model normalization", () => {
       missingFields: expect.arrayContaining(["anchorDate", "cycleDays"]),
     });
     expect(result.warnings).toContainEqual({
-      code: "UNSUPPORTED_DETAIL", field: "attentionAfterDays", value: "3",
+      code: "UNSUPPORTED_DETAIL", field: "attentionAfterDays", message: UNSUPPORTED_MESSAGE,
     });
 
     const elapsed = normalizeCreationDraftOutput({
@@ -278,9 +285,10 @@ describe("creation draft model normalization", () => {
         attentionAfterDays: 0, attentionBeforeDays: null, cycleDays: null,
       },
     }, { members, familyToday: "2026-08-04" });
+    if (elapsed.status !== "ready") throw new Error("expected ready day-record draft");
     expect(elapsed).toMatchObject({ draft: { attentionAfterDays: null } });
     expect(elapsed.warnings).toContainEqual({
-      code: "INVALID_INFERRED_VALUE", field: "attentionAfterDays", value: "0",
+      code: "INVALID_INFERRED_VALUE", field: "attentionAfterDays", message: INVALID_MESSAGE,
     });
 
     const overLimit = normalizeCreationDraftOutput({
@@ -306,20 +314,25 @@ describe("creation draft model normalization", () => {
       .toThrowError(expect.objectContaining({ code: "AI_INVALID_RESPONSE" }));
   });
 
-  it("requires warning.value to match the strict model schema", () => {
+  it("requires the exact model warning shape and accepts a nullable field", () => {
     expect(() => normalizeCreationDraftOutput({
       status: "ready", kind: "wish", missingFields: [],
-      warnings: [{ code: "UNSUPPORTED_DETAIL", field: "description" }],
+      warnings: [{ code: "UNSUPPORTED_DETAIL", field: "description", value: null }],
       draft: { title: "Wish", description: null, desiredDate: null },
     }, { members, familyToday: "2026-08-04" })).toThrow(CreationDraftInvalidResponseError);
 
     expect(normalizeCreationDraftOutput({
       status: "ready", kind: "wish", missingFields: [],
-      warnings: [{ code: "UNSUPPORTED_DETAIL", field: "description", value: null }],
+      warnings: [{ code: "UNSUPPORTED_DETAIL", field: null, message: "A safe global warning." }],
       draft: { title: "Wish", description: null, desiredDate: null },
     }, { members, familyToday: "2026-08-04" })).toMatchObject({
-      warnings: [{ code: "UNSUPPORTED_DETAIL", field: "description" }],
+      warnings: [{ code: "UNSUPPORTED_DETAIL", field: null, message: "A safe global warning." }],
     });
+    for (const message of ["", "m".repeat(501)]) expect(() => normalizeCreationDraftOutput({
+      status: "ready", kind: "wish", missingFields: [],
+      warnings: [{ code: "UNSUPPORTED_DETAIL", field: null, message }],
+      draft: { title: "Wish", description: null, desiredDate: null },
+    }, { members, familyToday: "2026-08-04" })).toThrow(CreationDraftInvalidResponseError);
   });
 
   it("keeps normalized warning and missing-field arrays capped while retaining derived validation", () => {
@@ -327,7 +340,7 @@ describe("creation draft model normalization", () => {
       status: "ready", kind: "event",
       missingFields: Array.from({ length: 32 }, (_, index) => `modelField${index}`),
       warnings: Array.from({ length: 32 }, (_, index) => ({
-        code: "UNSUPPORTED_DETAIL", field: `modelField${index}`, value: null,
+        code: "UNSUPPORTED_DETAIL", field: `modelField${index}`, message: "Model warning.",
       })),
       draft: {
         summary: "s".repeat(101), description: null, isAllDay: true,
@@ -336,11 +349,12 @@ describe("creation draft model normalization", () => {
         location: null, attendeeRefs: [],
       },
     }, { members, familyToday: "2026-08-04" });
+    if (result.status !== "ready") throw new Error("expected ready event draft");
     expect(result.missingFields).toHaveLength(32);
     expect(result.missingFields).toContain("summary");
     expect(result.warnings).toHaveLength(32);
     expect(result.warnings).toContainEqual({
-      code: "INVALID_INFERRED_VALUE", field: "summary", value: "s".repeat(101),
+      code: "INVALID_INFERRED_VALUE", field: "summary", message: INVALID_MESSAGE,
     });
   });
 
@@ -357,7 +371,13 @@ describe("creation draft model normalization", () => {
     expect(serialized).toContain("attendeeRefs");
     expect(serialized).not.toContain("attendeeIds");
     const variants = (CREATION_DRAFT_JSON_SCHEMA.schema.properties.result as { anyOf: Array<any> }).anyOf;
-    expect(variants[0].properties.candidates).toMatchObject({ minItems: 2, maxItems: 4 });
+    expect(variants[0]).toMatchObject({
+      required: ["status", "candidateKinds"],
+      properties: { candidateKinds: { minItems: 2, maxItems: 4 } },
+    });
+    expect(variants[0].properties.candidateKinds).not.toHaveProperty("uniqueItems");
+    expect(Object.keys(variants[0].properties)).toEqual(["status", "candidateKinds"]);
+    expect(serialized).not.toContain('"label"');
     expect(variants[1].properties.draft.properties).toMatchObject({
       summary: { maxLength: 100 }, description: { maxLength: 5000 }, location: { maxLength: 500 },
       attendeeRefs: { maxItems: 8 },
@@ -372,8 +392,15 @@ describe("creation draft model normalization", () => {
       title: { maxLength: 100 }, description: { maxLength: 5000 },
     });
     for (const variant of variants) {
-      expect(variant.properties.missingFields.maxItems).toBe(32);
-      expect(variant.properties.warnings.maxItems).toBe(32);
+      if (variant.properties.missingFields) expect(variant.properties.missingFields.maxItems).toBe(32);
+      if (variant.properties.warnings) {
+        expect(variant.properties.warnings.maxItems).toBe(32);
+        expect(variant.properties.warnings.items).toMatchObject({
+          required: ["code", "field", "message"],
+          properties: { field: { type: ["string", "null"] }, message: { minLength: 1, maxLength: 500 } },
+        });
+        expect(variant.properties.warnings.items.properties).not.toHaveProperty("value");
+      }
     }
   });
 });

@@ -48,11 +48,14 @@ describe("OpenAI-compatible creation provider", () => {
     expect(body.messages[0].role).toBe("system");
     expect(body.messages[0].content).toContain("lower-priority appendix");
     expect(body.messages[0].content).toContain("Prefer concise names.");
+    expect(body.messages[0].content).toContain('exactly {"status":"choose_kind","candidateKinds":[');
+    expect(body.messages[0].content).toContain("2 to 4 unique supported kinds");
     expect(body.messages[0].content).not.toContain(input.text);
     expect(body.messages[1]).toMatchObject({ role: "user" });
     expect(body.messages[1].content).toContain(input.text);
     expect(body.messages[1].content).toContain('"ref":"m1"');
     expect(body.messages[1].content).not.toContain("usr_");
+    expect(JSON.stringify(body.response_format)).not.toContain('"label"');
     expect(result).toMatchObject({
       output: { status: "ready", kind: "wish" },
       metadata: { providerStatus: 200, usage: { totalTokens: 15 } },

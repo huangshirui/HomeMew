@@ -16,8 +16,7 @@ const readyWish = {
 
 const chooseKind = {
   status: "choose_kind",
-  candidates: [{ kind: "event", label: "Event" }, { kind: "task", label: "Task" }],
-  missingFields: ["kind"], warnings: [],
+  candidateKinds: ["event", "task"],
 } as const;
 
 type Provider = { generate(input: CreationProviderInput): Promise<CreationProviderResult> };
@@ -93,6 +92,20 @@ describe("AI creation draft route", () => {
     const response = await call(appWith({ generate: vi.fn(async () => ({ output: chooseKind, metadata: { providerStatus: 200 } })) }), family.id, family.admin.token);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ data: chooseKind });
+  });
+
+  it("rejects the legacy labeled choose_kind shape", async () => {
+    const family = await createFamily("Creation legacy choose kind");
+    const response = await call(appWith({ generate: vi.fn(async () => ({
+      output: {
+        status: "choose_kind",
+        candidates: [{ kind: "event", label: "Event" }, { kind: "task", label: "Task" }],
+        missingFields: ["kind"], warnings: [],
+      },
+      metadata: { providerStatus: 200 },
+    })) }), family.id, family.admin.token);
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ error: { code: "AI_INVALID_RESPONSE" } });
   });
 
   it.each([

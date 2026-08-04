@@ -8,8 +8,8 @@ export type DraftWarningCode =
 
 export interface DraftWarning {
   code: DraftWarningCode;
-  field: string;
-  value?: string;
+  field: string | null;
+  message: string;
 }
 
 export interface EventFormDraft {
@@ -60,9 +60,7 @@ type ReadyDraft =
 
 export type NormalizedCreationDraft = ReadyDraft | {
   status: "choose_kind";
-  candidates: Array<{ kind: CreationKind; label: string }>;
-  missingFields: string[];
-  warnings: DraftWarning[];
+  candidateKinds: CreationKind[];
 };
 
 export interface ActiveMemberRef {
@@ -86,9 +84,9 @@ const nullableInteger = { type: ["integer", "null"] } as const;
 const closedObject = (required: readonly string[], properties: Record<string, unknown>) => ({
   type: "object", additionalProperties: false, required, properties,
 });
-const warningSchema = closedObject(["code", "field", "value"], {
+const warningSchema = closedObject(["code", "field", "message"], {
   code: { type: "string", enum: ["AMBIGUOUS_MEMBER", "UNRESOLVED_MEMBER", "INVALID_INFERRED_VALUE", "UNSUPPORTED_DETAIL"] },
-  field: { type: "string" }, value: nullableString,
+  field: { type: ["string", "null"] }, message: { type: "string", minLength: 1, maxLength: 500 },
 });
 const commonReady = {
   status: { const: "ready" },
@@ -105,13 +103,9 @@ export const CREATION_DRAFT_JSON_SCHEMA = {
   strict: true,
   schema: closedObject(["result"], {
     result: { anyOf: [
-      closedObject(["status", "candidates", "missingFields", "warnings"], {
+      closedObject(["status", "candidateKinds"], {
         status: { const: "choose_kind" },
-        candidates: { type: "array", minItems: 2, maxItems: 4, items: closedObject(["kind", "label"], {
-          kind: { type: "string", enum: CREATION_KINDS }, label: { type: "string" },
-        }) },
-        missingFields: { type: "array", maxItems: 32, items: { type: "string" } },
-        warnings: { type: "array", maxItems: 32, items: warningSchema },
+        candidateKinds: { type: "array", minItems: 2, maxItems: 4, items: { type: "string", enum: CREATION_KINDS } },
       }),
       readySchema("event", closedObject([
         "summary", "description", "isAllDay", "startDate", "endDate", "endDateExclusive",
@@ -175,15 +169,26 @@ function parseCommon(value: UnknownRecord): { missingFields: string[]; warnings:
   const missingFields = stringArray(value.missingFields);
   if (!Array.isArray(value.warnings) || value.warnings.length > 32) throw new CreationDraftInvalidResponseError();
   const warnings = value.warnings.map((item): DraftWarning => {
-    const warning = record(item, ["code", "field", "value"]);
-    requiredKeys(warning, ["code", "field", "value"]);
-    if (!["AMBIGUOUS_MEMBER", "UNRESOLVED_MEMBER", "INVALID_INFERRED_VALUE", "UNSUPPORTED_DETAIL"].includes(String(warning.code)) || typeof warning.field !== "string") {
+    const warning = record(item, ["code", "field", "message"]);
+    requiredKeys(warning, ["code", "field", "message"]);
+    if (!["AMBIGUOUS_MEMBER", "UNRESOLVED_MEMBER", "INVALID_INFERRED_VALUE", "UNSUPPORTED_DETAIL"].includes(String(warning.code)) || (warning.field !== null && typeof warning.field !== "string")) {
       throw new CreationDraftInvalidResponseError();
     }
-    if (warning.value !== null && typeof warning.value !== "string") throw new CreationDraftInvalidResponseError();
-    return { code: warning.code as DraftWarningCode, field: warning.field, ...(typeof warning.value === "string" ? { value: warning.value } : {}) };
+    if (typeof warning.message !== "string" || !warning.message.length || warning.message.length > 500) throw new CreationDraftInvalidResponseError();
+    return { code: warning.code as DraftWarningCode, field: warning.field as string | null, message: warning.message };
   });
   return { missingFields, warnings };
+}
+
+const DERIVED_WARNING_MESSAGES: Record<DraftWarningCode, string> = {
+  AMBIGUOUS_MEMBER: "The referenced member is ambiguous.",
+  UNRESOLVED_MEMBER: "The referenced member could not be resolved.",
+  INVALID_INFERRED_VALUE: "Invalid inferred value was discarded.",
+  UNSUPPORTED_DETAIL: "Unsupported field was discarded.",
+};
+
+function derivedWarning(code: DraftWarningCode, field: string | null): DraftWarning {
+  return { code, field, message: DERIVED_WARNING_MESSAGES[code] };
 }
 
 function cappedCommon(common: { missingFields: string[]; warnings: DraftWarning[] }) {
@@ -232,7 +237,7 @@ function clearInvalid(
   const value = draft[field];
   if (typeof value === "string" && !validator(value)) {
     draft[field] = null;
-    warnings.push({ code: "INVALID_INFERRED_VALUE", field, value });
+    warnings.push(derivedWarning("INVALID_INFERRED_VALUE", field));
     if (required && !missingFields.includes(field)) missingFields.push(field);
   }
 }
@@ -253,7 +258,7 @@ function resolveMembers(
   for (const ref of refs) {
     const matches = byRef.get(ref) ?? [];
     if (matches.length === 1) resolved.push(matches[0]!.userId);
-    else warnings.push({ code: matches.length ? "AMBIGUOUS_MEMBER" : "UNRESOLVED_MEMBER", field, value: ref });
+    else warnings.push(derivedWarning(matches.length ? "AMBIGUOUS_MEMBER" : "UNRESOLVED_MEMBER", field));
   }
   if (warnings.some((warning) => warning.field === field) && !missingFields.includes(field)) missingFields.push(field);
   return [...new Set(resolved)];
@@ -265,22 +270,18 @@ export function normalizeCreationDraftOutput(
 ): NormalizedCreationDraft {
   if (!validDate(options.familyToday)) throw new Error("familyToday must be YYYY-MM-DD");
   const supportedKinds = new Set(options.supportedKinds ?? CREATION_KINDS);
-  const envelope = record(input, ["status", "kind", "draft", "candidates", "missingFields", "warnings"]);
+  const envelope = record(input, ["status", "kind", "draft", "candidateKinds", "missingFields", "warnings"]);
   if (envelope.status === "choose_kind") {
-    requiredKeys(envelope, ["status", "candidates", "missingFields", "warnings"]);
-    if ("kind" in envelope || "draft" in envelope || !Array.isArray(envelope.candidates) || envelope.candidates.length > 4) throw new CreationDraftInvalidResponseError();
-    const seen = new Set<CreationKind>();
-    const candidates = envelope.candidates.map((item) => {
-      const candidate = record(item, ["kind", "label"]); requiredKeys(candidate, ["kind", "label"]);
-      if (!CREATION_KINDS.includes(candidate.kind as CreationKind) || !supportedKinds.has(candidate.kind as CreationKind) || typeof candidate.label !== "string") throw new CreationDraftInvalidResponseError();
-      return candidate as { kind: CreationKind; label: string };
-    }).filter((candidate) => !seen.has(candidate.kind) && Boolean(seen.add(candidate.kind)));
-    if (candidates.length < 2 || options.targetKind) throw new CreationDraftInvalidResponseError();
-    return { status: "choose_kind", candidates, ...parseCommon(envelope) };
+    const choose = record(input, ["status", "candidateKinds"]);
+    requiredKeys(choose, ["status", "candidateKinds"]);
+    if (!Array.isArray(choose.candidateKinds) || choose.candidateKinds.length < 2 || choose.candidateKinds.length > 4 || options.targetKind) throw new CreationDraftInvalidResponseError();
+    if (choose.candidateKinds.some((candidate) => typeof candidate !== "string" || !CREATION_KINDS.includes(candidate as CreationKind) || !supportedKinds.has(candidate as CreationKind))) throw new CreationDraftInvalidResponseError();
+    if (new Set(choose.candidateKinds).size !== choose.candidateKinds.length) throw new CreationDraftInvalidResponseError();
+    return { status: "choose_kind", candidateKinds: choose.candidateKinds as CreationKind[] };
   }
   if (envelope.status !== "ready") throw new CreationDraftInvalidResponseError();
   requiredKeys(envelope, ["status", "kind", "draft", "missingFields", "warnings"]);
-  if ("candidates" in envelope || !CREATION_KINDS.includes(envelope.kind as CreationKind)) throw new CreationDraftInvalidResponseError();
+  if ("candidateKinds" in envelope || !CREATION_KINDS.includes(envelope.kind as CreationKind)) throw new CreationDraftInvalidResponseError();
   const kind = envelope.kind as CreationKind;
   if (!supportedKinds.has(kind) || (options.targetKind && options.targetKind !== kind)) throw new CreationDraftInvalidResponseError();
   const common = parseCommon(envelope);
@@ -304,13 +305,13 @@ export function normalizeCreationDraftOutput(
     for (const field of ["startTime", "endTime"]) clearInvalid(draft, field, validTime, common.missingFields, common.warnings);
     for (const field of ["startTimezone", "endTimezone"]) clearInvalid(draft, field, validTimezone, common.missingFields, common.warnings);
     const clearUnsupportedEventField = (field: string) => {
-      if (draft[field] !== null) common.warnings.push({ code: "UNSUPPORTED_DETAIL", field, value: String(draft[field]) });
+      if (draft[field] !== null) common.warnings.push(derivedWarning("UNSUPPORTED_DETAIL", field));
       draft[field] = null;
     };
     if (draft.isAllDay === true) {
       for (const field of ["endDate", "startTime", "endTime", "startTimezone", "endTimezone"]) clearUnsupportedEventField(field);
       if (!draft.endDateExclusive || !draft.startDate || draft.endDateExclusive <= draft.startDate) {
-        if (draft.endDateExclusive) common.warnings.push({ code: "INVALID_INFERRED_VALUE", field: "endDateExclusive", value: String(draft.endDateExclusive) });
+        if (draft.endDateExclusive) common.warnings.push(derivedWarning("INVALID_INFERRED_VALUE", "endDateExclusive"));
         draft.endDateExclusive = null;
         if (!common.missingFields.includes("endDateExclusive")) common.missingFields.push("endDateExclusive");
       }
@@ -322,12 +323,12 @@ export function normalizeCreationDraftOutput(
       let localEnd = draft.endDate && draft.endTime && draft.endTimezone
         ? zonedLocalEpoch(String(draft.endDate), String(draft.endTime), String(draft.endTimezone)) : null;
       if (draft.startDate && draft.startTime && draft.startTimezone && localStart === null) {
-        common.warnings.push({ code: "INVALID_INFERRED_VALUE", field: "startTime", value: String(draft.startTime) });
+        common.warnings.push(derivedWarning("INVALID_INFERRED_VALUE", "startTime"));
         draft.startTime = null;
         if (!common.missingFields.includes("startTime")) common.missingFields.push("startTime");
       }
       if (draft.endDate && draft.endTime && draft.endTimezone && localEnd === null) {
-        common.warnings.push({ code: "INVALID_INFERRED_VALUE", field: "endTime", value: String(draft.endTime) });
+        common.warnings.push(derivedWarning("INVALID_INFERRED_VALUE", "endTime"));
         draft.endTime = null;
         if (!common.missingFields.includes("endTime")) common.missingFields.push("endTime");
       }
@@ -337,7 +338,7 @@ export function normalizeCreationDraftOutput(
         ? localEnd <= localStart
         : draft.startDate && draft.endDate && draft.startTime && draft.endTime && `${draft.endDate}T${draft.endTime}` <= `${draft.startDate}T${draft.startTime}`;
       if (invalidOrder) {
-        common.warnings.push({ code: "INVALID_INFERRED_VALUE", field: "endTime", value: String(draft.endTime) });
+        common.warnings.push(derivedWarning("INVALID_INFERRED_VALUE", "endTime"));
         draft.endTime = null; if (!common.missingFields.includes("endTime")) common.missingFields.push("endTime");
       }
     } else if (!common.missingFields.includes("isAllDay")) common.missingFields.push("isAllDay");
@@ -388,16 +389,16 @@ export function normalizeCreationDraftOutput(
   const invalidateNumber = (field: "attentionAfterDays" | "attentionBeforeDays" | "cycleDays", positive: boolean) => {
     const value = draft[field];
     if (value !== null && (value < 0 || value > 3650 || (positive && value < 1))) {
-      draft[field] = null; common.warnings.push({ code: "INVALID_INFERRED_VALUE", field, value: String(value) });
+      draft[field] = null; common.warnings.push(derivedWarning("INVALID_INFERRED_VALUE", field));
     }
   };
   invalidateNumber("attentionAfterDays", true); invalidateNumber("attentionBeforeDays", false); invalidateNumber("cycleDays", true);
   if ((draft.dayRecordKind === "elapsed" || draft.dayRecordKind === "cycle") && draft.anchorDate && draft.anchorDate > options.familyToday) {
-    common.warnings.push({ code: "INVALID_INFERRED_VALUE", field: "anchorDate", value: draft.anchorDate }); draft.anchorDate = null;
+    common.warnings.push(derivedWarning("INVALID_INFERRED_VALUE", "anchorDate")); draft.anchorDate = null;
   }
   const clearUnsupported = (field: "attentionAfterDays" | "attentionBeforeDays" | "cycleDays") => {
     const value = draft[field];
-    if (value !== null) common.warnings.push({ code: "UNSUPPORTED_DETAIL", field, value: String(value) });
+    if (value !== null) common.warnings.push(derivedWarning("UNSUPPORTED_DETAIL", field));
     draft[field] = null;
   };
   if (draft.dayRecordKind === "elapsed") { clearUnsupported("attentionBeforeDays"); clearUnsupported("cycleDays"); }
