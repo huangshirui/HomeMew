@@ -188,18 +188,24 @@ describe("creation draft model normalization", () => {
     }, { members, familyToday: "2026-08-04", supportedKinds: ["event"] })).toThrow(CreationDraftInvalidResponseError);
   });
 
-  it("maps only unique temporary member refs and warns for duplicate mappings and unknown refs", () => {
+  it("maps only unambiguous refs and rejects duplicate display names even for unique refs", () => {
     const result = normalizeCreationDraftOutput({
       status: "ready", kind: "task", ...common,
-      draft: { name: "Carry boxes", description: null, dueDate: null, assigneeRefs: ["m1", "m1", "m2", "m3"] },
+      draft: { name: "Carry boxes", description: null, dueDate: null, assigneeRefs: ["m1", "m1", "m2", "m3", "m5"] },
     }, {
-      members: [...members, { ref: "m2", userId: "usr_other_bob", name: "Another Bob" }],
+      members: [
+        ...members,
+        { ref: "m2", userId: "usr_other_bob", name: "Another Bob" },
+        { ref: "m3", userId: "usr_sam_one", name: "Sam" },
+        { ref: "m4", userId: "usr_sam_two", name: "Sam" },
+      ],
       familyToday: "2026-08-04",
     });
     expect(result).toMatchObject({
       draft: { assigneeIds: ["usr_alice"] },
       missingFields: ["assigneeIds"],
       warnings: [
+        { code: "AMBIGUOUS_MEMBER", field: "assigneeIds", message: AMBIGUOUS_MESSAGE },
         { code: "AMBIGUOUS_MEMBER", field: "assigneeIds", message: AMBIGUOUS_MESSAGE },
         { code: "UNRESOLVED_MEMBER", field: "assigneeIds", message: UNRESOLVED_MESSAGE },
       ],
@@ -253,6 +259,42 @@ describe("creation draft model normalization", () => {
     expect(nonexistentLocalTime).toMatchObject({
       draft: { startTime: null }, missingFields: expect.arrayContaining(["startTime"]),
       warnings: expect.arrayContaining([{ code: "INVALID_INFERRED_VALUE", field: "startTime", message: INVALID_MESSAGE }]),
+    });
+  });
+
+  it("clears repeated DST wall times instead of choosing an arbitrary fold", () => {
+    const repeatedStart = normalizeCreationDraftOutput({
+      status: "ready", kind: "event", ...common,
+      draft: {
+        summary: "Fall-back start", description: null, isAllDay: false,
+        startDate: "2026-11-01", endDate: "2026-11-01", endDateExclusive: null,
+        startTime: "01:30", endTime: "03:00", startTimezone: "America/Los_Angeles",
+        endTimezone: "America/Los_Angeles", location: null, attendeeRefs: [],
+      },
+    }, { members, familyToday: "2026-10-31" });
+    expect(repeatedStart).toMatchObject({
+      draft: { startTime: null, endTime: "03:00" },
+      missingFields: expect.arrayContaining(["startTime"]),
+      warnings: expect.arrayContaining([
+        { code: "INVALID_INFERRED_VALUE", field: "startTime", message: INVALID_MESSAGE },
+      ]),
+    });
+
+    const repeatedEnd = normalizeCreationDraftOutput({
+      status: "ready", kind: "event", ...common,
+      draft: {
+        summary: "Fall-back end", description: null, isAllDay: false,
+        startDate: "2026-11-01", endDate: "2026-11-01", endDateExclusive: null,
+        startTime: "00:30", endTime: "01:30", startTimezone: "America/Los_Angeles",
+        endTimezone: "America/Los_Angeles", location: null, attendeeRefs: [],
+      },
+    }, { members, familyToday: "2026-10-31" });
+    expect(repeatedEnd).toMatchObject({
+      draft: { startTime: "00:30", endTime: null },
+      missingFields: expect.arrayContaining(["endTime"]),
+      warnings: expect.arrayContaining([
+        { code: "INVALID_INFERRED_VALUE", field: "endTime", message: INVALID_MESSAGE },
+      ]),
     });
   });
 

@@ -43,7 +43,12 @@ function parseInput(input: Record<string, unknown>): { text: string; viewingTime
   if (typeof input.text !== "string" || input.text.trim().length < 1 || input.text.trim().length > 5000) {
     throw new ApiError("INVALID_REQUEST", "text must contain between 1 and 5000 characters", 400);
   }
-  const viewingTimezone = timezone(input.viewingTimezone);
+  let viewingTimezone: string;
+  try {
+    viewingTimezone = timezone(input.viewingTimezone);
+  } catch {
+    throw new ApiError("INVALID_REQUEST", "viewingTimezone must be a valid IANA timezone", 400);
+  }
   if (input.targetKind !== undefined && !CREATION_KINDS.includes(input.targetKind as CreationKind)) {
     throw new ApiError("INVALID_REQUEST", "targetKind is invalid", 400);
   }

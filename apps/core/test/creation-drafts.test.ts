@@ -115,8 +115,8 @@ describe("AI creation draft route", () => {
     ["missing text", { viewingTimezone: "UTC" }, "INVALID_REQUEST"],
     ["blank text", { text: "   ", viewingTimezone: "UTC" }, "INVALID_REQUEST"],
     ["overlong text", { text: "x".repeat(5001), viewingTimezone: "UTC" }, "INVALID_REQUEST"],
-    ["missing timezone", { text: "x" }, "INVALID_TIMEZONE"],
-    ["invalid timezone", { text: "x", viewingTimezone: "Mars/Olympus" }, "INVALID_TIMEZONE"],
+    ["missing timezone", { text: "x" }, "INVALID_REQUEST"],
+    ["invalid timezone", { text: "x", viewingTimezone: "Mars/Olympus" }, "INVALID_REQUEST"],
     ["invalid target kind", { text: "x", viewingTimezone: "UTC", targetKind: "note" }, "INVALID_REQUEST"],
   ])("rejects %s", async (_label, body, code) => {
     const family = await createFamily(`Creation invalid ${String(_label)}`);
@@ -198,7 +198,7 @@ describe("AI creation draft route", () => {
     expect((await response.json() as any).data.draft.anchorDate).toBe("2026-08-04");
   });
 
-  it("assigns stable temporary refs to active members, including duplicate display names, without exposing user IDs", async () => {
+  it("keeps stable temporary refs but never resolves duplicate display names to user IDs", async () => {
     const family = await createFamily("Creation members");
     const first = await addMember(family.id, "Sam", "2026-08-03T00:00:00.000Z");
     const second = await addMember(family.id, "Sam", "2026-08-03T00:00:00.000Z");
@@ -221,7 +221,15 @@ describe("AI creation draft route", () => {
     expect(inputs[1]!.members).toEqual(inputs[0]!.members);
     expect(JSON.stringify(inputs[0]!.members)).not.toContain(first.id);
     expect(JSON.stringify(inputs[0]!.members)).not.toContain(second.id);
-    expect((await firstResponse.json() as any).data.draft.assigneeIds.sort()).toEqual([first.id, second.id].sort());
+    const payload = (await firstResponse.json() as any).data;
+    expect(payload.draft.assigneeIds).toEqual([]);
+    expect(payload.missingFields).toContain("assigneeIds");
+    expect(payload.warnings).toEqual([
+      { code: "AMBIGUOUS_MEMBER", field: "assigneeIds", message: "The referenced member is ambiguous." },
+      { code: "AMBIGUOUS_MEMBER", field: "assigneeIds", message: "The referenced member is ambiguous." },
+    ]);
+    expect(JSON.stringify(payload)).not.toContain(first.id);
+    expect(JSON.stringify(payload)).not.toContain(second.id);
   });
 
   it("returns 503 when AI configuration is missing", async () => {
@@ -267,7 +275,7 @@ describe("AI creation draft route", () => {
     [new OpenAICompatibleProviderError("AI_TIMEOUT", "secret timeout"), 504, "AI_PROVIDER_TIMEOUT"],
     [new OpenAICompatibleProviderError("AI_RATE_LIMITED", "secret rate", 429), 429, "AI_RATE_LIMITED"],
     [new OpenAICompatibleProviderError("AI_UPSTREAM_UNAVAILABLE", "secret unavailable", 503), 502, "AI_PROVIDER_UNAVAILABLE"],
-    [new OpenAICompatibleProviderError("AI_UPSTREAM_ERROR", "secret bad request", 400), 502, "AI_PROVIDER_UNAVAILABLE"],
+    [new OpenAICompatibleProviderError("AI_NOT_CONFIGURED", "secret bad request", 400), 503, "AI_NOT_CONFIGURED"],
     [new OpenAICompatibleProviderError("AI_INVALID_RESPONSE", "secret raw model", 200), 502, "AI_INVALID_RESPONSE"],
   ])("maps provider errors safely", async (providerError, status, code) => {
     const family = await createFamily(`Creation error ${code}`);

@@ -220,6 +220,77 @@ POST   /api/v1/families/{familyId}/wishes/{wishId}/restore
 
 列表默认不含 archived，支持 `status`、`ownerUserId=me`、`claimantUserId=me`、`desiredFrom`、`desiredTo`、`sort`、`limit` 和 `cursor`。只有 active 家庭成员的用户身份可以访问；system 和 service 身份不能访问许愿池。成员退出或被移除时，其未完成认领会自动释放，但 owner 和实现人的历史引用继续保留。完整契约和错误响应以 `apps/core/openapi.yaml` 为准。
 
+## AI creation draft configuration
+
+`POST /api/v1/families/{familyId}/creation-drafts/interpret` is an ephemeral,
+read-only gateway. It does not write D1 or create an event, task, day record, or
+wish. This change does not select or hardcode a production model.
+
+Configure these deployment variables:
+
+- `AI_BASE_URL`: base URL of the OpenAI-compatible provider.
+- `AI_MODEL`: provider model identifier. The checked-in default is deliberately
+  blank, so the route fails closed with `AI_NOT_CONFIGURED` until an operator
+  selects a model.
+- `AI_PROMPT_APPENDIX`: optional deployment-specific guidance. It cannot
+  override the built-in safety and schema instructions.
+
+Store `AI_API_KEY` only as a Worker secret:
+
+```powershell
+corepack pnpm --filter @homemew/core exec wrangler secret put AI_API_KEY
+```
+
+The selected model must support strict JSON-schema structured output through
+the provider's OpenAI-compatible chat-completions API. `AI_RATE_LIMITER` is
+configured in `wrangler.jsonc` for 10 requests per user per 60 seconds. Because
+`AI_API_KEY` is listed under `secrets.required`, a production deployment needs
+that secret even while the blank `AI_MODEL` keeps interpretation disabled.
+
+For local development, keep real credentials only in the ignored
+`apps/core/.dev.vars` file, never in `.dev.vars.example`, source, shell history,
+test fixtures, or commits. A local file may contain:
+
+```dotenv
+AI_BASE_URL=https://provider.example/v1
+AI_MODEL=structured-output-capable-model
+AI_PROMPT_APPENDIX=
+AI_API_KEY=replace-locally
+```
+
+Do not log the API key, source household text, prompt appendix, member names,
+provider request/response bodies, or returned drafts. Operational logs are
+limited to request IDs, timing, result category, upstream status, and usage
+counts.
+
+Before production enablement:
+
+1. Choose and validate a structured-output-capable model; set `AI_BASE_URL`,
+   `AI_MODEL`, and any reviewed `AI_PROMPT_APPENDIX` as deployment variables.
+2. Install `AI_API_KEY` with `wrangler secret put` and confirm the rate-limit
+   binding is present.
+3. Run the local gates:
+
+   ```powershell
+   corepack pnpm --filter @homemew/core contract
+   corepack pnpm --filter @homemew/core typecheck
+   corepack pnpm --filter @homemew/core build
+   ```
+
+4. After deployment, send an authenticated smoke request to the interpretation
+   route with a non-production test phrase and verify `x-request-id` plus the
+   `{ "data": ... }` envelope. The smoke test must stop at the returned draft;
+   do not call a create endpoint.
+
+   ```powershell
+   $headers = @{ Authorization = "Bearer $env:HOMEMEW_USER_JWT" }
+   $body = @{ text = "Dinner tomorrow at 19:00"; viewingTimezone = "Asia/Shanghai" } | ConvertTo-Json
+   Invoke-WebRequest -Method Post -Uri "$env:HOMEMEW_CORE_URL/api/v1/families/fam_smoke/creation-drafts/interpret" -Headers $headers -ContentType "application/json" -Body $body
+   ```
+
+The gateway makes one provider attempt per request. Operators and clients must
+not assume an automatic retry.
+
 ## 本地 D1 与 R2
 
 ```powershell

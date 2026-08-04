@@ -215,19 +215,25 @@ function validTimezone(value: string): boolean {
 
 function zonedLocalEpoch(date: string, time: string, timeZone: string): number | null {
   const target = Date.parse(`${date}T${time}:00.000Z`);
-  let instant = target;
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone, year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
   });
-  for (let index = 0; index < 3; index += 1) {
+  const representedAt = (instant: number) => {
     const parts = formatter.formatToParts(new Date(instant));
     const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((item) => item.type === type)?.value);
-    const represented = Date.UTC(part("year"), part("month") - 1, part("day"), part("hour"), part("minute"), part("second"));
-    instant += target - represented;
+    return Date.UTC(part("year"), part("month") - 1, part("day"), part("hour"), part("minute"), part("second"));
+  };
+  const offsets = new Set<number>();
+  for (let hours = -36; hours <= 36; hours += 6) {
+    const sample = target + hours * 60 * 60 * 1000;
+    offsets.add(representedAt(sample) - sample);
   }
-  const represented = Object.fromEntries(formatter.formatToParts(new Date(instant)).map((item) => [item.type, item.value]));
-  return `${represented.year}-${represented.month}-${represented.day}T${represented.hour}:${represented.minute}` === `${date}T${time}` ? instant : null;
+  const candidates = [...offsets]
+    .map((offset) => target - offset)
+    .filter((instant) => representedAt(instant) === target);
+  const uniqueCandidates = [...new Set(candidates)];
+  return uniqueCandidates.length === 1 ? uniqueCandidates[0]! : null;
 }
 
 function clearInvalid(
@@ -253,11 +259,13 @@ function resolveMembers(
   refs: string[], field: string, members: ActiveMemberRef[], missingFields: string[], warnings: DraftWarning[],
 ): string[] {
   const byRef = new Map<string, ActiveMemberRef[]>();
+  const nameCounts = new Map<string, number>();
   for (const member of members) byRef.set(member.ref, [...(byRef.get(member.ref) ?? []), member]);
+  for (const member of members) nameCounts.set(member.name, (nameCounts.get(member.name) ?? 0) + 1);
   const resolved: string[] = [];
   for (const ref of refs) {
     const matches = byRef.get(ref) ?? [];
-    if (matches.length === 1) resolved.push(matches[0]!.userId);
+    if (matches.length === 1 && nameCounts.get(matches[0]!.name) === 1) resolved.push(matches[0]!.userId);
     else warnings.push(derivedWarning(matches.length ? "AMBIGUOUS_MEMBER" : "UNRESOLVED_MEMBER", field));
   }
   if (warnings.some((warning) => warning.field === field) && !missingFields.includes(field)) missingFields.push(field);

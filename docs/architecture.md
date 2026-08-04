@@ -350,3 +350,50 @@ must preserve the user's identity and call the normal family route.
 Membership removal releases unfinished claims as part of the same Core
 operation. Owner and fulfillment references remain historical data after a
 member leaves, consistent with other family-scoped audit references.
+
+## 16. AI creation draft gateway
+
+Core exposes a user-only family route that interprets household-language text
+as an ephemeral event, task, day-record, or wish draft. The caller must be an
+active user and active family member; system integrations and internal service
+identities cannot use this route. Interpretation is read-only: Core may read
+family and active-member context, but it performs no D1 writes and never creates
+the requested business record.
+
+Core owns the AI gateway and provider adapter. The current adapter calls a
+configured OpenAI-compatible endpoint with strict structured output. The
+outbound privacy boundary is deliberately narrow: the untrusted source text,
+current instant, family and viewing timezones, supported kinds, and active
+member display names paired with request-scoped temporary references may leave
+Core. HomeMew user IDs, other household business records, bearer tokens,
+provider credentials, and backend secrets are not sent. Provider-specific code
+must remain behind the adapter so a later model, provider, or locally hosted
+implementation can preserve the same public Core contract.
+
+Core validates and normalizes the provider response before returning it. Logs
+contain only operational metadata such as request ID, duration, result status,
+kind, upstream status, token counts, and error category. They must not contain
+the source text, prompts, member names, drafts, provider bodies, or API keys.
+Core makes one provider attempt and does not retry automatically.
+
+The client flow is:
+
+```text
+Client sends source text and viewing timezone
+→ Core returns a ready ephemeral draft
+  → client reviews and completes missing fields
+  → client calls the existing normal create endpoint
+or Core returns choose_kind with candidateKinds
+  → user selects a kind
+  → client repeats interpretation with the original text and targetKind
+  → client reviews the ready draft and uses the normal create endpoint
+```
+
+The interpretation response is never proof that a record exists. Final writes
+continue to use the existing event, task, day-record, and wish authorization,
+validation, and persistence paths.
+
+Relative event dates and times are interpreted in the request's
+`viewingTimezone`, which reflects the calendar the user is viewing. Relative
+date-only values for tasks, day records, and wishes are interpreted in the
+family's IANA timezone so household dates remain stable across viewers.

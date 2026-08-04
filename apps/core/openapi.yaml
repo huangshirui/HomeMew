@@ -27,6 +27,7 @@ tags:
   - name: Day Records
   - name: Wishes
   - name: Integrations
+  - name: Creation Drafts
   - name: OAuth
   - name: Internal
 paths:
@@ -654,6 +655,54 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/families/{familyId}/creation-drafts/interpret:
+    post:
+      tags: [Creation Drafts]
+      summary: Interpret household text as an ephemeral creation draft
+      description: |
+        Uses the configured AI provider to classify and normalize text into a
+        read-only draft. This operation never creates or updates a Core record
+        and performs no D1 writes. After reviewing and completing the draft,
+        the client submits it through the existing event, task, day-record, or
+        wish creation endpoint.
+      operationId: interpretCreationDraft
+      x-homemew-status: implemented
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InterpretCreationDraftRequest'
+      responses:
+        '200':
+          description: Ephemeral creation draft or a request to choose its kind
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreationDraftResponse'
+        '400':
+          $ref: '#/components/responses/CreationDraftInvalidRequest'
+        '401':
+          $ref: '#/components/responses/CreationDraftUnauthorized'
+        '403':
+          $ref: '#/components/responses/CreationDraftForbidden'
+        '404':
+          $ref: '#/components/responses/CreationDraftNotFound'
+        '429':
+          $ref: '#/components/responses/CreationDraftRateLimited'
+        '502':
+          $ref: '#/components/responses/CreationDraftBadGateway'
+        '503':
+          $ref: '#/components/responses/CreationDraftNotConfigured'
+        '504':
+          $ref: '#/components/responses/CreationDraftTimeout'
   /api/v1/families/{familyId}/events:
     parameters:
       - $ref: '#/components/parameters/FamilyId'
@@ -1512,6 +1561,62 @@ components:
       schema:
         type: string
   responses:
+    CreationDraftInvalidRequest:
+      description: INVALID_REQUEST
+      headers:
+        x-request-id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CreationDraftBadRequestError' }
+    CreationDraftUnauthorized:
+      description: UNAUTHORIZED
+      headers:
+        x-request-id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CreationDraftUnauthorizedError' }
+    CreationDraftForbidden:
+      description: FORBIDDEN
+      headers:
+        x-request-id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CreationDraftForbiddenError' }
+    CreationDraftNotFound:
+      description: USER_NOT_FOUND or FAMILY_NOT_FOUND
+      headers:
+        x-request-id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CreationDraftNotFoundError' }
+    CreationDraftRateLimited:
+      description: AI_RATE_LIMITED
+      headers:
+        x-request-id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CreationDraftRateLimitedError' }
+    CreationDraftBadGateway:
+      description: AI_PROVIDER_UNAVAILABLE or AI_INVALID_RESPONSE
+      headers:
+        x-request-id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CreationDraftBadGatewayError' }
+    CreationDraftNotConfigured:
+      description: AI_NOT_CONFIGURED
+      headers:
+        x-request-id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CreationDraftNotConfiguredError' }
+    CreationDraftTimeout:
+      description: AI_PROVIDER_TIMEOUT
+      headers:
+        x-request-id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CreationDraftTimeoutError' }
     WishResult:
       description: Updated wish
       content:
@@ -1707,6 +1812,293 @@ components:
               type: string
             requestId:
               type: string
+    CreationDraftErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, message, requestId]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        requestId: { type: string }
+    CreationDraftBadRequestError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          allOf:
+            - $ref: '#/components/schemas/CreationDraftErrorDetail'
+            - type: object
+              properties:
+                code: { const: INVALID_REQUEST }
+    CreationDraftUnauthorizedError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          allOf:
+            - $ref: '#/components/schemas/CreationDraftErrorDetail'
+            - type: object
+              properties:
+                code: { const: UNAUTHORIZED }
+    CreationDraftForbiddenError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          allOf:
+            - $ref: '#/components/schemas/CreationDraftErrorDetail'
+            - type: object
+              properties:
+                code: { const: FORBIDDEN }
+    CreationDraftNotFoundError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          allOf:
+            - $ref: '#/components/schemas/CreationDraftErrorDetail'
+            - type: object
+              properties:
+                code: { enum: [USER_NOT_FOUND, FAMILY_NOT_FOUND] }
+    CreationDraftRateLimitedError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          allOf:
+            - $ref: '#/components/schemas/CreationDraftErrorDetail'
+            - type: object
+              properties:
+                code: { const: AI_RATE_LIMITED }
+    CreationDraftBadGatewayError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          allOf:
+            - $ref: '#/components/schemas/CreationDraftErrorDetail'
+            - type: object
+              properties:
+                code: { enum: [AI_PROVIDER_UNAVAILABLE, AI_INVALID_RESPONSE] }
+    CreationDraftNotConfiguredError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          allOf:
+            - $ref: '#/components/schemas/CreationDraftErrorDetail'
+            - type: object
+              properties:
+                code: { const: AI_NOT_CONFIGURED }
+    CreationDraftTimeoutError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          allOf:
+            - $ref: '#/components/schemas/CreationDraftErrorDetail'
+            - type: object
+              properties:
+                code: { const: AI_PROVIDER_TIMEOUT }
+    CreationKind:
+      type: string
+      enum: [event, task, day_record, wish]
+    InterpretCreationDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [text, viewingTimezone]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          pattern: '\S'
+          description: |
+            Untrusted household-language text to interpret. Core removes
+            leading and trailing whitespace first; the trimmed value must
+            contain between 1 and 5000 characters. Leading or trailing
+            whitespace therefore does not count toward the limit.
+        viewingTimezone:
+          type: string
+          minLength: 1
+          description: |
+            Non-empty IANA timezone used to interpret relative event dates and
+            times. Relative date-only values for task, day_record, and wish
+            drafts are interpreted in the family's IANA timezone instead.
+        targetKind:
+          $ref: '#/components/schemas/CreationKind'
+    CreationDraftWarning:
+      type: object
+      additionalProperties: false
+      required: [code, field, message]
+      properties:
+        code:
+          type: string
+          enum: [AMBIGUOUS_MEMBER, UNRESOLVED_MEMBER, INVALID_INFERRED_VALUE, UNSUPPORTED_DETAIL]
+        field:
+          type: [string, 'null']
+        message:
+          type: string
+          minLength: 1
+          maxLength: 500
+    ChooseCreationKindDraft:
+      type: object
+      additionalProperties: false
+      required: [status, candidateKinds]
+      properties:
+        status: { const: choose_kind }
+        candidateKinds:
+          type: array
+          minItems: 2
+          maxItems: 4
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/CreationKind' }
+    CreationDraftReadyCommon:
+      type: object
+      required: [status, missingFields, warnings]
+      properties:
+        status: { const: ready }
+        missingFields:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items: { type: string }
+        warnings:
+          type: array
+          maxItems: 32
+          items: { $ref: '#/components/schemas/CreationDraftWarning' }
+    EventFormDraft:
+      type: object
+      additionalProperties: false
+      required: [summary, description, isAllDay, startDate, endDate, endDateExclusive, startTime, endTime, startTimezone, endTimezone, location, attendeeIds]
+      properties:
+        summary: { type: [string, 'null'], maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        isAllDay: { type: [boolean, 'null'] }
+        startDate: { type: [string, 'null'], format: date }
+        endDate: { type: [string, 'null'], format: date }
+        endDateExclusive: { type: [string, 'null'], format: date }
+        startTime:
+          type: [string, 'null']
+          pattern: '^(?:[01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: |
+            Local wall time. If the date, time, and timezone fall in a DST gap
+            or fold and do not identify one unambiguous instant, Core returns
+            null, marks startTime missing, and emits INVALID_INFERRED_VALUE.
+        endTime:
+          type: [string, 'null']
+          pattern: '^(?:[01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: |
+            Local wall time. If the date, time, and timezone fall in a DST gap
+            or fold and do not identify one unambiguous instant, Core returns
+            null, marks endTime missing, and emits INVALID_INFERRED_VALUE.
+        startTimezone:
+          type: [string, 'null']
+          minLength: 1
+          description: IANA timezone for the local start date and time.
+        endTimezone:
+          type: [string, 'null']
+          minLength: 1
+          description: IANA timezone for the local end date and time.
+        location: { type: [string, 'null'], maxLength: 500 }
+        attendeeIds:
+          type: array
+          maxItems: 8
+          uniqueItems: true
+          items: { type: string, pattern: '^usr_' }
+    TaskFormDraft:
+      type: object
+      additionalProperties: false
+      required: [name, description, dueDate, assigneeIds]
+      properties:
+        name: { type: [string, 'null'], maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        dueDate: { type: [string, 'null'], format: date }
+        assigneeIds:
+          type: array
+          maxItems: 8
+          uniqueItems: true
+          items: { type: string, pattern: '^usr_' }
+    DayRecordFormDraft:
+      type: object
+      additionalProperties: false
+      required: [dayRecordKind, name, description, anchorDate, subjectUserId, icon, attentionAfterDays, attentionBeforeDays, cycleDays]
+      properties:
+        dayRecordKind:
+          type: [string, 'null']
+          enum: [elapsed, countdown, cycle, null]
+        name: { type: [string, 'null'], maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        anchorDate: { type: [string, 'null'], format: date }
+        subjectUserId: { type: [string, 'null'], pattern: '^usr_' }
+        icon: { type: [string, 'null'], maxLength: 50 }
+        attentionAfterDays: { type: [integer, 'null'], minimum: 1, maximum: 3650 }
+        attentionBeforeDays: { type: [integer, 'null'], minimum: 0, maximum: 3650 }
+        cycleDays: { type: [integer, 'null'], minimum: 1, maximum: 3650 }
+    WishFormDraft:
+      type: object
+      additionalProperties: false
+      required: [title, description, desiredDate]
+      properties:
+        title: { type: [string, 'null'], maxLength: 100 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        desiredDate: { type: [string, 'null'], format: date }
+    EventCreationDraft:
+      allOf:
+        - $ref: '#/components/schemas/CreationDraftReadyCommon'
+        - type: object
+          required: [kind, draft]
+          properties:
+            kind: { const: event }
+            draft: { $ref: '#/components/schemas/EventFormDraft' }
+      unevaluatedProperties: false
+    TaskCreationDraft:
+      allOf:
+        - $ref: '#/components/schemas/CreationDraftReadyCommon'
+        - type: object
+          required: [kind, draft]
+          properties:
+            kind: { const: task }
+            draft: { $ref: '#/components/schemas/TaskFormDraft' }
+      unevaluatedProperties: false
+    DayRecordCreationDraft:
+      allOf:
+        - $ref: '#/components/schemas/CreationDraftReadyCommon'
+        - type: object
+          required: [kind, draft]
+          properties:
+            kind: { const: day_record }
+            draft: { $ref: '#/components/schemas/DayRecordFormDraft' }
+      unevaluatedProperties: false
+    WishCreationDraft:
+      allOf:
+        - $ref: '#/components/schemas/CreationDraftReadyCommon'
+        - type: object
+          required: [kind, draft]
+          properties:
+            kind: { const: wish }
+            draft: { $ref: '#/components/schemas/WishFormDraft' }
+      unevaluatedProperties: false
+    CreationDraftResult:
+      oneOf:
+        - $ref: '#/components/schemas/ChooseCreationKindDraft'
+        - $ref: '#/components/schemas/EventCreationDraft'
+        - $ref: '#/components/schemas/TaskCreationDraft'
+        - $ref: '#/components/schemas/DayRecordCreationDraft'
+        - $ref: '#/components/schemas/WishCreationDraft'
+    CreationDraftResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/CreationDraftResult' }
     HealthResponse:
       type: object
       required: [data]
