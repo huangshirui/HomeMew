@@ -9,13 +9,14 @@ import { registerTaskRoutes } from "./tasks";
 import { registerIntegrationRoutes } from "./integrations";
 import { registerDayRecordRoutes } from "./day-records";
 import { registerWishRoutes } from "./wishes";
+import { defaultCreationProvider, registerCreationDraftRoutes, type CreationDraftDependencies } from "./creation-drafts";
 
 type AppEnv = {
   Bindings: Bindings;
   Variables: Variables;
 };
 
-type Dependencies = {
+type Dependencies = CreationDraftDependencies & {
   getSchemaVersion: (env: Bindings) => Promise<string>;
 };
 
@@ -50,6 +51,8 @@ export function createApp(
 ): Hono<AppEnv> {
   const dependencies: Dependencies = {
     getSchemaVersion,
+    now: () => new Date(),
+    createCreationProvider: defaultCreationProvider,
     ...overrides,
   };
   const app = new Hono<AppEnv>();
@@ -96,6 +99,7 @@ export function createApp(
   registerTaskRoutes(app);
   registerDayRecordRoutes(app);
   registerWishRoutes(app);
+  registerCreationDraftRoutes(app, dependencies);
 
   app.notFound((context) => {
     return context.json(
