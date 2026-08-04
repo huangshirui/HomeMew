@@ -221,6 +221,35 @@ describe("AI creation draft route", () => {
     expect(await response.json()).toMatchObject({ error: { code: "AI_NOT_CONFIGURED" } });
   });
 
+  it.each(["absent", "blank"] as const)("keeps non-AI routes available when AI configuration is %s", async (mode) => {
+    const family = await createFamily(`Creation config isolation ${mode}`);
+    const configured = testBindings();
+    const app = createApp({ now: () => instant });
+    const appBindings = mode === "blank"
+      ? { ...configured, AI_API_KEY: "", AI_BASE_URL: "", AI_MODEL: "", AI_PROMPT_APPENDIX: "" }
+      : (({ AI_API_KEY: _key, AI_BASE_URL: _url, AI_MODEL: _model, AI_PROMPT_APPENDIX: _appendix, ...rest }) => rest)(configured);
+
+    const health = await app.request("/health", {}, appBindings);
+    const status = await app.request("/api/v1/status", {}, appBindings);
+    const me = await app.request("/api/v1/me", {
+      headers: { authorization: `Bearer ${family.admin.token}` },
+    }, appBindings);
+    const creation = await app.request(pathFor(family.id), {
+      method: "POST",
+      headers: { authorization: `Bearer ${family.admin.token}`, "content-type": "application/json" },
+      body: JSON.stringify({ text: "Make a wish", viewingTimezone: "UTC" }),
+    }, appBindings);
+
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({ data: { status: "ok" } });
+    expect(status.status).toBe(200);
+    expect(await status.json()).toMatchObject({ data: { status: "ok", database: "available" } });
+    expect(me.status).toBe(200);
+    expect(await me.json()).toMatchObject({ data: { id: family.admin.id } });
+    expect(creation.status).toBe(503);
+    expect(await creation.json()).toMatchObject({ error: { code: "AI_NOT_CONFIGURED" } });
+  });
+
   it.each([
     [new OpenAICompatibleProviderError("AI_TIMEOUT", "secret timeout"), 504, "AI_PROVIDER_TIMEOUT"],
     [new OpenAICompatibleProviderError("AI_RATE_LIMITED", "secret rate", 429), 429, "AI_RATE_LIMITED"],
