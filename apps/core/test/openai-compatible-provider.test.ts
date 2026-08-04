@@ -18,7 +18,7 @@ const input = {
 describe("OpenAI-compatible creation provider", () => {
   it("sends a strict non-streaming chat completion with separated untrusted input", async () => {
     const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({
-      choices: [{ message: { content: JSON.stringify({ result: {
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ result: {
         status: "ready", kind: "wish", missingFields: [], warnings: [],
         draft: { title: "A wish", description: null, desiredDate: null },
       } }) } }],
@@ -41,6 +41,7 @@ describe("OpenAI-compatible creation provider", () => {
     const body = JSON.parse(String(init.body));
     expect(body).toMatchObject({
       model: "model-1", stream: false, temperature: 0.1,
+      max_tokens: 2000,
       response_format: { type: "json_schema", json_schema: { strict: true } },
     });
     expect(body.messages).toHaveLength(2);
@@ -60,7 +61,7 @@ describe("OpenAI-compatible creation provider", () => {
 
   it("normalizes a base URL without a version path", async () => {
     const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({
-      choices: [{ message: { content: JSON.stringify({ result: {} }) } }],
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ result: {} }) } }],
     })));
     const provider = createOpenAICompatibleProvider({
       baseUrl: "https://ai.example.test", apiKey: "key", model: "model", fetch,
@@ -127,5 +128,28 @@ describe("OpenAI-compatible creation provider", () => {
     expect(error).toBeInstanceOf(OpenAICompatibleProviderError);
     expect(error).toMatchObject({ code: "AI_INVALID_RESPONSE" });
     expect(String(error)).not.toContain("not-json");
+  });
+
+  it.each([
+    ["length", undefined],
+    ["content_filter", undefined],
+    ["tool_calls", undefined],
+    [undefined, undefined],
+    ["stop", "I cannot comply"],
+  ])("rejects unsafe terminal state finish_reason=%s refusal=%s", async (finishReason, refusal) => {
+    const secretContent = JSON.stringify({ result: {
+      status: "ready", kind: "wish", missingFields: [], warnings: [],
+      draft: { title: "secret-valid-content", description: null, desiredDate: null },
+    } });
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({
+      choices: [{ ...(finishReason === undefined ? {} : { finish_reason: finishReason }), message: {
+        content: secretContent, ...(refusal === undefined ? {} : { refusal }),
+      } }],
+    })));
+    const provider = createOpenAICompatibleProvider({ baseUrl: "https://ai.example", apiKey: "key", model: "model", fetch });
+    const error = await provider.generate(input).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(OpenAICompatibleProviderError);
+    expect(error).toMatchObject({ code: "AI_INVALID_RESPONSE" });
+    expect(String(error)).not.toContain("secret-valid-content");
   });
 });

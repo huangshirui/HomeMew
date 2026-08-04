@@ -70,6 +70,91 @@ describe("creation draft model normalization", () => {
     expect(result).toMatchObject({ draft: { name: null, assigneeIds: [] }, missingFields: ["name"] });
   });
 
+  it("keeps exact string-limit boundaries for all draft kinds", () => {
+    const event = normalizeCreationDraftOutput({ status: "ready", kind: "event", ...common, draft: {
+      summary: "s".repeat(200), description: "d".repeat(5000), isAllDay: true,
+      startDate: "2026-08-05", endDate: null, endDateExclusive: "2026-08-06",
+      startTime: null, endTime: null, startTimezone: null, endTimezone: null,
+      location: "l".repeat(500), attendeeRefs: [],
+    } }, { members, familyToday: "2026-08-04" });
+    expect(event).toMatchObject({ draft: {
+      summary: "s".repeat(200), description: "d".repeat(5000), location: "l".repeat(500),
+    } });
+
+    const task = normalizeCreationDraftOutput({ status: "ready", kind: "task", ...common,
+      draft: { name: "n".repeat(200), description: "d".repeat(5000), dueDate: null, assigneeRefs: [] },
+    }, { members, familyToday: "2026-08-04" });
+    expect(task).toMatchObject({ draft: { name: "n".repeat(200), description: "d".repeat(5000) } });
+
+    const dayRecord = normalizeCreationDraftOutput({ status: "ready", kind: "day_record", ...common, draft: {
+      dayRecordKind: "elapsed", name: "n".repeat(100), description: "d".repeat(5000),
+      anchorDate: "2026-08-01", subjectMemberRef: null, icon: "i".repeat(50),
+      attentionAfterDays: null, attentionBeforeDays: null, cycleDays: null,
+    } }, { members, familyToday: "2026-08-04" });
+    expect(dayRecord).toMatchObject({ draft: {
+      name: "n".repeat(100), description: "d".repeat(5000), icon: "i".repeat(50),
+    } });
+
+    const wish = normalizeCreationDraftOutput({ status: "ready", kind: "wish", ...common,
+      draft: { title: "t".repeat(100), description: "d".repeat(5000), desiredDate: null },
+    }, { members, familyToday: "2026-08-04" });
+    expect(wish).toMatchObject({ draft: { title: "t".repeat(100), description: "d".repeat(5000) } });
+  });
+
+  it("clears every over-limit inferred string with warnings and required missing fields", () => {
+    const event = normalizeCreationDraftOutput({ status: "ready", kind: "event", ...common, draft: {
+      summary: "s".repeat(201), description: "d".repeat(5001), isAllDay: true,
+      startDate: "2026-08-05", endDate: null, endDateExclusive: "2026-08-06",
+      startTime: null, endTime: null, startTimezone: null, endTimezone: null,
+      location: "l".repeat(501), attendeeRefs: [],
+    } }, { members, familyToday: "2026-08-04" });
+    expect(event).toMatchObject({
+      draft: { summary: null, description: null, location: null },
+      missingFields: expect.arrayContaining(["summary"]),
+      warnings: expect.arrayContaining([
+        { code: "INVALID_INFERRED_VALUE", field: "summary", value: "s".repeat(201) },
+        { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
+        { code: "INVALID_INFERRED_VALUE", field: "location", value: "l".repeat(501) },
+      ]),
+    });
+
+    const task = normalizeCreationDraftOutput({ status: "ready", kind: "task", ...common,
+      draft: { name: "n".repeat(201), description: "d".repeat(5001), dueDate: null, assigneeRefs: [] },
+    }, { members, familyToday: "2026-08-04" });
+    expect(task).toMatchObject({
+      draft: { name: null, description: null }, missingFields: expect.arrayContaining(["name"]),
+      warnings: expect.arrayContaining([
+        { code: "INVALID_INFERRED_VALUE", field: "name", value: "n".repeat(201) },
+        { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
+      ]),
+    });
+
+    const dayRecord = normalizeCreationDraftOutput({ status: "ready", kind: "day_record", ...common, draft: {
+      dayRecordKind: "elapsed", name: "n".repeat(101), description: "d".repeat(5001),
+      anchorDate: "2026-08-01", subjectMemberRef: null, icon: "i".repeat(51),
+      attentionAfterDays: null, attentionBeforeDays: null, cycleDays: null,
+    } }, { members, familyToday: "2026-08-04" });
+    expect(dayRecord).toMatchObject({
+      draft: { name: null, description: null, icon: null }, missingFields: expect.arrayContaining(["name"]),
+      warnings: expect.arrayContaining([
+        { code: "INVALID_INFERRED_VALUE", field: "name", value: "n".repeat(101) },
+        { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
+        { code: "INVALID_INFERRED_VALUE", field: "icon", value: "i".repeat(51) },
+      ]),
+    });
+
+    const wish = normalizeCreationDraftOutput({ status: "ready", kind: "wish", ...common,
+      draft: { title: "t".repeat(101), description: "d".repeat(5001), desiredDate: null },
+    }, { members, familyToday: "2026-08-04" });
+    expect(wish).toMatchObject({
+      draft: { title: null, description: null }, missingFields: expect.arrayContaining(["title"]),
+      warnings: expect.arrayContaining([
+        { code: "INVALID_INFERRED_VALUE", field: "title", value: "t".repeat(101) },
+        { code: "INVALID_INFERRED_VALUE", field: "description", value: "d".repeat(5001) },
+      ]),
+    });
+  });
+
   it("accepts choose_kind only with at least two unique supported candidates", () => {
     expect(normalizeCreationDraftOutput({
       status: "choose_kind",
@@ -221,6 +306,44 @@ describe("creation draft model normalization", () => {
       .toThrowError(expect.objectContaining({ code: "AI_INVALID_RESPONSE" }));
   });
 
+  it("requires warning.value to match the strict model schema", () => {
+    expect(() => normalizeCreationDraftOutput({
+      status: "ready", kind: "wish", missingFields: [],
+      warnings: [{ code: "UNSUPPORTED_DETAIL", field: "description" }],
+      draft: { title: "Wish", description: null, desiredDate: null },
+    }, { members, familyToday: "2026-08-04" })).toThrow(CreationDraftInvalidResponseError);
+
+    expect(normalizeCreationDraftOutput({
+      status: "ready", kind: "wish", missingFields: [],
+      warnings: [{ code: "UNSUPPORTED_DETAIL", field: "description", value: null }],
+      draft: { title: "Wish", description: null, desiredDate: null },
+    }, { members, familyToday: "2026-08-04" })).toMatchObject({
+      warnings: [{ code: "UNSUPPORTED_DETAIL", field: "description" }],
+    });
+  });
+
+  it("keeps normalized warning and missing-field arrays capped while retaining derived validation", () => {
+    const result = normalizeCreationDraftOutput({
+      status: "ready", kind: "event",
+      missingFields: Array.from({ length: 32 }, (_, index) => `modelField${index}`),
+      warnings: Array.from({ length: 32 }, (_, index) => ({
+        code: "UNSUPPORTED_DETAIL", field: `modelField${index}`, value: null,
+      })),
+      draft: {
+        summary: "s".repeat(201), description: null, isAllDay: true,
+        startDate: "2026-08-05", endDate: null, endDateExclusive: "2026-08-06",
+        startTime: null, endTime: null, startTimezone: null, endTimezone: null,
+        location: null, attendeeRefs: [],
+      },
+    }, { members, familyToday: "2026-08-04" });
+    expect(result.missingFields).toHaveLength(32);
+    expect(result.missingFields).toContain("summary");
+    expect(result.warnings).toHaveLength(32);
+    expect(result.warnings).toContainEqual({
+      code: "INVALID_INFERRED_VALUE", field: "summary", value: "s".repeat(201),
+    });
+  });
+
   it("exports a closed strict JSON schema without confidence or free-form objects", () => {
     const serialized = JSON.stringify(CREATION_DRAFT_JSON_SCHEMA);
     expect(CREATION_DRAFT_JSON_SCHEMA.strict).toBe(true);
@@ -233,5 +356,24 @@ describe("creation draft model normalization", () => {
     expect(serialized).toContain('"additionalProperties":false');
     expect(serialized).toContain("attendeeRefs");
     expect(serialized).not.toContain("attendeeIds");
+    const variants = (CREATION_DRAFT_JSON_SCHEMA.schema.properties.result as { anyOf: Array<any> }).anyOf;
+    expect(variants[0].properties.candidates).toMatchObject({ minItems: 2, maxItems: 4 });
+    expect(variants[1].properties.draft.properties).toMatchObject({
+      summary: { maxLength: 200 }, description: { maxLength: 5000 }, location: { maxLength: 500 },
+      attendeeRefs: { maxItems: 8 },
+    });
+    expect(variants[2].properties.draft.properties).toMatchObject({
+      name: { maxLength: 200 }, description: { maxLength: 5000 }, assigneeRefs: { maxItems: 8 },
+    });
+    expect(variants[3].properties.draft.properties).toMatchObject({
+      name: { maxLength: 100 }, description: { maxLength: 5000 }, icon: { maxLength: 50 },
+    });
+    expect(variants[4].properties.draft.properties).toMatchObject({
+      title: { maxLength: 100 }, description: { maxLength: 5000 },
+    });
+    for (const variant of variants) {
+      expect(variant.properties.missingFields.maxItems).toBe(32);
+      expect(variant.properties.warnings.maxItems).toBe(32);
+    }
   });
 });

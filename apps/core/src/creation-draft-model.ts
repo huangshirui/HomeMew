@@ -81,6 +81,7 @@ export class CreationDraftInvalidResponseError extends Error {
 }
 
 const nullableString = { type: ["string", "null"] } as const;
+const nullableStringWithMax = (maxLength: number) => ({ type: ["string", "null"], maxLength } as const);
 const nullableInteger = { type: ["integer", "null"] } as const;
 const closedObject = (required: readonly string[], properties: Record<string, unknown>) => ({
   type: "object", additionalProperties: false, required, properties,
@@ -91,8 +92,8 @@ const warningSchema = closedObject(["code", "field", "value"], {
 });
 const commonReady = {
   status: { const: "ready" },
-  missingFields: { type: "array", items: { type: "string" } },
-  warnings: { type: "array", items: warningSchema },
+  missingFields: { type: "array", maxItems: 32, items: { type: "string" } },
+  warnings: { type: "array", maxItems: 32, items: warningSchema },
 };
 const readySchema = (kind: CreationKind, draft: unknown) => closedObject(
   ["status", "kind", "draft", "missingFields", "warnings"],
@@ -106,37 +107,37 @@ export const CREATION_DRAFT_JSON_SCHEMA = {
     result: { anyOf: [
       closedObject(["status", "candidates", "missingFields", "warnings"], {
         status: { const: "choose_kind" },
-        candidates: { type: "array", minItems: 2, items: closedObject(["kind", "label"], {
+        candidates: { type: "array", minItems: 2, maxItems: 4, items: closedObject(["kind", "label"], {
           kind: { type: "string", enum: CREATION_KINDS }, label: { type: "string" },
         }) },
-        missingFields: { type: "array", items: { type: "string" } },
-        warnings: { type: "array", items: warningSchema },
+        missingFields: { type: "array", maxItems: 32, items: { type: "string" } },
+        warnings: { type: "array", maxItems: 32, items: warningSchema },
       }),
       readySchema("event", closedObject([
         "summary", "description", "isAllDay", "startDate", "endDate", "endDateExclusive",
         "startTime", "endTime", "startTimezone", "endTimezone", "location", "attendeeRefs",
       ], {
-        summary: nullableString, description: nullableString, isAllDay: { type: ["boolean", "null"] },
+        summary: nullableStringWithMax(200), description: nullableStringWithMax(5000), isAllDay: { type: ["boolean", "null"] },
         startDate: nullableString, endDate: nullableString, endDateExclusive: nullableString,
         startTime: nullableString, endTime: nullableString, startTimezone: nullableString,
-        endTimezone: nullableString, location: nullableString,
-        attendeeRefs: { type: "array", items: { type: "string" } },
+        endTimezone: nullableString, location: nullableStringWithMax(500),
+        attendeeRefs: { type: "array", maxItems: 8, items: { type: "string" } },
       })),
       readySchema("task", closedObject(["name", "description", "dueDate", "assigneeRefs"], {
-        name: nullableString, description: nullableString, dueDate: nullableString,
-        assigneeRefs: { type: "array", items: { type: "string" } },
+        name: nullableStringWithMax(200), description: nullableStringWithMax(5000), dueDate: nullableString,
+        assigneeRefs: { type: "array", maxItems: 8, items: { type: "string" } },
       })),
       readySchema("day_record", closedObject([
         "dayRecordKind", "name", "description", "anchorDate", "subjectMemberRef", "icon",
         "attentionAfterDays", "attentionBeforeDays", "cycleDays",
       ], {
         dayRecordKind: { type: ["string", "null"], enum: ["elapsed", "countdown", "cycle", null] },
-        name: nullableString, description: nullableString, anchorDate: nullableString,
-        subjectMemberRef: nullableString, icon: nullableString,
+        name: nullableStringWithMax(100), description: nullableStringWithMax(5000), anchorDate: nullableString,
+        subjectMemberRef: nullableString, icon: nullableStringWithMax(50),
         attentionAfterDays: nullableInteger, attentionBeforeDays: nullableInteger, cycleDays: nullableInteger,
       })),
       readySchema("wish", closedObject(["title", "description", "desiredDate"], {
-        title: nullableString, description: nullableString, desiredDate: nullableString,
+        title: nullableStringWithMax(100), description: nullableStringWithMax(5000), desiredDate: nullableString,
       })),
     ] },
   }),
@@ -165,24 +166,31 @@ function integerOrNull(value: unknown): number | null {
   throw new CreationDraftInvalidResponseError();
 }
 
-function stringArray(value: unknown): string[] {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new CreationDraftInvalidResponseError();
+function stringArray(value: unknown, maxItems = 32): string[] {
+  if (!Array.isArray(value) || value.length > maxItems || value.some((item) => typeof item !== "string")) throw new CreationDraftInvalidResponseError();
   return [...new Set(value)];
 }
 
 function parseCommon(value: UnknownRecord): { missingFields: string[]; warnings: DraftWarning[] } {
   const missingFields = stringArray(value.missingFields);
-  if (!Array.isArray(value.warnings)) throw new CreationDraftInvalidResponseError();
+  if (!Array.isArray(value.warnings) || value.warnings.length > 32) throw new CreationDraftInvalidResponseError();
   const warnings = value.warnings.map((item): DraftWarning => {
     const warning = record(item, ["code", "field", "value"]);
-    requiredKeys(warning, ["code", "field"]);
+    requiredKeys(warning, ["code", "field", "value"]);
     if (!["AMBIGUOUS_MEMBER", "UNRESOLVED_MEMBER", "INVALID_INFERRED_VALUE", "UNSUPPORTED_DETAIL"].includes(String(warning.code)) || typeof warning.field !== "string") {
       throw new CreationDraftInvalidResponseError();
     }
-    if (warning.value !== undefined && warning.value !== null && typeof warning.value !== "string") throw new CreationDraftInvalidResponseError();
+    if (warning.value !== null && typeof warning.value !== "string") throw new CreationDraftInvalidResponseError();
     return { code: warning.code as DraftWarningCode, field: warning.field, ...(typeof warning.value === "string" ? { value: warning.value } : {}) };
   });
   return { missingFields, warnings };
+}
+
+function cappedCommon(common: { missingFields: string[]; warnings: DraftWarning[] }) {
+  return {
+    missingFields: common.missingFields.slice(-32),
+    warnings: common.warnings.slice(-32),
+  };
 }
 
 function validDate(value: string): boolean {
@@ -229,6 +237,13 @@ function clearInvalid(
   }
 }
 
+function clearOverLimit(
+  draft: Record<string, unknown>, field: string, maxLength: number,
+  missingFields: string[], warnings: DraftWarning[], required = false,
+): void {
+  clearInvalid(draft, field, (value) => value.length <= maxLength, missingFields, warnings, required);
+}
+
 function resolveMembers(
   refs: string[], field: string, members: ActiveMemberRef[], missingFields: string[], warnings: DraftWarning[],
 ): string[] {
@@ -253,7 +268,7 @@ export function normalizeCreationDraftOutput(
   const envelope = record(input, ["status", "kind", "draft", "candidates", "missingFields", "warnings"]);
   if (envelope.status === "choose_kind") {
     requiredKeys(envelope, ["status", "candidates", "missingFields", "warnings"]);
-    if ("kind" in envelope || "draft" in envelope || !Array.isArray(envelope.candidates)) throw new CreationDraftInvalidResponseError();
+    if ("kind" in envelope || "draft" in envelope || !Array.isArray(envelope.candidates) || envelope.candidates.length > 4) throw new CreationDraftInvalidResponseError();
     const seen = new Set<CreationKind>();
     const candidates = envelope.candidates.map((item) => {
       const candidate = record(item, ["kind", "label"]); requiredKeys(candidate, ["kind", "label"]);
@@ -280,8 +295,11 @@ export function normalizeCreationDraftOutput(
       startTime: stringOrNull(raw.startTime), endTime: stringOrNull(raw.endTime), startTimezone: stringOrNull(raw.startTimezone),
       endTimezone: stringOrNull(raw.endTimezone), location: stringOrNull(raw.location), attendeeIds: [],
     };
-    const refs = stringArray(raw.attendeeRefs);
+    const refs = stringArray(raw.attendeeRefs, 8);
     draft.attendeeIds = resolveMembers(refs, "attendeeIds", options.members, common.missingFields, common.warnings);
+    clearOverLimit(draft, "summary", 200, common.missingFields, common.warnings, true);
+    clearOverLimit(draft, "description", 5000, common.missingFields, common.warnings);
+    clearOverLimit(draft, "location", 500, common.missingFields, common.warnings);
     for (const field of ["startDate", "endDate", "endDateExclusive"]) clearInvalid(draft, field, validDate, common.missingFields, common.warnings, field === "startDate");
     for (const field of ["startTime", "endTime"]) clearInvalid(draft, field, validTime, common.missingFields, common.warnings);
     for (const field of ["startTimezone", "endTimezone"]) clearInvalid(draft, field, validTimezone, common.missingFields, common.warnings);
@@ -324,7 +342,7 @@ export function normalizeCreationDraftOutput(
       }
     } else if (!common.missingFields.includes("isAllDay")) common.missingFields.push("isAllDay");
     if (!draft.summary && !common.missingFields.includes("summary")) common.missingFields.push("summary");
-    return { status: "ready", kind, draft: draft as unknown as EventFormDraft, ...common };
+    return { status: "ready", kind, draft: draft as unknown as EventFormDraft, ...cappedCommon(common) };
   }
 
   if (kind === "task") {
@@ -332,20 +350,24 @@ export function normalizeCreationDraftOutput(
     const raw = record(envelope.draft, fields); requiredKeys(raw, fields);
     const draft: TaskFormDraft = {
       name: stringOrNull(raw.name), description: stringOrNull(raw.description), dueDate: stringOrNull(raw.dueDate),
-      assigneeIds: resolveMembers(stringArray(raw.assigneeRefs), "assigneeIds", options.members, common.missingFields, common.warnings),
+      assigneeIds: resolveMembers(stringArray(raw.assigneeRefs, 8), "assigneeIds", options.members, common.missingFields, common.warnings),
     };
+    clearOverLimit(draft as unknown as Record<string, unknown>, "name", 200, common.missingFields, common.warnings, true);
+    clearOverLimit(draft as unknown as Record<string, unknown>, "description", 5000, common.missingFields, common.warnings);
     clearInvalid(draft as unknown as Record<string, unknown>, "dueDate", validDate, common.missingFields, common.warnings);
     if (!draft.name && !common.missingFields.includes("name")) common.missingFields.push("name");
-    return { status: "ready", kind, draft, ...common };
+    return { status: "ready", kind, draft, ...cappedCommon(common) };
   }
 
   if (kind === "wish") {
     const fields = ["title", "description", "desiredDate"];
     const raw = record(envelope.draft, fields); requiredKeys(raw, fields);
     const draft: WishFormDraft = { title: stringOrNull(raw.title), description: stringOrNull(raw.description), desiredDate: stringOrNull(raw.desiredDate) };
+    clearOverLimit(draft as unknown as Record<string, unknown>, "title", 100, common.missingFields, common.warnings, true);
+    clearOverLimit(draft as unknown as Record<string, unknown>, "description", 5000, common.missingFields, common.warnings);
     clearInvalid(draft as unknown as Record<string, unknown>, "desiredDate", validDate, common.missingFields, common.warnings);
     if (!draft.title && !common.missingFields.includes("title")) common.missingFields.push("title");
-    return { status: "ready", kind, draft, ...common };
+    return { status: "ready", kind, draft, ...cappedCommon(common) };
   }
 
   const fields = ["dayRecordKind", "name", "description", "anchorDate", "subjectMemberRef", "icon", "attentionAfterDays", "attentionBeforeDays", "cycleDays"];
@@ -359,6 +381,9 @@ export function normalizeCreationDraftOutput(
     icon: stringOrNull(raw.icon), attentionAfterDays: integerOrNull(raw.attentionAfterDays),
     attentionBeforeDays: integerOrNull(raw.attentionBeforeDays), cycleDays: integerOrNull(raw.cycleDays),
   };
+  clearOverLimit(draft as unknown as Record<string, unknown>, "name", 100, common.missingFields, common.warnings, true);
+  clearOverLimit(draft as unknown as Record<string, unknown>, "description", 5000, common.missingFields, common.warnings);
+  clearOverLimit(draft as unknown as Record<string, unknown>, "icon", 50, common.missingFields, common.warnings);
   clearInvalid(draft as unknown as Record<string, unknown>, "anchorDate", validDate, common.missingFields, common.warnings, true);
   const invalidateNumber = (field: "attentionAfterDays" | "attentionBeforeDays" | "cycleDays", positive: boolean) => {
     const value = draft[field];
@@ -380,5 +405,5 @@ export function normalizeCreationDraftOutput(
   if (draft.dayRecordKind === "cycle") clearUnsupported("attentionAfterDays");
   for (const field of ["dayRecordKind", "name", "anchorDate"] as const) if (!draft[field] && !common.missingFields.includes(field)) common.missingFields.push(field);
   if (draft.dayRecordKind === "cycle" && draft.cycleDays === null && !common.missingFields.includes("cycleDays")) common.missingFields.push("cycleDays");
-  return { status: "ready", kind, draft, ...common };
+  return { status: "ready", kind, draft, ...cappedCommon(common) };
 }

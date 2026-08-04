@@ -91,6 +91,7 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleProviderC
             model: config.model,
             stream: false,
             temperature: 0.1,
+            max_tokens: 2000,
             response_format: { type: "json_schema", json_schema: CREATION_DRAFT_JSON_SCHEMA },
             messages: [
               {
@@ -133,6 +134,9 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleProviderC
           if (!Array.isArray(choices) || !choices.length) throw new Error("missing choice");
           const choice = choices[0] as Record<string, unknown>;
           const message = choice.message as Record<string, unknown> | undefined;
+          if (choice.finish_reason !== "stop" || (message && message.refusal !== undefined && message.refusal !== null)) {
+            throw new Error("unsafe terminal state");
+          }
           if (!message || typeof message.content !== "string") throw new Error("missing content");
           const parsed = JSON.parse(message.content) as unknown;
           if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid schema wrapper");
