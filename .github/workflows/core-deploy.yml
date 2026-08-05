@@ -55,9 +55,17 @@ jobs:
           status=$?
           set -e
           echo "$output"
-          if [ $status -ne 0 ] && ! echo "$output" | grep -qi "already exists"; then
-            exit $status
+
+          if [ "$status" -eq 0 ]; then
+            exit 0
           fi
+
+          if echo "$output" | grep -Eqi "already exists|already taken|code:[[:space:]]*11009"; then
+            echo "Queue homemew-creation-drafts already exists; continuing deployment."
+            exit 0
+          fi
+
+          exit "$status"
 
       - name: Apply D1 migrations
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
