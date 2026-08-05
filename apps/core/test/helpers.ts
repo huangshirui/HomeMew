@@ -12,6 +12,7 @@ export const bindings: Bindings = {
   AI_MODEL: "test-model",
   AI_PROMPT_APPENDIX: "",
   AI_RATE_LIMITER: { limit: async () => ({ success: true }) },
+  CREATION_DRAFT_QUEUE: { send: async () => undefined } as unknown as Bindings["CREATION_DRAFT_QUEUE"],
 };
 
 function encode(value: unknown): string {
