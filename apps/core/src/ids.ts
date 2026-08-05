@@ -1,6 +1,6 @@
 const inviteAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-export function createId(prefix: "usr" | "fam" | "fmem" | "inv" | "ired" | "evt" | "tsk" | "sys" | "crd" | "day" | "dyo" | "wsh"): string {
+export function createId(prefix: "usr" | "fam" | "fmem" | "inv" | "ired" | "evt" | "tsk" | "sys" | "crd" | "drf" | "day" | "dyo" | "wsh"): string {
   return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
