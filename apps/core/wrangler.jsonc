@@ -3,14 +3,13 @@
   "name": "homemew-core",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-02",
+  "keep_vars": true,
   "observability": {
     "enabled": true
   },
   "vars": {
     "ASSETS_PUBLIC_URL": "https://homemew-assets.aisr.online",
-    "AI_BASE_URL": "https://openrouter.ai/api/v1",
-    "AI_MODEL": "",
-    "AI_PROMPT_APPENDIX": ""
+    "AI_BASE_URL": "https://openrouter.ai/api/v1"
   },
   "secrets": {
     "required": ["JWT_SECRET"]
