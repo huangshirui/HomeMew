@@ -1,7 +1,7 @@
 /**
  * 喵一下页
  *
- * 创建解析任务后轮询结果，避免 AI 需要 40–60 秒时触发微信请求超时。
+ * 创建解析任务后轮询结果，避免自然语言解析需要 40–60 秒时触发微信请求超时。
  * 草稿只读、不直接写入日程、待办、日子或愿望表。
  */
 
@@ -161,7 +161,7 @@ Page({
     const poll = async (): Promise<void> => {
       if (token !== this._pollToken) return;
       if (Date.now() - this._pollStartedAt >= POLL_TIMEOUT_MS) {
-        this.fail({ code: 'AI_PROVIDER_TIMEOUT', message: 'AI processing timed out' });
+        this.fail({ code: 'AI_PROVIDER_TIMEOUT', message: '解析服务处理超时' });
         return;
       }
       try {
