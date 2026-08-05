@@ -54,12 +54,12 @@ export const ERROR_MESSAGES: Record<string, string> = {
   AI_QUOTA_EXCEEDED: '智能助手额度不足，请联系管理员充值或更换模型',
   AI_ACCESS_DENIED: '智能助手拒绝了这次请求，请换种说法再试',
   AI_MODEL_NOT_FOUND: '配置的智能模型不可用，请联系管理员检查模型名称',
+  AI_QUEUE_UNAVAILABLE: '智能助手任务队列暂时不可用，请稍后重试',
+  CREATION_DRAFT_NOT_FOUND: '这次解析任务不存在，请重新喵一下',
+  CREATION_DRAFT_EXPIRED: '这次解析任务已过期，请重新喵一下',
+  CREATION_DRAFT_STATE_CONFLICT: '解析状态已变化，请重新喵一下',
 };
 
-/**
- * 是否为乐观并发版本冲突。
- * 统一判断入口，避免各页面各写一套不一致的错误码判断。
- */
 export function isVersionConflict(code?: string): boolean {
   return (
     code === 'TASK_VERSION_CONFLICT' ||
@@ -69,14 +69,7 @@ export function isVersionConflict(code?: string): boolean {
   );
 }
 
-/**
- * 根据错误码获取用户友好提示。
- * @param code Core 返回的错误 code
- * @param fallbackMessage Core 返回的原始 message，未知 code 时回退展示
- */
 export function getErrorMessage(code?: string, fallbackMessage?: string): string {
-  if (code && ERROR_MESSAGES[code]) {
-    return ERROR_MESSAGES[code];
-  }
+  if (code && ERROR_MESSAGES[code]) return ERROR_MESSAGES[code];
   return fallbackMessage || '操作失败，请稍后重试';
 }
