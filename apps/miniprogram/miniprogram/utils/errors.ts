@@ -43,14 +43,17 @@ export const ERROR_MESSAGES: Record<string, string> = {
   CONFLICT: '内容已被其他家庭成员修改，请刷新后重试',
   VERSION_CONFLICT: '内容已被其他家庭成员修改，请刷新后重试',
 
-  // 喵一下（Creation Drafts）— 错误 code 来自 openapi.yaml 的 CreationDraft*Error。
-  // INVALID_REQUEST 契约里复用了通用 code，文案沿用上方「请求参数有误」；
-  // 下方仅补充喵一下专属的 AI 相关错误码。
+  // 喵一下（Creation Drafts）
   AI_RATE_LIMITED: '喵喵有点忙，稍等一下再试试',
   AI_PROVIDER_UNAVAILABLE: '智能助手暂时不可用，请稍后重试',
-  AI_INVALID_RESPONSE: '智能助手暂时不可用，请稍后重试',
+  AI_INVALID_RESPONSE: '智能助手没有正确理解这段内容，请换种说法再试',
   AI_NOT_CONFIGURED: '智能助手尚未配置，暂不可用',
   AI_PROVIDER_TIMEOUT: '智能助手响应超时，请稍后重试',
+  AI_REQUEST_REJECTED: '当前模型不支持这次解析要求，请联系管理员更换模型',
+  AI_AUTHENTICATION_FAILED: '智能助手密钥无效，请联系管理员检查配置',
+  AI_QUOTA_EXCEEDED: '智能助手额度不足，请联系管理员充值或更换模型',
+  AI_ACCESS_DENIED: '智能助手拒绝了这次请求，请换种说法再试',
+  AI_MODEL_NOT_FOUND: '配置的智能模型不可用，请联系管理员检查模型名称',
 };
 
 /**
