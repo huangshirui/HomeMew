@@ -12,7 +12,7 @@ const validWish = {
 };
 
 describe("AI creation draft prompt semantics", () => {
-  it("defines domain boundaries, time rules, multi-item handling, and the requesting member", async () => {
+  it("requires positive evidence and asks the user when classification is uncertain", async () => {
     const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({
       choices: [{ finish_reason: "stop", message: { content: JSON.stringify(validWish) } }],
     }), { status: 200, headers: { "content-type": "application/json" } }));
@@ -39,11 +39,15 @@ describe("AI creation draft prompt semantics", () => {
     const systemPrompt = String(body.messages[0].content);
     const userPayload = JSON.parse(String(body.messages[1].content));
 
-    expect(systemPrompt).toContain("event: something that happens or occupies calendar time");
-    expect(systemPrompt).toContain("task: an action someone needs to complete");
-    expect(systemPrompt).toContain("day_record: elapsed tracks time since a past date");
-    expect(systemPrompt).toContain("wish: a desire, idea, or goal");
-    expect(systemPrompt).toContain("Missing information alone is not ambiguity");
+    expect(systemPrompt).toContain("event: an occurrence whose defining meaning");
+    expect(systemPrompt).toContain("task: an action or obligation whose defining meaning");
+    expect(systemPrompt).toContain("day_record: a record whose defining meaning");
+    expect(systemPrompt).toContain("wish: an expressed desire, aspiration, or idea");
+    expect(systemPrompt).toContain("positive evidence for that kind");
+    expect(systemPrompt).toContain("No kind is a default or fallback");
+    expect(systemPrompt).toContain("Do not force a best guess");
+    expect(systemPrompt).toContain("all and only the plausible supported kinds");
+    expect(systemPrompt).toContain("Distinguish uncertainty about the kind from missing fields inside a known kind");
     expect(systemPrompt).toContain("extract only the first item and add an UNSUPPORTED_DETAIL warning");
     expect(systemPrompt).toContain("refer only to requestingMemberRef");
     expect(systemPrompt).toContain("A weekday without “next/下周” means the nearest occurrence");
