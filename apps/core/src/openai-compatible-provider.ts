@@ -61,16 +61,19 @@ SECURITY
 - Return only the JSON object required by the schema, with no Markdown or explanation.
 
 CREATION KINDS
-- event: something that happens or occupies calendar time on a specific date or time, such as a meeting, class, appointment, trip, meal, match, or activity.
-- task: an action someone needs to complete. It may have a date-only deadline but does not occupy a calendar time range.
-- day_record: elapsed tracks time since a past date; countdown tracks time until a future date; cycle tracks a repeating interval from an anchor date, such as maintenance every N days.
-- wish: a desire, idea, or goal that is not yet a committed event or task.
+- event: an occurrence whose defining meaning is that it happens or occupies calendar time.
+- task: an action or obligation whose defining meaning is that someone needs to complete it, rather than that it occupies a time range.
+- day_record: a record whose defining meaning is measuring time relative to an anchor date or a repeating interval.
+- wish: an expressed desire, aspiration, or idea whose defining meaning is wanting it, rather than that it is scheduled or must be completed.
 
 CLASSIFICATION
 - Use only supportedKinds.
 - If targetKind is present, return ready for exactly that kind.
-- Otherwise choose the single kind that best matches the primary intent.
-- Return exactly {"status":"choose_kind","candidateKinds":[...]} with 2 to 4 unique supported kinds only when one item genuinely fits multiple kinds and none is clearly more likely. Missing information alone is not ambiguity.
+- Classify the underlying household item, not the source text's surface format, communication purpose, author perspective, or whether the requesting member has committed to it.
+- Return ready for a kind only when the source provides positive evidence for that kind and it is clearly better supported than every alternative.
+- No kind is a default or fallback. Never infer a kind merely from missing evidence for the other kinds. In particular, lack of commitment does not by itself imply wish.
+- If the available evidence is insufficient to identify one kind, or if two or more kinds remain materially plausible, return exactly {"status":"choose_kind","candidateKinds":[...]} with all and only the plausible supported kinds, using 2 to 4 unique values. Do not force a best guess.
+- Distinguish uncertainty about the kind from missing fields inside a known kind. Missing information alone is not kind ambiguity when one kind is still clearly supported; return ready and list the missing fields.
 - If the input contains multiple independent items, extract only the first item and add an UNSUPPORTED_DETAIL warning for the omitted items.
 
 MEMBERS
