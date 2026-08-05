@@ -26,6 +26,7 @@ export function defaultCreationProvider(env: Bindings): CreationProvider {
     promptAppendix: env.AI_PROMPT_APPENDIX,
     appTitle: "HomeMew",
     appReferer: "https://homemew.aisr.online",
+    requireParameters: true,
   });
 }
 
@@ -81,7 +82,12 @@ function providerApiError(error: unknown): ApiError {
   if (error instanceof OpenAICompatibleProviderError) {
     if (error.code === "AI_NOT_CONFIGURED") return new ApiError("AI_NOT_CONFIGURED", "AI creation is not configured", 503);
     if (error.code === "AI_TIMEOUT") return new ApiError("AI_PROVIDER_TIMEOUT", "AI provider timed out", 504);
-    if (error.code === "AI_RATE_LIMITED" || error.status === 429) return new ApiError("AI_RATE_LIMITED", "AI creation rate limit reached", 429);
+    if (error.code === "AI_RATE_LIMITED") return new ApiError("AI_RATE_LIMITED", "AI creation rate limit reached", 429);
+    if (error.code === "AI_AUTHENTICATION_FAILED") return new ApiError("AI_AUTHENTICATION_FAILED", "AI provider authentication failed", 502);
+    if (error.code === "AI_QUOTA_EXCEEDED") return new ApiError("AI_QUOTA_EXCEEDED", "AI provider quota or balance is insufficient", 502);
+    if (error.code === "AI_ACCESS_DENIED") return new ApiError("AI_ACCESS_DENIED", "AI provider denied this request", 502);
+    if (error.code === "AI_MODEL_NOT_FOUND") return new ApiError("AI_MODEL_NOT_FOUND", "Configured AI model is unavailable", 502);
+    if (error.code === "AI_REQUEST_REJECTED") return new ApiError("AI_REQUEST_REJECTED", "AI provider rejected the structured request", 502);
     if (error.code === "AI_INVALID_RESPONSE") return new ApiError("AI_INVALID_RESPONSE", "AI provider returned an invalid response", 502);
   }
   return new ApiError("AI_PROVIDER_UNAVAILABLE", "AI provider is unavailable", 502);
