@@ -47,6 +47,18 @@ jobs:
           corepack pnpm --filter @homemew/core typecheck
           corepack pnpm --filter @homemew/core build
 
+      - name: Ensure creation draft queue
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: |
+          set +e
+          output=$(corepack pnpm --filter @homemew/core exec wrangler queues create homemew-creation-drafts 2>&1)
+          status=$?
+          set -e
+          echo "$output"
+          if [ $status -ne 0 ] && ! echo "$output" | grep -qi "already exists"; then
+            exit $status
+          fi
+
       - name: Apply D1 migrations
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
         run: corepack pnpm --filter @homemew/core db:migrate:remote
