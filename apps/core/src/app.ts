@@ -9,6 +9,7 @@ import { registerTaskRoutes } from "./tasks";
 import { registerIntegrationRoutes } from "./integrations";
 import { registerDayRecordRoutes } from "./day-records";
 import { registerWishRoutes } from "./wishes";
+import { registerCreationDraftJobRoutes } from "./creation-draft-jobs";
 import { defaultCreationProvider, registerCreationDraftRoutes, type CreationDraftDependencies } from "./creation-drafts";
 
 type AppEnv = {
@@ -83,13 +84,8 @@ export function createApp(
 
   app.get("/api/v1/status", async (context) => {
     const schemaVersion = await dependencies.getSchemaVersion(context.env);
-
     return context.json(
-      success({
-        status: "ok",
-        database: "available",
-        schemaVersion,
-      }),
+      success({ status: "ok", database: "available", schemaVersion }),
     );
   });
 
@@ -99,39 +95,20 @@ export function createApp(
   registerTaskRoutes(app);
   registerDayRecordRoutes(app);
   registerWishRoutes(app);
+  registerCreationDraftJobRoutes(app);
   registerCreationDraftRoutes(app, dependencies);
 
   app.notFound((context) => {
-    return context.json(
-      failure(
-        "NOT_FOUND",
-        "Route not found",
-        context.get("requestId"),
-      ),
-      404,
-    );
+    return context.json(failure("NOT_FOUND", "Route not found", context.get("requestId")), 404);
   });
 
   app.onError((error, context) => {
     const requestId = context.get("requestId");
-
     if (error instanceof ApiError) {
       return context.json(failure(error.code, error.message, requestId), error.status);
     }
-
-    console.error("Unhandled Core API error", {
-      requestId,
-      error,
-    });
-
-    return context.json(
-      failure(
-        "INTERNAL_ERROR",
-        "Internal server error",
-        requestId,
-      ),
-      500,
-    );
+    console.error("Unhandled Core API error", { requestId, error });
+    return context.json(failure("INTERNAL_ERROR", "Internal server error", requestId), 500);
   });
 
   return app;
