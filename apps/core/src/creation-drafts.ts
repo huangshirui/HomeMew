@@ -95,6 +95,8 @@ export function registerCreationDraftRoutes(app: App, dependencies: CreationDraf
 
     const input = parseInput(await body(context));
     const family = await familyContext(context.env, familyId);
+    const requestingMember = family.members.find((member) => member.userId === principal.id);
+    if (!requestingMember) throw new ApiError("FORBIDDEN", "Only active family members can interpret creation drafts", 403);
     const rateLimit = await context.env.AI_RATE_LIMITER.limit({ key: principal.id });
     if (!rateLimit.success) throw new ApiError("AI_RATE_LIMITED", "AI creation rate limit reached", 429);
 
@@ -113,6 +115,7 @@ export function registerCreationDraftRoutes(app: App, dependencies: CreationDraf
         viewingTimezone: input.viewingTimezone,
         supportedKinds: CREATION_KINDS,
         members: family.members.map(({ ref, name }) => ({ ref, name })),
+        requestingMemberRef: requestingMember.ref,
         ...(input.targetKind ? { targetKind: input.targetKind } : {}),
       });
       let normalized;
