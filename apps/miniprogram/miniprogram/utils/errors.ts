@@ -42,6 +42,15 @@ export const ERROR_MESSAGES: Record<string, string> = {
   NOT_FOUND: '内容不存在或已被删除',
   CONFLICT: '内容已被其他家庭成员修改，请刷新后重试',
   VERSION_CONFLICT: '内容已被其他家庭成员修改，请刷新后重试',
+
+  // 喵一下（Creation Drafts）— 错误 code 来自 openapi.yaml 的 CreationDraft*Error。
+  // INVALID_REQUEST 契约里复用了通用 code，文案沿用上方「请求参数有误」；
+  // 下方仅补充喵一下专属的 AI 相关错误码。
+  AI_RATE_LIMITED: '喵喵有点忙，稍等一下再试试',
+  AI_PROVIDER_UNAVAILABLE: '智能助手暂时不可用，请稍后重试',
+  AI_INVALID_RESPONSE: '智能助手暂时不可用，请稍后重试',
+  AI_NOT_CONFIGURED: '智能助手尚未配置，暂不可用',
+  AI_PROVIDER_TIMEOUT: '智能助手响应超时，请稍后重试',
 };
 
 /**

@@ -41,6 +41,9 @@ export interface OpenAICompatibleProviderConfig {
   promptAppendix?: string;
   fetch?: (input: string, init?: RequestInit) => Promise<Response>;
   timeoutMs?: number;
+  /** 透传给 OpenRouter 等兼容端点的 App 标识 */
+  appTitle?: string;
+  appReferer?: string;
 }
 
 const SYSTEM_INSTRUCTIONS = `You convert one household-language input into exactly one HomeMew creation draft that conforms to the supplied strict JSON schema.
@@ -113,7 +116,7 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleProviderC
     throw new OpenAICompatibleProviderError("AI_NOT_CONFIGURED", "AI provider configuration is incomplete");
   }
   const fetchImpl = config.fetch ?? ((input: string, init?: RequestInit) => globalThis.fetch(input, init));
-  const timeoutMs = config.timeoutMs ?? 15_000;
+  const timeoutMs = config.timeoutMs ?? 60_000;
   return {
     async generate(input: CreationProviderInput): Promise<CreationProviderResult> {
       const controller = new AbortController();
@@ -129,7 +132,12 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleProviderC
         try {
           response = await fetchImpl(endpoint(config.baseUrl), {
           method: "POST",
-          headers: { authorization: `Bearer ${config.apiKey}`, "content-type": "application/json" },
+          headers: {
+            authorization: `Bearer ${config.apiKey}`,
+            "content-type": "application/json",
+            ...(config.appReferer ? { "HTTP-Referer": config.appReferer } : {}),
+            ...(config.appTitle ? { "X-Title": config.appTitle } : {}),
+          },
           signal: controller.signal,
           body: JSON.stringify({
             model: config.model,

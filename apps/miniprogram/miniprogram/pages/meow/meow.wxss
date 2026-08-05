@@ -1,0 +1,231 @@
+/* 喵一下页 */
+
+.meow-container {
+  min-height: 100vh;
+  padding: 40rpx 32rpx calc(60rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.meow-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 32rpx 28rpx 20rpx;
+  box-shadow: 0 6rpx 20rpx rgba(67, 160, 71, 0.08);
+}
+
+.meow-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.meow-emoji {
+  font-size: 44rpx;
+  margin-right: 16rpx;
+}
+
+.meow-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333333;
+}
+
+.meow-input {
+  width: 100%;
+  min-height: 200rpx;
+  font-size: 30rpx;
+  line-height: 1.5;
+  color: #333333;
+  box-sizing: border-box;
+}
+
+.meow-placeholder {
+  color: #b5bdb9;
+}
+
+.meow-counter {
+  text-align: right;
+  font-size: 22rpx;
+  color: #b5bdb9;
+  margin-top: 8rpx;
+}
+
+.meow-error {
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  color: #e25b5b;
+  background: #fdecec;
+  padding: 16rpx 20rpx;
+  border-radius: 14rpx;
+}
+
+.meow-submit {
+  margin-top: 32rpx;
+  background: #43a047;
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 16rpx;
+  border: none;
+}
+
+.meow-submit.is-loading {
+  opacity: 0.8;
+}
+
+.meow-submit::after {
+  border: none;
+}
+
+/* choose_kind */
+.meow-choose {
+  margin-top: 36rpx;
+}
+
+.meow-choose-tip {
+  display: block;
+  font-size: 28rpx;
+  color: #555555;
+  margin-bottom: 20rpx;
+}
+
+.meow-choose-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.meow-choose-btn {
+  background: #ffffff;
+  color: #43a047;
+  font-size: 30rpx;
+  font-weight: 600;
+  border-radius: 16rpx;
+  border: 2rpx solid #43a047;
+  padding: 22rpx 0;
+}
+
+.meow-choose-btn::after {
+  border: none;
+}
+
+/* ready 结果预览 */
+.meow-result {
+  margin-top: 36rpx;
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 28rpx 28rpx 24rpx;
+  box-shadow: 0 6rpx 20rpx rgba(67, 160, 71, 0.08);
+}
+
+.meow-result-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.meow-result-badge {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #43a047;
+  background: #eaf6eb;
+  padding: 6rpx 18rpx;
+  border-radius: 20rpx;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.meow-result-hint {
+  font-size: 22rpx;
+  color: #999999;
+  flex: 1;
+}
+
+.meow-preview {
+  border-top: 2rpx solid #f0f4f2;
+  padding-top: 12rpx;
+}
+
+.meow-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 16rpx 0;
+  border-bottom: 2rpx solid #f5f7f6;
+}
+
+.meow-row-label {
+  width: 150rpx;
+  flex-shrink: 0;
+  font-size: 26rpx;
+  color: #999999;
+}
+
+.meow-row-value {
+  flex: 1;
+  font-size: 28rpx;
+  color: #333333;
+  word-break: break-all;
+}
+
+.meow-row.is-empty .meow-row-value {
+  color: #c0c8c4;
+}
+
+.meow-warnings {
+  margin-top: 16rpx;
+}
+
+.meow-warning {
+  display: flex;
+  align-items: center;
+  background: #fff8e8;
+  border-radius: 12rpx;
+  padding: 14rpx 16rpx;
+  margin-top: 10rpx;
+}
+
+.meow-warning-dot {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  background: #f0a020;
+  color: #ffffff;
+  font-size: 22rpx;
+  text-align: center;
+  line-height: 32rpx;
+  margin-right: 12rpx;
+  flex-shrink: 0;
+}
+
+.meow-warning-text {
+  flex: 1;
+  font-size: 24rpx;
+  color: #a8771a;
+}
+
+.meow-go {
+  margin-top: 28rpx;
+  background: #43a047;
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 16rpx;
+  border: none;
+}
+
+.meow-go::after {
+  border: none;
+}
+
+.meow-again {
+  margin-top: 18rpx;
+  background: #f5f8f6;
+  color: #666666;
+  font-size: 28rpx;
+  border-radius: 16rpx;
+  border: none;
+}
+
+.meow-again::after {
+  border: none;
+}

@@ -24,6 +24,8 @@ export function defaultCreationProvider(env: Bindings): CreationProvider {
     apiKey: env.AI_API_KEY ?? "",
     model: env.AI_MODEL ?? "",
     promptAppendix: env.AI_PROMPT_APPENDIX,
+    appTitle: "HomeMew",
+    appReferer: "https://homemew.aisr.online",
   });
 }
 

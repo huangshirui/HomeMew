@@ -45,6 +45,8 @@ interface RequestOptions {
   headers?: Record<string, string>;
   /** 是否跳过自动重试（写操作应设为 true） */
   skipRetry?: boolean;
+  /** 单次请求超时 (ms)，不传则使用全局 REQUEST_TIMEOUT */
+  timeout?: number;
 }
 
 /**
@@ -150,6 +152,7 @@ export function request<T>(path: string, options: RequestOptions = {}): Promise<
     data,
     headers = {},
     skipRetry = false,
+    timeout = REQUEST_TIMEOUT,
   } = options;
 
   const url = `${getCoreBaseUrl()}${path}`;
@@ -172,7 +175,7 @@ export function request<T>(path: string, options: RequestOptions = {}): Promise<
       Authorization: `Bearer ${token}`,
     };
 
-    const res = await doRequest(url, method, data, requestHeaders, REQUEST_TIMEOUT);
+    const res = await doRequest(url, method, data, requestHeaders, timeout);
 
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return extractData(res.statusCode, res.data) as T;
@@ -189,7 +192,7 @@ export function request<T>(path: string, options: RequestOptions = {}): Promise<
         ...requestHeaders,
         Authorization: `Bearer ${newToken}`,
       };
-      const retryRes = await doRequest(url, method, data, retryHeaders, REQUEST_TIMEOUT);
+      const retryRes = await doRequest(url, method, data, retryHeaders, timeout);
 
       if (retryRes.statusCode >= 200 && retryRes.statusCode < 300) {
         return extractData(retryRes.statusCode, retryRes.data) as T;

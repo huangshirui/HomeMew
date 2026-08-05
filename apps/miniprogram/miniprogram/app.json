@@ -4,6 +4,7 @@
     "pages/launch/disabled",
     "pages/profile-setup/profile-setup",
     "pages/home/home",
+    "pages/meow/meow",
     "pages/events/events",
     "pages/events/detail",
     "pages/events/edit",
