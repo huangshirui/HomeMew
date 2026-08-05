@@ -49,8 +49,10 @@ describe("OpenAI-compatible creation provider", () => {
     expect(body.messages[0].role).toBe("system");
     expect(body.messages[0].content).toContain("lower-priority appendix");
     expect(body.messages[0].content).toContain("Prefer concise names.");
-    expect(body.messages[0].content).toContain('exactly {"status":"choose_kind","candidateKinds":[');
-    expect(body.messages[0].content).toContain("2 to 4 unique supported kinds");
+    expect(body.messages[0].content).toContain('return exactly {"status":"choose_kind","candidateKinds":[');
+    expect(body.messages[0].content).toContain("using 2 to 4 unique values");
+    expect(body.messages[0].content).toContain("No kind is a default or fallback");
+    expect(body.messages[0].content).toContain("Do not force a best guess");
     expect(body.messages[0].content).toContain("Relative event dates and times use viewingTimezone.");
     expect(body.messages[0].content).toContain("Relative date-only values for task, day_record, and wish use familyTimezone.");
     expect(body.messages[0].content).toContain("For a one-day all-day event, endDateExclusive is the next calendar date.");
