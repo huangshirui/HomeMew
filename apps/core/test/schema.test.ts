@@ -47,7 +47,16 @@ describe("current schema", () => {
     ]);
     expect(familyColumns.results.map((column: { name: string }) => column.name)).toContain("avatar_key");
     expect(familyColumns.results.map((column: { name: string }) => column.name)).not.toContain("avatar_url");
-    expect(version?.value).toBe("10");
+    expect(version?.value).toBe("11");
+    const creationDraftTables = await env.DB.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='creation_draft_jobs'",
+    ).all<{ name: string }>();
+    expect(creationDraftTables.results.map((row: { name: string }) => row.name)).toEqual(["creation_draft_jobs"]);
+    const creationDraftColumns = await env.DB.prepare("PRAGMA table_info('creation_draft_jobs')").all<{ name: string }>();
+    expect(creationDraftColumns.results.map((column: { name: string }) => column.name)).toEqual(expect.arrayContaining([
+      "family_id", "requested_by_user_id", "status", "generation", "input_text", "viewing_timezone",
+      "target_kind", "result_json", "error_code", "attempt_count", "expires_at",
+    ]));
     const wishTables = await env.DB.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='wishes'",
     ).all<{ name: string }>();
@@ -108,5 +117,6 @@ describe("current schema", () => {
     expect(createId("day")).toMatch(/^day_/);
     expect(createId("dyo")).toMatch(/^dyo_/);
     expect(createId("wsh")).toMatch(/^wsh_/);
+    expect(createId("drf")).toMatch(/^drf_/);
   });
 });
