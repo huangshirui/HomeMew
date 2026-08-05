@@ -29,6 +29,22 @@
       "bucket_name": "homemew-assets"
     }
   ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "CREATION_DRAFT_QUEUE",
+        "queue": "homemew-creation-drafts"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "homemew-creation-drafts",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 2
+      }
+    ]
+  },
   "ratelimits": [
     {
       "name": "AI_RATE_LIMITER",
