@@ -1,36 +1,55 @@
 /**
- * 喵一下（Creation Drafts）相关 API 服务
+ * 喵一下（Creation Drafts）异步任务 API。
  *
- * POST /api/v1/families/{familyId}/creation-drafts/interpret
- *
- * 草稿只读、不落库，最终由用户在对应创建页补全后通过既有接口提交。
- * 该接口为写型（会产生 AI 调用副作用），显式 skipRetry: true 避免重复触发。
+ * 创建和选择类型接口只负责排队，通常会在几百毫秒内返回；
+ * 页面随后轮询 GET 状态，避免微信小程序的长请求超时。
  */
 
 import { request } from './api';
-import {
-  CreationDraftResult,
-  InterpretCreationDraftRequest,
-} from '../types/index';
+import type { CreationKind } from '../types/index';
+import type {
+  CreateCreationDraftJobRequest,
+  CreationDraftJob,
+  CreationDraftJobProcessing,
+} from '../types/creation-draft-jobs';
 
-/**
- * 调用喵一下解析接口。
- *
- * @param familyId 当前家庭 id
- * @param payload 用户输入文本 + 查看时区（+ 可选 targetKind）
- * @returns 解析结果：ready 草稿或 choose_kind 提示
- */
-export function interpretCreationDraft(
+export function createCreationDraftJob(
   familyId: string,
-  payload: InterpretCreationDraftRequest,
-): Promise<CreationDraftResult> {
-  return request<CreationDraftResult>(
-    `/api/v1/families/${familyId}/creation-drafts/interpret`,
+  payload: CreateCreationDraftJobRequest,
+): Promise<CreationDraftJobProcessing> {
+  return request<CreationDraftJobProcessing>(
+    `/api/v1/families/${familyId}/creation-drafts`,
     {
       method: 'POST',
       data: payload as unknown as Record<string, unknown>,
       skipRetry: true,
-      timeout: 30000,
+      timeout: 10000,
+    },
+  );
+}
+
+export function getCreationDraftJob(
+  familyId: string,
+  draftId: string,
+): Promise<CreationDraftJob> {
+  return request<CreationDraftJob>(
+    `/api/v1/families/${familyId}/creation-drafts/${draftId}`,
+    { method: 'GET', timeout: 10000 },
+  );
+}
+
+export function chooseCreationDraftKind(
+  familyId: string,
+  draftId: string,
+  targetKind: CreationKind,
+): Promise<CreationDraftJobProcessing> {
+  return request<CreationDraftJobProcessing>(
+    `/api/v1/families/${familyId}/creation-drafts/${draftId}/choose-kind`,
+    {
+      method: 'POST',
+      data: { targetKind },
+      skipRetry: true,
+      timeout: 10000,
     },
   );
 }
