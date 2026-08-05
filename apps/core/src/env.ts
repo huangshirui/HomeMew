@@ -1,3 +1,5 @@
+import type { CreationDraftQueueMessage } from "./creation-draft-jobs";
+
 export type Bindings = {
   DB: D1Database;
   AVATARS: R2Bucket;
@@ -9,6 +11,7 @@ export type Bindings = {
   AI_MODEL?: string;
   AI_PROMPT_APPENDIX?: string;
   AI_RATE_LIMITER: RateLimit;
+  CREATION_DRAFT_QUEUE: Queue<CreationDraftQueueMessage>;
 };
 
 export type Variables = {
