@@ -69,44 +69,126 @@
   border: none;
 }
 
+.meow-input.is-locked {
+  opacity: 0.55;
+}
+
 .meow-submit.is-loading {
   opacity: 0.8;
+}
+
+/* 解析中等待动效 */
+.meow-thinking {
+  margin-top: 24rpx;
+  display: flex;
+  align-items: center;
+  background: #eaf6eb;
+  border-radius: 16rpx;
+  padding: 22rpx 28rpx;
+}
+
+.meow-thinking-dots {
+  display: flex;
+  align-items: center;
+  margin-right: 18rpx;
+}
+
+.meow-thinking-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #43a047;
+  margin-right: 8rpx;
+  opacity: 0.4;
+  animation: thinkingBlink 1.2s infinite ease-in-out;
+}
+
+.meow-thinking-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.meow-thinking-dot:nth-child(3) {
+  animation-delay: 0.4s;
+  margin-right: 0;
+}
+
+@keyframes thinkingBlink {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.meow-thinking-text {
+  font-size: 28rpx;
+  color: #43a047;
+  font-weight: 500;
 }
 
 .meow-submit::after {
   border: none;
 }
 
-/* choose_kind */
-.meow-choose {
-  margin-top: 36rpx;
-}
-
-.meow-choose-tip {
-  display: block;
-  font-size: 28rpx;
-  color: #555555;
-  margin-bottom: 20rpx;
-}
-
-.meow-choose-list {
+/* choose_kind 底部选择框（与 tab bar 面板同款） */
+.sheet-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
   display: flex;
   flex-direction: column;
-  gap: 18rpx;
+  justify-content: flex-end;
 }
 
-.meow-choose-btn {
+.sheet {
   background: #ffffff;
-  color: #43a047;
-  font-size: 30rpx;
-  font-weight: 600;
-  border-radius: 16rpx;
-  border: 2rpx solid #43a047;
-  padding: 22rpx 0;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 16rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  animation: sheetUp 0.2s ease-out;
 }
 
-.meow-choose-btn::after {
-  border: none;
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet-handle {
+  width: 64rpx;
+  height: 8rpx;
+  border-radius: 4rpx;
+  background: #e0e0e0;
+  margin: 8rpx auto 16rpx;
+}
+
+.sheet-title {
+  font-size: 26rpx;
+  color: #999999;
+  text-align: center;
+  margin-bottom: 12rpx;
+}
+
+.sheet-action {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 16rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.sheet-action:first-of-type {
+  border-top: none;
+}
+
+.sheet-action-icon {
+  width: 48rpx;
+  margin-right: 24rpx;
+  font-size: 40rpx;
+  text-align: center;
+}
+
+.sheet-action-text {
+  font-size: 32rpx;
+  color: #333333;
 }
 
 /* ready 结果预览 */

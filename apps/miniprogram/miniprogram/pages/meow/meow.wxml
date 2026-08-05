@@ -9,20 +9,31 @@
       <text class="meow-title">说一句话，帮你起草</text>
     </view>
     <textarea
-      class="meow-input"
+      class="meow-input {{submitting ? 'is-locked' : ''}}"
       placeholder="例如：明天下午3点和爸妈视频通话，提醒我一下"
       placeholder-class="meow-placeholder"
       value="{{text}}"
       bindinput="onInput"
+      disabled="{{submitting}}"
       maxlength="5000"
       auto-height
-      focus="{{!hasResult}}"
+      focus="{{!hasResult && !submitting}}"
     />
     <view class="meow-counter">{{textLength}}/5000</view>
   </view>
 
   <!-- 错误提示 -->
   <view wx:if="{{error}}" class="meow-error">{{error}}</view>
+
+  <!-- 解析中：循环展示「日程/待办/日子/愿望」，让人知道仍在处理 -->
+  <view wx:if="{{submitting}}" class="meow-thinking">
+    <view class="meow-thinking-dots">
+      <view class="meow-thinking-dot"></view>
+      <view class="meow-thinking-dot"></view>
+      <view class="meow-thinking-dot"></view>
+    </view>
+    <text class="meow-thinking-text">正在识别为{{thinkingWords[thinkingIndex]}}…</text>
+  </view>
 
   <!-- 提交按钮 -->
   <button
@@ -32,17 +43,26 @@
     bindtap="onMeow"
   >喵一下</button>
 
-  <!-- choose_kind：让用户选择表单类型 -->
-  <view wx:if="{{chooseKinds.length > 0}}" class="meow-choose">
-    <text class="meow-choose-tip">没太确定你要记成什么，选一个吧：</text>
-    <view class="meow-choose-list">
-      <button
+  <!-- choose_kind：弹出底部选择框（浮在页面之上），让用户选择类型 -->
+  <view wx:if="{{sheetOpen}}" class="sheet-mask" bindtap="onSheetClose" catchtouchmove="noop">
+    <view
+      class="sheet"
+      catchtap="noop"
+      bindtouchstart="onSheetTouchStart"
+      bindtouchend="onSheetTouchEnd"
+    >
+      <view class="sheet-handle"></view>
+      <text class="sheet-title">想记成哪种？</text>
+      <view
         wx:for="{{chooseKinds}}"
         wx:key="*this"
-        class="meow-choose-btn"
+        class="sheet-action"
         data-kind="{{item}}"
         bindtap="onChooseKind"
-      >{{kindLabels[item]}}</button>
+      >
+        <text class="sheet-action-icon">{{kindIcons[item]}}</text>
+        <text class="sheet-action-text">{{kindLabels[item]}}</text>
+      </view>
     </view>
   </view>
 
