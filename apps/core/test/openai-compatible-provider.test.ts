@@ -26,7 +26,7 @@ describe("OpenAI-compatible creation provider", () => {
     }), { status: 200, headers: { "content-type": "application/json" } }));
     const provider = createOpenAICompatibleProvider({
       baseUrl: "https://ai.example.test/v1/", apiKey: "secret", model: "model-1",
-      promptAppendix: "Prefer concise names.", fetch,
+      promptAppendix: "Prefer concise names.", fetch, requireParameters: true,
     });
 
     const result = await provider.generate(input);
@@ -42,6 +42,7 @@ describe("OpenAI-compatible creation provider", () => {
     expect(body).toMatchObject({
       model: "model-1", stream: false, temperature: 0.1,
       max_tokens: 2000,
+      provider: { require_parameters: true },
       response_format: { type: "json_schema", json_schema: { strict: true } },
     });
     expect(body.messages).toHaveLength(2);
@@ -71,6 +72,18 @@ describe("OpenAI-compatible creation provider", () => {
       output: { status: "ready", kind: "wish" },
       metadata: { providerStatus: 200, usage: { totalTokens: 15 } },
     });
+  });
+
+  it("omits OpenRouter routing preferences unless enabled", async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ result: {} }) } }],
+    })));
+    const provider = createOpenAICompatibleProvider({
+      baseUrl: "https://ai.example.test", apiKey: "key", model: "model", fetch,
+    });
+    await provider.generate(input);
+    const body = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
+    expect(body.provider).toBeUndefined();
   });
 
   it("normalizes a base URL without a version path", async () => {
@@ -115,12 +128,15 @@ describe("OpenAI-compatible creation provider", () => {
   });
 
   it.each([
+    [400, "AI_REQUEST_REJECTED"],
+    [401, "AI_AUTHENTICATION_FAILED"],
+    [402, "AI_QUOTA_EXCEEDED"],
+    [403, "AI_ACCESS_DENIED"],
+    [404, "AI_MODEL_NOT_FOUND"],
+    [408, "AI_TIMEOUT"],
+    [422, "AI_REQUEST_REJECTED"],
     [429, "AI_RATE_LIMITED"],
     [500, "AI_UPSTREAM_UNAVAILABLE"],
-    [400, "AI_NOT_CONFIGURED"],
-    [401, "AI_NOT_CONFIGURED"],
-    [403, "AI_NOT_CONFIGURED"],
-    [404, "AI_NOT_CONFIGURED"],
   ])("maps upstream HTTP %i", async (status, code) => {
     const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response("upstream body must not escape", { status }));
     const provider = createOpenAICompatibleProvider({
