@@ -1,14 +1,20 @@
 /* 外部系统列表页样式 */
 
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding-top: 120rpx;
+/* 首屏加载骨架屏（对齐待办页） */
+.skeleton {
+  padding: 8rpx 0 0;
+  overflow: hidden;
 }
 
-.loading-text {
-  font-size: 28rpx;
-  color: var(--color-text-hint);
+.skel-day {
+  margin-bottom: 16rpx;
+}
+
+.skel-card {
+  height: 140rpx;
+  border-radius: 22rpx;
+  background-color: #eef2ef;
+  margin-bottom: 16rpx;
 }
 
 .intro {

@@ -1,7 +1,10 @@
 <!-- 外部系统列表页 -->
 <view class="container">
-  <view wx:if="{{!loaded}}" class="loading-state">
-    <text class="loading-text">加载中...</text>
+  <view wx:if="{{!loaded}}" class="skeleton">
+    <view class="skel-day" wx:for="{{[0, 1, 2]}}" wx:key="*this">
+      <view class="skel-card"></view>
+      <view class="skel-card"></view>
+    </view>
   </view>
 
   <block wx:else>

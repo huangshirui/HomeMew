@@ -7,16 +7,21 @@
   padding-bottom: 160rpx;
 }
 
-/* 加载状态 */
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding-top: 120rpx;
+/* 首屏加载骨架屏（对齐日程页，仅占位任务列表区） */
+.skeleton {
+  padding: 8rpx 0 0;
+  overflow: hidden;
 }
 
-.loading-text {
-  font-size: 28rpx;
-  color: var(--color-text-hint);
+.skel-day {
+  margin-bottom: 16rpx;
+}
+
+.skel-card {
+  height: 120rpx;
+  border-radius: 26rpx;
+  background-color: #eef2ef;
+  margin: 0 32rpx 16rpx;
 }
 
 /* ---------- 顶栏：成员范围 + 已完成入口（与日程页一致） ---------- */

@@ -4,15 +4,21 @@
   padding-bottom: 60rpx;
 }
 
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding-top: 120rpx;
+/* 首屏加载骨架屏（对齐待办页，仅占位列表区） */
+.skeleton {
+  padding: 8rpx 0 0;
+  overflow: hidden;
 }
 
-.loading-text {
-  font-size: 28rpx;
-  color: var(--color-text-hint);
+.skel-day {
+  margin-bottom: 16rpx;
+}
+
+.skel-card {
+  height: 120rpx;
+  border-radius: 26rpx;
+  background-color: #eef2ef;
+  margin-bottom: 16rpx;
 }
 
 /* 顶部只读范围条 */

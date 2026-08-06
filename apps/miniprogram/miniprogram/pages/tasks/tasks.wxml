@@ -1,12 +1,7 @@
 <!-- 待办任务列表页（进行中） -->
 <view class="container">
-  <!-- 加载中 -->
-  <view wx:if="{{!loaded}}" class="loading-state">
-    <text class="loading-text">加载中...</text>
-  </view>
-
   <!-- 无家庭引导 -->
-  <block wx:elif="{{noFamily}}">
+  <block wx:if="{{noFamily}}">
     <view class="empty-state">
       <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
       <text class="empty-title">还没有家庭</text>
@@ -42,8 +37,16 @@
       </view>
     </view>
 
+    <!-- 首屏加载骨架屏（对齐日程页，仅占位任务列表区） -->
+    <view wx:if="{{!loaded}}" class="skeleton">
+      <view class="skel-day" wx:for="{{[0, 1, 2]}}" wx:key="*this">
+        <view class="skel-card"></view>
+        <view class="skel-card"></view>
+      </view>
+    </view>
+
     <!-- 加载失败 -->
-    <view wx:if="{{listError}}" class="list-error" bindtap="onRetry">
+    <view wx:elif="{{listError}}" class="list-error" bindtap="onRetry">
       <text class="list-error-text">加载失败，点击重试</text>
     </view>
 

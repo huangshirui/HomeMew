@@ -171,3 +171,20 @@
   font-weight: 300;
   line-height: 1;
 }
+
+/* 首屏加载骨架屏（对齐待办页） */
+.skeleton {
+  padding: 8rpx 0 0;
+  overflow: hidden;
+}
+
+.skel-day {
+  margin-bottom: 18rpx;
+}
+
+.skel-card {
+  height: 120rpx;
+  border-radius: 26rpx;
+  background-color: #eef2ef;
+  margin-bottom: 18rpx;
+}

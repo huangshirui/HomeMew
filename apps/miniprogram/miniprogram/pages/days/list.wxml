@@ -34,9 +34,12 @@ module.exports.attentionClass = function (level, required) {
       </view>
     </scroll-view>
 
-    <!-- 首次加载 -->
-    <view wx:if="{{firstLoading}}" class="loading-state">
-      <text class="loading-text">加载中...</text>
+    <!-- 首次加载骨架屏 -->
+    <view wx:if="{{firstLoading}}" class="skeleton">
+      <view class="skel-day" wx:for="{{[0, 1, 2]}}" wx:key="*this">
+        <view class="skel-card"></view>
+        <view class="skel-card"></view>
+      </view>
     </view>
 
     <!-- 加载失败 -->
