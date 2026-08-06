@@ -51,6 +51,13 @@ type ScopeOption = {
   showAvatar: boolean;
 };
 
+/**
+ * 后台轮询间隔（毫秒）：页面可见期间每 60 秒重新拉取一次待办，
+ * 让其他家庭成员的新增 / 完成 / 删除在无需用户操作时也能自动出现。
+ * 页面隐藏时停止，不消耗流量。
+ */
+const POLL_INTERVAL_MS = 60 * 1000;
+
 Page({
   data: {
     // 成员范围
@@ -77,6 +84,11 @@ Page({
   // 脏标记订阅句柄：页面可见期间订阅，隐藏时取消，避免误刷新与泄漏
   _dirtyUnsubscribe: null as (() => void) | null,
 
+  /** 后台轮询定时器（页面可见期间才运行，拉取其他成员的变更） */
+  _pollTimer: null as ReturnType<typeof setInterval> | null,
+  /** 上次真正发起后台拉取的时间戳，用于轮询节流 */
+  _lastFetchAt: 0,
+
   onLoad(options: { familyId?: string }): void {
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
     if (!familyId) {
@@ -97,6 +109,7 @@ Page({
   onShow(): void {
     this.getTabBar()?.setData({ selected: 2 });
     this._subscribeDirty();
+    this._startPoll();
     const familyId = currentFamilyStore.value?.id || '';
     // 从无家庭恢复到有家庭
     if (familyId && this.data.noFamily) {
@@ -124,10 +137,43 @@ Page({
 
   onHide(): void {
     this._unsubscribeDirty();
+    this._stopPoll();
   },
 
   onUnload(): void {
     this._unsubscribeDirty();
+    this._stopPoll();
+  },
+
+  /**
+   * 启动后台轮询：页面可见期间每 60 秒重新拉取一次待办列表。
+   *
+   * 注意：
+   * - 只在 onShow 启动、onHide / onUnload 停止；
+   * - 通过 _lastFetchAt 节流，刚拉过（onShow / 下拉刷新 / 脏标记 / 切范围）就跳过本轮；
+   * - 每轮以 currentFamilyStore 为准校验家庭，家庭切换时交给 onShow 的
+   *   resetForFamily 处理，轮询自身不会用旧 familyId 发请求；
+   * - loadTasks 内部的 _reqSeq + familyId 校验会丢弃过期响应，不会串数据。
+   */
+  _startPoll(): void {
+    if (this._pollTimer) return;
+    this._pollTimer = setInterval(() => this._poll(), POLL_INTERVAL_MS);
+  },
+
+  _stopPoll(): void {
+    if (this._pollTimer) {
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
+    }
+  },
+
+  _poll(): void {
+    if (!this.data.loaded || this.data.noFamily) return;
+    const familyId = currentFamilyStore.value?.id || '';
+    // 家庭已切换但页面尚未重置：本轮不请求，等 onShow / resetForFamily 接管
+    if (!familyId || familyId !== this.data.familyId) return;
+    if (Date.now() - this._lastFetchAt < POLL_INTERVAL_MS) return;
+    this.loadTasks();
   },
 
   /** 家庭变化后完全重置（范围偏好按新家庭恢复） */
@@ -263,6 +309,8 @@ Page({
     const familyId = this.data.familyId;
     if (!familyId) return;
     const reqSeq = ++this._reqSeq;
+    // 记录拉取时间：任何来源（首屏 / 下拉 / 脏标记 / 切范围 / 轮询）都刷新节流窗口
+    this._lastFetchAt = Date.now();
     this.setData({ listError: false });
     try {
       const assigneeId = assigneeParamOf(this.data.scope);

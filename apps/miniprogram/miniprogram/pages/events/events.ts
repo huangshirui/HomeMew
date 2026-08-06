@@ -78,6 +78,13 @@ const MAX_PAGES_PER_WINDOW = 10;
 /** 距顶部 / 底部约 2~3 屏时提前触发加载（px） */
 const EDGE_THRESHOLD_PX = 1200;
 
+/**
+ * 后台轮询间隔（毫秒）：页面可见期间每 60 秒原地重拉一次已加载窗口，
+ * 让其他家庭成员的新增 / 修改 / 删除在无需用户操作时也能自动出现。
+ * 页面隐藏时停止，不消耗流量。
+ */
+const POLL_INTERVAL_MS = 60 * 1000;
+
 type EventItemView = {
   id: string;
   summary: string;
@@ -187,6 +194,10 @@ Page({
   _dirtyUnsubscribe: null as (() => void) | null,
   /** 每分钟本地重算定时器（只重算展示态，不重新拉后台） */
   _tickTimer: null as ReturnType<typeof setInterval> | null,
+  /** 后台轮询定时器（页面可见期间才运行，拉取其他成员的变更） */
+  _pollTimer: null as ReturnType<typeof setInterval> | null,
+  /** 上次真正发起后台拉取的时间戳，用于轮询节流 */
+  _lastFetchAt: 0,
   /** 上次重算得到的 isEnded 指纹，用于跳过无变化的 setData */
   _endedFingerprint: '' as string,
   /** 查看时区：请求参数与列表归组共用同一个值 */
@@ -221,6 +232,7 @@ Page({
   onShow(): void {
     this.getTabBar()?.setData({ selected: 1 });
     this._subscribeDirty();
+    this._startPoll();
     const familyId = currentFamilyStore.value?.id || '';
     // 从无家庭恢复到有家庭
     if (familyId && this.data.noFamily) {
@@ -247,11 +259,46 @@ Page({
   onHide(): void {
     this._unsubscribeDirty();
     this._stopTick();
+    this._stopPoll();
   },
 
   onUnload(): void {
     this._unsubscribeDirty();
     this._stopTick();
+    this._stopPoll();
+  },
+
+  /**
+   * 启动后台轮询：页面可见期间每 60 秒原地重拉一次已加载窗口
+   * （refreshLoadedRange 保持成员范围与滚动位置，不会跳回今天）。
+   *
+   * 注意：
+   * - 只在 onShow 启动、onHide / onUnload 停止；
+   * - 通过 _lastFetchAt 节流，刚拉过（首屏 / 脏标记 / 扩展窗口 / 切范围）就跳过本轮；
+   * - 家庭切换时由 onShow 的 resetForFamily 接管，轮询自身校验 familyId 不发旧请求；
+   * - refreshLoadedRange 内部的 _reqSeq + familyId 校验会丢弃过期响应；
+   * - 正在双向扩展加载时跳过本轮，避免与窗口扩展互相覆盖。
+   */
+  _startPoll(): void {
+    if (this._pollTimer) return;
+    this._pollTimer = setInterval(() => this._poll(), POLL_INTERVAL_MS);
+  },
+
+  _stopPoll(): void {
+    if (this._pollTimer) {
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
+    }
+  },
+
+  _poll(): void {
+    if (!this.data.loaded || this.data.noFamily) return;
+    const familyId = currentFamilyStore.value?.id || '';
+    if (!familyId || familyId !== this.data.familyId) return;
+    // 正在扩展窗口：本轮跳过，等扩展完成后的下一轮再刷新
+    if (this._loadingBack || this._loadingFwd) return;
+    if (Date.now() - this._lastFetchAt < POLL_INTERVAL_MS) return;
+    this.refreshLoadedRange();
   },
 
   /** 启动每分钟本地重算：仅用已缓存事件重算「已结束」等展示态，不请求后台 */
@@ -449,6 +496,8 @@ Page({
   async loadWindow(start: string, end: string): Promise<Event[]> {
     const familyId = this.data.familyId;
     const attendeeId = this.attendeeParam();
+    // 记录拉取时间：任何来源（首屏 / 扩展窗口 / 脏标记 / 切范围 / 轮询）都刷新节流窗口
+    this._lastFetchAt = Date.now();
     const items: Event[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < MAX_PAGES_PER_WINDOW; page++) {
