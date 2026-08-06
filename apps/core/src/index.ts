@@ -1,4 +1,5 @@
 import { createApp } from "./app";
+import { cleanupExpiredCreationDraftJobs } from "./creation-draft-cleanup";
 import { processCreationDraftQueue, type CreationDraftQueueMessage } from "./creation-draft-jobs";
 import { defaultCreationProvider } from "./creation-drafts";
 import type { Bindings } from "./env";
@@ -13,6 +14,12 @@ const worker = {
       now: () => new Date(),
       createCreationProvider: defaultCreationProvider,
     });
+  },
+  async scheduled(_controller: ScheduledController, env: Bindings): Promise<void> {
+    const result = await cleanupExpiredCreationDraftJobs(env);
+    if (result.deleted > 0) {
+      console.log("Expired creation draft jobs deleted", result);
+    }
   },
 };
 
