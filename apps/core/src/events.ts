@@ -418,12 +418,17 @@ export function registerEventRoutes(app: App): void {
     if (status !== "active" && status !== "cancelled") {
       throw new ApiError("INVALID_REQUEST", "status must be active or cancelled", 400);
     }
+    const q =
+      c.req.query("q") === undefined
+        ? undefined
+        : requireString(c.req.query("q"), "q", 100);
     const filter = JSON.stringify({
       startDate,
       endDate,
       viewingTimezone,
       status,
       attendeeId: c.req.query("attendeeId") ?? null,
+      q: q ?? null,
     });
     const cursor = c.req.query("cursor")
       ? decodeCursor(c.req.query("cursor")!, "events", sort)
@@ -457,6 +462,11 @@ export function registerEventRoutes(app: App): void {
       sql +=
         " AND EXISTS (SELECT 1 FROM event_attendees ea WHERE ea.event_id=e.id AND ea.user_id=?)";
       args.push(attendee);
+    }
+    if (q) {
+      sql +=
+        " AND (instr(lower(e.summary),lower(?))>0 OR instr(lower(COALESCE(e.description,'')),lower(?))>0 OR instr(lower(COALESCE(e.location,'')),lower(?))>0)";
+      args.push(q, q, q);
     }
     if (cursor) {
       sql +=
