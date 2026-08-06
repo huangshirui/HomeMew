@@ -87,6 +87,8 @@ DELETE /api/v1/families/{familyId}/events/{eventId}?version=2
 ```
 
 定时日程使用规范 UTC `startAt/endAt`；可空的 `startTimezone/endTimezone` 只用于显示，不参与服务端计算。创建时省略某个端点时区会使用家庭时区，显式 `null` 则保留为空。全天日程使用 `startDate/endDateExclusive`，两类字段不能混用。列表必须传 `startDate/endDateExclusive`，可选 `timezone` 指定查看日历的时区，单次最大 366 天。
+列表可选传 `q`，在当前日期窗口内对子串搜索 `summary`、`description`和 `location`。Core 会去除首尾空格，结果必须为 1 至 100 个字符；
+空白或超长搜索词返回 `INVALID_REQUEST`。`q` 与其他筛选条件一起绑定到分页 cursor，改变搜索词后必须丢弃旧 cursor，从第一页重新查询。
 
 创建示例：
 
@@ -118,6 +120,7 @@ POST   /api/v1/families/{familyId}/tasks/{taskId}/reopen
 `dueDate` 只接受 `YYYY-MM-DD` 或 `null`。列表默认只返回 `pending`，支持多个 `status`、`assigneeId=me`、`dueDateFrom`、`dueDateTo`、`includeNoDue`、四种 `sort`、`limit` 和不透明 `cursor`；按截止日期排序时无截止日期始终在最后。
 
 所有日程和待办接口都要求当前 JWT 用户是目标家庭的 active 成员。指定的参与人或负责人也必须是该家庭的 active 成员。PATCH、DELETE、complete 和 reopen 使用客户端读到的 `version`；版本过期返回对应的 `*_VERSION_CONFLICT`。DELETE 是软删除，普通读取不会返回已删除记录。
+待办列表可选传 `q`，对子串搜索 `name` 和 `description`，并可与状态、负责人、截止日期和排序条件组合。搜索词会去除首尾空格并限制为1 至 100 个字符；搜索条件变化后不能复用旧 cursor。
 
 ### 日子
 

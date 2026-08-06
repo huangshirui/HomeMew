@@ -740,6 +740,7 @@ paths:
           in: query
           schema:
             $ref: '#/components/schemas/EventStatus'
+        - $ref: '#/components/parameters/SearchQuery'
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Cursor'
       responses:
@@ -887,6 +888,7 @@ paths:
             type: string
             enum: [due_asc, due_desc, created_desc, updated_desc]
             default: due_asc
+        - $ref: '#/components/parameters/SearchQuery'
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Cursor'
       responses:
@@ -1560,6 +1562,24 @@ components:
       in: query
       schema:
         type: string
+    SearchQuery:
+      name: q
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+      description: |
+        Case-insensitive substring search after trimming leading and trailing
+        whitespace. Blank or overlong values return INVALID_REQUEST.
+
+        Event lists search summary, description, and location within the
+        required date window. Task lists search name and description.
+
+        The search value is part of the opaque cursor filter. When q or any
+        other filter changes, the client must discard the existing cursor and
+        restart pagination from the first page.
   responses:
     CreationDraftInvalidRequest:
       description: INVALID_REQUEST

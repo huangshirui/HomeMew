@@ -24,6 +24,30 @@ for(const name of ["startDate","endDateExclusive"]){
   if(!eventParameter(name)?.required)throw new Error(`${name} must be a required event-list parameter`);
 }
 if(eventParameter("start")||eventParameter("end"))throw new Error("Legacy event-list range parameters are forbidden");
+const searchQuery=document.components.parameters.SearchQuery;
+
+if(
+  searchQuery?.name!=="q"||
+  searchQuery?.in!=="query"||
+  searchQuery?.required!==false||
+  searchQuery?.schema?.type!=="string"||
+  searchQuery?.schema?.minLength!==1||
+  searchQuery?.schema?.maxLength!==100
+){
+  throw new Error("SearchQuery must define optional q with a 1-100 character contract");
+}
+
+for(const path of [
+  "/api/v1/families/{familyId}/events",
+  "/api/v1/families/{familyId}/tasks",
+]){
+  const parameters=document.paths[path].get.parameters;
+  if(!parameters.some(
+    (parameter)=>parameter.$ref==="#/components/parameters/SearchQuery"
+  )){
+    throw new Error(`${path} must reference SearchQuery`);
+  }
+}
 
 const schemas=document.components.schemas;
 if(schemas.Event.oneOf?.length!==2)throw new Error("Event must be a timed/all-day oneOf");
