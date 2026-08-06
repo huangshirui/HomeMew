@@ -19,6 +19,7 @@ export interface ListEventsParams {
   timezone: string;
   attendeeId?: string;
   status?: 'active' | 'cancelled';
+  q?: string;
   cursor?: string;
   limit?: number;
 }
@@ -37,6 +38,7 @@ export interface EventsPage {
  * @param params.startDate 日历查询窗口起始日期
  * @param params.endDateExclusive 日历查询窗口结束日期（不包含）
  * @param params.attendeeId 仅看指定参与人；传 'me' 表示仅看自己
+ * @param params.q 搜索标题、描述和地点
  * @param params.cursor 窗口内翻页游标（仅在同一日期窗口内有效）
  */
 export function fetchEventsPage(
@@ -51,6 +53,7 @@ export function fetchEventsPage(
   };
   if (params.attendeeId) query.attendeeId = params.attendeeId;
   if (params.status) query.status = params.status;
+  if (params.q) query.q = params.q;
   if (params.cursor) query.cursor = params.cursor;
 
   const qs = '?' + Object.entries(query)
