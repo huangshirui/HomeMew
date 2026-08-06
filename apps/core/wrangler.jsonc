@@ -7,6 +7,9 @@
   "observability": {
     "enabled": true
   },
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
   "vars": {
     "ASSETS_PUBLIC_URL": "https://homemew-assets.aisr.online",
     "AI_BASE_URL": "https://openrouter.ai/api/v1"
