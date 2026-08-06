@@ -198,6 +198,10 @@
   text-align: right;
 }
 
+.advanced-toggle {
+  justify-content: space-between;
+}
+
 .timezone-mask {
   position: fixed;
   top: 0;

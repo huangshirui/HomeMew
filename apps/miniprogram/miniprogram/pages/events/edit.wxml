@@ -74,20 +74,30 @@
             </view>
           </view>
         </picker>
-        <view class="field-row" data-target="start" bindtap="onOpenTimezone">
-          <text class="field-label">起点时区</text>
-          <view class="field-value">
-            <text class="timezone-value">{{startTimezoneLabel}} · {{startTimezone}}</text>
-            <text class="field-arrow">›</text>
-          </view>
+
+        <!-- 时区（默认折叠，展开后不可收回） -->
+        <view wx:if="{{!showAdvanced}}" class="field-row advanced-toggle" bindtap="onToggleAdvanced">
+          <text class="field-label">时区</text>
+          <text class="field-arrow">›</text>
         </view>
-        <view class="field-row" data-target="end" bindtap="onOpenTimezone">
-          <text class="field-label">终点时区</text>
-          <view class="field-value">
-            <text class="timezone-value">{{endTimezoneLabel}} · {{endTimezone}}</text>
-            <text class="field-arrow">›</text>
+
+        <block wx:if="{{showAdvanced}}">
+          <view class="field-row" data-target="start" bindtap="onOpenTimezone">
+            <text class="field-label">起点时区</text>
+            <view class="field-value">
+              <text class="timezone-value">{{startTimezoneLabel}} · {{startTimezone}}</text>
+              <text class="field-arrow">›</text>
+            </view>
           </view>
-        </view>
+
+          <view class="field-row" data-target="end" bindtap="onOpenTimezone">
+            <text class="field-label">终点时区</text>
+            <view class="field-value">
+              <text class="timezone-value">{{endTimezoneLabel}} · {{endTimezone}}</text>
+              <text class="field-arrow">›</text>
+            </view>
+          </view>
+        </block>
       </block>
 
       <view wx:else class="time-hint">

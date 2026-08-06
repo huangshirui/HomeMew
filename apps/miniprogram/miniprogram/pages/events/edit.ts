@@ -69,6 +69,7 @@ Page({
     endTimezoneMetadata: 'Asia/Shanghai' as string | null,
     startTimezoneLabel: '上海',
     endTimezoneLabel: '上海',
+    showAdvanced: false,
     timezoneTarget: 'start' as 'start' | 'end',
     timezoneQuery: '',
     timezoneOptions: [] as TimeZoneOption[],
@@ -299,6 +300,13 @@ Page({
     });
     this.refreshDerived();
   },
+
+  onToggleAdvanced(): void {
+    if (!this.data.showAdvanced) {
+      this.setData({ showAdvanced: true });
+    }
+  },
+
 
   onStartDateChange(e: WechatMiniprogram.PickerChange): void {
     this.setData({ startDate: e.detail.value as string });
