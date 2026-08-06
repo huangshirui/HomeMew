@@ -126,15 +126,20 @@ export function registerTaskRoutes(app: App): void {
     if (dueFrom && dueTo && dueTo < dueFrom) throw new ApiError("INVALID_REQUEST", "dueDateTo must not precede dueDateFrom", 400);
     const includeNoDue = c.req.query("includeNoDue") === "true";
     if (c.req.query("includeNoDue") && !["true", "false"].includes(c.req.query("includeNoDue")!)) throw new ApiError("INVALID_REQUEST", "includeNoDue must be true or false", 400);
+    const q = c.req.query("q") === undefined ? undefined : requireString(c.req.query("q"), "q", 100);
     let assignee=c.req.query("assigneeId");if(assignee==="me"&&principal.type==="system")throw new ApiError("INVALID_FILTER","me is unavailable for system identities",400);if(assignee==="me")assignee=userId;
     if (assignee) await requireRelatedMembers(c.env, familyId, [assignee], "assignee");
     const placeholders = statuses.map(() => "?").join(",");
-    const filter = JSON.stringify({ statuses, dueFrom: dueFrom ?? null, dueTo: dueTo ?? null, includeNoDue, assignee: assignee ?? null });
+    const filter = JSON.stringify({ statuses, dueFrom: dueFrom ?? null, dueTo: dueTo ?? null, includeNoDue, assignee: assignee ?? null, q: q ?? null });
     const cursor = c.req.query("cursor") ? decodeCursor(c.req.query("cursor")!, "tasks", sort) : undefined;
     if (cursor && cursor.filter !== filter) throw new ApiError("INVALID_REQUEST", "cursor is invalid for this query", 400);
     const args: unknown[] = [familyId, ...statuses];
     let sql = `SELECT t.* FROM tasks t WHERE t.family_id=? AND t.deleted_at IS NULL AND t.status IN (${placeholders})`;
     if (assignee) { sql += " AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id=t.id AND ta.user_id=?)"; args.push(assignee); }
+    if (q) {
+      sql += " AND (instr(lower(t.name),lower(?))>0 OR instr(lower(COALESCE(t.description,'')),lower(?))>0)";
+      args.push(q, q);
+    }
     if (dueFrom || dueTo) {
       const dated: string[] = [];
       if (dueFrom) { dated.push("t.due_date>=?"); args.push(dueFrom); }
