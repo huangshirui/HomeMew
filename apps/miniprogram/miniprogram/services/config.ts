@@ -16,6 +16,8 @@ export const STORAGE_KEYS = {
   coreApiUrl: 'coreApiUrl',
   /** 日程页成员范围选择前缀，完整 key 为 `eventsScope:{familyId}:{userId}` */
   eventsScope: 'eventsScope',
+  /** 待办页成员范围选择前缀，完整 key 为 `tasksScope:{familyId}:{userId}` */
+  tasksScope: 'tasksScope',
   /** 设备时区偏好模式：'system' | 'custom' */
   timeZoneMode: 'timeZoneMode',
   /** 设备时区偏好：指定的 IANA 时区（仅 mode 为 custom 时使用） */

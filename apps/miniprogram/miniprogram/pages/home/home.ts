@@ -37,6 +37,7 @@ import { eventDaysInRange } from '../../utils/event-timeline';
 import { isEventEnded, isEventOngoing, eventDisplayRank } from '../../utils/event-status';
 import { consumeAnyDirty, consumeDirtyDomains, markDirty, subscribe } from '../../stores/dirty';
 import { loadEventsScope } from '../../stores/events-scope';
+import { loadTasksScope, assigneeParamOf } from '../../stores/tasks-scope';
 import { listEvents } from '../../services/events';
 import { listTasks, completeTask } from '../../services/tasks';
 import { listAttentionDayRecords } from '../../services/day-records';
@@ -108,6 +109,15 @@ type AttentionCard = {
 /** 首页每个模块最多展示的条目数，超出由「查看全部」进入对应 Tab */
 const HOME_LIMIT = 3;
 
+/** 首页「待办提醒」最多展示的条目数，超出在末行提示更多 */
+const HOME_TASK_LIMIT = 10;
+
+/**
+ * 首页「待办提醒」的截止日期窗口：今天 / 明天 / 后天（共 3 天）。
+ * 已逾期的待办没有下界限制，始终包含；无截止日期的不进入该列表。
+ */
+const HOME_TASK_DUE_DAYS = 3;
+
 /** 关注级别排序权重：critical → warning → info → none */
 function attentionLevelRank(level: string): number {
   switch (level) {
@@ -134,6 +144,8 @@ Page({
 
     pendingTasks: [] as TaskHomeView[],
     pendingTaskCount: 0,
+    /** 近 3 天待办中未展示的剩余条数（> 0 时列表末行提示更多） */
+    pendingTaskMore: 0,
 
     attentionCards: [] as AttentionCard[],
 
@@ -364,7 +376,14 @@ Page({
     if (this.data.currentFamily) this.loadTodayEvents(this.data.currentFamily.id);
   },
 
-  /** 加载待办任务（进行中的任务） */
+  /**
+   * 加载待办任务（进行中的任务）。
+   *
+   * 跟随待办页的「成员范围」偏好（stores/tasks-scope）：all 不传、me 传 'me'、
+   * 其他传成员 userId，与「今天安排」跟随日程页范围的做法一致。
+   * 这里拉取范围内全部进行中的待办：首页「待办提醒」再按近 3 天截止筛选，
+   * 「需要关注」的逾期汇总与问候语计数仍基于同一份数据，保证口径一致。
+   */
   async loadTasks(familyId: string): Promise<void> {
     const hasOld = this.data.pendingTasks.length > 0;
     this.setData({
@@ -373,7 +392,13 @@ Page({
       tasksError: false,
     });
     try {
-      const tasks = await listTasks(familyId, { status: 'pending' });
+      const assigneeId = assigneeParamOf(loadTasksScope(familyId, userStore.value?.id || ''));
+      const tasks = await listTasks(familyId, {
+        status: 'pending',
+        includeNoDue: true,
+        sort: 'due_asc',
+        ...(assigneeId ? { assigneeId } : {}),
+      });
       if (this.data.currentFamily?.id !== familyId) return;
 
       this._pendingTasks = tasks;
@@ -468,8 +493,12 @@ Page({
       .filter(event => !(isEventEnded(event, now)))
       .sort((a, b) => eventDisplayRank(a, b, now))
       .map(event => mapTodayEvent(event, viewingTimezone, now));
-    const pendingTasks = [...this._pendingTasks]
-      .sort((a, b) => taskDueRank(a, today, tomorrow) - taskDueRank(b, today, tomorrow))
+    // 待办提醒：只保留截止日期在近 3 天（今天 / 明天 / 后天）内的待办，
+    // 已逾期的没有下界始终包含，无截止日期的不进入该列表；按截止日期升序。
+    const dueWindowEnd = addDaysToDateOnly(today, HOME_TASK_DUE_DAYS - 1);
+    const pendingTasks = this._pendingTasks
+      .filter((t) => t.status === 'pending' && !!t.dueDate && t.dueDate <= dueWindowEnd)
+      .sort((a, b) => (a.dueDate! < b.dueDate! ? -1 : a.dueDate! > b.dueDate! ? 1 : 0))
       .map((t) => {
         const v = mapTaskHome(t, today, tomorrow);
         v.completing = this._completingIds.has(t.id);
@@ -478,7 +507,10 @@ Page({
 
     const todayEventCount = todayEvents.length;
     const pendingTaskCount = this._pendingTasks.length;
-    const overdueCount = pendingTasks.filter((t) => t.isOverdue).length;
+    const overdueCount = this._pendingTasks.filter(
+      (t) => t.status === 'pending' && !!t.dueDate && t.dueDate < today,
+    ).length;
+    const pendingTaskMore = Math.max(0, pendingTasks.length - HOME_TASK_LIMIT);
     const urgent = findUrgentEvent(this._todayEvents);
 
     // 构建「需要关注」横向卡片（聚合日子关注项 + 逾期待办汇总 + 紧急日程）
@@ -492,7 +524,7 @@ Page({
       todayEvents.map((e) => `${e.id}:${e.isEnded ? 1 : 0}:${e.isOngoing ? 1 : 0}`).join('|') +
       '#' +
       pendingTasks.map((t) => `${t.id}:${t.isOverdue ? 1 : 0}:${t.completing ? 1 : 0}`).join('|') +
-      '#' +
+      `#${pendingTaskCount}:${pendingTaskMore}#` +
       attentionCards.map((c) => `${c.kind}:${c.id}:${c.level}`).join('|');
     // 每分钟重算时：若「进行中 / 已结束 / 逾期 / 提交中 / 关注卡」展示态都没有变化，跳过 setData，
     // 避免列表无谓闪动；计数与副标题也随指纹一并稳定。
@@ -502,8 +534,9 @@ Page({
     this.setData({
       todayEvents: todayEvents,
       todayEventCount,
-      pendingTasks: pendingTasks.slice(0, HOME_LIMIT),
+      pendingTasks: pendingTasks.slice(0, HOME_TASK_LIMIT),
       pendingTaskCount,
+      pendingTaskMore,
       attentionCards,
       greetingSubtitle: buildSubtitle(todayEventCount, pendingTaskCount, attentionCards.length),
     });
@@ -668,18 +701,12 @@ function mapTodayEvent(e: Event, viewingTimezone: string, now: number): TodayEve
   return { id: e.id, summary: e.summary, timeText, isAllDay: e.isAllDay, isEnded, isOngoing };
 }
 
-/** 待办截止优先级：已逾期(0) > 今天(1) > 明天(2) > 其他有截止(3) > 无截止(4) */
-function taskDueRank(t: Task, today: string, tomorrow: string): number {
-  if (t.status !== 'pending') return 99;
-  if (!t.dueDate) return 4;
-  if (t.dueDate < today) return 0;
-  if (t.dueDate === today) return 1;
-  if (t.dueDate === tomorrow) return 2;
-  return 3;
-}
-
+/**
+ * 截止日期文案。负责人单独作为一个标签展示，不再借道本函数，
+ * 否则有截止日期时负责人会被吞掉。
+ */
 function taskDueLabel(t: Task, today: string, tomorrow: string): string {
-  if (!t.dueDate) return (t.assignees || []).map((a) => a.displayName).join('、');
+  if (!t.dueDate) return '';
   if (t.dueDate < today) return '已逾期';
   if (t.dueDate === today) return '今天';
   if (t.dueDate === tomorrow) return '明天';

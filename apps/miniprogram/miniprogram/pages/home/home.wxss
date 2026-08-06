@@ -384,19 +384,50 @@
   color: var(--home-danger);
 }
 
-.task-due {
+/* 负责人 + 截止日期标签组（两者可同时展示） */
+.task-tags {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-left: 16rpx;
+  flex-shrink: 0;
+  max-width: 50%;
+}
+
+.task-assignee {
   font-size: 22rpx;
-  color: var(--home-secondary);
+  color: var(--home-primary);
   background-color: #EAF6EB;
   padding: 4rpx 14rpx;
   border-radius: 8rpx;
-  margin-left: 16rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-due {
+  font-size: 22rpx;
+  color: var(--home-secondary);
+  background-color: #f2f4f3;
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
   flex-shrink: 0;
 }
 
 .task-due.due-overdue {
   color: var(--home-danger);
   background-color: #fdecec;
+}
+
+/* 超出展示上限时的「更多」提示行 */
+.task-more {
+  padding: 20rpx 0 4rpx;
+  text-align: center;
+}
+
+.task-more-text {
+  font-size: 24rpx;
+  color: var(--home-secondary);
 }
 
 /* 悬浮新增按钮 */

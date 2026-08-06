@@ -1,4 +1,4 @@
-<!-- 待办任务列表页 -->
+<!-- 待办任务列表页（进行中） -->
 <view class="container">
   <!-- 加载中 -->
   <view wx:if="{{!loaded}}" class="loading-state">
@@ -19,23 +19,26 @@
   </block>
 
   <block wx:else>
-    <!-- 两段式统计 + 切换 -->
-    <view class="tab-bar">
-      <view
-        class="tab-item {{activeTab === 'pending' ? 'tab-active' : ''}}"
-        data-tab="pending"
-        bindtap="onTabChange"
-      >
-        <text class="tab-count">{{pendingCount}}</text>
-        <text class="tab-text">进行中</text>
+    <!-- 顶栏：成员范围 + 已完成入口 -->
+    <view class="topbar">
+      <view class="scope-btn" bindtap="onOpenScope">
+        <text class="scope-text">{{scopeLabel}}</text>
+        <text class="scope-caret">▾</text>
       </view>
-      <view
-        class="tab-item {{activeTab === 'completed' ? 'tab-active' : ''}}"
-        data-tab="completed"
-        bindtap="onTabChange"
-      >
-        <text class="tab-count">{{completedCount}}</text>
-        <text class="tab-text">已完成</text>
+      <view class="done-btn" bindtap="onViewCompleted">
+        <text class="done-text">已完成 ›</text>
+      </view>
+    </view>
+
+    <!-- 统计：进行中 / 已逾期 -->
+    <view class="stat-bar">
+      <view class="stat-item">
+        <text class="stat-count">{{pendingCount}}</text>
+        <text class="stat-text">进行中</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-count {{overdueCount > 0 ? 'stat-count-overdue' : ''}}">{{overdueCount}}</text>
+        <text class="stat-text">已逾期</text>
       </view>
     </view>
 
@@ -45,9 +48,9 @@
     </view>
 
     <!-- 任务列表 -->
-    <block wx:elif="{{displayTasks.length > 0}}">
+    <block wx:elif="{{pendingTasks.length > 0}}">
       <view
-        wx:for="{{displayTasks}}"
+        wx:for="{{pendingTasks}}"
         wx:key="id"
         class="task-card"
         data-id="{{item.id}}"
@@ -55,8 +58,7 @@
       >
         <!-- 左侧复选框（扩大点击热区） -->
         <view class="task-check-hit" data-id="{{item.id}}" catchtap="onToggleStatus">
-          <view class="task-check {{item.status === 'completed' ? 'check-done' : ''}} {{item.completing ? 'check-loading' : ''}}">
-            <text wx:if="{{item.status === 'completed' && !item.completing}}" class="check-icon-done">✓</text>
+          <view class="task-check {{item.completing ? 'check-loading' : ''}}">
             <text wx:if="{{item.completing}}" class="loading-dot"></text>
           </view>
         </view>
@@ -64,7 +66,7 @@
         <!-- 任务内容 -->
         <view class="task-body">
           <view class="task-name-row">
-            <text class="task-name {{item.status === 'completed' ? 'name-done' : ''}} {{item.isOverdue ? 'name-overdue' : ''}}">{{item.name}}</text>
+            <text class="task-name {{item.isOverdue ? 'name-overdue' : ''}}">{{item.name}}</text>
           </view>
           <view wx:if="{{item.assigneeText || item.dueText}}" class="task-meta">
             <text wx:if="{{item.assigneeText}}" class="assignee-tag">{{item.assigneeText}}</text>
@@ -77,12 +79,40 @@
       </view>
     </block>
 
-    <!-- 空状态（按当前 tab 区分） -->
+    <!-- 空状态 -->
     <view wx:else class="empty-state">
       <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
-      <text class="empty-title">{{activeTab === 'pending' ? '还没有进行中的待办' : '还没有已完成的待办'}}</text>
-      <view wx:if="{{activeTab === 'pending'}}" class="empty-actions">
-        <button class="btn-primary" bindtap="onCreate">新建待办</button>
+      <text class="empty-title">{{scope === 'me' ? '你还没有进行中的待办' : '还没有进行中的待办'}}</text>
+      <view class="empty-actions empty-actions-row">
+        <button class="btn-primary btn-sm" bindtap="onCreate">新建待办</button>
+      </view>
+    </view>
+
+    <!-- 成员范围选择弹层 -->
+    <view wx:if="{{showScopeSheet}}" class="sheet-mask" bindtap="onCloseScope" catchtouchmove="noop">
+      <view class="sheet" catchtap="noop">
+        <view class="sheet-header">
+          <text class="sheet-title">选择待办</text>
+        </view>
+        <view
+          wx:for="{{scopeOptions}}"
+          wx:key="key"
+          class="sheet-option {{scope === item.key ? 'sheet-option-active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onSelectScope"
+        >
+          <view wx:if="{{item.showAvatar}}" class="sheet-avatar-wrap">
+            <image class="sheet-avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+          </view>
+          <view wx:else class="sheet-avatar-wrap sheet-avatar-all">
+            <text class="sheet-avatar-all-text">家</text>
+          </view>
+          <text class="sheet-option-label">{{item.label}}</text>
+          <text wx:if="{{scope === item.key}}" class="sheet-check">✓</text>
+        </view>
+        <view class="sheet-cancel" bindtap="onCloseScope">
+          <text class="sheet-cancel-text">取消</text>
+        </view>
       </view>
     </view>
 

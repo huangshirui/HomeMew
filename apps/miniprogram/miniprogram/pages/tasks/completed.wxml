@@ -1,0 +1,57 @@
+<!-- 已完成待办列表页 -->
+<view class="container">
+  <!-- 加载中 -->
+  <view wx:if="{{!loaded}}" class="loading-state">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- 顶部：只读展示继承自待办页的成员范围 -->
+    <view class="scope-bar">
+      <text class="scope-bar-text">{{scopeLabel}}</text>
+      <text class="scope-bar-count">共 {{total}} 条</text>
+    </view>
+
+    <!-- 加载失败 -->
+    <view wx:if="{{listError}}" class="list-error" bindtap="onRetry">
+      <text class="list-error-text">加载失败，点击重试</text>
+    </view>
+
+    <!-- 已完成列表 -->
+    <block wx:elif="{{tasks.length > 0}}">
+      <view
+        wx:for="{{tasks}}"
+        wx:key="id"
+        class="task-card"
+        data-id="{{item.id}}"
+        bindtap="onTaskTap"
+      >
+        <view class="task-check-hit" data-id="{{item.id}}" catchtap="onReopen">
+          <view class="task-check check-done {{item.reopening ? 'check-loading' : ''}}">
+            <text wx:if="{{item.reopening}}" class="loading-dot"></text>
+            <text wx:else class="check-icon-done">✓</text>
+          </view>
+        </view>
+
+        <view class="task-body">
+          <view class="task-name-row">
+            <text class="task-name name-done">{{item.name}}</text>
+          </view>
+          <view class="task-meta">
+            <text wx:if="{{item.assigneeText}}" class="assignee-tag">{{item.assigneeText}}</text>
+            <text class="due-tag">{{item.completedText}}</text>
+          </view>
+        </view>
+
+        <text class="task-arrow">›</text>
+      </view>
+    </block>
+
+    <!-- 空状态 -->
+    <view wx:else class="empty-state">
+      <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
+      <text class="empty-title">还没有已完成的待办</text>
+      <text class="empty-desc">完成待办后会出现在这里。</text>
+    </view>
+  </block>
+</view>

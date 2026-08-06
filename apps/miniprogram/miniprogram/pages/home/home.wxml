@@ -158,15 +158,21 @@
           </view>
           <view class="task-body">
             <text class="task-name {{item.isOverdue ? 'name-overdue' : ''}}">{{item.name}}</text>
-            <text wx:if="{{item.dueText}}" class="task-due {{item.isOverdue ? 'due-overdue' : ''}}">{{item.dueText}}</text>
+            <view wx:if="{{item.assigneeText || item.dueText}}" class="task-tags">
+              <text wx:if="{{item.assigneeText}}" class="task-assignee">{{item.assigneeText}}</text>
+              <text wx:if="{{item.dueText}}" class="task-due {{item.isOverdue ? 'due-overdue' : ''}}">{{item.dueText}}</text>
+            </view>
           </view>
+        </view>
+        <view wx:if="{{pendingTaskMore > 0}}" class="task-more" bindtap="onViewTasks">
+          <text class="task-more-text">还有 {{pendingTaskMore}} 条待办 ›</text>
         </view>
       </view>
       <view wx:elif="{{tasksError}}" class="thin-error" bindtap="onRetryTasks">
         <text>更新失败，点击重试</text>
       </view>
       <view wx:else class="empty-hint">
-        <text class="empty-link" bindtap="onCreateTask">太棒了，待办已经清空！＋ 添加待办</text>
+        <text class="empty-link" bindtap="onCreateTask">最近 3 天没有到期的待办 ＋ 添加待办</text>
       </view>
     </view>
 

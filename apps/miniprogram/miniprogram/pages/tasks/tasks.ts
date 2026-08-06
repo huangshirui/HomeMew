@@ -1,29 +1,36 @@
 /**
- * 待办任务列表页
+ * 待办任务列表页（进行中）
  *
- * 顶部两段式统计/切换（进行中 N | 已完成 M）+ 任务列表。
- * - 默认进入「进行中」。
- * - 按当前 tab 的 status 请求数据；进行中 / 已完成两份数据一次性加载并缓存，切换 tab 不再请求网络。
- * - 空状态按当前 tab 文案区分。
- * - 无家庭时展示统一引导（创建 / 加入家庭）。
- * - 点击复选框可切换完成 / 恢复状态；点击卡片进入详情。
- * - 删除操作已迁移至详情页，列表不再常驻删除入口。
+ * 顶栏（对齐日程页）：左「成员范围」选择器 + 右「已完成」入口。
+ * - 成员范围：全家待办 / 我的待办 / 指定成员，默认「我的待办」，按
+ *   (familyId, userId) 本地持久化（stores/tasks-scope），与日程页相互独立。
+ * - 切换成员会 markDirty('tasks')，首页「待办提醒」随之以新范围重新拉取。
+ * - 已完成任务移至独立子页 pages/tasks/completed。
+ * - 顶部统计只展示「进行中 / 已逾期」，不再展示已完成。
+ * - 支持下拉刷新。
+ * - 点击复选框完成任务；点击卡片进入详情。
  */
 
-import { listTasks, completeTask, reopenTask } from '../../services/tasks';
-import { currentFamilyStore } from '../../stores/index';
+import { listTasks, completeTask } from '../../services/tasks';
+import { listFamilyMembers } from '../../services/families';
+import { currentFamilyStore, userStore } from '../../stores/index';
 import { consumeDirty, markDirty, subscribe } from '../../stores/dirty';
+import {
+  loadTasksScope,
+  saveTasksScope,
+  assigneeParamOf,
+  TasksScope,
+} from '../../stores/tasks-scope';
 import {
   showError,
   showSuccess,
   getErrorMessage,
   isVersionConflict,
   formatInstantInTimeZone,
+  safeAvatarUrl,
 } from '../../utils/index';
 import { getViewingTimeZone } from '../../services/settings';
-import { Task } from '../../types/index';
-
-type TabType = 'pending' | 'completed';
+import { Task, FamilyMember } from '../../types/index';
 
 type TaskView = {
   id: string;
@@ -37,22 +44,35 @@ type TaskView = {
   completing: boolean;
 };
 
+type ScopeOption = {
+  key: string;
+  label: string;
+  avatarUrl: string;
+  showAvatar: boolean;
+};
+
 Page({
   data: {
-    activeTab: 'pending' as TabType,
+    // 成员范围
+    scope: 'me' as TasksScope,
+    scopeLabel: '我的待办',
+    scopeOptions: [] as ScopeOption[],
+    showScopeSheet: false,
+
     pendingCount: 0,
-    completedCount: 0,
+    overdueCount: 0,
     pendingTasks: [] as TaskView[],
-    completedTasks: [] as TaskView[],
-    displayTasks: [] as TaskView[],
     loaded: false,
     listError: false,
     noFamily: false,
     familyId: '' as string,
   },
 
-  /** 请求序号：用于丢弃过期（家庭切换 / 慢网络）返回结果 */
+  /** 请求序号：用于丢弃过期（家庭切换 / 范围切换 / 慢网络）返回结果 */
   _reqSeq: 0,
+
+  /** 家庭成员（用于范围选择器） */
+  _members: [] as FamilyMember[],
 
   // 脏标记订阅句柄：页面可见期间订阅，隐藏时取消，避免误刷新与泄漏
   _dirtyUnsubscribe: null as (() => void) | null,
@@ -63,7 +83,14 @@ Page({
       this.setData({ loaded: true, noFamily: true });
       return;
     }
-    this.setData({ familyId, noFamily: false });
+    const scope = loadTasksScope(familyId, userStore.value?.id || '');
+    this.setData({
+      familyId,
+      noFamily: false,
+      scope,
+      scopeLabel: this.labelForScope(scope),
+    });
+    this.loadMembers();
     this.loadTasks();
   },
 
@@ -73,14 +100,12 @@ Page({
     const familyId = currentFamilyStore.value?.id || '';
     // 从无家庭恢复到有家庭
     if (familyId && this.data.noFamily) {
-      this.setData({ familyId, noFamily: false });
-      this.loadTasks();
+      this.resetForFamily(familyId);
       return;
     }
     // 家庭切换
     if (familyId && this.data.familyId && familyId !== this.data.familyId) {
-      this.setData({ familyId });
-      this.loadTasks();
+      this.resetForFamily(familyId);
       return;
     }
     // 变为无家庭
@@ -97,12 +122,37 @@ Page({
     }
   },
 
+  onHide(): void {
+    this._unsubscribeDirty();
+  },
+
+  onUnload(): void {
+    this._unsubscribeDirty();
+  },
+
+  /** 家庭变化后完全重置（范围偏好按新家庭恢复） */
+  resetForFamily(familyId: string): void {
+    const scope = loadTasksScope(familyId, userStore.value?.id || '');
+    this._members = [];
+    this.setData({
+      familyId,
+      noFamily: false,
+      scope,
+      scopeLabel: this.labelForScope(scope),
+      scopeOptions: [],
+      showScopeSheet: false,
+    });
+    this.loadMembers();
+    this.loadTasks();
+  },
+
   _subscribeDirty(): void {
     this._unsubscribeDirty();
     this._dirtyUnsubscribe = subscribe((domain) => {
       if (domain !== 'tasks') return;
       if (!this.data.loaded || this.data.noFamily) return;
       if (currentFamilyStore.value?.id !== this.data.familyId) return;
+      consumeDirty('tasks');
       this.loadTasks();
     });
   },
@@ -114,26 +164,121 @@ Page({
     }
   },
 
+  /* ---------------- 成员范围 ---------------- */
+
+  async loadMembers(): Promise<void> {
+    const familyId = this.data.familyId;
+    if (!familyId) return;
+    try {
+      const members = await listFamilyMembers(familyId);
+      if (familyId !== this.data.familyId) return;
+      this._members = members;
+      this.buildScopeOptions();
+      // 持久化的成员范围已不在家庭中：回落到「我的待办」
+      const scope = this.data.scope;
+      if (scope !== 'all' && scope !== 'me' && !members.some(m => m.userId === scope)) {
+        this.onScopeFallbackToMe();
+      } else {
+        this.setData({ scopeLabel: this.labelForScope(scope) });
+      }
+    } catch (error) {
+      // 成员列表加载失败不阻塞任务列表；打开选择器时会再尝试
+      console.error('[Tasks] Load members failed:', error);
+    }
+  },
+
+  onScopeFallbackToMe(): void {
+    saveTasksScope(this.data.familyId, userStore.value?.id || '', 'me');
+    this.setData({ scope: 'me', scopeLabel: this.labelForScope('me') });
+    // 成员范围变化：通知首页「待办提醒」以新范围重新拉取
+    markDirty('tasks');
+    this.loadTasks();
+  },
+
+  buildScopeOptions(): void {
+    const uid = userStore.value?.id || '';
+    const user = userStore.value;
+    const options: ScopeOption[] = [
+      { key: 'all', label: '全家待办', avatarUrl: '', showAvatar: false },
+      {
+        key: 'me',
+        label: '我的待办',
+        avatarUrl: safeAvatarUrl(user?.avatarUrl),
+        showAvatar: true,
+      },
+    ];
+    this._members
+      .filter(m => m.userId !== uid)
+      .forEach(m => {
+        options.push({
+          key: m.userId,
+          label: m.displayName,
+          avatarUrl: safeAvatarUrl(m.avatarUrl),
+          showAvatar: true,
+        });
+      });
+    this.setData({ scopeOptions: options });
+  },
+
+  labelForScope(scope: TasksScope): string {
+    if (scope === 'all') return '全家待办';
+    if (scope === 'me') return '我的待办';
+    const member = this._members.find(m => m.userId === scope);
+    return member ? `${member.displayName}的待办` : '家人待办';
+  },
+
+  onOpenScope(): void {
+    if (this.data.scopeOptions.length === 0) {
+      this.buildScopeOptions();
+    }
+    if (this._members.length === 0) {
+      this.loadMembers();
+    }
+    this.setData({ showScopeSheet: true });
+  },
+
+  onCloseScope(): void {
+    this.setData({ showScopeSheet: false });
+  },
+
+  onSelectScope(e: WechatMiniprogram.TouchEvent): void {
+    const key = e.currentTarget.dataset.key as string;
+    if (!key) return;
+    this.setData({ showScopeSheet: false });
+    if (key === this.data.scope) return;
+    saveTasksScope(this.data.familyId, userStore.value?.id || '', key);
+    this.setData({ scope: key, scopeLabel: this.labelForScope(key) });
+    // 通知首页「待办提醒」与已完成子页以新范围重新拉取
+    markDirty('tasks');
+    this.loadTasks();
+  },
+
+  noop(): void {
+    // 阻止弹层内容点击穿透 / 蒙层滚动穿透
+  },
+
+  /* ---------------- 数据加载 ---------------- */
+
   async loadTasks(): Promise<void> {
     const familyId = this.data.familyId;
     if (!familyId) return;
     const reqSeq = ++this._reqSeq;
     this.setData({ listError: false });
     try {
-      const [pending, completed] = await Promise.all([
-        listTasks(familyId, { status: 'pending' }),
-        listTasks(familyId, { status: 'completed' }),
-      ]);
-      // 家庭已切换 / 存在更新的请求：丢弃过期结果，避免旧家庭数据覆盖当前页面
+      const assigneeId = assigneeParamOf(this.data.scope);
+      const tasks = await listTasks(familyId, {
+        status: 'pending',
+        includeNoDue: true,
+        sort: 'due_asc',
+        ...(assigneeId ? { assigneeId } : {}),
+      });
+      // 家庭已切换 / 存在更新的请求：丢弃过期结果，避免旧数据覆盖当前页面
       if (reqSeq !== this._reqSeq || familyId !== this.data.familyId) return;
-      const pendingTasks = this.mapTasks(pending);
-      const completedTasks = this.mapTasks(completed);
+      const pendingTasks = this.mapTasks(tasks);
       this.setData({
         pendingTasks,
-        completedTasks,
         pendingCount: pendingTasks.length,
-        completedCount: completedTasks.length,
-        displayTasks: this.data.activeTab === 'pending' ? pendingTasks : completedTasks,
+        overdueCount: pendingTasks.filter(t => t.isOverdue).length,
         loaded: true,
         listError: false,
       });
@@ -148,6 +293,15 @@ Page({
 
   onRetry(): void {
     this.loadTasks();
+  },
+
+  async onPullDownRefresh(): Promise<void> {
+    if (this.data.noFamily) {
+      wx.stopPullDownRefresh();
+      return;
+    }
+    await Promise.all([this.loadTasks(), this.loadMembers()]);
+    wx.stopPullDownRefresh();
   },
 
   mapTasks(tasks: Task[]): TaskView[] {
@@ -177,41 +331,35 @@ Page({
     });
   },
 
-  onTabChange(e: WechatMiniprogram.TouchEvent): void {
-    const tab = e.currentTarget.dataset.tab as TabType;
-    if (!tab || tab === this.data.activeTab) return;
-    this.setData({
-      activeTab: tab,
-      displayTasks: tab === 'pending' ? this.data.pendingTasks : this.data.completedTasks,
-    });
-  },
+  /* ---------------- 交互 ---------------- */
 
   async onToggleStatus(e: WechatMiniprogram.TouchEvent): Promise<void> {
     const id = e.currentTarget.dataset.id as string;
     const familyId = this.data.familyId;
-    const inPending = this.data.pendingTasks.find(t => t.id === id);
-    const inCompleted = this.data.completedTasks.find(t => t.id === id);
-    const task = inPending || inCompleted;
+    const task = this.data.pendingTasks.find(t => t.id === id);
     if (!task || task.completing) return;
 
     // 乐观置为 loading
     this.setCompleting(id, true);
 
     try {
-      const updated = task.status === 'pending'
-        ? await completeTask(familyId, id, task.version)
-        : await reopenTask(familyId, id, task.version);
+      await completeTask(familyId, id, task.version);
       // 家庭已切换：不再改动当前页面
       if (familyId !== this.data.familyId) return;
-      showSuccess(task.status === 'pending' ? '已完成' : '已恢复');
-      // 直接用返回结果在两份列表间移动，立即消除 loading；再后台静默刷新校准
-      this.applyToggledTask(id, updated);
-      // mark dirty so home / other tabs refresh on return, and this page refreshes live via subscription
+      showSuccess('已完成');
+      // 从进行中列表移除，立即消除 loading
+      const pendingTasks = this.data.pendingTasks.filter(t => t.id !== id);
+      this.setData({
+        pendingTasks,
+        pendingCount: pendingTasks.length,
+        overdueCount: pendingTasks.filter(t => t.isOverdue).length,
+      });
+      // 通知首页 / 已完成子页刷新
       markDirty('tasks');
     } catch (error: unknown) {
       if (familyId !== this.data.familyId) return;
       this.setCompleting(id, false);
-      console.error('[Tasks] Toggle status failed:', error);
+      console.error('[Tasks] Complete failed:', error);
       const err = error as { code?: string; message?: string };
       if (isVersionConflict(err.code)) {
         showError(getErrorMessage(err.code) || '内容已被其他家庭成员修改，请刷新后重试');
@@ -222,33 +370,9 @@ Page({
     }
   },
 
-  /** 根据返回的最新 Task，在「进行中 / 已完成」两份列表间移动该任务 */
-  applyToggledTask(id: string, updated: Task): void {
-    const mapped = this.mapTasks([updated])[0];
-    const pendingTasks = this.data.pendingTasks.filter(t => t.id !== id);
-    const completedTasks = this.data.completedTasks.filter(t => t.id !== id);
-    if (mapped.status === 'pending') {
-      pendingTasks.unshift(mapped);
-    } else {
-      completedTasks.unshift(mapped);
-    }
-    this.setData({
-      pendingTasks,
-      completedTasks,
-      pendingCount: pendingTasks.length,
-      completedCount: completedTasks.length,
-      displayTasks: this.data.activeTab === 'pending' ? pendingTasks : completedTasks,
-    });
-  },
-
   setCompleting(id: string, completing: boolean): void {
-    const upd = (list: TaskView[]) => list.map(t => (t.id === id ? { ...t, completing } : t));
-    const pendingTasks = upd(this.data.pendingTasks);
-    const completedTasks = upd(this.data.completedTasks);
     this.setData({
-      pendingTasks,
-      completedTasks,
-      displayTasks: this.data.activeTab === 'pending' ? pendingTasks : completedTasks,
+      pendingTasks: this.data.pendingTasks.map(t => (t.id === id ? { ...t, completing } : t)),
     });
   },
 
@@ -257,6 +381,14 @@ Page({
     if (!id) return;
     wx.navigateTo({
       url: `/pages/tasks/detail?id=${id}&familyId=${this.data.familyId}`,
+    });
+  },
+
+  /** 进入已完成待办子页 */
+  onViewCompleted(): void {
+    if (!this.data.familyId) return;
+    wx.navigateTo({
+      url: `/pages/tasks/completed?familyId=${this.data.familyId}`,
     });
   },
 

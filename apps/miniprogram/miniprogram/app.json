@@ -11,6 +11,7 @@
     "pages/tasks/tasks",
     "pages/tasks/detail",
     "pages/tasks/edit",
+    "pages/tasks/completed",
     "pages/profile/profile",
     "pages/settings/settings",
     "pages/family/join",

@@ -1,7 +1,9 @@
 /* 待办任务列表页样式 */
 
 /* 页面容器：底部留白，避免最后一条内容被 FAB 遮挡 */
+/* 与日程页保持一致：不使用全局 .container 的 padding，由顶栏/统计栏/卡片自行携带 32rpx 留白 */
 .container {
+  padding: 0;
   padding-bottom: 160rpx;
 }
 
@@ -17,14 +19,60 @@
   color: var(--color-text-hint);
 }
 
-/* 两段式统计 + 切换 */
-.tab-bar {
+/* ---------- 顶栏：成员范围 + 已完成入口（与日程页一致） ---------- */
+
+.topbar {
   display: flex;
-  gap: 16rpx;
-  padding: 20rpx 0 24rpx;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 32rpx 12rpx;
+  background-color: var(--color-card);
 }
 
-.tab-item {
+.scope-btn {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  max-width: 40%;
+  flex-shrink: 0;
+}
+
+.scope-text {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-caret {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.done-btn {
+  padding: 8rpx 24rpx;
+  border: 2rpx solid var(--color-primary);
+  border-radius: 28rpx;
+  flex-shrink: 0;
+}
+
+.done-text {
+  font-size: 26rpx;
+  color: var(--color-primary);
+}
+
+/* ---------- 统计：进行中 / 已逾期 ---------- */
+
+.stat-bar {
+  display: flex;
+  gap: 16rpx;
+  padding: 12rpx 32rpx 24rpx;
+  background-color: var(--color-card);
+}
+
+.stat-item {
   flex: 1;
   height: 96rpx;
   display: flex;
@@ -33,32 +81,24 @@
   justify-content: center;
   border-radius: 16rpx;
   background-color: var(--color-bg-white);
-  border: 2rpx solid transparent;
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
-  transition: all 0.2s ease;
 }
 
-.tab-item.tab-active {
-  background-color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.tab-count {
+.stat-count {
   font-size: 40rpx;
   font-weight: 600;
   color: var(--color-primary);
   line-height: 1.1;
 }
 
-.tab-text {
+.stat-count.stat-count-overdue {
+  color: var(--color-danger);
+}
+
+.stat-text {
   font-size: 24rpx;
   color: var(--color-text-secondary);
   margin-top: 4rpx;
-}
-
-.tab-item.tab-active .tab-count,
-.tab-item.tab-active .tab-text {
-  color: #ffffff;
 }
 
 /* 加载失败 */
@@ -80,8 +120,13 @@
   display: flex;
   align-items: center;
   padding: 20rpx 12rpx 20rpx 4rpx;
-  margin-bottom: 16rpx;
+  margin: 0 32rpx 16rpx;
   box-shadow: 0 4rpx 16rpx rgba(45, 187, 120, 0.06);
+}
+
+/* 列表首尾卡片的圆角/间距微调（与日程页列表一致） */
+.task-card:first-child {
+  margin-top: 8rpx;
 }
 
 /* 复选框点击热区（视觉 44rpx，热区 ~84rpx） */
@@ -236,6 +281,120 @@
   width: 60%;
   display: flex;
   flex-direction: column;
+}
+
+/* 与日程页「新建日程」按钮一致：行内、自适应宽度的小号主按钮 */
+.empty-actions-row {
+  flex-direction: row;
+  justify-content: center;
+  gap: 24rpx;
+  width: auto;
+}
+
+.btn-sm {
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 28rpx;
+  padding: 0 40rpx;
+}
+
+/* ---------- 成员范围弹层（与日程页一致） ---------- */
+
+.sheet-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sheet {
+  background-color: var(--color-card);
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.sheet-header {
+  padding: 8rpx 0 20rpx;
+  text-align: center;
+}
+
+.sheet-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.sheet-option {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 12rpx;
+  border-radius: 18rpx;
+}
+
+.sheet-option-active {
+  background-color: #eaf7ec;
+}
+
+.sheet-avatar-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sheet-avatar {
+  width: 100%;
+  height: 100%;
+}
+
+.sheet-avatar-all {
+  background-color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sheet-avatar-all-text {
+  font-size: 30rpx;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.sheet-option-label {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-check {
+  font-size: 30rpx;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.sheet-cancel {
+  margin-top: 16rpx;
+  padding: 24rpx 0 8rpx;
+  text-align: center;
+  border-top: 2rpx solid rgba(0, 0, 0, 0.05);
+}
+
+.sheet-cancel-text {
+  font-size: 28rpx;
+  color: var(--color-text-secondary);
 }
 
 /* 悬浮新增按钮样式已统一到全局 app.wxss */
