@@ -89,6 +89,9 @@ Page({
     timeRangeText: '',
     /** picker 起始/结束日期最小值 */
     minDate: '',
+    /** 月历弹层显隐 */
+    showStartCalendar: false,
+    showEndCalendar: false,
   },
 
   onLoad(options: { familyId?: string; id?: string; date?: string }): void {
@@ -308,17 +311,34 @@ Page({
   },
 
 
-  onStartDateChange(e: WechatMiniprogram.PickerChange): void {
-    this.setData({ startDate: e.detail.value as string });
-    // 起始日期不能晚于结束日期
-    if (this.data.endDate && this.data.startDate > this.data.endDate) {
-      this.setData({ endDate: this.data.startDate });
-    }
+  onOpenStartDate(): void {
+    this.setData({ showStartCalendar: true });
+  },
+
+  onCloseStartCalendar(): void {
+    this.setData({ showStartCalendar: false });
+  },
+
+  onStartDateSelect(e: WechatMiniprogram.CustomEvent): void {
+    const date = e.detail.date as string;
+    if (!date) return;
+    // 选开始日期后，结束日期同步到同一天
+    this.setData({ startDate: date, endDate: date, showStartCalendar: false });
     this.refreshDerived();
   },
 
-  onEndDateChange(e: WechatMiniprogram.PickerChange): void {
-    this.setData({ endDate: e.detail.value as string });
+  onOpenEndDate(): void {
+    this.setData({ showEndCalendar: true });
+  },
+
+  onCloseEndCalendar(): void {
+    this.setData({ showEndCalendar: false });
+  },
+
+  onEndDateSelect(e: WechatMiniprogram.CustomEvent): void {
+    const date = e.detail.date as string;
+    if (!date) return;
+    this.setData({ endDate: date, showEndCalendar: false });
     this.refreshDerived();
   },
 

@@ -110,6 +110,10 @@ Page({
 
     /** 家庭时区下的今天，用于日期默认值与 picker 边界 */
     familyToday: '',
+    /** 月历弹层显隐与边界 */
+    showCalendar: false,
+    anchorMinDate: '',
+    anchorMaxDate: '',
   },
 
   onLoad(options: { familyId?: string; id?: string }): void {
@@ -303,8 +307,21 @@ Page({
     });
   },
 
-  onAnchorDateChange(e: WechatMiniprogram.PickerChange): void {
-    this.setData({ anchorDate: e.detail.value as string });
+  onOpenAnchorCalendar(): void {
+    if (this.data.mode !== 'create') return;
+    // elapsed / cycle 只能选今天及之前（与旧 picker 的 end=familyToday 一致）
+    const maxDate = this.data.kind === 'countdown' ? '' : this.data.familyToday;
+    this.setData({ showCalendar: true, anchorMaxDate: maxDate });
+  },
+
+  onCloseCalendar(): void {
+    this.setData({ showCalendar: false });
+  },
+
+  onAnchorCalendarSelect(e: WechatMiniprogram.CustomEvent): void {
+    const date = e.detail.date as string;
+    if (!date) return;
+    this.setData({ anchorDate: date, showCalendar: false });
   },
 
   onAttentionAfterInput(e: WechatMiniprogram.Input): void {

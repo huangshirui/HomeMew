@@ -28,26 +28,22 @@
     <!-- 日期 / 时间 -->
     <view class="card section">
       <!-- 起始日期 -->
-      <picker mode="date" value="{{startDate}}" start="{{minDate}}" bindchange="onStartDateChange">
-        <view class="field-row">
-          <text class="field-label">日期</text>
-          <view class="field-value">
-            <text class="field-text">{{startDate || '请选择日期'}}</text>
-            <text class="field-arrow">›</text>
-          </view>
+      <view class="field-row" bindtap="onOpenStartDate">
+        <text class="field-label">日期</text>
+        <view class="field-value">
+          <text class="field-text">{{startDate || '请选择日期'}}</text>
+          <text class="field-arrow">›</text>
         </view>
-      </picker>
+      </view>
 
       <!-- 结束日期 -->
-      <picker mode="date" value="{{endDate}}" start="{{minDate}}" bindchange="onEndDateChange">
-        <view class="field-row">
-          <text class="field-label">结束日期</text>
-          <view class="field-value">
-            <text class="field-text">{{endDate || '请选择结束日期'}}</text>
-            <text class="field-arrow">›</text>
-          </view>
+      <view class="field-row" bindtap="onOpenEndDate">
+        <text class="field-label">结束日期</text>
+        <view class="field-value">
+          <text class="field-text">{{endDate || '请选择结束日期'}}</text>
+          <text class="field-arrow">›</text>
         </view>
-      </picker>
+      </view>
 
       <!-- 全天开关 -->
       <view class="field-row all-day-row">
@@ -204,4 +200,24 @@
       </view>
     </scroll-view>
   </view>
+
+  <date-calendar
+    show="{{showStartCalendar}}"
+    mode="single"
+    value="{{startDate}}"
+    min-date="{{minDate}}"
+    title="选择开始日期"
+    bind:select="onStartDateSelect"
+    bind:close="onCloseStartCalendar"
+  />
+
+  <date-calendar
+    show="{{showEndCalendar}}"
+    mode="single"
+    value="{{endDate}}"
+    min-date="{{startDate}}"
+    title="选择结束日期"
+    bind:select="onEndDateSelect"
+    bind:close="onCloseEndCalendar"
+  />
 </view>

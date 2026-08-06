@@ -1,0 +1,52 @@
+<!-- 月历日期选择组件 -->
+<view wx:if="{{show}}" class="cal-mask" bindtap="onClose">
+  <view class="cal-sheet safe-area-bottom" catchtap="onNoop">
+    <view class="cal-header">
+      <text class="cal-title">{{title}}</text>
+      <text class="cal-close" bindtap="onClose">完成</text>
+    </view>
+
+    <view class="cal-nav">
+      <view class="cal-nav-btn" bindtap="onPrevMonth">
+        <text class="cal-nav-arrow">‹</text>
+      </view>
+      <view class="cal-nav-current">
+        <text class="cal-nav-year">{{viewYear}}年</text>
+        <text class="cal-nav-month">{{viewMonth}}月</text>
+      </view>
+      <view class="cal-nav-btn" bindtap="onNextMonth">
+        <text class="cal-nav-arrow">›</text>
+      </view>
+      <view class="cal-today-btn" bindtap="onToday">
+        <text class="cal-today-text">今天</text>
+      </view>
+    </view>
+
+    <view class="cal-week-row">
+      <text
+        wx:for="{{weekHeader}}"
+        wx:key="*this"
+        class="cal-week-cell {{index === 0 || index === 6 ? 'cal-week-weekend' : ''}}"
+      >{{item}}</text>
+    </view>
+
+    <view class="cal-grid">
+      <view
+        wx:for="{{cells}}"
+        wx:key="date"
+        class="cal-cell {{item.out ? 'cal-cell-out' : ''}} {{item.today ? 'cal-cell-today' : ''}} {{item.disabled ? 'cal-cell-disabled' : ''}} {{item.inRange ? 'cal-cell-in-range' : ''}} {{item.rangeStart ? 'cal-cell-range-start' : ''}} {{item.rangeEnd ? 'cal-cell-range-end' : ''}} {{item.selected && !item.rangeStart && !item.rangeEnd && !item.inRange ? 'cal-cell-selected' : ''}}"
+        data-date="{{item.date}}"
+        bindtap="onTapCell"
+      >
+        <view class="cal-cell-inner">
+          <text class="cal-cell-day">{{item.day}}</text>
+          <text wx:if="{{item.today}}" class="cal-cell-today-tag">今</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{mode === 'range'}}" class="cal-range-tip">
+      <text class="cal-range-tip-text">先选择开始日期，再选择结束日期</text>
+    </view>
+  </view>
+</view>

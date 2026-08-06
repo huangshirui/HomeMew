@@ -49,21 +49,13 @@
     <view class="card">
       <!-- elapsed -->
       <block wx:if="{{kind === 'elapsed'}}">
-        <picker
-          wx:if="{{mode === 'create'}}"
-          mode="date"
-          value="{{anchorDate}}"
-          end="{{familyToday}}"
-          bindchange="onAnchorDateChange"
-        >
-          <view class="field-row">
-            <text class="field-label">从哪一天开始计算</text>
-            <view class="field-value">
-              <text class="field-text">{{anchorDate}}</text>
-              <text class="field-arrow">›</text>
-            </view>
+        <view wx:if="{{mode === 'create'}}" class="field-row" bindtap="onOpenAnchorCalendar">
+          <text class="field-label">从哪一天开始计算</text>
+          <view class="field-value">
+            <text class="field-text">{{anchorDate}}</text>
+            <text class="field-arrow">›</text>
           </view>
-        </picker>
+        </view>
         <view wx:else class="field-row">
           <text class="field-label">最近一次</text>
           <text class="field-readonly">{{anchorDate}}</text>
@@ -86,15 +78,13 @@
 
       <!-- countdown -->
       <block wx:elif="{{kind === 'countdown'}}">
-        <picker mode="date" value="{{anchorDate}}" bindchange="onAnchorDateChange">
-          <view class="field-row">
-            <text class="field-label">目标日期</text>
-            <view class="field-value">
-              <text class="field-text">{{anchorDate}}</text>
-              <text class="field-arrow">›</text>
-            </view>
+        <view class="field-row" bindtap="onOpenAnchorCalendar">
+          <text class="field-label">目标日期</text>
+          <view class="field-value">
+            <text class="field-text">{{anchorDate}}</text>
+            <text class="field-arrow">›</text>
           </view>
-        </picker>
+        </view>
         <view class="field-row">
           <text class="field-label">提前多少天提醒</text>
           <input
@@ -109,21 +99,13 @@
 
       <!-- cycle -->
       <block wx:else>
-        <picker
-          wx:if="{{mode === 'create'}}"
-          mode="date"
-          value="{{anchorDate}}"
-          end="{{familyToday}}"
-          bindchange="onAnchorDateChange"
-        >
-          <view class="field-row">
-            <text class="field-label">上次处理日期</text>
-            <view class="field-value">
-              <text class="field-text">{{anchorDate}}</text>
-              <text class="field-arrow">›</text>
-            </view>
+        <view wx:if="{{mode === 'create'}}" class="field-row" bindtap="onOpenAnchorCalendar">
+          <text class="field-label">上次处理日期</text>
+          <view class="field-value">
+            <text class="field-text">{{anchorDate}}</text>
+            <text class="field-arrow">›</text>
           </view>
-        </picker>
+        </view>
         <view wx:else class="field-row">
           <text class="field-label">上次处理</text>
           <text class="field-readonly">{{anchorDate}}</text>
@@ -220,4 +202,15 @@
       {{submitting ? '保存中...' : (mode === 'edit' ? '保存' : '创建')}}
     </button>
   </view>
+
+  <date-calendar
+    show="{{showCalendar}}"
+    mode="single"
+    value="{{anchorDate}}"
+    min-date="{{anchorMinDate}}"
+    max-date="{{anchorMaxDate}}"
+    title="选择日期"
+    bind:select="onAnchorCalendarSelect"
+    bind:close="onCloseCalendar"
+  />
 </view>

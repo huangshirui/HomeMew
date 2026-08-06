@@ -51,6 +51,8 @@ Page({
     dueText: '请选择截止日期',
     /** picker 最小日期 */
     minDate: '',
+    /** 月历弹层显隐 */
+    showCalendar: false,
   },
 
   onLoad(options: { familyId?: string; id?: string }): void {
@@ -179,8 +181,18 @@ Page({
     this.setData({ description: e.detail.value });
   },
 
-  onDueChange(e: WechatMiniprogram.PickerChange): void {
-    this.setData({ dueDate: e.detail.value as string });
+  onOpenCalendar(): void {
+    this.setData({ showCalendar: true });
+  },
+
+  onCloseCalendar(): void {
+    this.setData({ showCalendar: false });
+  },
+
+  onCalendarSelect(e: WechatMiniprogram.CustomEvent): void {
+    const date = e.detail.date as string;
+    if (!date) return;
+    this.setData({ dueDate: date, showCalendar: false });
     this.refreshDerived();
   },
 

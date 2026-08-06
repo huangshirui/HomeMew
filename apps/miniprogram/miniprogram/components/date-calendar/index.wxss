@@ -1,0 +1,209 @@
+/* 月历日期选择组件样式 */
+.cal-mask {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  z-index: 100;
+}
+
+.cal-sheet {
+  width: 100%;
+  background-color: #ffffff;
+  border-radius: 24rpx 24rpx 0 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 24rpx;
+  box-sizing: border-box;
+}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+  border-bottom: 2rpx solid var(--color-divider);
+}
+
+.cal-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.cal-close {
+  font-size: 28rpx;
+  color: var(--color-primary);
+}
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 32rpx 8rpx;
+}
+
+.cal-nav-btn {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.cal-nav-btn:active {
+  background-color: var(--color-border);
+}
+
+.cal-nav-arrow {
+  font-size: 44rpx;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.cal-nav-current {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8rpx;
+}
+
+.cal-nav-year {
+  font-size: 30rpx;
+  color: var(--color-text-hint);
+}
+
+.cal-nav-month {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.cal-today-btn {
+  padding: 8rpx 20rpx;
+  border-radius: 28rpx;
+  background-color: var(--color-primary-tint);
+}
+
+.cal-today-text {
+  font-size: 26rpx;
+  color: var(--color-primary);
+}
+
+.cal-week-row {
+  display: flex;
+  padding: 12rpx 16rpx 0;
+}
+
+.cal-week-cell {
+  flex: 1;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  padding: 8rpx 0;
+}
+
+.cal-week-weekend {
+  color: var(--color-primary);
+}
+
+.cal-grid {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 8rpx 16rpx;
+}
+
+.cal-cell {
+  width: 14.2857%;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 4rpx;
+}
+
+.cal-cell-inner {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.cal-cell-day {
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  line-height: 1.1;
+}
+
+.cal-cell-today-tag {
+  font-size: 16rpx;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.cal-cell-out .cal-cell-day {
+  color: var(--color-text-hint);
+}
+
+.cal-cell-today .cal-cell-inner {
+  border: 2rpx solid var(--color-primary);
+}
+
+.cal-cell-disabled .cal-cell-day {
+  color: var(--color-divider);
+}
+
+/* 区间中点 */
+.cal-cell-in-range .cal-cell-inner {
+  background-color: var(--color-primary-tint);
+  border-radius: 0;
+  width: 100%;
+  height: 72rpx;
+}
+
+/* 起点 / 终点 / 单选选中 */
+.cal-cell-selected .cal-cell-inner,
+.cal-cell-range-start .cal-cell-inner,
+.cal-cell-range-end .cal-cell-inner {
+  background-color: var(--color-primary);
+  border-radius: 50%;
+  width: 72rpx;
+  height: 72rpx;
+}
+
+.cal-cell-selected .cal-cell-day,
+.cal-cell-range-start .cal-cell-day,
+.cal-cell-range-end .cal-cell-day,
+.cal-cell-selected .cal-cell-today-tag,
+.cal-cell-range-start .cal-cell-today-tag,
+.cal-cell-range-end .cal-cell-today-tag {
+  color: #ffffff;
+}
+
+/* 起点/终点位于区间头尾时，与 in-range 连接（半圆角） */
+.cal-cell-range-start.cal-cell-in-range .cal-cell-inner {
+  border-radius: 36rpx 0 0 36rpx;
+  width: 100%;
+}
+
+.cal-cell-range-end.cal-cell-in-range .cal-cell-inner {
+  border-radius: 0 36rpx 36rpx 0;
+  width: 100%;
+}
+
+.cal-range-tip {
+  padding: 8rpx 32rpx 0;
+  text-align: center;
+}
+
+.cal-range-tip-text {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}

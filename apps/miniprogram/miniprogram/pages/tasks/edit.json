@@ -1,1 +1,7 @@
-{"navigationBarTitleText": "添加待办", "backgroundColor": "#f5f6f7"}
+{
+  "navigationBarTitleText": "添加待办",
+  "backgroundColor": "#f5f6f7",
+  "usingComponents": {
+    "date-calendar": "/components/date-calendar/index"
+  }
+}

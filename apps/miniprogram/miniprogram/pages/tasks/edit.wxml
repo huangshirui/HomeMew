@@ -27,16 +27,14 @@
 
     <!-- 截止日期 -->
     <view class="card section">
-      <picker mode="date" value="{{dueDate}}" start="{{minDate}}" bindchange="onDueChange">
-        <view class="field-row">
-          <text class="field-label">截止日期</text>
-          <view class="field-value">
-            <text class="field-text {{dueDate ? '' : 'field-placeholder'}}">{{dueText}}</text>
-            <text wx:if="{{dueDate}}" class="clear-btn" catchtap="onClearDue">✕</text>
-            <text wx:else class="field-arrow">›</text>
-          </view>
+      <view class="field-row" bindtap="onOpenCalendar">
+        <text class="field-label">截止日期</text>
+        <view class="field-value">
+          <text class="field-text {{dueDate ? '' : 'field-placeholder'}}">{{dueText}}</text>
+          <text wx:if="{{dueDate}}" class="clear-btn" catchtap="onClearDue">✕</text>
+          <text wx:else class="field-arrow">›</text>
         </view>
-      </picker>
+      </view>
       <view class="field-hint">
         <text class="hint-text">选填，仅精确到天</text>
       </view>
@@ -103,4 +101,14 @@
       {{submitting ? '保存中...' : (mode === 'edit' ? '保存' : '创建')}}
     </button>
   </view>
+
+  <date-calendar
+    show="{{showCalendar}}"
+    mode="single"
+    value="{{dueDate}}"
+    min-date="{{minDate}}"
+    title="选择截止日期"
+    bind:select="onCalendarSelect"
+    bind:close="onCloseCalendar"
+  />
 </view>
