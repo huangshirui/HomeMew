@@ -20,6 +20,7 @@ import {
  *
  * @param status 按 status 筛选：pending | completed
  * @param assigneeId 仅看指定负责人；传 'me' 表示仅看自己的
+ * @param q 搜索名称和描述
  */
 export async function listTasks(
   familyId: string,
@@ -30,6 +31,7 @@ export async function listTasks(
     dueDateTo?: string;
     includeNoDue?: boolean;
     sort?: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc';
+    q?: string;
   },
 ): Promise<Task[]> {
   const items: Task[] = [];
@@ -46,6 +48,7 @@ export async function listTasks(
       query.includeNoDue = String(params.includeNoDue);
     }
     if (params?.sort) query.sort = params.sort;
+    if (params?.q) query.q = params.q;
     if (cursor) query.cursor = cursor;
 
     const qs = '?' + Object.entries(query)
