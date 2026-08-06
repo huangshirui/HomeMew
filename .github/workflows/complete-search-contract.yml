@@ -1,0 +1,259 @@
+name: Complete Search Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/complete-search-contract.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Update contract and documentation
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"anchor not found in {path}: {old[:80]!r}")
+              if text.count(old) != 1:
+                  raise SystemExit(f"anchor is not unique in {path}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          openapi = "apps/core/openapi.yaml"
+
+          replace_once(
+              openapi,
+              """        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/EventStatus'
+        - $ref: '#/components/parameters/Limit'
+""",
+              """        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/EventStatus'
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/Limit'
+""",
+          )
+
+          replace_once(
+              openapi,
+              """        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [due_asc, due_desc, created_desc, updated_desc]
+            default: due_asc
+        - $ref: '#/components/parameters/Limit'
+""",
+              """        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [due_asc, due_desc, created_desc, updated_desc]
+            default: due_asc
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/Limit'
+""",
+          )
+
+          replace_once(
+              openapi,
+              """    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+  responses:
+""",
+              """    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+    SearchQuery:
+      name: q
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+      description: |
+        Case-insensitive substring search after trimming leading and trailing
+        whitespace. Blank or overlong values return INVALID_REQUEST. Event
+        lists search summary, description, and location within the required
+        date window. Task lists search name and description. The value is part
+        of the opaque cursor filter and changing it requires starting again
+        without a cursor.
+  responses:
+""",
+          )
+
+          check = "apps/core/scripts/check-openapi.mjs"
+          replace_once(
+              check,
+              """if(eventParameter(\"start\")||eventParameter(\"end\"))throw new Error(\"Legacy event-list range parameters are forbidden\");
+
+const schemas=document.components.schemas;
+""",
+              """if(eventParameter(\"start\")||eventParameter(\"end\"))throw new Error(\"Legacy event-list range parameters are forbidden\");
+
+const searchQuery=document.components.parameters.SearchQuery;
+if(searchQuery?.name!==\"q\"||searchQuery?.in!==\"query\"||searchQuery?.required!==false||searchQuery?.schema?.minLength!==1||searchQuery?.schema?.maxLength!==100)throw new Error(\"SearchQuery must define optional q with a 1-100 character contract\");
+for(const path of [\"/api/v1/families/{familyId}/events\",\"/api/v1/families/{familyId}/tasks\"]){
+  const parameters=document.paths[path].get.parameters;
+  if(!parameters.some((parameter)=>parameter.$ref===\"#/components/parameters/SearchQuery\"))throw new Error(`${path} must reference SearchQuery`);
+}
+
+const schemas=document.components.schemas;
+""",
+          )
+
+          core_readme = "apps/core/README.md"
+          replace_once(
+              core_readme,
+              """全天日程使用 `startDate/endDateExclusive`，两类字段不能混用。列表必须传 `startDate/endDateExclusive`，可选 `timezone` 指定查看日历的时区，单次最大 366 天。
+
+创建示例：
+""",
+              """全天日程使用 `startDate/endDateExclusive`，两类字段不能混用。列表必须传 `startDate/endDateExclusive`，可选 `timezone` 指定查看日历的时区，单次最大 366 天。
+
+列表可选传 `q`，在当前日期窗口内对子串搜索 `summary`、`description` 和 `location`。Core 会去除首尾空格，结果必须为 1 至 100 个字符；空白或超长搜索词返回 `INVALID_REQUEST`。`q` 与其他筛选条件一起绑定到分页 cursor，改变搜索词后必须丢弃旧 cursor，从第一页重新查询。
+
+创建示例：
+""",
+          )
+
+          replace_once(
+              core_readme,
+              """`dueDate` 只接受 `YYYY-MM-DD` 或 `null`。列表默认只返回 `pending`，支持多个 `status`、`assigneeId=me`、`dueDateFrom`、`dueDateTo`、`includeNoDue`、四种 `sort`、`limit` 和不透明 `cursor`；按截止日期排序时无截止日期始终在最后。
+
+所有日程和待办接口都要求当前 JWT 用户是目标家庭的 active 成员。
+""",
+              """`dueDate` 只接受 `YYYY-MM-DD` 或 `null`。列表默认只返回 `pending`，支持多个 `status`、`assigneeId=me`、`dueDateFrom`、`dueDateTo`、`includeNoDue`、四种 `sort`、`limit` 和不透明 `cursor`；按截止日期排序时无截止日期始终在最后。
+
+待办列表可选传 `q`，对子串搜索 `name` 和 `description`，并可与状态、负责人、截止日期和排序条件组合。搜索词同样会去除首尾空格并限制为 1 至 100 个字符；搜索条件变化后不能复用旧 cursor。
+
+所有日程和待办接口都要求当前 JWT 用户是目标家庭的 active 成员。
+""",
+          )
+
+          root_readme = "README.md"
+          replace_once(
+              root_readme,
+              """- `/api/v1/families/{familyId}/events`：家庭日程 CRUD、范围筛选与分页。
+- `/api/v1/families/{familyId}/tasks`：家庭待办 CRUD、完成/重开、筛选与分页。
+""",
+              """- `/api/v1/families/{familyId}/events`：家庭日程 CRUD、日期范围/成员/关键词筛选与分页。
+- `/api/v1/families/{familyId}/tasks`：家庭待办 CRUD、完成/重开、成员/日期/关键词筛选与分页。
+""",
+          )
+
+          agent = "apps/miniprogram/AGENTS.md"
+          replace_once(
+              agent,
+              """When a version conflict occurs, reload the latest object and ask the user to review it. Never silently overwrite another member's change.
+
+## Task rules
+""",
+              """When a version conflict occurs, reload the latest object and ask the user to review it. Never silently overwrite another member's change.
+
+Event list search uses the optional `q` query parameter and still requires `startDate` and `endDateExclusive`. Search only covers the requested window and matches summary, description, and location. Any search or filter change must discard the old opaque cursor.
+
+## Task rules
+""",
+          )
+
+          replace_once(
+              agent,
+              """Do not add subtasks, labels, priority, recurrence, comments, or per-assignee completion unless the product rules and OpenAPI are updated first.
+
+## Page and state design
+""",
+              """Do not add subtasks, labels, priority, recurrence, comments, or per-assignee completion unless the product rules and OpenAPI are updated first.
+
+Task list search uses the optional `q` parameter and matches name and description. It may be combined with status, assignee, due-date, and sort filters. Blank searches must be handled locally rather than sent as `q`; every search or filter change must clear existing items and cursor before loading the first page.
+
+Detailed Mini Program search behavior is documented in `apps/miniprogram/docs/search.md`.
+
+## Page and state design
+""",
+          )
+
+          mini_readme = "apps/miniprogram/README.md"
+          marker = """## 5.2 日程
+
+提供：
+
+* 日历或日期列表；
+* 日程列表；
+* 日程详情；
+* 创建日程；
+* 编辑日程；
+* 删除日程；
+* 按参与人筛选。
+"""
+          replacement = """## 5.2 日程
+
+提供：
+
+* 日历或日期列表；
+* 日程列表；
+* 日程详情；
+* 创建日程；
+* 编辑日程；
+* 删除日程；
+* 按参与人筛选；
+* 在明确日期范围内按标题、描述和地点搜索。
+
+搜索实现与分页约定见 [`docs/search.md`](docs/search.md)。
+"""
+          replace_once(mini_readme, marker, replacement)
+
+          replace_once(
+              mini_readme,
+              """* 删除任务；
+* 按负责人筛选。
+""",
+              """* 删除任务；
+* 按负责人筛选；
+* 按任务名称和描述搜索。
+""",
+          )
+          PY
+
+      - name: Validate OpenAPI contract
+        run: |
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm --filter @homemew/core contract
+
+      - name: Remove one-time workflow and commit
+        shell: bash
+        run: |
+          rm .github/workflows/complete-search-contract.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/core/openapi.yaml apps/core/scripts/check-openapi.mjs apps/core/README.md README.md apps/miniprogram/AGENTS.md apps/miniprogram/README.md apps/miniprogram/docs/search.md .github/workflows/complete-search-contract.yml
+          git commit -m "docs: complete event and task search contract"
+          git push
