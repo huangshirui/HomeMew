@@ -204,12 +204,15 @@ Page({
 
     this._userUnsubscribe = userStore.subscribe(() => this.refreshGreeting());
     this._familyUnsubscribe = currentFamilyStore.subscribe((family) => {
+      const newFamily = family as FamilyView | null;
       const prevId = this.data.currentFamily?.id;
-      this.setData({ currentFamily: family as FamilyView | null });
-      const newId = (family as FamilyView | null)?.id;
+      this.setData({ currentFamily: newFamily });
+      const newId = newFamily?.id;
       if (newId && newId !== prevId) {
-        // 家庭切换：立即以新家庭重新拉取，并重置轮询节流窗口，
-        // 避免下一轮轮询紧接着又对新家庭重复请求一次
+        // 家庭切换：先清空旧家庭的所有缓存与派生展示数据，避免「需要关注」、
+        // 今天安排、待办提醒等仍短暂显示上一个家庭的内容；随后再以新家庭重新拉取。
+        this._resetFamilyData();
+        // 重置轮询节流窗口，避免下一轮轮询紧接着又对新家庭重复请求一次
         this._markFetched();
         this.loadTodayEvents(newId);
         this.loadTasks(newId);
@@ -301,6 +304,31 @@ Page({
     this._lastFetchAt = Date.now();
   },
 
+  /**
+   * 清空当前家庭的全部缓存与派生展示数据，并重置展示态指纹。
+   * 用于家庭切换或重新加载开始：保证旧家庭的「需要关注」日子 / 今天安排 /
+   * 待办提醒不会在新家庭数据返回前继续显示，避免串数据。
+   *
+   * 注意：不清空 loading/error 标志由各自 load* 负责；此处仅清空数据，
+   * 并触发一次 setData 让界面立即回落到空态（加载中由对应 load* 接管）。
+   */
+  _resetFamilyData(): void {
+    this._todayEvents = [];
+    this._pendingTasks = [];
+    this._completingIds.clear();
+    this._statusFingerprint = '';
+    this.setData({
+      todayEvents: [],
+      todayEventCount: 0,
+      pendingTasks: [],
+      pendingTaskCount: 0,
+      pendingTaskMore: 0,
+      attentionDays: [],
+      attentionCards: [],
+      greetingSubtitle: '',
+    });
+  },
+
   _subscribeDirty(): void {
     this._unsubscribeDirty();
     this._dirtyUnsubscribe = subscribe((domain) => {
@@ -336,6 +364,7 @@ Page({
       await Promise.all([loadFamilies(), this.ensureUser()]);
       const families = familiesStore.value;
       const current = restoreCurrentFamily(families) || currentFamilyStore.value;
+      const prevId = this.data.currentFamily?.id;
       this.setData({
         families: families as FamilyView[],
         currentFamily: current as FamilyView | null,
@@ -352,6 +381,10 @@ Page({
       this.refreshGreeting();
 
       if (current) {
+        // 家庭发生变化时先清空旧数据，避免新家庭加载完成前残留上一个家庭的内容
+        if (prevId && prevId !== current.id) {
+          this._resetFamilyData();
+        }
         this.loadTodayEvents(current.id);
         this.loadTasks(current.id);
         this.loadAttentionDays(current.id);
