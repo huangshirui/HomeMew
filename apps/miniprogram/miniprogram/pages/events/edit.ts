@@ -13,7 +13,8 @@
  * 全天日程的 end 在 UI 显示为包含式，提交时按 SPEC 9.5 加一天转换为不包含形式。
  */
 
-import { getEvent, createEvent, updateEvent } from '../../services/events';
+import { getEvent, createEvent, updateEvent, createEventsBatch } from '../../services/events';
+import type { BatchCreateItemResult } from '../../services/events';
 import { listFamilyMembers } from '../../services/families';
 import { currentFamilyStore, familiesStore } from '../../stores/index';
 import {
@@ -21,6 +22,7 @@ import {
   showSuccess,
   showLoading,
   hideLoading,
+  showConfirm,
   getErrorMessage,
   isVersionConflict,
   parseDateOnly,
@@ -43,6 +45,7 @@ import {
 } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 import { consumePendingDraft } from '../../stores/draft-buffer';
+import { consumeCloneSource } from '../../stores/clone-buffer';
 
 type MemberOption = {
   userId: string;
@@ -52,6 +55,8 @@ type MemberOption = {
 };
 
 type Mode = 'create' | 'edit';
+
+/** 批量创建时保留失败项，便于用户显式重试 */
 
 Page({
   data: {
@@ -84,6 +89,10 @@ Page({
     startTime: '09:00',
     endTime: '10:00',
     location: '',
+    /** 重复创建：连续 N 天（1 表示不重复），最长 7 天 */
+    repeatDays: 1,
+    repeatOptions: ['1', '2', '3', '4', '5', '6', '7'],
+    repeatSummaryText: '不重复',
     /** 视图用派生 */
     dateRangeText: '',
     timeRangeText: '',
@@ -94,7 +103,7 @@ Page({
     showEndCalendar: false,
   },
 
-  onLoad(options: { familyId?: string; id?: string; date?: string }): void {
+  onLoad(options: { familyId?: string; id?: string; date?: string; clone?: string }): void {
     const familyId = options?.familyId;
     if (!familyId) {
       showError('缺少家庭参数');
@@ -168,6 +177,7 @@ Page({
       });
       this.refreshDerived();
       this.applyConsumedDraft();
+      this.applyConsumedClone();
     } catch (error: unknown) {
       hideLoading();
       console.error('[EventEdit] Load members failed:', error);
@@ -211,6 +221,68 @@ Page({
       }));
     }
     this.setData(patch);
+    this.refreshDerived();
+  },
+
+  /** 复制入口：消费 clone buffer 中的源日程并预填创建表单（保留原日期，用户可改） */
+  applyConsumedClone(): void {
+    if (this.data.mode !== 'create') return;
+    const source = consumeCloneSource();
+    if (!source) return;
+    const selectedIds = new Set(source.attendees.map(a => a.userId));
+    let startDateStr: string;
+    let endDateStr: string;
+    let startTimeStr = '09:00';
+    let endTimeStr = '10:00';
+    let startTimezone = this.data.deviceTimezone;
+    let endTimezone = this.data.deviceTimezone;
+    let startTimezoneMetadata: string | null = this.data.deviceTimezone;
+    let endTimezoneMetadata: string | null = this.data.deviceTimezone;
+    if (source.isAllDay) {
+      startDateStr = formatDateOnly(parseDateOnly(source.startDate));
+      endDateStr = addDaysToDateOnly(source.endDateExclusive, -1);
+    } else {
+      startTimezoneMetadata = source.startTimezone;
+      endTimezoneMetadata = source.endTimezone;
+      startTimezone = source.startTimezone || this.data.deviceTimezone;
+      endTimezone = source.endTimezone || this.data.deviceTimezone;
+      const start = formatInstantInTimeZone(source.startAt, startTimezone);
+      const end = formatInstantInTimeZone(source.endAt, endTimezone);
+      startDateStr = start.date;
+      endDateStr = end.date;
+      startTimeStr = start.time;
+      endTimeStr = end.time;
+    }
+    const timezoneOptions = buildTimeZoneOptions([
+      startTimezone,
+      endTimezone,
+      startTimezoneMetadata,
+      endTimezoneMetadata,
+      this.data.deviceTimezone,
+      resolveFamilyTimezone(this.data.familyId),
+    ]);
+    this.setData({
+      summary: source.summary,
+      description: source.description || '',
+      isAllDay: source.isAllDay,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      startTime: startTimeStr,
+      endTime: endTimeStr,
+      startTimezone,
+      endTimezone,
+      startTimezoneMetadata,
+      endTimezoneMetadata,
+      startTimezoneLabel: timeZoneLabel(startTimezone),
+      endTimezoneLabel: timeZoneLabel(endTimezone),
+      timezoneOptions,
+      filteredTimezoneOptions: timezoneOptions,
+      location: source.location || '',
+      members: this.data.members.map((m) => ({
+        ...m,
+        selected: selectedIds.has(m.userId),
+      })),
+    });
     this.refreshDerived();
   },
 
@@ -342,6 +414,21 @@ Page({
     this.refreshDerived();
   },
 
+  /** 连续重复天数选择（1=不重复，最长 7 天） */
+  onRepeatChange(e: WechatMiniprogram.PickerChange): void {
+    const raw = this.data.repeatOptions[Number(e.detail.value)];
+    const repeatDays = raw ? Number(raw) : 1;
+    this.setData({ repeatDays });
+    this.refreshRepeatText();
+  },
+
+  refreshRepeatText(): void {
+    const days = this.data.repeatDays;
+    this.setData({
+      repeatSummaryText: days <= 1 ? '不重复' : `连续 ${days} 天（含今天）`,
+    });
+  },
+
   onStartTimeChange(e: WechatMiniprogram.PickerChange): void {
     this.setData({ startTime: e.detail.value as string });
     // 调整结束时间以保证 > 起始
@@ -433,6 +520,108 @@ Page({
 
   /* ----------------- 提交 ----------------- */
 
+  /**
+   * 构建单条创建 payload。timed 事件需要按家庭时区把墙上时间转为 UTC ISO，
+   * 可能弹出夏令时候选选择，故为异步；用户取消选择时返回 null。
+   */
+  async buildPayload(): Promise<CreateEventRequest | null> {
+    const summary = (this.data.summary || '').trim();
+    const attendeeIds = this.data.members.filter(m => m.selected).map(m => m.userId);
+    const common = {
+      summary,
+      description: this.data.description.trim() || null,
+      attendeeIds,
+      location: this.data.location.trim() || null,
+    };
+    if (this.data.isAllDay) {
+      return {
+        ...common,
+        isAllDay: true,
+        startDate: this.data.startDate,
+        endDateExclusive: addDaysToDateOnly(this.data.endDate, 1),
+      };
+    }
+    if (!/^\d{1,2}:\d{2}$/.test(this.data.startTime) || !/^\d{1,2}:\d{2}$/.test(this.data.endTime)) {
+      showError('请输入有效的时间');
+      return null;
+    }
+    const startCandidates = getWallTimeCandidates(
+      this.data.startDate,
+      this.data.startTime,
+      this.data.startTimezone,
+    );
+    const endCandidates = getWallTimeCandidates(
+      this.data.endDate,
+      this.data.endTime,
+      this.data.endTimezone,
+    );
+    const startIso = await chooseWallTimeCandidate('开始时间', startCandidates, this.data.startTimezone);
+    if (!startIso) return null;
+    const endIso = await chooseWallTimeCandidate('结束时间', endCandidates, this.data.endTimezone);
+    if (!endIso) return null;
+    if (new Date(endIso).getTime() <= new Date(startIso).getTime()) {
+      showError('结束时间必须晚于开始时间');
+      return null;
+    }
+    return {
+      ...common,
+      isAllDay: false,
+      startAt: startIso,
+      endAt: endIso,
+      startTimezone: this.data.startTimezoneMetadata,
+      endTimezone: this.data.endTimezoneMetadata,
+    };
+  },
+
+  /**
+   * 把单条 payload 按「连续 N 天」展开为 N 条独立 payload。
+   * - 全天事件：日期整体平移 days 天（endDateExclusive 同样平移）；
+   * - 定时事件：对目标天的墙上时间重新求该天的 UTC ISO（自动处理 DST 偏移）。
+   */
+  expandPayloads(base: CreateEventRequest, repeatDays: number): CreateEventRequest[] {
+    const count = Math.min(Math.max(repeatDays, 1), 7);
+    const payloads: CreateEventRequest[] = [];
+    for (let i = 0; i < count; i++) {
+      if (i === 0) {
+        payloads.push(base);
+        continue;
+      }
+      if (base.isAllDay) {
+        payloads.push({
+          ...base,
+          isAllDay: true,
+          startDate: addDaysToDateOnly(base.startDate, i),
+          endDateExclusive: addDaysToDateOnly(base.endDateExclusive, i),
+        });
+      } else {
+        const startCands = getWallTimeCandidates(
+          addDaysToDateOnly(this.data.startDate, i),
+          this.data.startTime,
+          this.data.startTimezone,
+        );
+        const endCands = getWallTimeCandidates(
+          addDaysToDateOnly(this.data.endDate, i),
+          this.data.endTime,
+          this.data.endTimezone,
+        );
+        if (startCands.length === 0 || endCands.length === 0) {
+          continue;
+        }
+        const startIso = startCands[0];
+        const endIso = endCands[0];
+        payloads.push({
+          ...base,
+          isAllDay: false,
+          startAt: startIso,
+          endAt: endIso,
+          startTimezone: this.data.startTimezoneMetadata,
+          endTimezone: this.data.endTimezoneMetadata,
+        });
+      }
+    }
+    return payloads;
+  },
+
   async onSubmit(): Promise<void> {
     if (this.data.submitting) return;
     const summary = (this.data.summary || '').trim();
@@ -449,79 +638,107 @@ Page({
       showError('结束日期不能早于开始日期');
       return;
     }
-    const attendeeIds = this.data.members.filter(m => m.selected).map(m => m.userId);
-    const common = {
-      summary,
-      description: this.data.description.trim() || null,
-      attendeeIds,
-      location: this.data.location.trim() || null,
-    };
-    let payload: CreateEventRequest;
-    if (this.data.isAllDay) {
-      // 全天：使用纯日期，end 为不包含式（显示的最后一天 +1）
-      payload = {
-        ...common,
-        isAllDay: true,
-        startDate: this.data.startDate,
-        endDateExclusive: addDaysToDateOnly(this.data.endDate, 1),
-      };
-    } else {
-      if (!/^\d{1,2}:\d{2}$/.test(this.data.startTime) || !/^\d{1,2}:\d{2}$/.test(this.data.endTime)) {
-        showError('请输入有效的时间');
-        return;
+
+    const basePayload = await this.buildPayload();
+    if (!basePayload) return;
+
+    // 编辑模式或仅单条：走原有单条逻辑
+    if (this.data.mode === 'edit' || this.data.repeatDays <= 1) {
+      this.setData({ submitting: true });
+      showLoading(this.data.mode === 'edit' ? '保存中...' : '创建中...');
+      try {
+        if (this.data.mode === 'edit') {
+          const updatePayload: UpdateEventRequest = { ...basePayload, version: this.data.version };
+          await updateEvent(this.data.familyId, this.data.eventId, updatePayload);
+        } else {
+          await createEvent(this.data.familyId, basePayload);
+        }
+        hideLoading();
+        showSuccess(this.data.mode === 'edit' ? '已保存' : '已创建');
+        markDirty('events');
+        setTimeout(() => wx.navigateBack(), 800);
+      } catch (error: unknown) {
+        hideLoading();
+        this.setData({ submitting: false });
+        console.error('[EventEdit] Submit failed:', error);
+        const err = error as { code?: string; message?: string };
+        if (isVersionConflict(err.code)) {
+          showError('该日程已被其他成员修改，请重新进入编辑');
+          return;
+        }
+        showError(getErrorMessage(err.code, err.message) || '保存失败，请重试');
       }
-      // 按家庭时区把墙上时间转换为 UTC ISO，避免非东八区家庭产生偏移
-      const startCandidates = getWallTimeCandidates(
-        this.data.startDate,
-        this.data.startTime,
-        this.data.startTimezone,
-      );
-      const endCandidates = getWallTimeCandidates(
-        this.data.endDate,
-        this.data.endTime,
-        this.data.endTimezone,
-      );
-      const startIso = await chooseWallTimeCandidate('开始时间', startCandidates, this.data.startTimezone);
-      if (!startIso) return;
-      const endIso = await chooseWallTimeCandidate('结束时间', endCandidates, this.data.endTimezone);
-      if (!endIso) return;
-      if (new Date(endIso).getTime() <= new Date(startIso).getTime()) {
-        showError('结束时间必须晚于开始时间');
-        return;
-      }
-      payload = {
-        ...common,
-        isAllDay: false,
-        startAt: startIso,
-        endAt: endIso,
-        startTimezone: this.data.startTimezoneMetadata,
-        endTimezone: this.data.endTimezoneMetadata,
-      };
+      return;
     }
 
+    // 批量创建（连续 N 天）：逐条独立 create，失败收集、用户显式重试
+    const payloads = this.expandPayloads(basePayload, this.data.repeatDays);
     this.setData({ submitting: true });
-    showLoading(this.data.mode === 'edit' ? '保存中...' : '创建中...');
+    showLoading(`创建中 0/${payloads.length}`);
     try {
-      if (this.data.mode === 'edit') {
-        const updatePayload: UpdateEventRequest = { ...payload, version: this.data.version };
-        await updateEvent(this.data.familyId, this.data.eventId, updatePayload);
-      } else {
-        await createEvent(this.data.familyId, payload);
-      }
+      const result = await createEventsBatch(this.data.familyId, payloads, {
+        concurrency: 3,
+        onProgress: (done, total) => showLoading(`创建中 ${done}/${total}`),
+      });
       hideLoading();
-      showSuccess(this.data.mode === 'edit' ? '已保存' : '已创建');
-      markDirty('events');
-      setTimeout(() => wx.navigateBack(), 800);
+      if (result.failed.length === 0) {
+        showSuccess(`已创建 ${result.succeeded.length} 条日程`);
+        markDirty('events');
+        setTimeout(() => wx.navigateBack(), 800);
+        return;
+      }
+      // 部分失败：保留失败项，让用户显式重试
+      await this.handleBatchPartialFailure(result.failed);
     } catch (error: unknown) {
       hideLoading();
       this.setData({ submitting: false });
-      console.error('[EventEdit] Submit failed:', error);
+      console.error('[EventEdit] Batch submit failed:', error);
       const err = error as { code?: string; message?: string };
-      if (isVersionConflict(err.code)) {
-        showError('该日程已被其他成员修改，请重新进入编辑');
-        return;
+      showError(getErrorMessage(err.code, err.message) || '创建失败，请重试');
+    }
+  },
+
+  /**
+   * 批量创建部分失败处理：展示成功/失败数量，用户确认后仅对失败项重试一次。
+   * 绝不自动整批重试，避免对成功项重复创建。
+   */
+  async handleBatchPartialFailure(
+    failedItems: BatchCreateItemResult[],
+  ): Promise<void> {
+    const failedCount = failedItems.length;
+    const confirmed = await showConfirm(
+      '部分创建失败',
+      `已创建 ${this.data.repeatDays - failedCount} 条，失败 ${failedCount} 条。是否重试失败的项？`,
+    );
+    if (!confirmed) {
+      this.setData({ submitting: false });
+      // 用户放弃重试也回退页面，已成功的已落库
+      markDirty('events');
+      setTimeout(() => wx.navigateBack(), 600);
+      return;
+    }
+    // 仅对失败项重新提交
+    this.setData({ submitting: true });
+    showLoading(`重试中 0/${failedItems.length}`);
+    try {
+      const retry = await createEventsBatch(
+        this.data.familyId,
+        failedItems.map(f => f.payload),
+        {
+          concurrency: 3,
+          onProgress: (done, total) => showLoading(`重试中 ${done}/${total}`),
+        },
+      );
+      hideLoading();
+      if (retry.failed.length === 0) {
+        showSuccess('全部已创建');
+      } else {
+        showError(`仍有 ${retry.failed.length} 条失败，可稍后在日程中手动补建`);
       }
-      showError(getErrorMessage(err.code, err.message) || '保存失败，请重试');
+    } finally {
+      this.setData({ submitting: false });
+      markDirty('events');
+      setTimeout(() => wx.navigateBack(), 600);
     }
   },
 

@@ -79,6 +79,10 @@
   color: #cccccc;
 }
 
+.field-picker {
+  flex: 1;
+}
+
 .all-day-row {
   justify-content: space-between;
 }

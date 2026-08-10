@@ -45,6 +45,23 @@
         </view>
       </view>
 
+      <!-- 连续重复天数（仅新建，最长 7 天） -->
+      <view wx:if="{{mode === 'create'}}" class="field-row">
+        <text class="field-label">重复</text>
+        <picker
+          class="field-picker"
+          mode="selector"
+          range="{{repeatOptions}}"
+          value="{{repeatDays - 1}}"
+          bindchange="onRepeatChange"
+        >
+          <view class="field-value">
+            <text class="field-text">{{repeatSummaryText}}</text>
+            <text class="field-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
       <!-- 全天开关 -->
       <view class="field-row all-day-row">
         <text class="field-label">全天</text>

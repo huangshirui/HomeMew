@@ -134,3 +134,87 @@ export function deleteEvent(familyId: string, eventId: string, version: number):
     },
   );
 }
+
+/** 单条批量创建的结果 */
+export interface BatchCreateItemResult {
+  index: number;
+  payload: CreateEventRequest;
+  event: Event | null;
+  error: { code?: string; message?: string; requestId?: string } | null;
+}
+
+/** 批量创建日程的汇总结果 */
+export interface BatchCreateEventsResult {
+  succeeded: Event[];
+  failed: BatchCreateItemResult[];
+  /** 总条数 */
+  total: number;
+}
+
+export interface CreateEventsBatchOptions {
+  /** 最大并发数，默认 3 */
+  concurrency?: number;
+  /** 每完成一条（无论成功失败）的进度回调 */
+  onProgress?: (done: number, total: number) => void;
+}
+
+/**
+ * 批量创建多个独立日程（Core 当前无批量端点，此处为客户端多次独立 create）。
+ *
+ * - 仅使用 implemented 的 event create 路由；
+ * - 每条都是独立的非幂等写操作，失败项绝不自动重试，避免重复创建；
+ * - 失败项保留其原始 payload，供调用方在全部跑完后让用户显式重试；
+ * - 写请求已 skipRetry，这里也不对网络错误盲目重试。
+ */
+export async function createEventsBatch(
+  familyId: string,
+  payloads: CreateEventRequest[],
+  options: CreateEventsBatchOptions = {},
+): Promise<BatchCreateEventsResult> {
+  const concurrency = Math.max(1, options.concurrency ?? 3);
+  const total = payloads.length;
+  const results: BatchCreateItemResult[] = payloads.map((payload, index) => ({
+    index,
+    payload,
+    event: null,
+    error: null,
+  }));
+
+  let cursor = 0;
+  let done = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const current = cursor;
+      if (current >= total) return;
+      cursor += 1;
+      try {
+        const event = await createEvent(familyId, payloads[current]);
+        results[current].event = event;
+      } catch (error: unknown) {
+        const err = error as { code?: string; message?: string; requestId?: string };
+        results[current].error = {
+          code: err.code,
+          message: err.message,
+          requestId: err.requestId,
+        };
+      } finally {
+        done += 1;
+        options.onProgress?.(done, total);
+      }
+    }
+  };
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, total) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+
+  const succeeded: Event[] = [];
+  const failed: BatchCreateItemResult[] = [];
+  for (const r of results) {
+    if (r.event) succeeded.push(r.event);
+    else failed.push(r);
+  }
+  return { succeeded, failed, total };
+}

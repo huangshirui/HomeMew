@@ -67,6 +67,7 @@
     <!-- 操作 -->
     <view class="actions">
       <button class="btn-outline flex-1" bindtap="onEdit">编辑</button>
+      <button class="btn-outline flex-1" bindtap="onClone">复制</button>
       <button
         class="btn-outline danger flex-1"
         disabled="{{deleting}}"

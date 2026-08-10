@@ -26,6 +26,7 @@ import { getViewingTimeZone } from '../../services/settings';
 import { Event } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 import { currentFamilyStore, familiesStore } from '../../stores/index';
+import { setCloneSource } from '../../stores/clone-buffer';
 
 Page({
   data: {
@@ -144,6 +145,16 @@ Page({
     if (!this.data.event) return;
     wx.navigateTo({
       url: `/pages/events/edit?familyId=${this.data.familyId}&id=${this.data.event.id}`,
+    });
+  },
+
+  /** 复制：保留源日程字段，跳转到创建页预填（日期顺延一天作为默认值） */
+  onClone(): void {
+    const event = this.data.event;
+    if (!event) return;
+    setCloneSource(event);
+    wx.navigateTo({
+      url: `/pages/events/edit?familyId=${this.data.familyId}&clone=1`,
     });
   },
 
