@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "pnpm --filter @homemew/core dev",
     "test": "pnpm --filter @homemew/core test",
-    "test:miniprogram-login": "node --test apps/miniprogram/cloudfunctions/login/identity.test.js apps/miniprogram/cloudfunctions/login/lifespace.test.js",
+    "test:miniprogram-login": "node --check apps/miniprogram/cloudfunctions/login/index.js && node --check apps/miniprogram/cloudfunctions/login/lifespace.js && node --test apps/miniprogram/cloudfunctions/login/identity.test.js apps/miniprogram/cloudfunctions/login/lifespace.test.js",
     "typecheck": "pnpm --filter @homemew/core typecheck",
     "typecheck:miniprogram": "pnpm --filter homemew-miniprogram typecheck",
     "build": "pnpm --filter @homemew/core build",
