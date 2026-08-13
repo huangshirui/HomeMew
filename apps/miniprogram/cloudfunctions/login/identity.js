@@ -7,22 +7,37 @@ async function resolveIdentity({
   createUser,
   addMapping,
   updateMapping,
+  mappingField = 'homemewUserId',
   nowIso = () => new Date().toISOString(),
 }) {
+  if (!mappingField || typeof mappingField !== 'string') {
+    throw new Error('mappingField is required');
+  }
+
   const now = nowIso();
-  if (!existingMapping?.homemewUserId) {
+  const existingUserId = existingMapping?.[mappingField];
+  if (!existingUserId) {
     const userId = await createUser(openid);
-    await addMapping({
-      openid,
-      homemewUserId: userId,
-      provider: 'wechat_miniprogram',
-      createdAt: now,
-      updatedAt: now,
-    });
+    if (existingMapping?._id) {
+      await updateMapping({
+        mappingId: existingMapping._id,
+        data: {
+          [mappingField]: userId,
+          updatedAt: now,
+        },
+      });
+    } else {
+      await addMapping({
+        openid,
+        [mappingField]: userId,
+        provider: 'wechat_miniprogram',
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
     return { userId, isNewUser: true };
   }
 
-  const existingUserId = existingMapping.homemewUserId;
   if (await verifyUser(existingUserId)) {
     await updateMapping({
       mappingId: existingMapping._id,
@@ -35,7 +50,7 @@ async function resolveIdentity({
   await updateMapping({
     mappingId: existingMapping._id,
     data: {
-      homemewUserId: replacementUserId,
+      [mappingField]: replacementUserId,
       updatedAt: now,
     },
   });
