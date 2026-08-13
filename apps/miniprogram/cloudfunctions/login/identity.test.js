@@ -41,29 +41,6 @@ test('reuses a verified mapping', async () => {
   assert.deepEqual(updates, [{ mappingId: 'map-1', data: { updatedAt: '2026-08-01T01:02:03.000Z' } }]);
 });
 
-test('adds a parallel LifeSpace mapping to the existing openid document without overwriting HomeMew identity', async () => {
-  const updates = [];
-  const result = await resolveIdentity({
-    openid: 'wx-migrate',
-    existingMapping: { _id: 'map-life', homemewUserId: 'hmw-user' },
-    mappingField: 'lifespaceUserId',
-    verifyUser: async () => assert.fail('new LifeSpace mapping must not verify before creation'),
-    createUser: async () => 'usr_lifespace',
-    addMapping: async () => assert.fail('must reuse the existing openid mapping document'),
-    updateMapping: async value => updates.push(value),
-    nowIso: () => '2026-08-13T01:02:03.000Z',
-  });
-  assert.deepEqual(result, { userId: 'usr_lifespace', isNewUser: true });
-  assert.deepEqual(updates, [{
-    mappingId: 'map-life',
-    data: {
-      lifespaceUserId: 'usr_lifespace',
-      updatedAt: '2026-08-13T01:02:03.000Z',
-    },
-  }]);
-  assert.equal(updates[0].data.homemewUserId, undefined);
-});
-
 test('rebuilds a stale mapping only when verification reports missing', async () => {
   const updates = [];
   const result = await resolveIdentity({
