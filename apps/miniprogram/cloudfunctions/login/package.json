@@ -2,13 +2,13 @@
   "name": "login",
   "version": "1.0.0",
   "private": true,
-  "description": "HomeMew 登录云函数：可信 openid 映射与 HomeMew/LifeSpace staging 身份交换",
+  "description": "HomeMew 登录云函数：获取 openid、映射身份、创建用户、签发 JWT",
   "main": "index.js",
   "engines": {
     "node": ">=16"
   },
   "scripts": {
-    "test": "node --test identity.test.js lifespace.test.js"
+    "test": "node --test identity.test.js"
   },
   "license": "UNLICENSED",
   "dependencies": {
