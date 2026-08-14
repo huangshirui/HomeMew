@@ -20,6 +20,16 @@ function requiredString(value, name) {
 function baseUrl(value, name) {
   return requiredString(value, name).replace(/\/+$/u, '');
 }
+function isLoginReady(env) {
+  return Boolean(
+    env.WECHAT_APP_ID
+      && env.WECHAT_APP_SECRET
+      && env.LIFESPACE_APPLICATION_CREDENTIAL?.startsWith('lsa_')
+      && env.LIFESPACE_IDENTITY_URL
+      && env.LIFESPACE_CORE_URL
+      && env.WECHAT_IDENTITIES,
+  );
+}
 async function readJson(request) {
   const value = await request.json().catch(() => null);
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -146,7 +156,14 @@ export default {
   async fetch(request, env) {
     try {
       const url = new URL(request.url);
-      if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, service: 'homemew-backend' });
+      if (request.method === 'GET' && url.pathname === '/health') {
+        return json({
+          ok: true,
+          service: 'homemew-backend',
+          environment: env.ENVIRONMENT ?? 'unknown',
+          loginReady: isLoginReady(env),
+        });
+      }
       if (request.method === 'POST' && url.pathname === '/api/v1/login/wechat') return await login(request, env);
       return json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
     } catch (error) {
