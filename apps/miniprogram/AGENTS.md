@@ -13,11 +13,13 @@ Mini Program
 -> wx.login()
 -> HomeMew Cloudflare application backend
 -> WeChat jscode2session (server-side appsecret)
--> openid -> LifeSpace usr_* mapping in HomeMew application D1
+-> openid -> LifeSpace usr_* mapping in HomeMew Durable Object
 -> LifeSpace Identity /internal/v1/tokens using server-only lsa_*
 -> short-lived LifeSpace user token
 -> Mini Program
 ```
+
+The mapping Durable Object is keyed per WeChat application identity and uses SQLite-backed Durable Object storage. Do not create a dedicated HomeMew D1 only for the login mapping.
 
 Do not use `wx.cloud.init`, `wx.cloud.callFunction`, WeChat Cloud Database, or WeChat Cloud Storage as an application dependency. Never expose WeChat `appsecret` or the LifeSpace application credential in client code.
 
