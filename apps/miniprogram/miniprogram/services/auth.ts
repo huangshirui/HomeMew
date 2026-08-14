@@ -9,9 +9,10 @@
 import { LoginResponse } from '../types/index';
 import { getLoginBackendUrl, isTokenValid, REQUEST_TIMEOUT, STORAGE_KEYS } from './config';
 
-interface LoginBackendError {
+type CloudflareLoginResponse = LoginResponse & {
+  identityApiUrl?: string;
   error?: { code?: string; message?: string };
-}
+};
 
 export async function callLogin(): Promise<LoginResponse> {
   const code = await new Promise<string>((resolve, reject) => {
@@ -34,7 +35,7 @@ export async function callLogin(): Promise<LoginResponse> {
       header: { 'Content-Type': 'application/json' },
       timeout: REQUEST_TIMEOUT,
       success(response) {
-        const result = response.data as LoginResponse & LoginBackendError;
+        const result = response.data as CloudflareLoginResponse;
         if (response.statusCode < 200 || response.statusCode >= 300 || result?.error) {
           const message = result?.error?.message || `登录服务请求失败 (${response.statusCode})`;
           reject(new Error(`登录失败: ${message}`));
@@ -44,6 +45,7 @@ export async function callLogin(): Promise<LoginResponse> {
           reject(new Error('登录失败: 未返回有效访问令牌'));
           return;
         }
+        if (result.identityApiUrl) wx.setStorageSync(STORAGE_KEYS.identityApiUrl, result.identityApiUrl);
         resolve(result);
       },
       fail(error) {
@@ -58,7 +60,6 @@ export async function loginAndSaveToken(): Promise<{ isNewUser: boolean }> {
   wx.setStorageSync(STORAGE_KEYS.accessToken, result.accessToken);
   wx.setStorageSync(STORAGE_KEYS.tokenExpiresAt, result.expiresAt);
   if (result.coreApiUrl) wx.setStorageSync(STORAGE_KEYS.coreApiUrl, result.coreApiUrl);
-  if (result.identityApiUrl) wx.setStorageSync(STORAGE_KEYS.identityApiUrl, result.identityApiUrl);
   return { isNewUser: result.isNewUser };
 }
 
