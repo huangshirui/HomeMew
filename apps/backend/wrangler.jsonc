@@ -9,9 +9,12 @@
       { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
     ]
   },
-  "exports": {
-    "WechatIdentity": { "type": "durable-object", "storage": "sqlite" }
-  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WechatIdentity"]
+    }
+  ],
   "env": {
     "staging": {
       "workers_dev": false,
