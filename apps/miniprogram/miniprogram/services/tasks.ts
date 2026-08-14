@@ -1,27 +1,80 @@
-/**
- * 待办任务相关 API 服务
- *
- * - GET 请求允许 401 自动重试
- * - 写操作（POST/PATCH/DELETE）显式 skipRetry: true，避免重复创建
- */
+/** HomeMew 待办 -> LifeSpace task model。 */
 
 import { request } from './api';
 import {
   Task,
   CreateTaskRequest,
   UpdateTaskRequest,
-  VersionActionRequest,
 } from '../types/index';
+import {
+  ResourceBase,
+  LifeSpacePage,
+  getSpaceMembers,
+  modelRecordPath,
+  personRefs,
+  queryString,
+  spacePath,
+  unavailableActor,
+  userIdToPersonId,
+  userIdsToPersonIds,
+} from './lifespace';
 
-/**
- * 列出家庭待办任务
- *
- * GET /api/v1/families/{familyId}/tasks
- *
- * @param status 按 status 筛选：pending | completed
- * @param assigneeId 仅看指定负责人；传 'me' 表示仅看自己的
- * @param q 搜索名称和描述
- */
+type TaskResource = ResourceBase & {
+  name: string;
+  description: string | null;
+  dueDate: string | null;
+  status: 'pending' | 'completed' | 'cancelled';
+  assigneePersonIds: string[];
+  completedAt: string | null;
+  completedById: string | null;
+  completedByType: 'user' | 'service' | 'device' | null;
+};
+
+async function toTask(spaceId: string, raw: TaskResource): Promise<Task> {
+  const members = await getSpaceMembers(spaceId);
+  const completedMember = raw.completedByType === 'user'
+    ? members.find(item => item.userId === raw.completedById)
+    : undefined;
+  return {
+    id: raw.id,
+    familyId: raw.spaceId,
+    name: raw.name,
+    description: raw.description ?? null,
+    dueDate: raw.dueDate ?? null,
+    status: raw.status,
+    assignees: personRefs(raw.assigneePersonIds, members),
+    completedAt: raw.completedAt ?? null,
+    completedBy: completedMember ? {
+      type: 'user',
+      id: completedMember.userId,
+      name: completedMember.displayName,
+      avatarUrl: null,
+    } : null,
+    createdBy: unavailableActor(),
+    updatedBy: unavailableActor(),
+    version: raw.version,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+}
+
+async function fetchAllRaw(
+  familyId: string,
+  query: Record<string, string | number | boolean | null | undefined>,
+): Promise<TaskResource[]> {
+  const items: TaskResource[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 50; page++) {
+    const data = await request<LifeSpacePage<TaskResource>>(
+      `${spacePath(familyId, 'tasks')}${queryString({ ...query, cursor, limit: 100 })}`,
+    );
+    items.push(...(data.items ?? []));
+    cursor = data.nextCursor;
+    if (!cursor) break;
+  }
+  return items;
+}
+
 export async function listTasks(
   familyId: string,
   params?: {
@@ -34,110 +87,91 @@ export async function listTasks(
     q?: string;
   },
 ): Promise<Task[]> {
-  const items: Task[] = [];
-  let cursor: string | null = null;
-  // 循环拉取所有分页，避免顶部计数 / 历史列表只显示第一页。
-  // 设置合理上限防止异常游标导致死循环。
-  for (let page = 0; page < 50; page++) {
-    const query: Record<string, string> = { limit: '100' };
-    if (params?.status) query.status = params.status;
-    if (params?.assigneeId) query.assigneeId = params.assigneeId;
-    if (params?.dueDateFrom) query.dueDateFrom = params.dueDateFrom;
-    if (params?.dueDateTo) query.dueDateTo = params.dueDateTo;
-    if (params?.includeNoDue !== undefined) {
-      query.includeNoDue = String(params.includeNoDue);
-    }
-    if (params?.sort) query.sort = params.sort;
-    if (params?.q) query.q = params.q;
-    if (cursor) query.cursor = cursor;
+  const assigneePersonId = params?.assigneeId
+    ? await userIdToPersonId(familyId, params.assigneeId)
+    : null;
+  const sortMap = {
+    due_asc: 'dueDate:asc',
+    due_desc: 'dueDate:desc',
+    created_desc: 'createdAt:desc',
+    updated_desc: 'updatedAt:desc',
+  } as const;
+  const base = {
+    status: params?.status,
+    assigneePersonIds: assigneePersonId ?? undefined,
+    q: params?.q,
+    sort: params?.sort ? sortMap[params.sort] : 'dueDate:asc',
+  };
+  const ranged = await fetchAllRaw(familyId, {
+    ...base,
+    dueDateFrom: params?.dueDateFrom,
+    dueDateTo: params?.dueDateTo,
+  });
 
-    const qs = '?' + Object.entries(query)
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join('&');
-
-    const data: { items: Task[]; nextCursor: string | null } = await request<{
-      items: Task[];
-      nextCursor: string | null;
-    }>(`/api/v1/families/${familyId}/tasks${qs}`);
-
-    items.push(...(data.items ?? []));
-    cursor = data.nextCursor;
-    if (!cursor) break;
+  let raw = ranged;
+  if (params?.includeNoDue && (params.dueDateFrom || params.dueDateTo)) {
+    const allMatching = await fetchAllRaw(familyId, base);
+    raw = [...ranged, ...allMatching.filter(item => item.dueDate === null)];
+    raw = raw.filter((item, index, values) => values.findIndex(other => other.id === item.id) === index);
   }
-  return items;
+  return Promise.all(raw.map(item => toTask(familyId, item)));
 }
 
-/**
- * 获取单个待办任务详情
- * GET /api/v1/families/{familyId}/tasks/{taskId}
- */
-export function getTask(familyId: string, taskId: string): Promise<Task> {
-  return request<Task>(`/api/v1/families/${familyId}/tasks/${taskId}`);
+export async function getTask(familyId: string, taskId: string): Promise<Task> {
+  return toTask(familyId, await request<TaskResource>(modelRecordPath(familyId, 'tasks', taskId)));
 }
 
-/**
- * 创建待办任务
- * POST /api/v1/families/{familyId}/tasks
- */
-export function createTask(familyId: string, data: CreateTaskRequest): Promise<Task> {
-  return request<Task>(`/api/v1/families/${familyId}/tasks`, {
+export async function createTask(familyId: string, data: CreateTaskRequest): Promise<Task> {
+  const assigneePersonIds = await userIdsToPersonIds(familyId, data.assigneeIds);
+  const raw = await request<TaskResource>(spacePath(familyId, 'tasks'), {
     method: 'POST',
-    data: data as unknown as Record<string, unknown>,
+    data: {
+      name: data.name,
+      description: data.description ?? null,
+      dueDate: data.dueDate ?? null,
+      assigneePersonIds,
+    },
     skipRetry: true,
   });
+  return toTask(familyId, raw);
 }
 
-/**
- * 更新待办任务
- * PATCH /api/v1/families/{familyId}/tasks/{taskId}
- */
-export function updateTask(
+export async function updateTask(
   familyId: string,
   taskId: string,
   data: UpdateTaskRequest,
 ): Promise<Task> {
-  return request<Task>(`/api/v1/families/${familyId}/tasks/${taskId}`, {
+  const { assigneeIds, ...rest } = data;
+  const payload: Record<string, unknown> = { ...rest };
+  if (assigneeIds !== undefined) payload.assigneePersonIds = await userIdsToPersonIds(familyId, assigneeIds);
+  const raw = await request<TaskResource>(modelRecordPath(familyId, 'tasks', taskId), {
     method: 'PATCH',
-    data: data as unknown as Record<string, unknown>,
+    data: payload,
     skipRetry: true,
   });
+  return toTask(familyId, raw);
 }
 
-/**
- * 完成待办任务
- * POST /api/v1/families/{familyId}/tasks/{taskId}/complete
- */
-export function completeTask(familyId: string, taskId: string, version: number): Promise<Task> {
-  return request<Task>(`/api/v1/families/${familyId}/tasks/${taskId}/complete`, {
-    method: 'POST',
-    data: { version } as unknown as Record<string, unknown>,
-    skipRetry: true,
-  });
-}
-
-/**
- * 恢复待办任务（已完成 → 待完成）
- * POST /api/v1/families/{familyId}/tasks/{taskId}/reopen
- * 返回更新后的 Task（Core 返回最新版本）。
- */
-export function reopenTask(familyId: string, taskId: string, version: number): Promise<Task> {
-  return request<Task>(`/api/v1/families/${familyId}/tasks/${taskId}/reopen`, {
-    method: 'POST',
-    data: { version } as unknown as Record<string, unknown>,
-    skipRetry: true,
-  });
-}
-
-/**
- * 删除待办任务
- * DELETE /api/v1/families/{familyId}/tasks/{taskId}?version=N
- */
-export function deleteTask(familyId: string, taskId: string, version: number): Promise<void> {
-  return request<void>(
-    `/api/v1/families/${familyId}/tasks/${taskId}?version=${version}`,
-    {
-      method: 'DELETE',
-      skipRetry: true,
-    },
+async function action(familyId: string, taskId: string, actionKey: 'complete' | 'reopen', version: number): Promise<Task> {
+  const raw = await request<TaskResource>(
+    `${modelRecordPath(familyId, 'tasks', taskId)}/actions/${actionKey}`,
+    { method: 'POST', data: { version }, skipRetry: true },
   );
+  return toTask(familyId, raw);
+}
+
+export function completeTask(familyId: string, taskId: string, version: number): Promise<Task> {
+  return action(familyId, taskId, 'complete', version);
+}
+
+export function reopenTask(familyId: string, taskId: string, version: number): Promise<Task> {
+  return action(familyId, taskId, 'reopen', version);
+}
+
+export function deleteTask(familyId: string, taskId: string, version: number): Promise<void> {
+  return request<void>(modelRecordPath(familyId, 'tasks', taskId), {
+    method: 'DELETE',
+    data: { version },
+    skipRetry: true,
+  });
 }
