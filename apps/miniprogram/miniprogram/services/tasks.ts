@@ -1,14 +1,10 @@
-/** HomeMew 待办 -> LifeSpace task model。 */
+/** HomeMew 待办 -> LifeSpace task 模型与 Actions。 */
 
 import { request } from './api';
+import { Task, CreateTaskRequest, UpdateTaskRequest } from '../types/index';
 import {
-  Task,
-  CreateTaskRequest,
-  UpdateTaskRequest,
-} from '../types/index';
-import {
-  ResourceBase,
   LifeSpacePage,
+  ResourceBase,
   getSpaceMembers,
   modelRecordPath,
   personRefs,
@@ -20,36 +16,29 @@ import {
 } from './lifespace';
 
 type TaskResource = ResourceBase & {
-  name: string;
+  title: string;
   description: string | null;
+  status: 'open' | 'completed';
   dueDate: string | null;
-  status: 'pending' | 'completed' | 'cancelled';
   assigneePersonIds: string[];
   completedAt: string | null;
-  completedById: string | null;
-  completedByType: 'user' | 'service' | 'device' | null;
+  completedBy: { type: 'user' | 'service' | 'device'; id: string; displayName: string } | null;
 };
 
 async function toTask(spaceId: string, raw: TaskResource): Promise<Task> {
   const members = await getSpaceMembers(spaceId);
-  const completedMember = raw.completedByType === 'user'
-    ? members.find(item => item.userId === raw.completedById)
-    : undefined;
   return {
     id: raw.id,
     familyId: raw.spaceId,
-    name: raw.name,
+    title: raw.title,
     description: raw.description ?? null,
-    dueDate: raw.dueDate ?? null,
     status: raw.status,
+    dueDate: raw.dueDate ?? null,
     assignees: personRefs(raw.assigneePersonIds, members),
     completedAt: raw.completedAt ?? null,
-    completedBy: completedMember ? {
-      type: 'user',
-      id: completedMember.userId,
-      name: completedMember.displayName,
-      avatarUrl: null,
-    } : null,
+    completedBy: raw.completedBy
+      ? { userId: raw.completedBy.id, displayName: raw.completedBy.displayName, avatarUrl: null }
+      : null,
     createdBy: unavailableActor(),
     updatedBy: unavailableActor(),
     version: raw.version,
@@ -65,7 +54,7 @@ async function fetchAllRaw(
   const items: TaskResource[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < 50; page++) {
-    const data = await request<LifeSpacePage<TaskResource>>(
+    const data: LifeSpacePage<TaskResource> = await request<LifeSpacePage<TaskResource>>(
       `${spacePath(familyId, 'tasks')}${queryString({ ...query, cursor, limit: 100 })}`,
     );
     items.push(...(data.items ?? []));
@@ -78,57 +67,66 @@ async function fetchAllRaw(
 export async function listTasks(
   familyId: string,
   params?: {
-    status?: 'pending' | 'completed';
+    status?: 'open' | 'completed';
     assigneeId?: string;
-    dueDateFrom?: string;
-    dueDateTo?: string;
-    includeNoDue?: boolean;
-    sort?: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc';
+    dueFrom?: string;
+    dueTo?: string;
     q?: string;
+    limit?: number;
+    cursor?: string;
   },
+): Promise<{ items: Task[]; nextCursor: string | null }> {
+  const assigneePersonId = params?.assigneeId
+    ? await userIdToPersonId(familyId, params.assigneeId)
+    : null;
+  const data = await request<LifeSpacePage<TaskResource>>(
+    `${spacePath(familyId, 'tasks')}${queryString({
+      status: params?.status,
+      assigneePersonIds: assigneePersonId ?? undefined,
+      dueDateGte: params?.dueFrom,
+      dueDateLte: params?.dueTo,
+      q: params?.q,
+      sort: 'dueDate:asc',
+      cursor: params?.cursor,
+      limit: params?.limit ?? 100,
+    })}`,
+  );
+  return {
+    items: await Promise.all((data.items ?? []).map(item => toTask(familyId, item))),
+    nextCursor: data.nextCursor,
+  };
+}
+
+export async function listAllTasks(
+  familyId: string,
+  params?: { status?: 'open' | 'completed'; assigneeId?: string; dueFrom?: string; dueTo?: string; q?: string },
 ): Promise<Task[]> {
   const assigneePersonId = params?.assigneeId
     ? await userIdToPersonId(familyId, params.assigneeId)
     : null;
-  const sortMap = {
-    due_asc: 'dueDate:asc',
-    due_desc: 'dueDate:desc',
-    created_desc: 'createdAt:desc',
-    updated_desc: 'updatedAt:desc',
-  } as const;
-  const base = {
+  const rows = await fetchAllRaw(familyId, {
     status: params?.status,
     assigneePersonIds: assigneePersonId ?? undefined,
+    dueDateGte: params?.dueFrom,
+    dueDateLte: params?.dueTo,
     q: params?.q,
-    sort: params?.sort ? sortMap[params.sort] : 'dueDate:asc',
-  };
-  const ranged = await fetchAllRaw(familyId, {
-    ...base,
-    dueDateFrom: params?.dueDateFrom,
-    dueDateTo: params?.dueDateTo,
+    sort: 'dueDate:asc',
   });
-
-  let raw = ranged;
-  if (params?.includeNoDue && (params.dueDateFrom || params.dueDateTo)) {
-    const allMatching = await fetchAllRaw(familyId, base);
-    raw = [...ranged, ...allMatching.filter(item => item.dueDate === null)];
-    raw = raw.filter((item, index, values) => values.findIndex(other => other.id === item.id) === index);
-  }
-  return Promise.all(raw.map(item => toTask(familyId, item)));
+  return Promise.all(rows.map(item => toTask(familyId, item)));
 }
 
 export async function getTask(familyId: string, taskId: string): Promise<Task> {
   return toTask(familyId, await request<TaskResource>(modelRecordPath(familyId, 'tasks', taskId)));
 }
 
-export async function createTask(familyId: string, data: CreateTaskRequest): Promise<Task> {
-  const assigneePersonIds = await userIdsToPersonIds(familyId, data.assigneeIds);
+export async function createTask(familyId: string, payload: CreateTaskRequest): Promise<Task> {
+  const assigneePersonIds = await userIdsToPersonIds(familyId, payload.assigneeIds);
   const raw = await request<TaskResource>(spacePath(familyId, 'tasks'), {
     method: 'POST',
     data: {
-      name: data.name,
-      description: data.description ?? null,
-      dueDate: data.dueDate ?? null,
+      title: payload.title,
+      description: payload.description ?? null,
+      dueDate: payload.dueDate ?? null,
       assigneePersonIds,
     },
     skipRetry: true,
@@ -139,39 +137,38 @@ export async function createTask(familyId: string, data: CreateTaskRequest): Pro
 export async function updateTask(
   familyId: string,
   taskId: string,
-  data: UpdateTaskRequest,
+  payload: UpdateTaskRequest,
 ): Promise<Task> {
-  const { assigneeIds, ...rest } = data;
-  const payload: Record<string, unknown> = { ...rest };
-  if (assigneeIds !== undefined) payload.assigneePersonIds = await userIdsToPersonIds(familyId, assigneeIds);
+  const assigneePersonIds = payload.assigneeIds === undefined
+    ? undefined
+    : await userIdsToPersonIds(familyId, payload.assigneeIds);
+  const data: Record<string, unknown> = { version: payload.version };
+  if (payload.title !== undefined) data.title = payload.title;
+  if (payload.description !== undefined) data.description = payload.description;
+  if (payload.dueDate !== undefined) data.dueDate = payload.dueDate;
+  if (assigneePersonIds !== undefined) data.assigneePersonIds = assigneePersonIds;
   const raw = await request<TaskResource>(modelRecordPath(familyId, 'tasks', taskId), {
-    method: 'PATCH',
-    data: payload,
-    skipRetry: true,
+    method: 'PATCH', data, skipRetry: true,
   });
   return toTask(familyId, raw);
 }
 
-async function action(familyId: string, taskId: string, actionKey: 'complete' | 'reopen', version: number): Promise<Task> {
-  const raw = await request<TaskResource>(
-    `${modelRecordPath(familyId, 'tasks', taskId)}/actions/${actionKey}`,
-    { method: 'POST', data: { version }, skipRetry: true },
-  );
+export async function deleteTask(familyId: string, taskId: string, version: number): Promise<void> {
+  await request<unknown>(modelRecordPath(familyId, 'tasks', taskId), {
+    method: 'DELETE', data: { version }, skipRetry: true,
+  });
+}
+
+export async function completeTask(familyId: string, taskId: string, version: number): Promise<Task> {
+  const raw = await request<TaskResource>(`${modelRecordPath(familyId, 'tasks', taskId)}/actions/complete`, {
+    method: 'POST', data: { version }, skipRetry: true,
+  });
   return toTask(familyId, raw);
 }
 
-export function completeTask(familyId: string, taskId: string, version: number): Promise<Task> {
-  return action(familyId, taskId, 'complete', version);
-}
-
-export function reopenTask(familyId: string, taskId: string, version: number): Promise<Task> {
-  return action(familyId, taskId, 'reopen', version);
-}
-
-export function deleteTask(familyId: string, taskId: string, version: number): Promise<void> {
-  return request<void>(modelRecordPath(familyId, 'tasks', taskId), {
-    method: 'DELETE',
-    data: { version },
-    skipRetry: true,
+export async function reopenTask(familyId: string, taskId: string, version: number): Promise<Task> {
+  const raw = await request<TaskResource>(`${modelRecordPath(familyId, 'tasks', taskId)}/actions/reopen`, {
+    method: 'POST', data: { version }, skipRetry: true,
   });
+  return toTask(familyId, raw);
 }
