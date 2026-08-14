@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "homemew-backend",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-14",
+  "durable_objects": {
+    "bindings": [
+      { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
+    ]
+  },
+  "exports": {
+    "WechatIdentity": { "type": "durable-object", "storage": "sqlite" }
+  },
+  "env": {
+    "staging": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
+        ]
+      }
+    },
+    "production": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
+        ]
+      }
+    }
+  }
+}
