@@ -25,6 +25,7 @@ When HomeMew needs a capability LifeSpace does not provide, do not invent a hidd
 - HomeMew users map to LifeSpace Identity users; member-facing domain references map through Space Person IDs where the LifeSpace contract requires them.
 - The Mini Program calls LifeSpace Identity/Core directly for normal authenticated requests.
 - A small HomeMew Cloudflare application backend handles WeChat provider trust only: `wx.login` code exchange, `openid -> LifeSpace user_id` mapping, and exchange of the server-only LifeSpace application credential for a short-lived user token.
+- The WeChat identity mapping is stored in a SQLite-backed Durable Object keyed per WeChat application identity; do not provision a dedicated HomeMew D1 merely for this mapping.
 - Never expose WeChat `appsecret`, LifeSpace `lsa_*` application credentials, service credentials, signing keys, or other backend secrets to Mini Program code.
 - Do not reintroduce WeChat Cloud Development as an application dependency.
 - Do not add a permanent `/families/...` compatibility BFF in front of LifeSpace. Product DTO adaptation belongs at explicit HomeMew client/application boundaries.
@@ -47,7 +48,7 @@ A task in this repository must not modify LifeSpace unless the user has explicit
 Allowed responsibilities include:
 
 - exchanging a WeChat `wx.login` code with the WeChat server API;
-- maintaining `openid -> usr_*` mapping;
+- maintaining `openid -> usr_*` mapping in a HomeMew-owned Durable Object;
 - authenticating to LifeSpace Identity with the HomeMew server-only application credential;
 - requesting short-lived LifeSpace user tokens;
 - other trusted WeChat server capabilities if explicitly required later.
@@ -91,6 +92,6 @@ Follow the active LifeSpace model/capability contract. In particular, preserve U
 
 - Keep dependencies minimal.
 - Do not add new behavior to legacy `apps/core` as part of normal HomeMew feature work.
-- Do not place authoritative household data in HomeMew D1, Mini Program storage, or WeChat Cloud Database.
+- Do not place authoritative household data in HomeMew backend storage, Mini Program storage, or WeChat Cloud Database.
 - Update HomeMew architecture/product docs and affected client tests whenever the application mapping changes.
 - Important architectural decisions must be appended to the ALOHA & HomeMew engineering log.
