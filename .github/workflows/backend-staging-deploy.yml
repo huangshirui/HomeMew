@@ -1,0 +1,122 @@
+name: Deploy HomeMew backend staging
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - lifespace-cutover
+    paths:
+      - apps/backend/**
+      - .github/workflows/backend-staging-deploy.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homemew-backend-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      HOMEMEW_WECHAT_APP_SECRET: ${{ secrets.HOMEMEW_WECHAT_APP_SECRET }}
+      HOMEMEW_LIFESPACE_STAGING_APPLICATION_CREDENTIAL: ${{ secrets.HOMEMEW_LIFESPACE_STAGING_APPLICATION_CREDENTIAL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Validate deployment credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN is not configured" >&2; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID is not configured" >&2; exit 1; }
+
+      - name: Validate backend syntax
+        run: node --check apps/backend/worker.mjs
+
+      - name: Verify LifeSpace staging is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 https://auth-staging.aisr.online/health >/dev/null
+          curl --fail --silent --show-error --retry 3 https://core-staging.aisr.online/health >/dev/null
+
+      - name: Deploy staging Worker and Durable Object
+        run: >-
+          corepack pnpm --dir apps/core exec wrangler deploy
+          --config "$GITHUB_WORKSPACE/apps/backend/wrangler.jsonc"
+          --env staging
+
+      - name: Sync configured staging runtime secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${HOMEMEW_WECHAT_APP_SECRET:-}" ] && [ -z "${HOMEMEW_LIFESPACE_STAGING_APPLICATION_CREDENTIAL:-}" ]; then
+            echo "No HomeMew login runtime secrets are configured yet; deployment remains health-checkable but login is not ready."
+            exit 0
+          fi
+
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const secrets = {};
+          if (process.env.HOMEMEW_WECHAT_APP_SECRET) {
+            secrets.WECHAT_APP_SECRET = process.env.HOMEMEW_WECHAT_APP_SECRET;
+          }
+          if (process.env.HOMEMEW_LIFESPACE_STAGING_APPLICATION_CREDENTIAL) {
+            secrets.LIFESPACE_APPLICATION_CREDENTIAL = process.env.HOMEMEW_LIFESPACE_STAGING_APPLICATION_CREDENTIAL;
+          }
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'homemew-staging-secrets.json'), JSON.stringify(secrets));
+          NODE
+
+          corepack pnpm --dir apps/core exec wrangler secret bulk "$RUNNER_TEMP/homemew-staging-secrets.json" \
+            --config "$GITHUB_WORKSPACE/apps/backend/wrangler.jsonc" \
+            --env staging
+
+      - name: Verify staging backend health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 12 --retry-delay 3 --retry-all-errors \
+            https://homemew-staging.aisr.online/health
+          echo
+
+      - name: Summarize staging deployment
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          {
+            echo "## HomeMew backend staging"
+            echo
+            echo "- Worker: https://homemew-staging.aisr.online"
+            echo "- LifeSpace Identity: https://auth-staging.aisr.online"
+            echo "- LifeSpace Core: https://core-staging.aisr.online"
+            echo "- Identity mapping: SQLite-backed Durable Object"
+            if [ -n "${HOMEMEW_WECHAT_APP_SECRET:-}" ]; then
+              echo "- WeChat app secret: configured"
+            else
+              echo "- WeChat app secret: missing"
+            fi
+            if [ -n "${HOMEMEW_LIFESPACE_STAGING_APPLICATION_CREDENTIAL:-}" ]; then
+              echo "- LifeSpace application credential: configured"
+            else
+              echo "- LifeSpace application credential: missing"
+            fi
+            echo "- Production traffic/configuration: untouched"
+          } >> "$GITHUB_STEP_SUMMARY"
