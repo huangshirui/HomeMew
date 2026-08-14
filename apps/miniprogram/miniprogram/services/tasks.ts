@@ -1,7 +1,7 @@
 /** HomeMew 待办 -> LifeSpace task 模型与 Actions。 */
 
 import { request } from './api';
-import { Task, CreateTaskRequest, UpdateTaskRequest } from '../types/index';
+import { Actor, Task, CreateTaskRequest, UpdateTaskRequest } from '../types/index';
 import {
   LifeSpacePage,
   ResourceBase,
@@ -25,20 +25,28 @@ type TaskResource = ResourceBase & {
   completedBy: { type: 'user' | 'service' | 'device'; id: string; displayName: string } | null;
 };
 
+function toActor(raw: TaskResource['completedBy']): Actor | null {
+  if (!raw) return null;
+  return {
+    type: raw.type === 'user' ? 'user' : 'system',
+    id: raw.id,
+    name: raw.displayName,
+    avatarUrl: null,
+  };
+}
+
 async function toTask(spaceId: string, raw: TaskResource): Promise<Task> {
   const members = await getSpaceMembers(spaceId);
   return {
     id: raw.id,
     familyId: raw.spaceId,
-    title: raw.title,
+    name: raw.title,
     description: raw.description ?? null,
-    status: raw.status,
+    status: raw.status === 'open' ? 'pending' : 'completed',
     dueDate: raw.dueDate ?? null,
     assignees: personRefs(raw.assigneePersonIds, members),
     completedAt: raw.completedAt ?? null,
-    completedBy: raw.completedBy
-      ? { userId: raw.completedBy.id, displayName: raw.completedBy.displayName, avatarUrl: null }
-      : null,
+    completedBy: toActor(raw.completedBy),
     createdBy: unavailableActor(),
     updatedBy: unavailableActor(),
     version: raw.version,
@@ -47,72 +55,67 @@ async function toTask(spaceId: string, raw: TaskResource): Promise<Task> {
   };
 }
 
-async function fetchAllRaw(
+function platformSort(sort: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc' | undefined): string {
+  switch (sort) {
+    case 'due_desc': return 'dueDate:desc';
+    case 'created_desc': return 'createdAt:desc';
+    case 'updated_desc': return 'updatedAt:desc';
+    case 'due_asc':
+    default: return 'dueDate:asc';
+  }
+}
+
+function inDueRange(
+  task: TaskResource,
+  params: { dueDateFrom?: string; dueDateTo?: string; includeNoDue?: boolean } | undefined,
+): boolean {
+  if (!params?.dueDateFrom && !params?.dueDateTo) return true;
+  if (!task.dueDate) return params?.includeNoDue === true;
+  if (params.dueDateFrom && task.dueDate < params.dueDateFrom) return false;
+  if (params.dueDateTo && task.dueDate > params.dueDateTo) return false;
+  return true;
+}
+
+/**
+ * 保持旧 HomeMew 页面侧契约：参数名与返回值仍为 Task[]。
+ * LifeSpace 的 open 状态在这里映射为 HomeMew pending；日期窗口在 service 层适配。
+ */
+export async function listTasks(
   familyId: string,
-  query: Record<string, string | number | boolean | null | undefined>,
-): Promise<TaskResource[]> {
+  params?: {
+    status?: 'pending' | 'completed';
+    assigneeId?: string;
+    dueDateFrom?: string;
+    dueDateTo?: string;
+    includeNoDue?: boolean;
+    sort?: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc';
+    q?: string;
+  },
+): Promise<Task[]> {
+  const assigneePersonId = params?.assigneeId
+    ? await userIdToPersonId(familyId, params.assigneeId)
+    : null;
   const items: TaskResource[] = [];
   let cursor: string | null = null;
+
   for (let page = 0; page < 50; page++) {
     const data: LifeSpacePage<TaskResource> = await request<LifeSpacePage<TaskResource>>(
-      `${spacePath(familyId, 'tasks')}${queryString({ ...query, cursor, limit: 100 })}`,
+      `${spacePath(familyId, 'tasks')}${queryString({
+        status: params?.status === 'pending' ? 'open' : params?.status,
+        assigneePersonIds: assigneePersonId ?? undefined,
+        q: params?.q,
+        sort: platformSort(params?.sort),
+        cursor,
+        limit: 100,
+      })}`,
     );
     items.push(...(data.items ?? []));
     cursor = data.nextCursor;
     if (!cursor) break;
   }
-  return items;
-}
 
-export async function listTasks(
-  familyId: string,
-  params?: {
-    status?: 'open' | 'completed';
-    assigneeId?: string;
-    dueFrom?: string;
-    dueTo?: string;
-    q?: string;
-    limit?: number;
-    cursor?: string;
-  },
-): Promise<{ items: Task[]; nextCursor: string | null }> {
-  const assigneePersonId = params?.assigneeId
-    ? await userIdToPersonId(familyId, params.assigneeId)
-    : null;
-  const data = await request<LifeSpacePage<TaskResource>>(
-    `${spacePath(familyId, 'tasks')}${queryString({
-      status: params?.status,
-      assigneePersonIds: assigneePersonId ?? undefined,
-      dueDateGte: params?.dueFrom,
-      dueDateLte: params?.dueTo,
-      q: params?.q,
-      sort: 'dueDate:asc',
-      cursor: params?.cursor,
-      limit: params?.limit ?? 100,
-    })}`,
-  );
-  return {
-    items: await Promise.all((data.items ?? []).map(item => toTask(familyId, item))),
-    nextCursor: data.nextCursor,
-  };
-}
-
-export async function listAllTasks(
-  familyId: string,
-  params?: { status?: 'open' | 'completed'; assigneeId?: string; dueFrom?: string; dueTo?: string; q?: string },
-): Promise<Task[]> {
-  const assigneePersonId = params?.assigneeId
-    ? await userIdToPersonId(familyId, params.assigneeId)
-    : null;
-  const rows = await fetchAllRaw(familyId, {
-    status: params?.status,
-    assigneePersonIds: assigneePersonId ?? undefined,
-    dueDateGte: params?.dueFrom,
-    dueDateLte: params?.dueTo,
-    q: params?.q,
-    sort: 'dueDate:asc',
-  });
-  return Promise.all(rows.map(item => toTask(familyId, item)));
+  const filtered = items.filter(item => inDueRange(item, params));
+  return Promise.all(filtered.map(item => toTask(familyId, item)));
 }
 
 export async function getTask(familyId: string, taskId: string): Promise<Task> {
@@ -124,7 +127,7 @@ export async function createTask(familyId: string, payload: CreateTaskRequest): 
   const raw = await request<TaskResource>(spacePath(familyId, 'tasks'), {
     method: 'POST',
     data: {
-      title: payload.title,
+      title: payload.name,
       description: payload.description ?? null,
       dueDate: payload.dueDate ?? null,
       assigneePersonIds,
@@ -143,7 +146,7 @@ export async function updateTask(
     ? undefined
     : await userIdsToPersonIds(familyId, payload.assigneeIds);
   const data: Record<string, unknown> = { version: payload.version };
-  if (payload.title !== undefined) data.title = payload.title;
+  if (payload.name !== undefined) data.title = payload.name;
   if (payload.description !== undefined) data.description = payload.description;
   if (payload.dueDate !== undefined) data.dueDate = payload.dueDate;
   if (assigneePersonIds !== undefined) data.assigneePersonIds = assigneePersonIds;
