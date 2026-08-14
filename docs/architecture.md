@@ -1,399 +1,127 @@
 # HomeMew System Architecture
 
-## 1. Purpose
+## 1. Positioning
 
-HomeMew is a household affairs assistant and productivity product. The initial deployment serves one primary household with at most eight members, while the data model supports users joining multiple households and creating at most three households.
+HomeMew is a household application built on LifeSpace. LifeSpace is the platform source of truth for Identity, Spaces/authorization, domain models, Actions, contracts, migrations and business data. HomeMew owns household product UX plus provider-specific application integration.
 
-Core is a unified API and data store shared by the WeChat Mini Program, WeCom application through n8n, the household display, HomeMew Agent, ALOHA, and future clients.
+The legacy `apps/core` implementation remains in this repository only as a migration/reference source until it is explicitly retired; new HomeMew business behavior must not be added there.
 
-## 2. System context
+## 2. Target context
 
 ```text
 WeChat Mini Program
-  ├─ login / identity / WeChat APIs ──> WeChat Cloud Functions
-  └─ normal business API + user JWT ──> HomeMew Core
+  ├─ wx.login code ───────────────> HomeMew Cloudflare application backend
+  │                                  ├─ WeChat jscode2session
+  │                                  ├─ HomeMew D1: openid -> LifeSpace usr_*
+  │                                  └─ LifeSpace Identity internal token exchange
+  │
+  ├─ profile/avatar + user token ─> LifeSpace Identity
+  └─ household business + token ──> LifeSpace Core
 
-WeCom self-built application
-  └─ messages ──> n8n / HomeMew Agent ──> HomeMew Core
-
-Household display
-  └─ read-only backend or narrowly scoped device credential ──> HomeMew Core
-
-Scheduled jobs / notification delivery
-  └─ service token ──> HomeMew Core internal API
+n8n / Agents / other applications
+  └─ their own LifeSpace application/service identity + Data Grants ─> LifeSpace
 ```
 
-## 3. Component responsibilities
+There is no WeChat Cloud Development dependency and no permanent HomeMew compatibility BFF for normal business APIs.
 
-### 3.1 HomeMew Core
+## 3. HomeMew Cloudflare application backend
 
-Deployment: Cloudflare Worker using Hono and D1.
+`apps/backend/` is a narrow trusted adapter, not a second Core.
 
 Responsibilities:
 
-- HomeMew users
-- Families and memberships
-- Invitations
-- Events and attendees
-- Tasks and assignees
-- Wishes, ownership, claiming, and fulfillment state
-- Notifications and delivery state when implemented
-- Authorization based on HomeMew identity and family membership
-- Validation, business rules, audit fields, and optimistic concurrency
-- Stable API contracts for every client
+- receive a one-time `wx.login()` code;
+- call the WeChat `jscode2session` server API with the server-only app secret;
+- resolve and persist `openid -> LifeSpace user_id` in a small HomeMew-owned D1;
+- create a LifeSpace Identity user when the provider identity is first seen;
+- authenticate as the registered HomeMew LifeSpace application using a server-only `lsa_*` credential;
+- request a short-lived LifeSpace user token and return it to the Mini Program.
 
-Core is the only source of truth for household business data.
+It must not persist Spaces/families, events, tasks, day records, wishes or duplicate LifeSpace authorization.
 
-Core does not:
+Required secrets/configuration:
 
-- Authenticate an `openid` directly
-- Store WeChat Mini Program `openid` or WeCom `userid` as the business user ID
-- Expose D1 directly to clients
-- Delegate household authorization to the Mini Program or n8n
-- Store normal event/task data in WeChat Cloud Database
+- `WECHAT_APP_ID`
+- `WECHAT_APP_SECRET`
+- `LIFESPACE_APPLICATION_CREDENTIAL`
+- `LIFESPACE_IDENTITY_URL`
+- `LIFESPACE_CORE_URL`
+- D1 binding `DB`
 
-### 3.2 WeChat Cloud Functions
+The Mini Program never receives `openid`, the WeChat app secret, or the LifeSpace application credential.
 
-Responsibilities:
-
-- Obtain a trustworthy Mini Program `openid` from the WeChat runtime
-- Maintain the mapping from external WeChat identity to HomeMew internal user ID
-- Create a HomeMew user through the protected internal Core API when first seen
-- Issue short-lived user access tokens accepted by Core
-- Call WeChat server-side APIs, such as Mini Program code generation or subscription-message APIs
-- Store WeChat-specific configuration and identity mapping
-
-Normal family, event, and task API calls should not be transparently proxied through Cloud Functions after login. The Mini Program calls Core directly with a short-lived user token.
-
-### 3.3 WeChat Mini Program
-
-Responsibilities:
-
-- User-facing GUI for family, member, invitation, event, and task operations
-- Call the login Cloud Function when no valid Core user token is available
-- Call Core directly for normal business operations
-- Treat Core responses as the source of truth
-- Hide unavailable controls based on role for usability, while relying on Core for security
-- Re-login and retry once after an expired-token response
-
-The Mini Program may cache UI state and recent data, but must not become an independent business data store.
-
-### 3.4 n8n and HomeMew Agent
-
-Two execution modes must remain distinct.
-
-User-initiated operation:
+## 4. Identity flow
 
 ```text
-User sends WeCom message
-→ resolve WeCom userid to HomeMew user ID
-→ obtain a short-lived user-context token
-→ Agent calls normal Core API
-→ Core applies the user's family permissions
+Mini Program
+-> wx.login()
+-> POST HomeMew /api/v1/login/wechat { code }
+-> WeChat jscode2session
+-> trusted openid
+-> lookup HomeMew D1 mapping
+-> if absent: POST LifeSpace Identity /internal/v1/users
+-> POST LifeSpace Identity /internal/v1/tokens
+-> { accessToken, expiresAt, coreApiUrl, identityApiUrl }
 ```
 
-System-initiated operation:
+The access token represents the LifeSpace user, has the HomeMew application as its authorized party, and carries only the scopes granted to that application. Token refresh repeats this flow with a fresh WeChat code.
+
+## 5. Household model mapping
+
+HomeMew keeps product-friendly terms in the UI but maps them explicitly at the client service boundary:
+
+| HomeMew | LifeSpace |
+|---|---|
+| family | `Space(kind=family)` |
+| family admin | Space `owner` / `admin` |
+| writable member | Space `editor` |
+| member reference in business models | Space Person |
+| event | `event` model + Calendar capability |
+| task | `task` model + Actions |
+| day | `day_record` model + Temporal capability |
+| wish | `wish` model + Actions |
+| 喵一下 | Registry Creation Draft capability |
+
+HomeMew services may expose `familyId`, `attendeeIds`, `assigneeIds` and similar product DTOs to pages, but translate them to Space IDs/Person IDs before calling LifeSpace.
+
+## 6. Normal Mini Program requests
 
 ```text
-Scheduled trigger
-→ n8n uses service identity
-→ calls dedicated internal/service API
-→ Core applies service scope and owns cleanup/notification rules
+Mini Program
+-> Authorization: Bearer <short-lived LifeSpace user token>
+-> LifeSpace Identity/Core
 ```
 
-A scheduled task must not permanently impersonate a household administrator.
+The shared request client selects Identity or Core explicitly, parses standard LifeSpace envelopes, propagates request IDs, serializes token refresh and does not blindly retry non-idempotent writes.
 
-### 3.5 Household display
+`currentFamilyId` remains UI state only. LifeSpace Space membership and grant checks are authoritative.
 
-The display is read-only. A static Cloudflare Pages application must not contain a long-lived service secret in browser JavaScript.
+## 7. Media
 
-Preferred options:
+- Current-user avatar: `PUT LifeSpace Identity /api/v1/me/avatar`.
+- Family avatar: `PUT LifeSpace Core /api/v1/spaces/{spaceId}/avatar`, including the current Space `version` in multipart data.
+- Household images do not use WeChat Cloud Storage.
 
-- A small backend/Worker proxy with a narrowly scoped credential
-- A short-lived device token issued by a trusted backend
-- A public-display endpoint that returns only explicitly approved household summary data and is protected by a revocable device identity
+## 8. Data ownership
 
-## 4. Identity model
+HomeMew-owned D1 may store provider/application integration metadata such as the WeChat identity mapping. It must not become an authoritative household data store.
 
-### 4.1 HomeMew internal identity
+Authoritative household data and authorization live in LifeSpace. Mini Program storage is cache/UI state only.
 
-Core business records reference `users.id`, for example:
+## 9. External systems
 
-```text
-usr_01JXYZ...
-```
+LifeSpace Data Grants are the target authorization mechanism for n8n, Agents, devices and other software principals.
 
-The current user is derived from the verified token subject, never from request body or query parameters.
+The legacy HomeMew Mini Program also contains an administrator UI that creates “external systems” and issues API tokens/client secrets. At the time of this cutover, LifeSpace exposes Data Grant management but does not yet expose an equivalent end-user flow for provisioning a new service principal plus its credential. Do not recreate this as a HomeMew-only credential authority. Keep that surface unavailable until a separately approved LifeSpace capability is defined.
 
-### 4.2 External identity mapping
+## 10. Migration/cutover rules
 
-External mapping lives outside Core:
+- Do not dual-write HomeMew Core and LifeSpace.
+- Do not keep a permanent `/api/v1/families/...` facade in front of LifeSpace.
+- Migrate data once, validate, then cut the Mini Program over.
+- Production provider mapping and a production `lsa_*` credential are application secrets and must be established only during an explicitly authorized production cutover.
+- The old HomeMew Core domain may continue to exist temporarily for rollback/reference, but post-cutover Mini Program business traffic must not use it.
 
-```text
-(provider, app_id, external_user_id) → homemew_user_id
-```
+## 11. LifeSpace change boundary
 
-Examples:
-
-- Mini Program: `external_user_id = openid`
-- WeCom: `external_user_id = userid`
-
-The same HomeMew user may be associated with multiple external identities.
-
-### 4.3 User token
-
-Current Core uses HS256 Bearer JWT. A normal token subject is a HomeMew `users.id`.
-
-Target claims:
-
-```json
-{
-  "sub": "usr_01JXYZ",
-  "type": "user",
-  "client_id": "wechat-miniprogram",
-  "iss": "homemew-identity",
-  "aud": "homemew-core",
-  "iat": 1784680000,
-  "exp": 1784683600,
-  "jti": "tok_01JXYZ"
-}
-```
-
-Core validates the HS256 signature and requires `sub`, `type`, `iss`, `aud`, `iat`, and `exp`. Tokens may live for at most one hour. User tokens use `type: user` and `aud: homemew-core`; service tokens use `type: service` and `aud: homemew-core-internal`. Internal endpoints additionally require the `internal` scope.
-
-### 4.4 Service token
-
-A service token represents software, not a household member.
-
-Target example:
-
-```json
-{
-  "sub": "svc_n8n",
-  "type": "service",
-  "scope": "notifications:read notifications:update maintenance:run",
-  "iss": "homemew-identity",
-  "aud": "homemew-core",
-  "exp": 1784683600
-}
-```
-
-Service endpoints must check explicit scopes and must not run `activeUser()` against a service subject.
-
-The current `scope: internal` mechanism is an MVP capability used by `POST /api/v1/internal/users`. Fine-grained service scopes and additional service endpoints are planned architecture.
-
-## 5. Authorization model
-
-Authorization has two layers.
-
-### 5.1 Caller identity and scope
-
-- Verify the Bearer token
-- Determine whether the caller is a user or service when typed tokens are implemented
-- Check required service scope for internal endpoints
-
-### 5.2 Family business permission
-
-For user operations:
-
-- Read/write family data: active membership required
-- Family settings, invitations, and member administration: `admin` role required
-- The last administrator cannot be removed, demoted, or leave
-
-Every family-scoped query must constrain both resource ID and `family_id`.
-
-## 6. API layout
-
-```text
-/health                         unauthenticated deployment probe
-/api/v1/status                  unauthenticated API/D1 probe
-/api/v1/me                      authenticated user API
-/api/v1/families/...            authenticated family business API
-/api/v1/family-invites/...      authenticated invitation join API
-/api/v1/internal/...            trusted service API
-```
-
-Do not duplicate all user APIs under `/internal`. Add internal endpoints only for system operations that have no meaningful acting household user, such as pending notification delivery, delivery result updates, and controlled maintenance jobs.
-
-## 7. Mini Program request flow
-
-### 7.1 First launch
-
-```text
-Mini Program calls login Cloud Function
-→ Cloud Function gets openid
-→ mapping lookup misses
-→ Cloud Function calls POST /api/v1/internal/users with trusted service token
-→ Core creates usr_xxx
-→ Cloud Function stores openid → usr_xxx
-→ Cloud Function signs short-lived user token
-→ Mini Program calls GET /api/v1/me
-→ Mini Program calls GET /api/v1/me/families
-```
-
-### 7.2 Returning launch
-
-```text
-Restore local token
-→ refresh through login Cloud Function if missing/expiring
-→ GET /api/v1/me
-→ GET /api/v1/me/families
-→ restore a still-valid current family
-→ fetch household data in parallel
-```
-
-### 7.3 Expired token
-
-```text
-Core returns 401
-→ one coordinated login refresh
-→ retry original request once
-```
-
-Writes must not be blindly retried unless idempotency is supported.
-
-## 8. Data ownership and storage
-
-- D1 stores Core relational data.
-- R2 may store future attachments or images.
-- WeChat Cloud Database stores only WeChat-specific identity mapping and configuration required by Cloud Functions.
-- Client local storage stores short-lived token metadata and UI preferences, not authoritative household records.
-
-## 9. Time semantics
-
-- Every concrete instant stored or returned by Core uses canonical RFC 3339 UTC with a `Z` suffix. Internal JWT, OAuth, and rate-limit epoch seconds remain valid absolute-time representations.
-- Timed events use UTC `startAt` and `endAt`. Optional `startTimezone` and `endTimezone` are display metadata only and never affect duration, ordering, overlap, or conflict calculations.
-- All-day events use the date-only half-open range `[startDate, endDateExclusive)` and are never converted to timestamps.
-- Task `dueDate` is date-only and follows household calendar semantics; it is not a timestamp.
-- Event list requests provide a date window and may provide an IANA viewing timezone. Core uses that timezone only to derive UTC bounds for timed events and compares all-day events directly by date.
-- Every family has an IANA default timezone, initially `Asia/Shanghai`. It is the fallback viewing timezone and the default display metadata for omitted timed-event endpoint timezones; changing it does not rewrite existing events.
-
-## 10. Concurrency and deletion
-
-Events and tasks use integer `version` for optimistic concurrency. Clients submit the version they read; Core rejects stale writes with a conflict error.
-
-Events and tasks are soft-deleted using `deleted_at` and `deleted_by`. Normal list/detail endpoints exclude deleted rows.
-
-## 11. Deployment
-
-- Core: Cloudflare Workers, deployed by GitHub Actions and Wrangler CLI
-- Database: Cloudflare D1, with remote migrations applied before Worker deployment
-- Mini Program: WeChat Mini Program with WeChat Cloud Development for Cloud Functions
-- Household display: Cloudflare Pages, with a protected data access path
-- n8n: handles WeCom message integration, Agent orchestration, scheduled jobs, and channel delivery
-
-## 12. Planned evolution
-
-Near-term:
-
-- Implement event and task contracts documented in OpenAPI
-- Add fine-grained service identity and scope middleware
-- Add notification model and internal delivery endpoints
-- Generate TypeScript types or SDK from OpenAPI
-- Add OpenAPI validation and contract checks to CI
-
-Explicitly out of the first event/task scope:
-
-- Recurring events and exception dates
-- External event attendees and RSVP
-- Recurring tasks, subtasks, labels, priorities, comments, and attachments
-- Per-assignee completion state
-- External calendar synchronization
-
-## 13. External system integrations
-
-An external integration is a non-human `system` principal owned by exactly one
-family. It is not a family member and never appears in attendee or assignee
-lists. Active family administrators manage integrations through the implemented
-`/api/v1/families/{familyId}/integrations` contract.
-
-Core resolves user JWTs, OAuth system JWTs, and `hmw_pat_` API tokens into one
-Principal used by the shared family, event, task, and day-record routes. System OAuth JWTs
-are issued only by `POST /oauth/token`, use `aud=homemew-core`, live for one
-hour, and identify their originating credential. Core checks the credential,
-integration, family grant, token scope, and current database permissions on
-every request. Disabling or deleting an integration, removing a permission, or
-revoking the originating credential therefore takes effect immediately.
-Internal `service` identities remain limited to internal endpoints.
-
-Secrets are generated and handled only by Core. The Mini Program may receive a
-new secret from an administrator API once for display, but must not persist it.
-Core stores only credential hashes and redacted suffixes.
-
-## 14. Day records
-
-Day records are lightweight household date state owned by Core. They cover an
-elapsed date, a future or past countdown target, or a repeating cycle with an
-occurrence history. They do not model asset specifications, costs, attachments,
-vehicle mileage, or maintenance projects; those belong to a future household
-assets domain.
-
-Every day record is family-scoped and uses date-only values interpreted against
-the family's current IANA timezone. Core derives attention state at request time
-and stores a cycle's indexed next due date. User and external-system principals
-share the same routes through `day-records:read/write`; internal service tokens
-do not gain access to family routes.
-
-## 15. Wishes
-
-Wishes are personal intentions shared inside a family. Core owns wish content,
-ownership, claiming, fulfillment, archival, optimistic concurrency, and soft
-deletion. A wish remains distinct from a task: claiming expresses a household
-member's intent to help, but does not create an assignee or execution plan.
-
-Wish routes accept only user principals who are active members of the family.
-The authenticated user is always the owner of a newly created wish, and Core
-never trusts a client-supplied owner ID. External systems and internal services
-do not access this domain in the first version; a user-initiated Agent action
-must preserve the user's identity and call the normal family route.
-
-Membership removal releases unfinished claims as part of the same Core
-operation. Owner and fulfillment references remain historical data after a
-member leaves, consistent with other family-scoped audit references.
-
-## 16. AI creation draft gateway
-
-Core exposes a user-only family route that interprets household-language text
-as an ephemeral event, task, day-record, or wish draft. The caller must be an
-active user and active family member; system integrations and internal service
-identities cannot use this route. Interpretation is read-only: Core may read
-family and active-member context, but it performs no D1 writes and never creates
-the requested business record.
-
-Core owns the AI gateway and provider adapter. The current adapter calls a
-configured OpenAI-compatible endpoint with strict structured output. The
-outbound privacy boundary is deliberately narrow: the untrusted source text,
-current instant, family and viewing timezones, supported kinds, and active
-member display names paired with request-scoped temporary references may leave
-Core. HomeMew user IDs, other household business records, bearer tokens,
-provider credentials, and backend secrets are not sent. Provider-specific code
-must remain behind the adapter so a later model, provider, or locally hosted
-implementation can preserve the same public Core contract.
-
-Core validates and normalizes the provider response before returning it. Logs
-contain only operational metadata such as request ID, duration, result status,
-kind, upstream status, token counts, and error category. They must not contain
-the source text, prompts, member names, drafts, provider bodies, or API keys.
-Core makes one provider attempt and does not retry automatically.
-
-The client flow is:
-
-```text
-Client sends source text and viewing timezone
-→ Core returns a ready ephemeral draft
-  → client reviews and completes missing fields
-  → client calls the existing normal create endpoint
-or Core returns choose_kind with candidateKinds
-  → user selects a kind
-  → client repeats interpretation with the original text and targetKind
-  → client reviews the ready draft and uses the normal create endpoint
-```
-
-The interpretation response is never proof that a record exists. Final writes
-continue to use the existing event, task, day-record, and wish authorization,
-validation, and persistence paths.
-
-Relative event dates and times are interpreted in the request's
-`viewingTimezone`, which reflects the calendar the user is viewing. Relative
-date-only values for tasks, day records, and wishes are interpreted in the
-family's IANA timezone so household dates remain stable across viewers.
+If HomeMew discovers a missing platform capability, finish independent HomeMew work and document the gap. Any LifeSpace repository modification requires explicit user approval first and must then follow LifeSpace's own `AGENTS.md`.
