@@ -12,7 +12,7 @@ The legacy `apps/core` implementation remains in this repository only as a migra
 WeChat Mini Program
   ├─ wx.login code ───────────────> HomeMew Cloudflare application backend
   │                                  ├─ WeChat jscode2session
-  │                                  ├─ HomeMew D1: openid -> LifeSpace usr_*
+  │                                  ├─ Durable Object: openid -> LifeSpace usr_*
   │                                  └─ LifeSpace Identity internal token exchange
   │
   ├─ profile/avatar + user token ─> LifeSpace Identity
@@ -32,12 +32,16 @@ Responsibilities:
 
 - receive a one-time `wx.login()` code;
 - call the WeChat `jscode2session` server API with the server-only app secret;
-- resolve and persist `openid -> LifeSpace user_id` in a small HomeMew-owned D1;
+- resolve and persist `openid -> LifeSpace user_id` in a HomeMew-owned SQLite-backed Durable Object;
 - create a LifeSpace Identity user when the provider identity is first seen;
 - authenticate as the registered HomeMew LifeSpace application using a server-only `lsa_*` credential;
 - request a short-lived LifeSpace user token and return it to the Mini Program.
 
-It must not persist Spaces/families, events, tasks, day records, wishes or duplicate LifeSpace authorization.
+The Durable Object is keyed by `WeChat appid + openid`, so each external identity has its own coordination/storage unit. Concurrent first-login requests to the same live object share one in-flight user-creation promise before the mapping is persisted. A dedicated HomeMew D1 is intentionally not provisioned for this small identity mapping.
+
+This removes the D1 database-slot cost while retaining strongly consistent per-identity storage. There is still a narrow crash window between a successful LifeSpace user creation and the Durable Object storage write; eliminating that window completely would require an idempotency contract on the LifeSpace user-creation API and therefore is not implemented as a HomeMew-only workaround.
+
+The backend must not persist Spaces/families, events, tasks, day records, wishes or duplicate LifeSpace authorization.
 
 Required secrets/configuration:
 
@@ -46,7 +50,7 @@ Required secrets/configuration:
 - `LIFESPACE_APPLICATION_CREDENTIAL`
 - `LIFESPACE_IDENTITY_URL`
 - `LIFESPACE_CORE_URL`
-- D1 binding `DB`
+- Durable Object binding `WECHAT_IDENTITIES`
 
 The Mini Program never receives `openid`, the WeChat app secret, or the LifeSpace application credential.
 
@@ -58,11 +62,14 @@ Mini Program
 -> POST HomeMew /api/v1/login/wechat { code }
 -> WeChat jscode2session
 -> trusted openid
--> lookup HomeMew D1 mapping
--> if absent: POST LifeSpace Identity /internal/v1/users
+-> resolve HomeMew WechatIdentity Durable Object
+-> if mapping absent: POST LifeSpace Identity /internal/v1/users
+-> persist openid -> LifeSpace user_id mapping in Durable Object
 -> POST LifeSpace Identity /internal/v1/tokens
 -> { accessToken, expiresAt, coreApiUrl, identityApiUrl }
 ```
+
+An existing mapping is authoritative. If LifeSpace later refuses token issuance for a mapped user, HomeMew does not silently create a replacement user and overwrite the mapping; the inconsistency must be investigated instead.
 
 The access token represents the LifeSpace user, has the HomeMew application as its authorized party, and carries only the scopes granted to that application. Token refresh repeats this flow with a fresh WeChat code.
 
@@ -104,7 +111,7 @@ The shared request client selects Identity or Core explicitly, parses standard L
 
 ## 8. Data ownership
 
-HomeMew-owned D1 may store provider/application integration metadata such as the WeChat identity mapping. It must not become an authoritative household data store.
+HomeMew-owned Durable Object storage may hold provider/application integration metadata such as the WeChat identity mapping. It must not become an authoritative household data store.
 
 Authoritative household data and authorization live in LifeSpace. Mini Program storage is cache/UI state only.
 
@@ -119,6 +126,7 @@ The legacy HomeMew Mini Program also contains an administrator UI that creates �
 - Do not dual-write HomeMew Core and LifeSpace.
 - Do not keep a permanent `/api/v1/families/...` facade in front of LifeSpace.
 - Migrate data once, validate, then cut the Mini Program over.
+- Staging and production HomeMew Workers use separate Durable Object namespaces and separate secrets.
 - Production provider mapping and a production `lsa_*` credential are application secrets and must be established only during an explicitly authorized production cutover.
 - The old HomeMew Core domain may continue to exist temporarily for rollback/reference, but post-cutover Mini Program business traffic must not use it.
 
