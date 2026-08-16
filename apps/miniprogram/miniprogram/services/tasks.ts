@@ -5,6 +5,7 @@ import { Actor, Task, CreateTaskRequest, UpdateTaskRequest } from '../types/inde
 import {
   LifeSpacePage,
   ResourceBase,
+  SpaceMember,
   getSpaceMembers,
   modelRecordPath,
   personRefs,
@@ -16,21 +17,31 @@ import {
 } from './lifespace';
 
 type TaskResource = ResourceBase & {
-  title: string;
+  name: string;
   description: string | null;
-  status: 'open' | 'completed';
+  status: 'pending' | 'completed' | 'cancelled';
   dueDate: string | null;
   assigneePersonIds: string[];
   completedAt: string | null;
-  completedBy: { type: 'user' | 'service' | 'device'; id: string; displayName: string } | null;
+  completedByType: 'user' | 'service' | 'device' | null;
+  completedById: string | null;
 };
 
-function toActor(raw: TaskResource['completedBy']): Actor | null {
-  if (!raw) return null;
+function toCompletedActor(raw: TaskResource, members: SpaceMember[]): Actor | null {
+  if (!raw.completedByType || !raw.completedById) return null;
+  if (raw.completedByType === 'user') {
+    const member = members.find(item => item.userId === raw.completedById);
+    return {
+      type: 'user',
+      id: raw.completedById,
+      name: member?.displayName ?? raw.completedById,
+      avatarUrl: null,
+    };
+  }
   return {
-    type: raw.type === 'user' ? 'user' : 'system',
-    id: raw.id,
-    name: raw.displayName,
+    type: 'system',
+    id: raw.completedById,
+    name: raw.completedById,
     avatarUrl: null,
   };
 }
@@ -40,13 +51,13 @@ async function toTask(spaceId: string, raw: TaskResource): Promise<Task> {
   return {
     id: raw.id,
     familyId: raw.spaceId,
-    name: raw.title,
+    name: raw.name,
     description: raw.description ?? null,
-    status: raw.status === 'open' ? 'pending' : 'completed',
+    status: raw.status,
     dueDate: raw.dueDate ?? null,
     assignees: personRefs(raw.assigneePersonIds, members),
     completedAt: raw.completedAt ?? null,
-    completedBy: toActor(raw.completedBy),
+    completedBy: toCompletedActor(raw, members),
     createdBy: unavailableActor(),
     updatedBy: unavailableActor(),
     version: raw.version,
@@ -55,14 +66,19 @@ async function toTask(spaceId: string, raw: TaskResource): Promise<Task> {
   };
 }
 
-function platformSort(sort: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc' | undefined): string {
-  switch (sort) {
-    case 'due_desc': return 'dueDate:desc';
-    case 'created_desc': return 'createdAt:desc';
-    case 'updated_desc': return 'updatedAt:desc';
-    case 'due_asc':
-    default: return 'dueDate:asc';
-  }
+function platformSort(sort: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc' | undefined): string | undefined {
+  if (sort === 'due_desc') return 'dueDate:desc';
+  if (sort === 'due_asc' || sort === undefined) return 'dueDate:asc';
+  return undefined;
+}
+
+function clientSort(
+  items: TaskResource[],
+  sort: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc' | undefined,
+): TaskResource[] {
+  if (sort !== 'created_desc' && sort !== 'updated_desc') return items;
+  const field = sort === 'created_desc' ? 'createdAt' : 'updatedAt';
+  return [...items].sort((a, b) => b[field].localeCompare(a[field]));
 }
 
 function inDueRange(
@@ -77,8 +93,9 @@ function inDueRange(
 }
 
 /**
- * 保持旧 HomeMew 页面侧契约：参数名与返回值仍为 Task[]。
- * LifeSpace 的 open 状态在这里映射为 HomeMew pending；日期窗口在 service 层适配。
+ * 保持 HomeMew 页面侧契约：参数名与返回值仍为 Task[]。
+ * LifeSpace task 已原生使用 pending/completed/cancelled 与 name；日期窗口以及
+ * created/updated 排序在 HomeMew service 层适配。
  */
 export async function listTasks(
   familyId: string,
@@ -101,7 +118,7 @@ export async function listTasks(
   for (let page = 0; page < 50; page++) {
     const data: LifeSpacePage<TaskResource> = await request<LifeSpacePage<TaskResource>>(
       `${spacePath(familyId, 'tasks')}${queryString({
-        status: params?.status === 'pending' ? 'open' : params?.status,
+        status: params?.status,
         assigneePersonIds: assigneePersonId ?? undefined,
         q: params?.q,
         sort: platformSort(params?.sort),
@@ -114,7 +131,10 @@ export async function listTasks(
     if (!cursor) break;
   }
 
-  const filtered = items.filter(item => inDueRange(item, params));
+  const filtered = clientSort(
+    items.filter(item => inDueRange(item, params)),
+    params?.sort,
+  );
   return Promise.all(filtered.map(item => toTask(familyId, item)));
 }
 
@@ -127,7 +147,7 @@ export async function createTask(familyId: string, payload: CreateTaskRequest): 
   const raw = await request<TaskResource>(spacePath(familyId, 'tasks'), {
     method: 'POST',
     data: {
-      title: payload.name,
+      name: payload.name,
       description: payload.description ?? null,
       dueDate: payload.dueDate ?? null,
       assigneePersonIds,
@@ -146,7 +166,7 @@ export async function updateTask(
     ? undefined
     : await userIdsToPersonIds(familyId, payload.assigneeIds);
   const data: Record<string, unknown> = { version: payload.version };
-  if (payload.name !== undefined) data.title = payload.name;
+  if (payload.name !== undefined) data.name = payload.name;
   if (payload.description !== undefined) data.description = payload.description;
   if (payload.dueDate !== undefined) data.dueDate = payload.dueDate;
   if (assigneePersonIds !== undefined) data.assigneePersonIds = assigneePersonIds;
