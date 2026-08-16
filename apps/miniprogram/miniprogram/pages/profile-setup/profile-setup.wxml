@@ -45,6 +45,7 @@
       placeholder="输入昵称，或点键盘上的「微信」"
       value="{{displayName}}"
       bindinput="onDisplayNameInput"
+      bindnicknamereview="onNicknameReview"
       maxlength="20"
       confirm-type="done"
     />
