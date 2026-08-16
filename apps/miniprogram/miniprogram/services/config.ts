@@ -10,6 +10,8 @@ const STAGING_LOGIN_BACKEND_URL = 'https://homemew-staging.aisr.online';
 const STAGING_IDENTITY_BASE_URL = 'https://auth-staging.aisr.online';
 const STAGING_CORE_BASE_URL = 'https://core-staging.aisr.online';
 
+export type RuntimeEnvironment = 'staging' | 'production';
+
 export const STORAGE_KEYS = {
   accessToken: 'accessToken',
   tokenExpiresAt: 'tokenExpiresAt',
@@ -17,6 +19,7 @@ export const STORAGE_KEYS = {
   coreApiUrl: 'coreApiUrl',
   loginBackendUrl: 'loginBackendUrl',
   identityApiUrl: 'identityApiUrl',
+  runtimeEnvironment: 'runtimeEnvironment',
   eventsScope: 'eventsScope',
   tasksScope: 'tasksScope',
   timeZoneMode: 'timeZoneMode',
@@ -27,17 +30,21 @@ export const REQUEST_TIMEOUT = 15000;
 export const UPLOAD_TIMEOUT = 30000;
 export const TOKEN_EXPIRE_BUFFER_MS = 2 * 60 * 1000;
 
-function isReleaseMiniProgram(): boolean {
+export function resolveRuntimeEnvironment(envVersion: string | undefined): RuntimeEnvironment {
+  return envVersion === 'release' ? 'production' : 'staging';
+}
+
+export function getRuntimeEnvironment(): RuntimeEnvironment {
   try {
-    return wx.getAccountInfoSync().miniProgram.envVersion === 'release';
+    return resolveRuntimeEnvironment(wx.getAccountInfoSync().miniProgram.envVersion);
   } catch (_) {
-    // API 在当前基础库可用；若异常，优先保持 production 默认，避免发布版误连 staging。
-    return true;
+    // 无法识别运行版本时保持 production 默认，避免正式客户端误连 staging。
+    return 'production';
   }
 }
 
 function runtimeDefaults(): { loginBackendUrl: string; identityApiUrl: string; coreApiUrl: string } {
-  if (isReleaseMiniProgram()) {
+  if (getRuntimeEnvironment() === 'production') {
     return {
       loginBackendUrl: PROD_LOGIN_BACKEND_URL,
       identityApiUrl: PROD_IDENTITY_BASE_URL,
@@ -51,9 +58,58 @@ function runtimeDefaults(): { loginBackendUrl: string; identityApiUrl: string; c
   };
 }
 
+/**
+ * 防止 develop/trial 与 release 共享的历史 Storage 把客户端带到错误环境。
+ * 首次运行新隔离逻辑、或 staging/production 发生切换时，仅清理环境相关状态；
+ * 时区等纯 UI 偏好继续保留。
+ */
+export function ensureRuntimeEnvironmentStorage(): RuntimeEnvironment {
+  const current = getRuntimeEnvironment();
+  const previous = wx.getStorageSync(STORAGE_KEYS.runtimeEnvironment) as RuntimeEnvironment | '';
+  if (previous !== current) {
+    for (const key of [
+      STORAGE_KEYS.accessToken,
+      STORAGE_KEYS.tokenExpiresAt,
+      STORAGE_KEYS.currentFamilyId,
+      STORAGE_KEYS.coreApiUrl,
+      STORAGE_KEYS.identityApiUrl,
+      STORAGE_KEYS.loginBackendUrl,
+    ]) {
+      wx.removeStorageSync(key);
+    }
+    wx.setStorageSync(STORAGE_KEYS.runtimeEnvironment, current);
+  }
+  return current;
+}
+
 export function normalizeBaseUrl(url: string): string {
   if (!url) return '';
   return url.replace(/\/+$/, '');
+}
+
+function environmentSafeUrl(cached: string, expected: string): string {
+  const normalized = normalizeBaseUrl(cached);
+  // 服务 URL 由受信 HomeMew backend 下发，但缓存必须属于当前运行环境。
+  // 当前各环境均使用唯一 canonical origin，因此跨环境旧值直接忽略。
+  return normalized === expected ? normalized : expected;
+}
+
+export function getRuntimeServiceUrls(): { loginBackendUrl: string; identityApiUrl: string; coreApiUrl: string } {
+  const defaults = runtimeDefaults();
+  return {
+    loginBackendUrl: environmentSafeUrl(
+      (wx.getStorageSync(STORAGE_KEYS.loginBackendUrl) as string) || '',
+      defaults.loginBackendUrl,
+    ),
+    identityApiUrl: environmentSafeUrl(
+      (wx.getStorageSync(STORAGE_KEYS.identityApiUrl) as string) || '',
+      defaults.identityApiUrl,
+    ),
+    coreApiUrl: environmentSafeUrl(
+      (wx.getStorageSync(STORAGE_KEYS.coreApiUrl) as string) || '',
+      defaults.coreApiUrl,
+    ),
+  };
 }
 
 export function generateRequestId(): string {
@@ -71,18 +127,15 @@ export function evaluateToken(
 }
 
 export function getCoreBaseUrl(): string {
-  const cached = (wx.getStorageSync(STORAGE_KEYS.coreApiUrl) as string) || '';
-  return normalizeBaseUrl(cached || runtimeDefaults().coreApiUrl);
+  return getRuntimeServiceUrls().coreApiUrl;
 }
 
 export function getIdentityBaseUrl(): string {
-  const cached = (wx.getStorageSync(STORAGE_KEYS.identityApiUrl) as string) || '';
-  return normalizeBaseUrl(cached || runtimeDefaults().identityApiUrl);
+  return getRuntimeServiceUrls().identityApiUrl;
 }
 
 export function getLoginBackendUrl(): string {
-  const cached = (wx.getStorageSync(STORAGE_KEYS.loginBackendUrl) as string) || '';
-  return normalizeBaseUrl(cached || runtimeDefaults().loginBackendUrl);
+  return getRuntimeServiceUrls().loginBackendUrl;
 }
 
 export function isTokenValid(): boolean {
