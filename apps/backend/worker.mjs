@@ -87,6 +87,29 @@ async function issueUserToken(env, userId) {
   return { accessToken: data.accessToken, expiresIn: data.expiresIn };
 }
 
+function migratedLifeSpaceUserId(env, openid) {
+  const raw = typeof env.WECHAT_IDENTITY_BOOTSTRAP_MAP === 'string'
+    ? env.WECHAT_IDENTITY_BOOTSTRAP_MAP.trim()
+    : '';
+  if (!raw) return null;
+
+  let mappings;
+  try {
+    mappings = JSON.parse(raw);
+  } catch {
+    throw new HttpError(500, 'BACKEND_NOT_CONFIGURED', '微信身份迁移映射配置无效');
+  }
+  if (!mappings || typeof mappings !== 'object' || Array.isArray(mappings)) {
+    throw new HttpError(500, 'BACKEND_NOT_CONFIGURED', '微信身份迁移映射配置无效');
+  }
+  const userId = mappings[openid];
+  if (userId === undefined) return null;
+  if (typeof userId !== 'string' || !userId.startsWith('usr_')) {
+    throw new HttpError(500, 'BACKEND_NOT_CONFIGURED', '微信身份迁移映射包含无效用户');
+  }
+  return userId;
+}
+
 export class WechatIdentity extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -97,6 +120,17 @@ export class WechatIdentity extends DurableObject {
     const mapping = await this.ctx.storage.get('mapping');
     if (mapping?.lifespaceUserId?.startsWith('usr_')) {
       return { userId: mapping.lifespaceUserId, isNewUser: false };
+    }
+
+    const migratedUserId = migratedLifeSpaceUserId(this.env, openid);
+    if (migratedUserId) {
+      const now = new Date().toISOString();
+      await this.ctx.storage.put('mapping', {
+        lifespaceUserId: migratedUserId,
+        createdAt: now,
+        migratedAt: now,
+      });
+      return { userId: migratedUserId, isNewUser: false };
     }
 
     // The object is keyed by WeChat appid + openid. A shared in-memory promise
@@ -162,6 +196,7 @@ export default {
           service: 'homemew-backend',
           environment: env.ENVIRONMENT ?? 'unknown',
           loginReady: isLoginReady(env),
+          identityBootstrapConfigured: Boolean(env.WECHAT_IDENTITY_BOOTSTRAP_MAP),
         });
       }
       if (request.method === 'POST' && url.pathname === '/api/v1/login/wechat') return await login(request, env);
