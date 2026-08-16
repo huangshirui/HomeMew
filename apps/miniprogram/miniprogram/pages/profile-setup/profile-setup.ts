@@ -52,6 +52,13 @@ Page({
     this.setData({ displayName: e.detail.value });
   },
 
+  onNicknameReview(e: WechatMiniprogram.CustomEvent): void {
+    const { nickname, pass } = e.detail;
+    if (pass && nickname) {
+      this.setData({ displayName: nickname });
+    }
+  },
+
   async onChooseAvatar(e: WechatMiniprogram.CustomEvent): Promise<void> {
     const { avatarUrl } = e.detail;
     if (!avatarUrl) return;

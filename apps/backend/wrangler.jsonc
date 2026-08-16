@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "homemew-backend",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-14",
+  "workers_dev": false,
+  "durable_objects": {
+    "bindings": [
+      { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WechatIdentity"]
+    }
+  ],
+  "env": {
+    "staging": {
+      "workers_dev": false,
+      "routes": [
+        { "pattern": "homemew-staging.aisr.online", "custom_domain": true }
+      ],
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "WECHAT_APP_ID": "wxfd143b71ac6ace74",
+        "LIFESPACE_IDENTITY_URL": "https://auth-staging.aisr.online",
+        "LIFESPACE_CORE_URL": "https://core-staging.aisr.online"
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
+        ]
+      }
+    },
+    "production": {
+      "workers_dev": false,
+      "vars": {
+        "ENVIRONMENT": "production",
+        "WECHAT_APP_ID": "wxfd143b71ac6ace74",
+        "LIFESPACE_IDENTITY_URL": "https://auth.aisr.online",
+        "LIFESPACE_CORE_URL": "https://core.aisr.online"
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
+        ]
+      }
+    }
+  }
+}

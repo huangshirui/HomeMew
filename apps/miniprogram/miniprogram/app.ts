@@ -1,4 +1,8 @@
 import { FamilyListItem } from './types/index';
+import {
+  ensureRuntimeEnvironmentStorage,
+  getRuntimeServiceUrls,
+} from './services/config';
 
 App<IAppOption>({
   globalData: {
@@ -8,14 +12,11 @@ App<IAppOption>({
   },
 
   onLaunch() {
-    if (!wx.cloud) {
-      console.error('当前基础库不支持云开发');
-      return;
-    }
-    wx.cloud.init({
-      env: (wx.cloud as unknown as { DYNAMIC_CURRENT_ENV: string }).DYNAMIC_CURRENT_ENV,
-      traceUser: true,
-    });
+    // HomeMew no longer depends on WeChat Cloud Development.
+    // wx.login() codes are exchanged by the HomeMew Cloudflare application backend.
+    const environment = ensureRuntimeEnvironmentStorage();
+    const urls = getRuntimeServiceUrls();
+    console.info('[HomeMew Runtime]', { environment, ...urls });
   },
 
   onShow() {

@@ -24,9 +24,6 @@
   },
   "appid": "wxfd143b71ac6ace74",
   "editorSetting": {},
-  "cloudfunctionTemplateRoot": "cloudfunctions/",
-  "cloudfunctionRoot": "cloudfunctions/",
-  "cloudbaseRoot": "",
   "miniprogramRoot": "miniprogram/",
   "srcMiniprogramRoot": "miniprogram/",
   "pluginRoot": ""

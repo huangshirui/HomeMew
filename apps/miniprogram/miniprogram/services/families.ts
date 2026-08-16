@@ -1,11 +1,10 @@
 /**
- * 家庭相关 API 服务
- *
- * 写请求（POST/PATCH/DELETE）默认不自动重试 401（见 api.ts 的 shouldAutoRetry）。
- * 每个写方法都显式设置 skipRetry: true，避免重复提交。
+ * HomeMew “家庭”是产品概念；平台侧原生映射为 LifeSpace Space(kind=family)。
+ * 本文件保留页面现有 Family DTO，显式在边界处做 Space/role/invite 映射。
  */
 
 import { request } from './api';
+import { getCurrentUser } from './users';
 import {
   FamilyListItem,
   FamilyDetail,
@@ -22,138 +21,234 @@ import {
   JoinFamilyResult,
 } from '../types/index';
 
-/**
- * 获取当前用户的家庭列表
- * GET /api/v1/me/families
- */
-export function listMyFamilies(): Promise<FamilyListItem[]> {
-  return request<{ items: FamilyListItem[] }>('/api/v1/me/families')
-    .then(data => data.items ?? []);
+type SpaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
+type Space = {
+  id: string;
+  kind: 'personal' | 'family' | 'team';
+  name: string;
+  timezone: string;
+  avatarUrl: string | null;
+  role?: SpaceRole;
+  version: number;
+  access?: { role?: SpaceRole };
+};
+type SpaceMember = {
+  id: string;
+  userId: string;
+  role: SpaceRole;
+  version: number;
+  personId: string;
+  displayName: string;
+  createdAt?: string;
+};
+type SpaceInvite = {
+  id: string;
+  token?: string;
+  tokenPrefix?: string;
+  status: 'active' | 'expired' | 'exhausted' | 'revoked';
+  expiresAt: string;
+  maxUses: number;
+  usedCount: number;
+  createdByUserId?: string;
+  createdAt: string;
+};
+
+function familyRole(role: SpaceRole | undefined): 'admin' | 'member' {
+  return role === 'owner' || role === 'admin' ? 'admin' : 'member';
 }
 
-/**
- * 创建家庭
- * POST /api/v1/families
- */
-export function createFamily(data: CreateFamilyRequest): Promise<CreateFamilyResult> {
-  return request<CreateFamilyResult>('/api/v1/families', {
+function spaceRole(role: 'admin' | 'member'): 'admin' | 'editor' {
+  return role === 'admin' ? 'admin' : 'editor';
+}
+
+async function members(spaceId: string): Promise<SpaceMember[]> {
+  return request<SpaceMember[]>(`/api/v1/spaces/${spaceId}/members`);
+}
+
+export async function listMyFamilies(): Promise<FamilyListItem[]> {
+  const spaces = await request<Space[]>('/api/v1/me/spaces');
+  const families = spaces.filter(space => space.kind === 'family');
+  return Promise.all(families.map(async space => ({
+    id: space.id,
+    name: space.name,
+    avatarUrl: space.avatarUrl,
+    timezone: space.timezone,
+    role: familyRole(space.role),
+    memberCount: (await members(space.id)).length,
+  })));
+}
+
+export async function createFamily(data: CreateFamilyRequest): Promise<CreateFamilyResult> {
+  const me = await getCurrentUser();
+  const created = await request<Space & { ownerPersonId: string }>('/api/v1/spaces', {
     method: 'POST',
-    data: data as unknown as Record<string, unknown>,
+    data: {
+      kind: 'family',
+      name: data.name,
+      timezone: data.timezone ?? 'Asia/Shanghai',
+      ownerDisplayName: me.displayName,
+    },
     skipRetry: true,
   });
+  return {
+    id: created.id,
+    name: created.name,
+    avatarUrl: created.avatarUrl,
+    timezone: created.timezone,
+    role: 'admin',
+    memberCount: 1,
+    createdAt: new Date().toISOString(),
+  };
 }
 
-/**
- * 获取家庭详情
- * GET /api/v1/families/{familyId}
- */
-export function getFamily(familyId: string): Promise<FamilyDetail> {
-  return request<FamilyDetail>(`/api/v1/families/${familyId}`);
+export async function getFamily(familyId: string): Promise<FamilyDetail> {
+  const [space, list] = await Promise.all([
+    request<Space>(`/api/v1/spaces/${familyId}`),
+    members(familyId),
+  ]);
+  const myUserId = (await request<{ principal: { id: string } }>('/api/v1/me')).principal.id;
+  const mine = list.find(item => item.userId === myUserId);
+  return {
+    id: space.id,
+    name: space.name,
+    avatarUrl: space.avatarUrl,
+    timezone: space.timezone,
+    status: 'active',
+    createdBy: list.find(item => item.role === 'owner')?.userId ?? '',
+    currentUserRole: familyRole(mine?.role ?? space.access?.role),
+    memberCount: list.length,
+    createdAt: list.find(item => item.role === 'owner')?.createdAt ?? '',
+  };
 }
 
-/**
- * 更新家庭资料
- * PATCH /api/v1/families/{familyId}
- * 返回 FamilySummary（不含 role / memberCount）
- */
-export function updateFamily(familyId: string, data: UpdateFamilyRequest): Promise<FamilySummary> {
-  return request<FamilySummary>(`/api/v1/families/${familyId}`, {
+export async function updateFamily(familyId: string, data: UpdateFamilyRequest): Promise<FamilySummary> {
+  const current = await request<Space>(`/api/v1/spaces/${familyId}`);
+  const updated = await request<Space>(`/api/v1/spaces/${familyId}`, {
     method: 'PATCH',
-    data: data as unknown as Record<string, unknown>,
+    data: { ...data, version: current.version },
     skipRetry: true,
   });
+  return {
+    id: updated.id,
+    name: updated.name,
+    avatarUrl: updated.avatarUrl,
+    timezone: updated.timezone,
+    status: 'active',
+  };
 }
 
-/**
- * 获取家庭成员列表
- * GET /api/v1/families/{familyId}/members
- */
-export function listFamilyMembers(familyId: string): Promise<FamilyMember[]> {
-  return request<{ items: FamilyMember[] }>(`/api/v1/families/${familyId}/members`)
-    .then(data => data.items ?? []);
+export async function listFamilyMembers(familyId: string): Promise<FamilyMember[]> {
+  return (await members(familyId)).map(member => ({
+    userId: member.userId,
+    displayName: member.displayName,
+    avatarUrl: null,
+    role: familyRole(member.role),
+    joinedAt: member.createdAt ?? '',
+    personId: member.personId,
+    membershipVersion: member.version,
+  } as FamilyMember));
 }
 
-/**
- * 修改成员角色
- * PATCH /api/v1/families/{familyId}/members/{userId}
- */
-export function updateMemberRole(familyId: string, userId: string, role: 'admin' | 'member'): Promise<UpdateMemberRoleRequest & { userId: string }> {
-  return request<UpdateMemberRoleRequest & { userId: string }>(`/api/v1/families/${familyId}/members/${userId}`, {
+export async function updateMemberRole(
+  familyId: string,
+  userId: string,
+  role: 'admin' | 'member',
+): Promise<UpdateMemberRoleRequest & { userId: string }> {
+  const member = (await members(familyId)).find(item => item.userId === userId);
+  if (!member) throw new Error('家庭成员不存在');
+  const updated = await request<SpaceMember>(`/api/v1/spaces/${familyId}/members/${userId}`, {
     method: 'PATCH',
-    data: { role },
+    data: { role: spaceRole(role), version: member.version },
     skipRetry: true,
   });
+  return { userId: updated.userId, role: familyRole(updated.role) };
 }
 
-/**
- * 移除成员
- * DELETE /api/v1/families/{familyId}/members/{userId}
- */
 export function removeFamilyMember(familyId: string, userId: string): Promise<void> {
-  return request<void>(`/api/v1/families/${familyId}/members/${userId}`, {
+  return request<void>(`/api/v1/spaces/${familyId}/members/${userId}`, {
     method: 'DELETE',
     skipRetry: true,
   });
 }
 
-/**
- * 离开家庭
- * POST /api/v1/families/{familyId}/leave
- */
 export function leaveFamily(familyId: string): Promise<void> {
-  return request<void>(`/api/v1/families/${familyId}/leave`, {
+  return request<void>(`/api/v1/spaces/${familyId}/leave`, {
     method: 'POST',
     skipRetry: true,
   });
 }
 
-/**
- * 创建邀请
- * POST /api/v1/families/{familyId}/invites
- */
-export function createInvite(familyId: string, data?: CreateInviteRequest): Promise<InviteCreated> {
-  return request<InviteCreated>(`/api/v1/families/${familyId}/invites`, {
+export async function createInvite(familyId: string, data?: CreateInviteRequest): Promise<InviteCreated> {
+  const invite = await request<SpaceInvite>(`/api/v1/spaces/${familyId}/invites`, {
     method: 'POST',
-    data: (data ?? {}) as unknown as Record<string, unknown>,
+    data: { role: 'editor', ...(data ?? {}) },
     skipRetry: true,
   });
+  return {
+    id: invite.id,
+    code: invite.token ?? '',
+    joinPath: `/pages/family/join?code=${encodeURIComponent(invite.token ?? '')}`,
+    expiresAt: invite.expiresAt,
+    maxUses: invite.maxUses,
+    usedCount: invite.usedCount,
+  };
 }
 
-/**
- * 获取邀请列表
- * GET /api/v1/families/{familyId}/invites
- */
-export function listInvites(familyId: string): Promise<InviteListItem[]> {
-  return request<{ items: InviteListItem[] }>(`/api/v1/families/${familyId}/invites`)
-    .then(data => data.items ?? []);
+export async function listInvites(familyId: string): Promise<InviteListItem[]> {
+  const list = await request<SpaceInvite[]>(`/api/v1/spaces/${familyId}/invites`);
+  return list.map(invite => ({
+    id: invite.id,
+    status: invite.status,
+    expiresAt: invite.expiresAt,
+    maxUses: invite.maxUses,
+    usedCount: invite.usedCount,
+    createdBy: invite.createdByUserId ?? '',
+    createdAt: invite.createdAt,
+  }));
 }
 
-/**
- * 撤销邀请
- * POST /api/v1/families/{familyId}/invites/{inviteId}/revoke
- */
 export function revokeInvite(familyId: string, inviteId: string): Promise<void> {
-  return request<void>(`/api/v1/families/${familyId}/invites/${inviteId}/revoke`, {
+  return request<void>(`/api/v1/spaces/${familyId}/invites/${inviteId}/revoke`, {
     method: 'POST',
     skipRetry: true,
   });
 }
 
-/**
- * 预览邀请
- * GET /api/v1/family-invites/{code}
- */
-export function previewInvite(code: string): Promise<InvitePreview> {
-  return request<InvitePreview>(`/api/v1/family-invites/${code}`);
+export async function previewInvite(code: string): Promise<InvitePreview> {
+  const preview = await request<{
+    space: { id: string; name: string; avatarUrl?: string | null; memberCount: number };
+    expiresAt: string;
+    canJoin: boolean;
+  }>(`/api/v1/space-invites/${encodeURIComponent(code)}`);
+  return {
+    family: {
+      id: preview.space.id,
+      name: preview.space.name,
+      avatarUrl: preview.space.avatarUrl ?? null,
+      memberCount: preview.space.memberCount,
+    },
+    expiresAt: preview.expiresAt,
+    canJoin: preview.canJoin,
+  };
 }
 
-/**
- * 通过邀请码加入家庭
- * POST /api/v1/family-invites/{code}/join
- */
-export function joinFamilyByCode(code: string): Promise<JoinFamilyResult> {
-  return request<JoinFamilyResult>(`/api/v1/family-invites/${code}/join`, {
+export async function joinFamilyByCode(code: string): Promise<JoinFamilyResult> {
+  const joined = await request<{
+    spaceId: string;
+    spaceName: string;
+    role: SpaceRole;
+    joinedAt?: string;
+    membership?: { spaceId?: string; role?: SpaceRole };
+    space?: { id: string; name: string };
+  }>(`/api/v1/space-invites/${encodeURIComponent(code)}/join`, {
     method: 'POST',
+    data: {},
     skipRetry: true,
   });
+  return {
+    familyId: joined.spaceId ?? joined.membership?.spaceId ?? joined.space?.id ?? '',
+    familyName: joined.spaceName ?? joined.space?.name ?? '',
+    role: 'member',
+    joinedAt: joined.joinedAt ?? new Date().toISOString(),
+  };
 }

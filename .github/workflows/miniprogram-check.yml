@@ -1,0 +1,40 @@
+name: Mini Program Check
+
+on:
+  pull_request:
+    paths:
+      - apps/miniprogram/**
+      - apps/backend/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/miniprogram-check.yml
+  push:
+    branches:
+      - main
+    paths:
+      - apps/miniprogram/**
+      - apps/backend/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/miniprogram-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: corepack enable
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Check Cloudflare login backend syntax
+        run: node --check apps/backend/worker.mjs
+      - name: Type-check Mini Program
+        run: corepack pnpm --filter homemew-miniprogram typecheck

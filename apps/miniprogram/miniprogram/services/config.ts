@@ -1,85 +1,143 @@
 /**
- * 统一配置：API 地址、Storage key、超时、Token 有效性判断、请求 ID。
- *
- * 普通请求（api.ts）与头像上传（media.ts）共用本文件，
- * 避免重复维护多个配置源，保证 Token 判断与地址格式只有一套。
+ * 统一配置：HomeMew 应用后端、LifeSpace Identity/Core、Storage key、超时与 Token 判断。
  */
 
-/** Core API 基础地址回退值（当本地未缓存云函数回传的地址时） */
-export const CORE_BASE_URL_FALLBACK = 'https://homemew.aisr.online';
+const PROD_LOGIN_BACKEND_URL = 'https://homemew.aisr.online';
+const PROD_IDENTITY_BASE_URL = 'https://auth.aisr.online';
+const PROD_CORE_BASE_URL = 'https://core.aisr.online';
 
-/** Storage key 集中管理，避免散落字符串 */
+const STAGING_LOGIN_BACKEND_URL = 'https://homemew-staging.aisr.online';
+const STAGING_IDENTITY_BASE_URL = 'https://auth-staging.aisr.online';
+const STAGING_CORE_BASE_URL = 'https://core-staging.aisr.online';
+
+export type RuntimeEnvironment = 'staging' | 'production';
+
 export const STORAGE_KEYS = {
   accessToken: 'accessToken',
   tokenExpiresAt: 'tokenExpiresAt',
   currentFamilyId: 'currentFamilyId',
   coreApiUrl: 'coreApiUrl',
-  /** 日程页成员范围选择前缀，完整 key 为 `eventsScope:{familyId}:{userId}` */
+  loginBackendUrl: 'loginBackendUrl',
+  identityApiUrl: 'identityApiUrl',
+  runtimeEnvironment: 'runtimeEnvironment',
   eventsScope: 'eventsScope',
-  /** 待办页成员范围选择前缀，完整 key 为 `tasksScope:{familyId}:{userId}` */
   tasksScope: 'tasksScope',
-  /** 设备时区偏好模式：'system' | 'custom' */
   timeZoneMode: 'timeZoneMode',
-  /** 设备时区偏好：指定的 IANA 时区（仅 mode 为 custom 时使用） */
   timeZoneCustom: 'timeZoneCustom',
 } as const;
 
-/** 普通请求超时 (ms) */
 export const REQUEST_TIMEOUT = 15000;
-
-/** 头像上传超时 (ms) */
 export const UPLOAD_TIMEOUT = 30000;
+export const TOKEN_EXPIRE_BUFFER_MS = 2 * 60 * 1000;
 
-/** Token 提前过期缓冲 (ms) */
-export const TOKEN_EXPIRE_BUFFER_MS = 5 * 60 * 1000;
+export function resolveRuntimeEnvironment(envVersion: string | undefined): RuntimeEnvironment {
+  return envVersion === 'release' ? 'production' : 'staging';
+}
+
+export function getRuntimeEnvironment(): RuntimeEnvironment {
+  try {
+    return resolveRuntimeEnvironment(wx.getAccountInfoSync().miniProgram.envVersion);
+  } catch (_) {
+    // 无法识别运行版本时保持 production 默认，避免正式客户端误连 staging。
+    return 'production';
+  }
+}
+
+function runtimeDefaults(): { loginBackendUrl: string; identityApiUrl: string; coreApiUrl: string } {
+  if (getRuntimeEnvironment() === 'production') {
+    return {
+      loginBackendUrl: PROD_LOGIN_BACKEND_URL,
+      identityApiUrl: PROD_IDENTITY_BASE_URL,
+      coreApiUrl: PROD_CORE_BASE_URL,
+    };
+  }
+  return {
+    loginBackendUrl: STAGING_LOGIN_BACKEND_URL,
+    identityApiUrl: STAGING_IDENTITY_BASE_URL,
+    coreApiUrl: STAGING_CORE_BASE_URL,
+  };
+}
 
 /**
- * 去除末尾的斜杠，统一 API 基础地址格式。
- * 纯函数，便于测试。
+ * 防止 develop/trial 与 release 共享的历史 Storage 把客户端带到错误环境。
+ * 首次运行新隔离逻辑、或 staging/production 发生切换时，仅清理环境相关状态；
+ * 时区等纯 UI 偏好继续保留。
  */
+export function ensureRuntimeEnvironmentStorage(): RuntimeEnvironment {
+  const current = getRuntimeEnvironment();
+  const previous = wx.getStorageSync(STORAGE_KEYS.runtimeEnvironment) as RuntimeEnvironment | '';
+  if (previous !== current) {
+    for (const key of [
+      STORAGE_KEYS.accessToken,
+      STORAGE_KEYS.tokenExpiresAt,
+      STORAGE_KEYS.currentFamilyId,
+      STORAGE_KEYS.coreApiUrl,
+      STORAGE_KEYS.identityApiUrl,
+      STORAGE_KEYS.loginBackendUrl,
+    ]) {
+      wx.removeStorageSync(key);
+    }
+    wx.setStorageSync(STORAGE_KEYS.runtimeEnvironment, current);
+  }
+  return current;
+}
+
 export function normalizeBaseUrl(url: string): string {
   if (!url) return '';
   return url.replace(/\/+$/, '');
 }
 
-/**
- * 生成简单请求 ID，用于链路追踪。
- * 纯函数，便于测试。
- */
+function environmentSafeUrl(cached: string, expected: string): string {
+  const normalized = normalizeBaseUrl(cached);
+  // 服务 URL 由受信 HomeMew backend 下发，但缓存必须属于当前运行环境。
+  // 当前各环境均使用唯一 canonical origin，因此跨环境旧值直接忽略。
+  return normalized === expected ? normalized : expected;
+}
+
+export function getRuntimeServiceUrls(): { loginBackendUrl: string; identityApiUrl: string; coreApiUrl: string } {
+  const defaults = runtimeDefaults();
+  return {
+    loginBackendUrl: environmentSafeUrl(
+      (wx.getStorageSync(STORAGE_KEYS.loginBackendUrl) as string) || '',
+      defaults.loginBackendUrl,
+    ),
+    identityApiUrl: environmentSafeUrl(
+      (wx.getStorageSync(STORAGE_KEYS.identityApiUrl) as string) || '',
+      defaults.identityApiUrl,
+    ),
+    coreApiUrl: environmentSafeUrl(
+      (wx.getStorageSync(STORAGE_KEYS.coreApiUrl) as string) || '',
+      defaults.coreApiUrl,
+    ),
+  };
+}
+
 export function generateRequestId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 }
 
-/**
- * 判断 token 是否有效（纯函数，不依赖 wx）。
- * 以下情况均视为无效：
- * - 无 token
- * - 无 expiresAt
- * - expiresAt 无法解析
- * - 距过期不足 5 分钟
- */
 export function evaluateToken(
   token: string | null | undefined,
   expiresAt: string | null | undefined,
 ): boolean {
-  if (!token) return false;
-  if (!expiresAt) return false;
-
+  if (!token || !expiresAt) return false;
   const expireTime = new Date(expiresAt).getTime();
   if (Number.isNaN(expireTime)) return false;
-
-  const now = Date.now();
-  return now < expireTime - TOKEN_EXPIRE_BUFFER_MS;
+  return Date.now() < expireTime - TOKEN_EXPIRE_BUFFER_MS;
 }
 
-/** 读取本地缓存的 Core API 基础地址（去掉末尾斜杠） */
 export function getCoreBaseUrl(): string {
-  const cached = (wx.getStorageSync(STORAGE_KEYS.coreApiUrl) as string) || '';
-  const base = cached || CORE_BASE_URL_FALLBACK;
-  return normalizeBaseUrl(base);
+  return getRuntimeServiceUrls().coreApiUrl;
 }
 
-/** 统一判断本地是否有有效 token */
+export function getIdentityBaseUrl(): string {
+  return getRuntimeServiceUrls().identityApiUrl;
+}
+
+export function getLoginBackendUrl(): string {
+  return getRuntimeServiceUrls().loginBackendUrl;
+}
+
 export function isTokenValid(): boolean {
   const token = wx.getStorageSync(STORAGE_KEYS.accessToken) as string | undefined;
   const expiresAt = wx.getStorageSync(STORAGE_KEYS.tokenExpiresAt) as string | undefined;

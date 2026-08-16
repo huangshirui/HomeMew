@@ -1,392 +1,110 @@
 # HomeMew Mini Program Agent Instructions
 
-This file applies to all work under `apps/miniprogram/`.
+This file applies to `apps/miniprogram/`. Read `/AGENTS.md`, `/docs/architecture.md`, `/docs/product-rules.md`, this application's README, and the current LifeSpace contract relevant to the task before making changes.
 
-Mini Program tasks should normally modify only `apps/miniprogram/`.
-Changes outside this directory are allowed only when required to update
-the shared API contract, architecture, product rules, or the corresponding
-Core implementation. Do not make unrelated repository-wide changes.
+## Architecture
 
-Before changing Mini Program code, read these files in order:
+The Mini Program is a HomeMew UI client, not a business backend.
 
-1. `/AGENTS.md`
-2. `/docs/architecture.md`
-3. `/docs/product-rules.md`
-4. `/apps/core/openapi.yaml`
-5. `/apps/miniprogram/README.md`
+### Login
+
+```text
+Mini Program
+-> wx.login()
+-> HomeMew Cloudflare application backend
+-> WeChat jscode2session (server-side appsecret)
+-> openid -> LifeSpace usr_* mapping in HomeMew Durable Object
+-> LifeSpace Identity /internal/v1/tokens using server-only lsa_*
+-> short-lived LifeSpace user token
+-> Mini Program
+```
+
+The mapping Durable Object is keyed per WeChat application identity and uses SQLite-backed Durable Object storage. Do not create a dedicated HomeMew D1 only for the login mapping.
+
+Do not use `wx.cloud.init`, `wx.cloud.callFunction`, WeChat Cloud Database, or WeChat Cloud Storage as an application dependency. Never expose WeChat `appsecret` or the LifeSpace application credential in client code.
+
+### Normal requests
+
+```text
+Mini Program
+-> Authorization: Bearer <short-lived LifeSpace user token>
+-> LifeSpace Identity or Core
+```
+
+Do not add a transparent HomeMew `/families/...` proxy/BFF. HomeMew product terms are adapted explicitly in `miniprogram/services/` to LifeSpace APIs.
 
 ## Source of truth
 
-Use the following priority when information conflicts:
+- Platform API/auth/model behavior: `huangshirui/LifeSpace`.
+- HomeMew product/UX behavior: this repository.
+- Legacy `apps/core/openapi.yaml` is not the current Mini Program platform contract after the LifeSpace cutover.
+- If LifeSpace lacks a required capability, identify the exact gap and obtain explicit approval before modifying LifeSpace. Do not invent a permanent client or BFF workaround.
 
-1. `/apps/core/openapi.yaml` defines the Core API contract.
-2. `/docs/product-rules.md` defines product and permission rules.
-3. `/docs/architecture.md` defines system boundaries and request flows.
-4. Core automated tests define verified runtime behavior.
-5. Core source code is implementation detail.
-6. Mini Program UI code must not redefine business rules.
+## Product mapping
 
-Every Core route in OpenAPI contains `x-homemew-status`:
+- family -> LifeSpace `Space(kind=family)`
+- HomeMew admin -> Space `owner`/`admin`
+- ordinary writable member -> Space `editor`
+- member references used by models -> Space Person IDs
+- event -> `event` + Calendar capability
+- task -> `task` + Actions
+- day -> `day_record` + Temporal capability
+- wish -> `wish` + Actions
+- 喵一下 -> Registry Creation Drafts
 
-- `implemented`: the route is available and may be integrated.
-- `planned`: the contract is approved but the route is not yet available.
+The UI may keep names such as `familyId`, `attendeeIds` and `assigneeIds`; service adapters must translate them to platform fields such as Space IDs and Person IDs.
 
-Do not call, mock as completed, or present a `planned` route as deployed unless the current task explicitly asks for a temporary mock or for the Core implementation as well.
+## Shared request client
 
-## Product role
+All authenticated requests must use the shared request layer. It must:
 
-The HomeMew Mini Program is the primary graphical client for household members. It provides:
+- attach the Bearer token;
+- choose LifeSpace Identity/Core explicitly;
+- parse standard success/error envelopes;
+- retain request IDs for diagnostics;
+- handle timeouts;
+- serialize token refresh so concurrent requests do not trigger multiple refreshes;
+- refresh through `wx.login()` + HomeMew Cloudflare backend;
+- never blindly retry non-idempotent writes.
 
-- WeChat login and HomeMew identity initialization;
-- creation, joining, switching, and management of households;
-- household member and invitation management;
-- event and task interfaces;
-- landing pages opened from notifications;
-- conventional forms and detail pages that complement the HomeMew Agent.
+## State and authorization
 
-The Mini Program is not an independent business backend.
+`currentFamilyId` is UI state only. LifeSpace authorization is authoritative. Client role checks only control presentation.
 
-All household business data belongs in HomeMew Core. Do not store authoritative families, members, invitations, events, tasks, or notifications in the WeChat cloud database.
+At startup, refresh authentication, load the current user and accessible family Spaces, validate the cached family, then select/restore an accessible family.
 
-## Architecture boundary
+## Time and concurrency
 
-Use the following request flow.
+Follow LifeSpace contract semantics:
 
-### Login and identity initialization
-
-```text
-Mini Program
-→ WeChat cloud function
-→ obtain trusted openid from the WeChat runtime
-→ resolve openid to HomeMew user_id
-→ create the Core user when required
-→ issue a short-lived HomeMew user JWT
-→ return the JWT to the Mini Program
-```
-
-The external identity mapping is maintained outside Core.
-
-Core only knows HomeMew internal user IDs. Never send `openid` or Enterprise WeChat `userid` to ordinary Core business APIs.
-
-### Normal business requests
-
-```text
-Mini Program
-→ Authorization: Bearer <short-lived user JWT>
-→ Cloudflare Worker Core API
-```
-
-After login, ordinary user, family, member, invitation, event, and task requests should call Core directly unless the architecture document is explicitly changed.
-
-Do not add transparent cloud-function proxy wrappers for every Core API merely because cloud functions are available.
-
-### WeChat server capabilities
-
-Use cloud functions for capabilities that require trusted WeChat server credentials or context, including:
-
-- obtaining trusted `openid`;
-- maintaining external identity mappings;
-- issuing HomeMew JWTs;
-- calling WeChat server APIs;
-- generating Mini Program codes;
-- subscription-message operations;
-- decrypting WeChat-protected data.
-
-Never expose the following to Mini Program code:
-
-- `JWT_SECRET` or any JWT signing private key;
-- Core service tokens;
-- n8n credentials;
-- WeChat `appsecret`;
-- Enterprise WeChat secrets.
-
-## Authentication behavior
-
-The Mini Program stores only a short-lived user access token and its expiry time.
-
-For authenticated Core requests:
-
-```http
-Authorization: Bearer <accessToken>
-```
-
-The JWT `sub` represents the HomeMew internal `users.id`.
-
-Implement one shared request client that:
-
-- attaches the Bearer token;
-- parses Core success envelopes as `{ "data": ... }`;
-- parses errors as `{ "error": { "code", "message", "requestId" } }`;
-- handles network timeouts;
-- handles `401` by running the login cloud function and retrying the original request once;
-- prevents concurrent requests from triggering multiple simultaneous login refreshes;
-- returns typed application errors instead of silently swallowing failures.
-
-Do not automatically retry non-idempotent writes unless the Core contract supports an idempotency key for that operation.
-
-Examples of writes that must not be blindly retried:
-
-- create family;
-- join family;
-- create invitation;
-- create event;
-- create task;
-- complete or reopen task.
-
-## User and family context
-
-Treat `currentFamilyId` as UI state only, never as proof of authorization.
-
-At startup:
-
-1. obtain or refresh the HomeMew user token;
-2. call `GET /api/v1/me`;
-3. call `GET /api/v1/me/families`;
-4. verify that the locally cached family still exists in the returned list;
-5. select the only family automatically, restore the previous valid family, or show a family selector.
-
-If the cached family is no longer accessible, remove it from local state and do not keep displaying cached family business data.
-
-The Core must remain responsible for checking active family membership and administrator permissions.
-
-Front-end role checks only control visibility and interaction. They are not security controls.
-
-## Permission rules
-
-Ordinary active family members may:
-
-- view family information and members;
-- view, create, update, and delete household events;
-- view, create, update, complete, reopen, and delete household tasks;
-- leave the family.
-
-Family administrators additionally may:
-
-- edit family information;
-- create and revoke invitations;
-- promote or demote administrators;
-- remove members.
-
-Ordinary members must not see administrator-only controls, but all write calls must still rely on Core authorization.
-
-## API integration rules
-
-Never infer Core fields from a page mockup or create a client-only variation of a Core resource.
-
-Before implementing a request:
-
-1. find the operation in `/apps/core/openapi.yaml`;
-2. confirm `x-homemew-status` is `implemented`;
-3. follow the documented path, query, request body, response envelope, nullable fields, and error codes;
-4. use HomeMew IDs, not display names, as identifiers;
-5. keep API DTOs separate from page view models when formatting is needed.
-
-Do not manually duplicate the full Core contract across multiple service files.
-
-Prefer a single typed API layer organized by domain, for example:
-
-```text
-miniprogram/services/
-  api.ts
-  auth.ts
-  users.ts
-  families.ts
-  events.ts
-  tasks.ts
-```
-
-If generated TypeScript definitions become available, use them as the source for request and response types. Until then, define types from OpenAPI and keep them in one dedicated location.
-
-## Invitation flow
-
-Invitation codes are temporary credentials.
-
-Do not:
-
-- print complete invitation codes in production logs;
-- include them in analytics payloads;
-- retain them longer than required;
-- expose family member lists or business data before authentication and Core authorization.
-
-Joining flow:
-
-```text
-login
-→ GET /api/v1/family-invites/{code}
-→ show limited family preview
-→ explicit user confirmation
-→ POST /api/v1/family-invites/{code}/join
-→ refresh GET /api/v1/me/families
-→ select the joined family
-```
-
-Treat `ALREADY_FAMILY_MEMBER` as a recoverable navigation state and guide the user into the family instead of showing only a technical error.
-
-## Event rules
-
-Follow these domain rules when the event routes become implemented:
-
-- an event belongs to exactly one family;
-- `summary` is required;
-- attendees are selected by HomeMew `userId` and must be active family members;
-- an event may have no attendees;
-- timed events use UTC `startAt`/`endAt`; nullable endpoint IANA timezones are display metadata;
-- all-day events use `startDate`/`endDateExclusive` date values and never undergo timezone conversion;
-- all-day event end dates are exclusive in the API;
-- the UI may display inclusive dates but must convert them correctly before submission;
-- edits and deletes use the contract's version field to prevent silent concurrent overwrites;
-- do not implement recurring events until the contract explicitly supports them.
-
-When a version conflict occurs, reload the latest object and ask the user to review it. Never silently overwrite another member's change.
-
-## Task rules
-
-Follow these domain rules when the task routes become implemented:
-
-- a task belongs to exactly one family;
-- `name` is required;
-- `dueDate` is nullable and has date-only granularity;
-- assignees are selected by HomeMew `userId` and must be active family members;
-- a task may have no assignees and then represents a shared family task;
-- the task has one overall status, not one completion status per assignee;
-- any active family member may complete or reopen a task in the first version;
-- edits, completion, reopening, and deletion use the contract's version field;
-- overdue is a derived UI state, not a stored Core status.
-
-Do not add subtasks, labels, priority, recurrence, comments, or per-assignee completion unless the product rules and OpenAPI are updated first.
-
-## Page and state design
-
-Recommended first-version navigation:
-
-```text
-Home
-Events
-Tasks
-Me
-```
-
-Keep page state explicit:
-
-- authentication state;
-- current user;
-- available families;
-- current family;
-- role in current family;
-- page-specific loading, empty, error, and submitting states.
-
-Do not require every Home module to succeed before displaying the page. Family summary, events, and tasks should be able to load and fail independently.
-
-Avoid a global store for transient form fields. Preserve unsent form input across temporary network errors or page interruptions when practical.
-
-## WeChat UX requirements
-
-All mutations must prevent duplicate taps while submitting.
-
-Require explicit confirmation before:
-
-- deleting an event or task;
-- removing a family member;
-- leaving a family;
-- revoking an invitation.
-
-Use user-facing messages for expected errors, including:
-
-- login expired;
-- permission denied;
-- family member limit reached;
-- family creation limit reached;
-- invitation expired, revoked, exhausted, or invalid;
-- content deleted or unavailable;
-- version conflict.
-
-Do not expose raw internal exception text to users. Preserve `requestId` for diagnostics.
+- timed event instants use RFC 3339 UTC;
+- all-day ranges are half-open date ranges;
+- date-only values such as task due dates are not converted to UTC instants;
+- use the appropriate IANA timezone for household/viewing calculations;
+- pass current resource `version` for operations that require optimistic concurrency;
+- on version conflict, reload and ask the user to review rather than silently overwrite.
 
 ## Local storage
 
-Allowed local state includes:
+Allowed: short-lived token, token expiry, current family/Space ID, non-secret service URLs, UI preferences and temporary cache.
 
-- short-lived access token;
-- token expiration time;
-- current family ID;
-- selected date or simple UI preferences;
-- temporary cached API data.
+Never persist backend credentials, WeChat secrets, LifeSpace `lsa_*`, or an alternate authoritative copy of household data.
 
-Local cache is never authoritative.
+## Local development
 
-Do not persist:
-
-- service credentials;
-- signing secrets;
-- raw WeChat secrets;
-- permanent copies of household data as an alternative data store.
-
-## Technology and scope
-
-The current intended first-version approach is a native WeChat Mini Program with TypeScript and WeChat cloud functions.
-
-Do not introduce uni-app, Taro, React, Vue, or another cross-platform framework without an explicit architecture decision.
-
-Keep dependencies minimal. Prefer native components and platform APIs for the MVP.
-
-The current `apps/miniprogram` directory may still be a placeholder. When initializing it, preserve this file and document:
-
-- local development commands;
-- cloud environment configuration;
-- required non-secret environment values;
-- build and type-check commands;
-- how to run or test cloud functions.
-
-## Local development and build
-
-TypeScript is compiled locally with `tsc` (NOT the developer tool's built-in
-SWC "summer" compiler, which is known to drop `@swc/runtime` helpers and
-white-screen async pages in some tool versions). `tsc` emits native ES2017
-`async/await` (no `@swc/runtime` / `tslib` helpers), so the compiled `.js`
-runs identically in the simulator and on real devices.
+The Mini Program remains native TypeScript. Do not introduce uni-app, Taro, React, Vue or another framework without an explicit architecture decision.
 
 From `apps/miniprogram/`:
 
 ```bash
-npm install              # install typescript + miniprogram-api-typings
-npm run typecheck        # type-check only, no emit (tsc --noEmit)
-npm run build            # compile miniprogram/**/*.ts -> miniprogram/**/*.js
-npm run watch            # recompile on change (keep running while editing)
+npm install
+npm run typecheck
+npm run build
+npm run watch
 ```
 
-- `miniprogram/tsconfig.json` has `target: ES2017`, `module: CommonJS`,
-  `noEmit: false`; `.js` files are emitted next to their `.ts` source.
-- `project.config.json` does NOT set `useCompilerPlugins`; the developer tool
-  loads the precompiled `.js` directly.
-- Generated `miniprogram/**/*.js` and `*.js.map` are git-ignored (see repo
-  root `.gitignore`). Never commit compiled `.js`.
-- After editing `.ts`, re-run `npm run build` (or keep `npm run watch` running)
-  before previewing in the developer tool.
-- Cloud functions under `cloudfunctions/` are deployed separately; see each
-  function's `package.json` for its install/deploy steps.
-
-## Change discipline
-
-When a Mini Program task reveals that the Core contract is missing or unsuitable:
-
-1. do not invent a hidden client workaround;
-2. identify the exact missing Core capability;
-3. update the product rules or architecture when the behavior changes;
-4. update OpenAPI before relying on the new contract;
-5. implement or request the Core change;
-6. only then integrate the Mini Program.
-
-When a change affects an existing Core operation, update all affected client types, tests, and error handling in the same change where practical.
+`project.config.json` must not configure a cloud-function root after the cutover. Compiled Mini Program JS remains generated locally and must not be committed.
 
 ## Definition of done
 
-A Mini Program feature is complete only when:
-
-- it follows the documented architecture boundary;
-- it calls only implemented Core routes;
-- requests and responses match OpenAPI;
-- authentication expiry and errors are handled;
-- family permissions are represented correctly in the UI;
-- loading, empty, failure, and duplicate-submit states are covered;
-- no secrets or authoritative business data are placed in the client;
-- relevant documentation and tests are updated.
+A Mini Program change is complete only when it follows the LifeSpace contract, uses the shared auth/request path, contains no backend secrets, handles expiry/errors/concurrency, updates affected HomeMew docs/tests, and does not silently reintroduce a second business backend.

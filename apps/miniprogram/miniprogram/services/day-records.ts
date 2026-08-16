@@ -1,12 +1,4 @@
-/**
- * 日子（Day Records）相关 API 服务
- *
- * 严格按 /apps/core/openapi.yaml 的 Day Records 契约实现。
- *
- * - GET 请求允许 401 自动重试；
- * - 写操作（POST/PATCH/DELETE）显式 skipRetry: true，避免重复创建或重复推进 anchorDate；
- * - 列表服务返回 { items, nextCursor }，由页面自己控制分页，不在服务层自动拉全量。
- */
+/** HomeMew “日子” -> LifeSpace day_record Temporal capability。 */
 
 import { request } from './api';
 import {
@@ -18,19 +10,23 @@ import {
   CreateDayRecordOccurrenceRequest,
   CreateDayRecordOccurrenceResult,
 } from '../types/index';
+import {
+  ResourceBase,
+  LifeSpacePage,
+  getSpaceMembers,
+  modelRecordPath,
+  personRef,
+  queryString,
+  spacePath,
+  unavailableActor,
+  userIdToPersonId,
+} from './lifespace';
 
-/** 分页结果 */
-export interface Page<T> {
-  items: T[];
-  nextCursor: string | null;
-}
+export interface Page<T> { items: T[]; nextCursor: string | null }
 
 export interface ListDayRecordsParams {
-  /** 逗号分隔的 kind，例如 'elapsed,cycle'；不传表示全部 */
   kind?: DayRecordKind | string;
-  /** 逗号分隔的 status，默认 active */
   status?: string;
-  /** 活跃成员 ID 或 'me' */
   subjectUserId?: string;
   attentionOnly?: boolean;
   sort?: 'attention' | 'date_asc' | 'date_desc' | 'created_desc' | 'updated_desc';
@@ -38,198 +34,242 @@ export interface ListDayRecordsParams {
   cursor?: string | null;
 }
 
-function buildQuery(params: Record<string, string | number | boolean | null | undefined>): string {
-  const entries = Object.entries(params).filter(
-    ([, v]) => v !== undefined && v !== null && v !== '',
-  );
-  if (entries.length === 0) return '';
-  return (
-    '?' +
-    entries
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-      .join('&')
-  );
+type TemporalComputed = {
+  today: string;
+  state: string;
+  attentionLevel: string;
+  isAttentionRequired: boolean;
+  elapsedDays?: number;
+  remainingDays?: number | null;
+  progressRatio?: number;
+  nextDueDate?: string;
+};
+
+type DayRecordResource = ResourceBase & {
+  kind: 'elapsed' | 'countdown' | 'cycle';
+  name: string;
+  description: string | null;
+  anchorDate: string;
+  subjectPersonId: string | null;
+  icon: string | null;
+  status: 'active' | 'archived';
+  attentionAfterDays: number | null;
+  attentionBeforeDays: number | null;
+  cycleDays: number | null;
+  computed?: { temporal?: TemporalComputed };
+};
+
+type OccurrenceResource = {
+  id: string;
+  recordId: string;
+  occurredOn: string;
+  note: string | null;
+  source: 'initial' | 'manual';
+  intervalDays: number | null;
+  recordedBy: { type: 'user' | 'service' | 'device'; id: string; displayName: string };
+  createdAt: string;
+};
+
+function dateDays(from: string, to: string): number {
+  const start = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  return Math.round((end - start) / 86_400_000);
 }
 
-/**
- * 列出日子记录（单页）
- * GET /api/v1/families/{familyId}/day-records
- */
-export function listDayRecords(
+async function toDayRecord(spaceId: string, raw: DayRecordResource): Promise<DayRecord> {
+  const members = await getSpaceMembers(spaceId);
+  const computed = raw.computed?.temporal as DayRecord['computed'];
+  const common = {
+    id: raw.id,
+    familyId: raw.spaceId,
+    name: raw.name,
+    description: raw.description ?? null,
+    subject: personRef(raw.subjectPersonId, members),
+    icon: raw.icon ?? null,
+    status: raw.status,
+    version: raw.version,
+    createdBy: unavailableActor(),
+    updatedBy: unavailableActor(),
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+  if (raw.kind === 'elapsed') {
+    return {
+      ...common,
+      kind: 'elapsed',
+      anchorDate: raw.anchorDate,
+      attentionAfterDays: raw.attentionAfterDays,
+      computed: computed as Extract<DayRecord, { kind: 'elapsed' }>['computed'],
+    };
+  }
+  if (raw.kind === 'countdown') {
+    return {
+      ...common,
+      kind: 'countdown',
+      anchorDate: raw.anchorDate,
+      attentionBeforeDays: raw.attentionBeforeDays,
+      computed: computed as Extract<DayRecord, { kind: 'countdown' }>['computed'],
+    };
+  }
+  return {
+    ...common,
+    kind: 'cycle',
+    anchorDate: raw.anchorDate,
+    cycleDays: raw.cycleDays ?? 1,
+    nextDueDate: raw.computed?.temporal?.nextDueDate ?? raw.anchorDate,
+    attentionBeforeDays: raw.attentionBeforeDays,
+    computed: computed as Extract<DayRecord, { kind: 'cycle' }>['computed'],
+  };
+}
+
+export async function listDayRecords(
   familyId: string,
   params: ListDayRecordsParams = {},
 ): Promise<Page<DayRecord>> {
-  const qs = buildQuery({
-    kind: params.kind,
-    status: params.status,
-    subjectUserId: params.subjectUserId,
-    attentionOnly: params.attentionOnly === undefined ? undefined : params.attentionOnly,
-    sort: params.sort,
-    limit: params.limit,
-    cursor: params.cursor,
-  });
-  return request<Page<DayRecord>>(`/api/v1/families/${familyId}/day-records${qs}`);
+  const subjectPersonId = params.subjectUserId
+    ? await userIdToPersonId(familyId, params.subjectUserId)
+    : null;
+  const sortMap = {
+    attention: 'attention:desc',
+    date_asc: 'effectiveDate:asc',
+    date_desc: 'effectiveDate:desc',
+    created_desc: 'createdAt:desc',
+    updated_desc: 'updatedAt:desc',
+  } as const;
+  const raw = await request<LifeSpacePage<DayRecordResource>>(
+    `${spacePath(familyId, 'day-records')}${queryString({
+      kind: params.kind,
+      status: params.status,
+      subjectPersonId: subjectPersonId ?? undefined,
+      attentionOnly: params.attentionOnly,
+      sort: params.sort ? sortMap[params.sort] : undefined,
+      limit: params.limit,
+      cursor: params.cursor,
+    })}`,
+  );
+  return {
+    items: await Promise.all(raw.items.map(item => toDayRecord(familyId, item))),
+    nextCursor: raw.nextCursor,
+  };
 }
 
-/**
- * 拉取全部「需要关注」的日子。
- *
- * 首页「需要关注」区域需要展示全部当前关注项，因此在此提供一个安全分页的
- * helper：遵循 cursor 分页，并设置条数与页数上限，避免异常 cursor 导致死循环。
- */
-export async function listAttentionDayRecords(
-  familyId: string,
-  maxItems = 100,
-): Promise<DayRecord[]> {
+export async function listAttentionDayRecords(familyId: string, maxItems = 100): Promise<DayRecord[]> {
   const items: DayRecord[] = [];
   let cursor: string | null = null;
   const seenCursors = new Set<string>();
-
   for (let page = 0; page < 10; page++) {
-    const result: Page<DayRecord> = await listDayRecords(familyId, {
-      status: 'active',
-      attentionOnly: true,
-      sort: 'attention',
-      limit: 50,
-      cursor,
+    const result = await listDayRecords(familyId, {
+      status: 'active', attentionOnly: true, sort: 'attention', limit: 50, cursor,
     });
-    items.push(...(result.items ?? []));
+    items.push(...result.items);
     if (items.length >= maxItems) return items.slice(0, maxItems);
-
     cursor = result.nextCursor;
-    // 服务端返回重复 cursor 时立刻停止，防止死循环
     if (!cursor || seenCursors.has(cursor)) break;
     seenCursors.add(cursor);
   }
   return items;
 }
 
-/**
- * 获取日子详情
- * GET /api/v1/families/{familyId}/day-records/{dayRecordId}
- */
-export function getDayRecord(familyId: string, dayRecordId: string): Promise<DayRecord> {
-  return request<DayRecord>(`/api/v1/families/${familyId}/day-records/${dayRecordId}`);
+export async function getDayRecord(familyId: string, dayRecordId: string): Promise<DayRecord> {
+  return toDayRecord(familyId, await request<DayRecordResource>(modelRecordPath(familyId, 'day-records', dayRecordId)));
 }
 
-/**
- * 创建日子
- * POST /api/v1/families/{familyId}/day-records
- */
-export function createDayRecord(
+async function writePayload(
   familyId: string,
-  data: CreateDayRecordRequest,
-): Promise<DayRecord> {
-  return request<DayRecord>(`/api/v1/families/${familyId}/day-records`, {
-    method: 'POST',
-    data: data as unknown as Record<string, unknown>,
-    skipRetry: true,
-  });
+  data: CreateDayRecordRequest | UpdateDayRecordRequest,
+): Promise<Record<string, unknown>> {
+  const { subjectUserId, ...rest } = data;
+  return {
+    ...rest,
+    ...(subjectUserId !== undefined ? { subjectPersonId: await userIdToPersonId(familyId, subjectUserId) } : {}),
+  } as unknown as Record<string, unknown>;
 }
 
-/**
- * 更新日子（仅 active 记录）
- * PATCH /api/v1/families/{familyId}/day-records/{dayRecordId}
- *
- * 注意：elapsed / cycle 的 anchorDate 不能通过本接口修改，需新增 occurrence。
- */
-export function updateDayRecord(
+export async function createDayRecord(familyId: string, data: CreateDayRecordRequest): Promise<DayRecord> {
+  const raw = await request<DayRecordResource>(spacePath(familyId, 'day-records'), {
+    method: 'POST', data: await writePayload(familyId, data), skipRetry: true,
+  });
+  return toDayRecord(familyId, raw);
+}
+
+export async function updateDayRecord(
   familyId: string,
   dayRecordId: string,
   data: UpdateDayRecordRequest,
 ): Promise<DayRecord> {
-  return request<DayRecord>(`/api/v1/families/${familyId}/day-records/${dayRecordId}`, {
-    method: 'PATCH',
-    data: data as unknown as Record<string, unknown>,
-    skipRetry: true,
+  const raw = await request<DayRecordResource>(modelRecordPath(familyId, 'day-records', dayRecordId), {
+    method: 'PATCH', data: await writePayload(familyId, data), skipRetry: true,
+  });
+  return toDayRecord(familyId, raw);
+}
+
+export function deleteDayRecord(familyId: string, dayRecordId: string, version: number): Promise<void> {
+  return request<void>(modelRecordPath(familyId, 'day-records', dayRecordId), {
+    method: 'DELETE', data: { version }, skipRetry: true,
   });
 }
 
-/**
- * 软删除日子
- * DELETE /api/v1/families/{familyId}/day-records/{dayRecordId}?version=N
- */
-export function deleteDayRecord(
-  familyId: string,
-  dayRecordId: string,
-  version: number,
-): Promise<void> {
-  return request<void>(
-    `/api/v1/families/${familyId}/day-records/${dayRecordId}?version=${version}`,
-    { method: 'DELETE', skipRetry: true },
-  );
-}
-
-/**
- * 列出记录历史（Core 保证最新优先）
- * GET /api/v1/families/{familyId}/day-records/{dayRecordId}/occurrences
- */
-export function listDayRecordOccurrences(
+export async function listDayRecordOccurrences(
   familyId: string,
   dayRecordId: string,
   params: { limit?: number; cursor?: string | null } = {},
 ): Promise<Page<DayRecordOccurrence>> {
-  const qs = buildQuery({ limit: params.limit, cursor: params.cursor });
-  return request<Page<DayRecordOccurrence>>(
-    `/api/v1/families/${familyId}/day-records/${dayRecordId}/occurrences${qs}`,
+  const raw = await request<LifeSpacePage<OccurrenceResource>>(
+    `${modelRecordPath(familyId, 'day-records', dayRecordId)}/occurrences${queryString(params)}`,
   );
+  return {
+    items: raw.items.map(item => ({
+      id: item.id,
+      dayRecordId: item.recordId,
+      occurredOn: item.occurredOn,
+      note: item.note,
+      source: item.source,
+      intervalDays: item.intervalDays,
+      recordedBy: {
+        type: item.recordedBy.type === 'user' ? 'user' : 'system',
+        id: item.recordedBy.id,
+        name: item.recordedBy.displayName,
+        avatarUrl: null,
+      },
+      createdAt: item.createdAt,
+    })),
+    nextCursor: raw.nextCursor,
+  };
 }
 
-/**
- * 记录一次发生（elapsed「今天又做了」/ cycle「今天已处理」）
- * POST /api/v1/families/{familyId}/day-records/{dayRecordId}/occurrences
- *
- * 返回值包含推进后的最新记录，调用方必须改用返回的 record.version。
- */
-export function createDayRecordOccurrence(
+export async function createDayRecordOccurrence(
   familyId: string,
   dayRecordId: string,
   data: CreateDayRecordOccurrenceRequest,
 ): Promise<CreateDayRecordOccurrenceResult> {
-  return request<CreateDayRecordOccurrenceResult>(
-    `/api/v1/families/${familyId}/day-records/${dayRecordId}/occurrences`,
-    {
-      method: 'POST',
-      data: data as unknown as Record<string, unknown>,
-      skipRetry: true,
-    },
+  const previous = await getDayRecord(familyId, dayRecordId);
+  const raw = await request<DayRecordResource>(
+    `${modelRecordPath(familyId, 'day-records', dayRecordId)}/actions/record-occurrence`,
+    { method: 'POST', data: data as unknown as Record<string, unknown>, skipRetry: true },
   );
+  return {
+    previousAnchorDate: previous.anchorDate,
+    intervalDays: dateDays(previous.anchorDate, data.occurredOn),
+    record: await toDayRecord(familyId, raw),
+  };
 }
 
-/**
- * 归档日子
- * POST /api/v1/families/{familyId}/day-records/{dayRecordId}/archive
- */
-export function archiveDayRecord(
+async function stateAction(
   familyId: string,
   dayRecordId: string,
+  action: 'archive' | 'restore',
   version: number,
 ): Promise<DayRecord> {
-  return request<DayRecord>(
-    `/api/v1/families/${familyId}/day-records/${dayRecordId}/archive`,
-    {
-      method: 'POST',
-      data: { version } as unknown as Record<string, unknown>,
-      skipRetry: true,
-    },
+  const raw = await request<DayRecordResource>(
+    `${modelRecordPath(familyId, 'day-records', dayRecordId)}/actions/${action}`,
+    { method: 'POST', data: { version }, skipRetry: true },
   );
+  return toDayRecord(familyId, raw);
 }
 
-/**
- * 恢复已归档的日子
- * POST /api/v1/families/{familyId}/day-records/{dayRecordId}/restore
- */
-export function restoreDayRecord(
-  familyId: string,
-  dayRecordId: string,
-  version: number,
-): Promise<DayRecord> {
-  return request<DayRecord>(
-    `/api/v1/families/${familyId}/day-records/${dayRecordId}/restore`,
-    {
-      method: 'POST',
-      data: { version } as unknown as Record<string, unknown>,
-      skipRetry: true,
-    },
-  );
+export function archiveDayRecord(familyId: string, dayRecordId: string, version: number): Promise<DayRecord> {
+  return stateAction(familyId, dayRecordId, 'archive', version);
+}
+export function restoreDayRecord(familyId: string, dayRecordId: string, version: number): Promise<DayRecord> {
+  return stateAction(familyId, dayRecordId, 'restore', version);
 }
