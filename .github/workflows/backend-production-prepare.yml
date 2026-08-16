@@ -1,6 +1,11 @@
 name: Prepare HomeMew backend production
 
 on:
+  push:
+    branches:
+      - lifespace-cutover
+    paths:
+      - .github/workflows/backend-production-prepare.yml
   workflow_dispatch:
     inputs:
       confirmation:
@@ -24,6 +29,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: Validate production preparation intent
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         shell: bash
         run: |
           set -euo pipefail
