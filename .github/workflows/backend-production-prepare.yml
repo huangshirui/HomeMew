@@ -5,6 +5,7 @@ on:
     branches:
       - lifespace-cutover
     paths:
+      - apps/backend/**
       - .github/workflows/backend-production-prepare.yml
   workflow_dispatch:
     inputs:
