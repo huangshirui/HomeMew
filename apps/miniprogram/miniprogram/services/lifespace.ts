@@ -1,6 +1,7 @@
 import { Actor, PersonRef } from '../types/index';
 import { zonedDateTimeToIso } from '../utils/datetime';
 import { request } from './api';
+import { AsyncKeyedTtlCache } from './async-keyed-ttl-cache';
 
 export type SpaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
 export type SpaceMember = {
@@ -25,6 +26,9 @@ export type ResourceBase = {
   updatedAt: string;
 };
 
+const SPACE_MEMBERS_CACHE_TTL_MS = 30_000;
+const spaceMembersCache = new AsyncKeyedTtlCache<SpaceMember[]>(SPACE_MEMBERS_CACHE_TTL_MS);
+
 export function spacePath(spaceId: string, route: string): string {
   return `/api/v1/spaces/${encodeURIComponent(spaceId)}/${route}`;
 }
@@ -33,8 +37,21 @@ export function modelRecordPath(spaceId: string, route: string, recordId: string
   return `${spacePath(spaceId, route)}/${encodeURIComponent(recordId)}`;
 }
 
-export async function getSpaceMembers(spaceId: string): Promise<SpaceMember[]> {
-  return request<SpaceMember[]>(spacePath(spaceId, 'members'));
+/**
+ * Space Person 映射是多个 HomeMew DTO 适配器的公共依赖。
+ * 同一个 Space 在 30 秒内共享一份结果，并对并发 miss 做 single-flight，避免
+ * Event / Task / DayRecord / Wish 列表把一次 members 查询放大成 N+1 HTTP 请求。
+ * LifeSpace 仍对每个业务请求独立做权限校验；此缓存只用于客户端展示映射。
+ */
+export function getSpaceMembers(spaceId: string): Promise<SpaceMember[]> {
+  return spaceMembersCache.get(
+    spaceId,
+    () => request<SpaceMember[]>(spacePath(spaceId, 'members')),
+  );
+}
+
+export function invalidateSpaceMembers(spaceId?: string): void {
+  spaceMembersCache.invalidate(spaceId);
 }
 
 export async function getCurrentLifeSpaceUserId(): Promise<string> {
