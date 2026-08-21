@@ -4,12 +4,11 @@ import { LatencySample, LatencySummary, summarizeLatency } from './latency-metri
 const SAMPLE_COUNT = 3;
 const PROBE_TIMEOUT_MS = 10_000;
 
-type RequestProfileSubset = {
-  rtt?: number;
-};
-
-type ProbeResponse = WechatMiniprogram.RequestSuccessCallbackResult & {
-  profile?: RequestProfileSubset;
+type ProbeResponse = {
+  statusCode: number;
+  profile?: {
+    rtt?: number;
+  };
 };
 
 export type CoreLatencyReport = LatencySummary & {
@@ -37,7 +36,7 @@ function probe(path: '/health' | '/api/v1/status'): Promise<LatencySample> {
         'x-request-id': requestId,
       },
       success(result) {
-        const response = result as ProbeResponse;
+        const response = result as unknown as ProbeResponse;
         const elapsedMs = Date.now() - startedAt;
         if (response.statusCode < 200 || response.statusCode >= 300) {
           reject(new Error(`Core probe failed: HTTP ${response.statusCode}`));
