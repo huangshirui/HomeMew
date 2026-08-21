@@ -36,5 +36,7 @@ jobs:
       - run: corepack pnpm install --frozen-lockfile
       - name: Check Cloudflare login backend syntax
         run: node --check apps/backend/worker.mjs
+      - name: Test Mini Program runtime configuration
+        run: corepack pnpm --filter homemew-miniprogram test
       - name: Type-check Mini Program
         run: corepack pnpm --filter homemew-miniprogram typecheck
