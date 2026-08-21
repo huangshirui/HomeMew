@@ -132,6 +132,10 @@
   padding: 22rpx 20rpx;
 }
 
+.metric-wide {
+  grid-column: 1 / -1;
+}
+
 .metric-label,
 .metric-value,
 .metric-note {
