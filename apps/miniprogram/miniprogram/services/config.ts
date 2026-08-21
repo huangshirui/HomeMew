@@ -12,6 +12,13 @@ const STAGING_CORE_BASE_URL = 'https://core-staging.aisr.online';
 
 export type RuntimeEnvironment = 'staging' | 'production';
 
+/**
+ * Phase 7 production cutover 已完成。当前 main 明确固定到 production，
+ * 因此微信开发者工具、体验版和正式版都访问正式 HomeMew/LifeSpace。
+ * staging 地址继续保留，后续如需恢复环境分流必须通过显式代码变更完成。
+ */
+const ACTIVE_RUNTIME_ENVIRONMENT: RuntimeEnvironment = 'production';
+
 export const STORAGE_KEYS = {
   accessToken: 'accessToken',
   tokenExpiresAt: 'tokenExpiresAt',
@@ -30,17 +37,12 @@ export const REQUEST_TIMEOUT = 15000;
 export const UPLOAD_TIMEOUT = 30000;
 export const TOKEN_EXPIRE_BUFFER_MS = 2 * 60 * 1000;
 
-export function resolveRuntimeEnvironment(envVersion: string | undefined): RuntimeEnvironment {
-  return envVersion === 'release' ? 'production' : 'staging';
+export function resolveRuntimeEnvironment(_envVersion: string | undefined): RuntimeEnvironment {
+  return ACTIVE_RUNTIME_ENVIRONMENT;
 }
 
 export function getRuntimeEnvironment(): RuntimeEnvironment {
-  try {
-    return resolveRuntimeEnvironment(wx.getAccountInfoSync().miniProgram.envVersion);
-  } catch (_) {
-    // 无法识别运行版本时保持 production 默认，避免正式客户端误连 staging。
-    return 'production';
-  }
+  return ACTIVE_RUNTIME_ENVIRONMENT;
 }
 
 function runtimeDefaults(): { loginBackendUrl: string; identityApiUrl: string; coreApiUrl: string } {
@@ -59,8 +61,8 @@ function runtimeDefaults(): { loginBackendUrl: string; identityApiUrl: string; c
 }
 
 /**
- * 防止 develop/trial 与 release 共享的历史 Storage 把客户端带到错误环境。
- * 首次运行新隔离逻辑、或 staging/production 发生切换时，仅清理环境相关状态；
+ * 防止历史 staging/production Storage 把客户端带到错误环境。
+ * 首次运行新隔离逻辑、或运行环境发生切换时，仅清理环境相关状态；
  * 时区等纯 UI 偏好继续保留。
  */
 export function ensureRuntimeEnvironmentStorage(): RuntimeEnvironment {
