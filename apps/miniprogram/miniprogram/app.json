@@ -13,6 +13,7 @@
     "pages/tasks/edit",
     "pages/tasks/completed",
     "pages/profile/profile",
+    "pages/about/about",
     "pages/settings/settings",
     "pages/family/join",
     "pages/family/detail",
