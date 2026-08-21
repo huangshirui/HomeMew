@@ -2,12 +2,14 @@ export class AsyncKeyedTtlCache<T> {
   private readonly values = new Map<string, { value: T; expiresAt: number }>();
   private readonly inFlight = new Map<string, Promise<T>>();
   private readonly keyGenerations = new Map<string, number>();
+  private readonly ttlMs: number;
+  private readonly now: () => number;
   private epoch = 0;
 
-  constructor(
-    private readonly ttlMs: number,
-    private readonly now: () => number = () => Date.now(),
-  ) {}
+  constructor(ttlMs: number, now: () => number = () => Date.now()) {
+    this.ttlMs = ttlMs;
+    this.now = now;
+  }
 
   get(key: string, loader: () => Promise<T>): Promise<T> {
     const cached = this.values.get(key);
