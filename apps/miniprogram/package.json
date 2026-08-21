@@ -4,7 +4,7 @@
   "private": true,
   "description": "HomeMew 微信小程序。本地用 tsc 将 TypeScript 预编译为 ES2017/CommonJS 的 .js，微信开发者工具直接加载 .js，避免新版 SWC (summer) 编译器缺失 @swc/runtime helper 导致白屏。",
   "scripts": {
-    "test": "node --experimental-strip-types --test tests/runtime-environment.test.ts tests/async-keyed-ttl-cache.test.ts tests/latency-metrics.test.ts tests/resource-audit-actor-regression.test.ts",
+    "test": "node --experimental-strip-types --test tests/runtime-environment.test.ts tests/async-keyed-ttl-cache.test.ts tests/latency-metrics.test.ts tests/home-attention-days-regression.test.ts tests/resource-audit-actor-regression.test.ts",
     "typecheck": "tsc -p miniprogram/tsconfig.json --noEmit",
     "build": "tsc -p miniprogram/tsconfig.json",
     "watch": "tsc -p miniprogram/tsconfig.json --watch"
