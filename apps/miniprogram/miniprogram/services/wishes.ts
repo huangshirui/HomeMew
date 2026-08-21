@@ -5,13 +5,13 @@ import { Wish, CreateWishRequest, UpdateWishRequest, PersonRef } from '../types/
 import {
   ResourceBase,
   LifeSpacePage,
+  auditActor,
   currentPersonId,
   getSpaceMembers,
   modelRecordPath,
   personRef,
   queryString,
   spacePath,
-  unavailableActor,
   userIdToPersonId,
 } from './lifespace';
 
@@ -58,8 +58,8 @@ async function toWish(spaceId: string, raw: WishResource): Promise<Wish> {
     claimedAt: raw.claimedAt ?? null,
     fulfilledBy: personRef(raw.fulfilledByPersonId, members),
     fulfilledAt: raw.fulfilledAt ?? null,
-    createdBy: unavailableActor(),
-    updatedBy: unavailableActor(),
+    createdBy: auditActor(raw.createdBy),
+    updatedBy: auditActor(raw.updatedBy),
     version: raw.version,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
