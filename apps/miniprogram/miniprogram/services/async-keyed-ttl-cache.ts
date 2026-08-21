@@ -1,6 +1,8 @@
 export class AsyncKeyedTtlCache<T> {
   private readonly values = new Map<string, { value: T; expiresAt: number }>();
   private readonly inFlight = new Map<string, Promise<T>>();
+  private readonly keyGenerations = new Map<string, number>();
+  private epoch = 0;
 
   constructor(
     private readonly ttlMs: number,
@@ -18,9 +20,16 @@ export class AsyncKeyedTtlCache<T> {
     const pending = this.inFlight.get(key);
     if (pending) return pending;
 
+    const requestEpoch = this.epoch;
+    const requestGeneration = this.keyGenerations.get(key) ?? 0;
     const request = loader()
       .then(value => {
-        this.values.set(key, { value, expiresAt: this.now() + this.ttlMs });
+        if (
+          this.epoch === requestEpoch
+          && (this.keyGenerations.get(key) ?? 0) === requestGeneration
+        ) {
+          this.values.set(key, { value, expiresAt: this.now() + this.ttlMs });
+        }
         return value;
       })
       .finally(() => {
@@ -34,8 +43,12 @@ export class AsyncKeyedTtlCache<T> {
   invalidate(key?: string): void {
     if (key === undefined) {
       this.values.clear();
+      this.inFlight.clear();
+      this.epoch += 1;
       return;
     }
     this.values.delete(key);
+    this.inFlight.delete(key);
+    this.keyGenerations.set(key, (this.keyGenerations.get(key) ?? 0) + 1);
   }
 }
