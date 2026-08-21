@@ -5,6 +5,7 @@
 
 import { request } from './api';
 import { getCurrentUser } from './users';
+import { getSpaceMembers, invalidateSpaceMembers, SpaceMember } from './lifespace';
 import {
   FamilyListItem,
   FamilyDetail,
@@ -32,15 +33,6 @@ type Space = {
   version: number;
   access?: { role?: SpaceRole };
 };
-type SpaceMember = {
-  id: string;
-  userId: string;
-  role: SpaceRole;
-  version: number;
-  personId: string;
-  displayName: string;
-  createdAt?: string;
-};
 type SpaceInvite = {
   id: string;
   token?: string;
@@ -62,7 +54,7 @@ function spaceRole(role: 'admin' | 'member'): 'admin' | 'editor' {
 }
 
 async function members(spaceId: string): Promise<SpaceMember[]> {
-  return request<SpaceMember[]>(`/api/v1/spaces/${spaceId}/members`);
+  return getSpaceMembers(spaceId);
 }
 
 export async function listMyFamilies(): Promise<FamilyListItem[]> {
@@ -161,21 +153,24 @@ export async function updateMemberRole(
     data: { role: spaceRole(role), version: member.version },
     skipRetry: true,
   });
+  invalidateSpaceMembers(familyId);
   return { userId: updated.userId, role: familyRole(updated.role) };
 }
 
-export function removeFamilyMember(familyId: string, userId: string): Promise<void> {
-  return request<void>(`/api/v1/spaces/${familyId}/members/${userId}`, {
+export async function removeFamilyMember(familyId: string, userId: string): Promise<void> {
+  await request<void>(`/api/v1/spaces/${familyId}/members/${userId}`, {
     method: 'DELETE',
     skipRetry: true,
   });
+  invalidateSpaceMembers(familyId);
 }
 
-export function leaveFamily(familyId: string): Promise<void> {
-  return request<void>(`/api/v1/spaces/${familyId}/leave`, {
+export async function leaveFamily(familyId: string): Promise<void> {
+  await request<void>(`/api/v1/spaces/${familyId}/leave`, {
     method: 'POST',
     skipRetry: true,
   });
+  invalidateSpaceMembers(familyId);
 }
 
 export async function createInvite(familyId: string, data?: CreateInviteRequest): Promise<InviteCreated> {
@@ -245,8 +240,10 @@ export async function joinFamilyByCode(code: string): Promise<JoinFamilyResult> 
     data: {},
     skipRetry: true,
   });
+  const familyId = joined.spaceId ?? joined.membership?.spaceId ?? joined.space?.id ?? '';
+  if (familyId) invalidateSpaceMembers(familyId);
   return {
-    familyId: joined.spaceId ?? joined.membership?.spaceId ?? joined.space?.id ?? '',
+    familyId,
     familyName: joined.spaceName ?? joined.space?.name ?? '',
     role: 'member',
     joinedAt: joined.joinedAt ?? new Date().toISOString(),
