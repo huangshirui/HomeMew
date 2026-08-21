@@ -13,12 +13,12 @@ import {
 import {
   ResourceBase,
   LifeSpacePage,
+  auditActor,
   getSpaceMembers,
   modelRecordPath,
   personRef,
   queryString,
   spacePath,
-  unavailableActor,
   userIdToPersonId,
 } from './lifespace';
 
@@ -88,8 +88,8 @@ async function toDayRecord(spaceId: string, raw: DayRecordResource): Promise<Day
     icon: raw.icon ?? null,
     status: raw.status,
     version: raw.version,
-    createdBy: unavailableActor(),
-    updatedBy: unavailableActor(),
+    createdBy: auditActor(raw.createdBy),
+    updatedBy: auditActor(raw.updatedBy),
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
   };
