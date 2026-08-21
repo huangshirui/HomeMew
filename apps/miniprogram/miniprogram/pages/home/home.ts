@@ -526,6 +526,10 @@ Page({
         attentionDays: records.map(mapDayRecordView),
         daysLoading: false,
       });
+      // attentionCards / greetingSubtitle 都是由 attentionDays 派生的。
+      // 日子请求可能比日程和待办更晚返回，因此必须在这里主动重算，
+      // 不能依赖其它并发请求“顺便”触发 recompute。
+      this.recompute();
     } catch (e) {
       console.error('[Home] Load attention days failed:', e);
       if (this.data.currentFamily?.id !== familyId) return;
