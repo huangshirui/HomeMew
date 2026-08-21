@@ -16,12 +16,20 @@ export type SpaceMember = {
 
 export type LifeSpacePage<T> = { items: T[]; nextCursor: string | null };
 
+export type LifeSpaceAuditActor = {
+  type: 'user' | 'service' | 'device';
+  id: string;
+  displayName: string;
+};
+
 export type ResourceBase = {
   id: string;
   spaceId: string;
   modelKey: string;
   modelVersion: number;
   version: number;
+  createdBy: LifeSpaceAuditActor;
+  updatedBy: LifeSpaceAuditActor;
   createdAt: string;
   updatedAt: string;
 };
@@ -103,12 +111,14 @@ export function personRefs(personIds: string[] | undefined, members: SpaceMember
     .filter((value): value is PersonRef => value !== null);
 }
 
-/**
- * LifeSpace Generic Resource 当前不暴露旧 HomeMew 的 createdBy/updatedBy 展示对象。
- * 保留一个明确的“平台未提供审计展示信息”占位，避免伪造具体成员身份。
- */
-export function unavailableActor(): Actor {
-  return { type: 'user', id: '', name: '', avatarUrl: null };
+/** Map the platform audit principal into HomeMew's legacy UI Actor shape. */
+export function auditActor(actor: LifeSpaceAuditActor): Actor {
+  return {
+    type: actor.type === 'user' ? 'user' : 'system',
+    id: actor.id,
+    name: actor.displayName,
+    avatarUrl: null,
+  };
 }
 
 export function calendarUtcRange(startDate: string, endDateExclusive: string, timezone: string): {
