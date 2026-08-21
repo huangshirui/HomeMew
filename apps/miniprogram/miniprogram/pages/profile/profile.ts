@@ -128,13 +128,10 @@ Page({
     });
   },
 
-  /** 关于 */
+  /** 关于与运行诊断 */
   onAbout(): void {
-    wx.showModal({
-      title: '关于家事喵',
-      content: '家事喵 v1.4.7\n\n你的家庭事务小助手\n\n帮助家庭成员共同管理日程与待办，让家务协作更轻松。',
-      showCancel: false,
-      confirmText: '知道了',
+    wx.navigateTo({
+      url: '/pages/about/about',
     });
   },
 });
