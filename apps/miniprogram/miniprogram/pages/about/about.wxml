@@ -21,7 +21,7 @@
 
     <view wx:if="{{testing && !latency}}" class="testing-state">
       <text class="inline-spin">⟳</text>
-      <text class="testing-text">正在测试网络和 D1 响应时间…</text>
+      <text class="testing-text">正在测试网络、D1 和真实业务链路…</text>
     </view>
 
     <view wx:if="{{errorText}}" class="error-box">
@@ -55,6 +55,11 @@
           <text class="metric-value">{{latency.extraText}}</text>
           <text class="metric-note">status − health，仅作估算</text>
         </view>
+        <view class="metric-item metric-wide">
+          <text class="metric-label">真实业务链路</text>
+          <text class="metric-value">{{latency.businessText}}</text>
+          <text class="metric-note">当前家庭 pending tasks，limit=1；包含用户鉴权、Space/模型权限与业务 D1 查询</text>
+        </view>
       </view>
 
       <view class="sample-block">
@@ -65,6 +70,10 @@
         <view class="sample-row">
           <text class="sample-label">Status 三次</text>
           <text class="sample-value">{{latency.statusSamplesText}}</text>
+        </view>
+        <view class="sample-row">
+          <text class="sample-label">业务三次</text>
+          <text class="sample-value">{{latency.businessSamplesText}}</text>
         </view>
       </view>
 
@@ -80,6 +89,7 @@
     <text class="note-title">怎么看这些数字</text>
     <text class="note-text">/health 不访问 D1，所以它更接近当前设备到 Core Worker 的网络与 Edge 基线。</text>
     <text class="note-text">/api/v1/status 会读取 LifeSpace Core 的 schema metadata，因此包含一次真实 D1 往返。</text>
-    <text class="note-text">两者差值会受到连接复用、网络抖动和 Worker 调度影响，不等于 D1 SQL 执行时间。</text>
+    <text class="note-text">真实业务链路会读取当前家庭的一条 pending Task，并经过正常用户鉴权、Space/模型权限和业务查询，更接近日常页面的一次 API。</text>
+    <text class="note-text">status 与 health 的差值会受到连接复用、网络抖动和 Worker 调度影响，不等于 D1 SQL 执行时间。</text>
   </view>
 </view>
