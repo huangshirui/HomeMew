@@ -5,8 +5,10 @@ type LatencyView = {
   healthText: string;
   statusText: string;
   extraText: string;
+  businessText: string;
   healthSamplesText: string;
   statusSamplesText: string;
+  businessSamplesText: string;
   networkTypeText: string;
   coreBaseUrl: string;
   testedAtText: string;
@@ -60,8 +62,10 @@ Page({
           healthText: `${report.healthMedianMs} ms`,
           statusText: `${report.statusMedianMs} ms`,
           extraText: `≈ ${report.workerD1ExtraMs} ms`,
+          businessText: report.businessMedianMs === null ? '未测试' : `${report.businessMedianMs} ms`,
           healthSamplesText: formatSamples(report.healthSamples),
           statusSamplesText: formatSamples(report.statusSamples),
+          businessSamplesText: report.businessSamples.length ? formatSamples(report.businessSamples) : '无当前家庭',
           networkTypeText: networkTypeLabel(report.networkType),
           coreBaseUrl: report.coreBaseUrl,
           testedAtText: formatLocalTime(report.testedAt),
