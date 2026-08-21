@@ -24,19 +24,27 @@ export class AsyncKeyedTtlCache<T> {
 
     const requestEpoch = this.epoch;
     const requestGeneration = this.keyGenerations.get(key) ?? 0;
-    const request = loader()
-      .then(value => {
+    let request: Promise<T>;
+    const clearInFlight = (): void => {
+      if (this.inFlight.get(key) === request) this.inFlight.delete(key);
+    };
+
+    request = loader().then(
+      value => {
         if (
           this.epoch === requestEpoch
           && (this.keyGenerations.get(key) ?? 0) === requestGeneration
         ) {
           this.values.set(key, { value, expiresAt: this.now() + this.ttlMs });
         }
+        clearInFlight();
         return value;
-      })
-      .finally(() => {
-        if (this.inFlight.get(key) === request) this.inFlight.delete(key);
-      });
+      },
+      error => {
+        clearInFlight();
+        throw error;
+      },
+    );
 
     this.inFlight.set(key, request);
     return request;
