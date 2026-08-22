@@ -2,6 +2,7 @@ import { Actor, PersonRef } from '../types/index';
 import { zonedDateTimeToIso } from '../utils/datetime';
 import { request } from './api';
 import { AsyncKeyedTtlCache } from './async-keyed-ttl-cache';
+import { getUserAvatarUrl } from './config';
 
 export type SpaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
 export type SpaceMember = {
@@ -102,7 +103,11 @@ export function personRef(personId: string | null | undefined, members: SpaceMem
   if (!personId) return null;
   const member = members.find(item => item.personId === personId);
   if (!member) return null;
-  return { userId: member.userId, displayName: member.displayName, avatarUrl: null };
+  return {
+    userId: member.userId,
+    displayName: member.displayName,
+    avatarUrl: getUserAvatarUrl(member.userId),
+  };
 }
 
 export function personRefs(personIds: string[] | undefined, members: SpaceMember[]): PersonRef[] {
