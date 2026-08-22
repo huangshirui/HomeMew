@@ -5,6 +5,7 @@
 
 import { request } from './api';
 import { getCurrentUser } from './users';
+import { getUserAvatarUrl } from './config';
 import { getSpaceMembers, invalidateSpaceMembers, SpaceMember } from './lifespace';
 import {
   FamilyListItem,
@@ -133,7 +134,7 @@ export async function listFamilyMembers(familyId: string): Promise<FamilyMember[
   return (await members(familyId)).map(member => ({
     userId: member.userId,
     displayName: member.displayName,
-    avatarUrl: null,
+    avatarUrl: getUserAvatarUrl(member.userId),
     role: familyRole(member.role),
     joinedAt: member.createdAt ?? '',
     personId: member.personId,
