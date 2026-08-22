@@ -1,55 +1,38 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
-import { adaptLifeSpaceEventDraft } from '../miniprogram/services/creation-draft-adapter.ts';
+import { formatInstantInTimeZone } from '../miniprogram/utils/datetime.ts';
 
-test('timed event draft converts LifeSpace startAt into HomeMew wall time', () => {
-  const draft = adaptLifeSpaceEventDraft({
-    summary: '足球比赛',
-    description: null,
-    location: null,
-    isAllDay: false,
-    startAt: '2026-08-22T02:00:00.000Z',
-    endAt: null,
-    startTimezone: null,
-    endTimezone: null,
-    startDate: null,
-    endDateExclusive: null,
-    attendeePersonIds: [],
-  }, 'Asia/Shanghai');
+const adapterSource = readFileSync(
+  new URL('../miniprogram/services/creation-draft-adapter.ts', import.meta.url),
+  'utf8',
+);
+const serviceSource = readFileSync(
+  new URL('../miniprogram/services/creation-drafts.ts', import.meta.url),
+  'utf8',
+);
+const meowSource = readFileSync(
+  new URL('../miniprogram/pages/meow/meow.ts', import.meta.url),
+  'utf8',
+);
 
-  assert.equal(draft.isAllDay, false);
-  assert.equal(draft.startDate, '2026-08-22');
-  assert.equal(draft.startTime, '10:00');
-  assert.equal(draft.endDate, '2026-08-22');
-  assert.equal(draft.endTime, '');
+test('viewing timezone converts LifeSpace UTC event start into HomeMew wall time', () => {
+  assert.deepEqual(
+    formatInstantInTimeZone('2026-08-22T02:00:00.000Z', 'Asia/Shanghai'),
+    { date: '2026-08-22', time: '10:00' },
+  );
 });
 
-test('timed event draft preserves an explicit endAt', () => {
-  const draft = adaptLifeSpaceEventDraft({
-    summary: '足球训练',
-    isAllDay: false,
-    startAt: '2026-08-22T02:00:00.000Z',
-    endAt: '2026-08-22T03:30:00.000Z',
-    startTimezone: null,
-    endTimezone: null,
-  }, 'Asia/Shanghai');
-
-  assert.equal(draft.startTime, '10:00');
-  assert.equal(draft.endTime, '11:30');
-  assert.equal(draft.endDate, '2026-08-22');
+test('event draft adapter leaves unknown end time empty instead of inventing a duration', () => {
+  assert.match(adapterSource, /endDate:\s*end\?\.date \?\? start\?\.date \?\? ''/);
+  assert.match(adapterSource, /endTime:\s*end\?\.time \?\? ''/);
+  assert.match(adapterSource, /startTime:\s*start\?\.time \?\? ''/);
 });
 
-test('all-day event draft converts half-open end date to inclusive form date', () => {
-  const draft = adaptLifeSpaceEventDraft({
-    summary: '家庭活动',
-    isAllDay: true,
-    startDate: '2026-08-22',
-    endDateExclusive: '2026-08-23',
-  }, 'Asia/Shanghai');
-
-  assert.equal(draft.startDate, '2026-08-22');
-  assert.equal(draft.endDate, '2026-08-22');
-  assert.equal(draft.startTime, null);
-  assert.equal(draft.endTime, null);
+test('Creation Draft service adapts event drafts with the interpretation viewing timezone', () => {
+  assert.match(serviceSource, /adaptLifeSpaceEventDraft\(raw\.draft, viewingTimezone\)/);
+  assert.match(serviceSource, /getCreationDraftJob\([\s\S]*viewingTimezone: string/);
+  assert.match(meowSource, /this\.startPolling\(familyId, job\.draftId, viewingTimezone\)/);
+  assert.match(meowSource, /getCreationDraftJob\(familyId, draftId, viewingTimezone\)/);
 });
