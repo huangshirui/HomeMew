@@ -9,10 +9,11 @@
   "scripts": {
     "dev": "pnpm --filter @homemew/core dev",
     "test": "pnpm --filter @homemew/core test",
+    "test:web": "node --test apps/web/worker.test.mjs",
     "typecheck": "pnpm --filter @homemew/core typecheck",
     "typecheck:miniprogram": "pnpm --filter homemew-miniprogram typecheck",
     "build": "pnpm --filter @homemew/core build",
-    "check": "pnpm typecheck:miniprogram && pnpm --filter @homemew/core contract && pnpm test && pnpm typecheck && pnpm build"
+    "check": "pnpm test:web && pnpm typecheck:miniprogram && pnpm --filter @homemew/core contract && pnpm test && pnpm typecheck && pnpm build"
   },
   "devDependencies": {
     "miniprogram-api-typings": "5.2.1"

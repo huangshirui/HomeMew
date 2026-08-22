@@ -1,57 +1,132 @@
-# HomeMew
+# HomeMew 家事喵
 
-HomeMew 是一个面向家庭场景的 monorepo。MVP Core 已实现内部用户、家庭、成员、邀请、日程与待办 API；网页大屏和微信小程序保留目录，待产品需求明确后再选择框架。
+HomeMew 是构建在 LifeSpace 平台之上的家庭事务应用。LifeSpace 是 Identity、Space/Data Grant、领域模型、权限、业务数据、契约和平台部署的唯一权威来源；HomeMew 负责家庭场景的产品体验、微信 provider 适配和 Web 应用边界。
+
+## 当前架构
+
+```text
+WeChat Mini Program
+  -> HomeMew Cloudflare backend
+       -> WeChat jscode2session
+       -> Durable Object: openid -> LifeSpace usr_*
+       -> LifeSpace Identity trusted application exchange
+  -> LifeSpace Identity / Core
+
+HomeMew Web
+  -> Cloudflare Access
+  -> HomeMew Web Worker / same-origin BFF
+       -> LifeSpace Identity Access principal exchange/linking
+       -> LifeSpace Identity / Core
+```
+
+HomeMew 不再拥有独立的家庭业务 Core。`apps/core/` 仅保留为历史迁移/参考代码，不得继续新增业务行为。
 
 ## 目录
 
 ```text
 apps/
-  core/         Cloudflare Worker + Hono + D1 API
-  web/          网页大屏预留目录（未来绑定 Cloudflare Pages）
-  miniprogram/  微信小程序预留目录
+  backend/      微信 provider 信任适配器；维护 openid -> LifeSpace usr_* 映射
+  miniprogram/  微信小程序
+  web/          HomeMew Web + same-origin BFF；Cloudflare Access 登录
+  core/         旧 HomeMew Core，仅用于历史/迁移参考
 ```
 
-项目使用 pnpm workspace，不包含 Turborepo，也暂不创建没有消费者的共享 package。
+## 生产状态
 
-## 本地开发
+HomeMew 生产业务数据已经完成一次性迁移并切换到 LifeSpace。当前权威业务数据位于 LifeSpace production；旧 HomeMew Core/D1 仅在稳定化和回滚证据窗口内冻结保留，不再作为正常写入源。
 
-要求 Node.js 24 或更高版本，并通过 Corepack 使用仓库指定的 pnpm 版本。
+当前生产入口：
 
-```powershell
+```text
+homemew.aisr.online -> homemew-backend-production
+                       -> auth.aisr.online
+                       -> core.aisr.online
+```
+
+生产域名目前仍承载小程序 `/api/v1/login/wechat`。HomeMew Web 在独立 staging hostname 验证 Cloudflare Access + LifeSpace Identity 0.5.0 流程之前，不接管该生产域名。
+
+## Identity 边界
+
+### Mini Program
+
+微信 `openid` 是 HomeMew 应用自己的 provider identity，不进入 LifeSpace Identity。`apps/backend` 使用 SQLite-backed Durable Object 保存 `openid -> usr_*`，并使用 server-only `lsa_*` 向 LifeSpace Identity 换取短期用户 Token。
+
+小程序永远不能获得：
+
+- 微信 `appsecret`；
+- `openid` 映射存储；
+- LifeSpace `lsa_*` application credential；
+- service credentials / signing keys。
+
+### Web
+
+Cloudflare Access 是 HomeMew Web 的长期登录/SSO 层。HomeMew Web 不保存 `Access sub -> usr_*` 映射；它把原始 `Cf-Access-Jwt-Assertion` 交给 LifeSpace Identity 独立验证，由 Identity 负责 `(iss, sub) -> usr_*` 解析和账户链接。
+
+Web BFF 使用独立的 HomeMew-Web `lsa_*`，不能复用 Mini Program application credential。LifeSpace user bearer 只保存在签名、host-only、HttpOnly 的短期应用 session 中，不暴露给浏览器 JavaScript。
+
+## HomeMew Web
+
+确认的长期技术路线是 React + TypeScript + Vite + Cloudflare Worker，并采用 same-origin BFF。
+
+第一个 Web 切片先实现 Identity × Access 边界：
+
+- Access session exchange；
+- explicit new-user registration；
+- one-time existing-account link challenge；
+- same-origin LifeSpace Core/Identity proxy；
+- Cookie session + exact Origin CSRF protection。
+
+之后再接 React 页面。首期产品路由：
+
+```text
+/
+/calendar
+/tasks
+/days
+/wishes
+/family
+/settings
+/settings/integrations
+```
+
+Desktop 使用 Sidebar，Mobile 使用 Bottom Navigation；视觉保持家庭、温暖、轻量，不做企业 ERP/管理后台风格。
+
+## LifeSpace 模型映射
+
+| HomeMew | LifeSpace |
+| --- | --- |
+| family | `Space(kind=family)` |
+| family admin | Space `owner` / `admin` |
+| writable member | Space `editor` |
+| member relation | Space Person |
+| event | `event` + Calendar capability |
+| task | `task` + Actions |
+| day | `day_record` + Temporal capability |
+| wish | `wish` + Actions |
+| 喵一下 | Registry Creation Draft capability |
+
+HomeMew 可以在 UI DTO 中保留 `familyId`、`assigneeIds` 等产品语言，但必须在客户端/BFF 边界显式映射到 LifeSpace contract；不能重新建立第二套后端领域模型。
+
+## 本地检查
+
+要求 Node.js 24+，并使用仓库固定的 pnpm 版本。
+
+```bash
 corepack enable
-corepack pnpm install
-corepack pnpm --filter @homemew/core db:migrate:local
-corepack pnpm dev
-```
-
-默认开发地址由 Wrangler 输出。可将 `apps/core/.dev.vars.example` 复制为 `apps/core/.dev.vars`，配置允许访问 Core 的浏览器来源。
-
-常用命令：
-
-```powershell
-corepack pnpm test
-corepack pnpm typecheck
-corepack pnpm build
+corepack pnpm install --frozen-lockfile
 corepack pnpm check
 ```
 
-## Core API
+Web BFF 测试可单独运行：
 
-- `GET /health`：不访问数据库的部署探活。
-- `GET /api/v1/status`：验证 API 与 D1，并返回当前 schema 版本。
-- `/api/v1/me`、`/api/v1/families`、成员与邀请接口：HomeMew 用户和家庭领域 API。
-- `/api/v1/families/{familyId}/events`：家庭日程 CRUD、范围筛选与分页。
-- `/api/v1/families/{familyId}/tasks`：家庭待办 CRUD、完成/重开、筛选与分页。
-- `POST /api/v1/internal/users`：仅供带 `internal` scope 的身份服务创建内部用户。
+```bash
+corepack pnpm test:web
+```
 
-Core 使用 HS256 Bearer JWT，普通 Token 的 `sub` 是 HomeMew 内部用户 ID。微信和企业微信身份映射始终位于 Core 之外。
+## 开发前必读
 
-成功响应使用 `{ "data": ... }`，错误响应使用 `{ "error": { "code", "message", "requestId" } }`。Core 接受或生成 `x-request-id`，并在响应头中返回它。
-
-详细配置与首次部署步骤见 [apps/core/README.md](apps/core/README.md)。
-
-## 自动化
-
-- `Core Check` 在 pull request 和推送到 `main` 时运行测试、类型检查和 dry-run 构建。
-- `Deploy Core` 只在推送到 `main` 且 Core 相关路径变化时运行；先执行检查和远程 migration，再使用 Wrangler CLI 部署。
-- 网页大屏尚未初始化，因此当前没有 Cloudflare Pages workflow。未来由 Pages 直接绑定 `apps/web`。
+- `AGENTS.md`
+- `docs/architecture.md`
+- `docs/product-rules.md`
+- `apps/web/README.md`（Web 工作）
+- 当前 LifeSpace 对应 contract / architecture（平台 API 与权限的唯一源码来源）
