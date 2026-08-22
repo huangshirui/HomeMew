@@ -24,10 +24,22 @@ test('viewing timezone converts LifeSpace UTC event start into HomeMew wall time
   );
 });
 
-test('event draft adapter leaves unknown end time empty instead of inventing a duration', () => {
-  assert.match(adapterSource, /endDate:\s*end\?\.date \?\? start\?\.date \?\? ''/);
-  assert.match(adapterSource, /endTime:\s*end\?\.time \?\? ''/);
-  assert.match(adapterSource, /startTime:\s*start\?\.time \?\? ''/);
+test('event draft adapter defaults an absent endAt to a 60-minute duration', () => {
+  assert.match(adapterSource, /DEFAULT_EVENT_DURATION_MS\s*=\s*60 \* 60 \* 1000/);
+  assert.match(adapterSource, /start\.getTime\(\) \+ DEFAULT_EVENT_DURATION_MS/);
+  assert.match(
+    adapterSource,
+    /const end = explicitEndAt[\s\S]*\? localInstant\(explicitEndAt, endZone\)[\s\S]*: defaultEndFromStart\(draft\.startAt, endZone\)/,
+  );
+});
+
+test('one-hour default preserves date rollover in the viewing timezone', () => {
+  const start = new Date('2026-08-22T15:30:00.000Z');
+  const defaultEnd = new Date(start.getTime() + 60 * 60 * 1000).toISOString();
+  assert.deepEqual(
+    formatInstantInTimeZone(defaultEnd, 'Asia/Shanghai'),
+    { date: '2026-08-23', time: '00:30' },
+  );
 });
 
 test('Creation Draft service adapts event drafts with the interpretation viewing timezone', () => {

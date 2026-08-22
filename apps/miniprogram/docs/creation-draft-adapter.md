@@ -18,15 +18,18 @@ HomeMew event forms edit local wall-clock fields:
 
 `miniprogram/services/creation-draft-adapter.ts` converts timed event instants using the same `viewingTimezone` that was supplied to LifeSpace for interpretation. If LifeSpace supplies endpoint timezone metadata, it is used for that endpoint conversion; otherwise the viewing timezone is used.
 
-When `endAt` is absent, HomeMew does **not** infer a duration. The adapter carries the start date forward as the form end date and sets `endTime` to an empty string. This intentionally overrides the normal manual-create default time. The existing event form submission validation then requires the user to choose an end time before the record can be created.
+When LifeSpace omits `endAt`, HomeMew applies an application-level default duration of **60 minutes** and pre-fills the form end date/time as `startAt + 60 minutes`. This is a HomeMew UX default only; it does not change the LifeSpace model contract, where `endAt` remains nullable in Creation Drafts. If LifeSpace explicitly supplies `endAt`, the explicit value always wins and HomeMew does not replace it.
+
+The default is calculated from the UTC start instant before conversion to wall-clock fields, so date rollover is preserved correctly. For example, a start time of `23:30` produces a default end time of `00:30` on the following day.
 
 Examples:
 
-- `周六上午10点足球比赛` -> start date/time filled, end date same as start date, end time empty.
-- `周六上午10点到11点足球训练` -> both start and end date/time filled.
+- `周六上午10点足球比赛` -> start date/time filled, end date same as start date, end time defaults to `11:00`.
+- `周六晚上11点半足球比赛` -> start `23:30`, default end `00:30` on the following day.
+- `周六上午10点到11点足球训练` -> both start and explicit end date/time are filled from LifeSpace; no default is applied.
 
 All-day drafts preserve LifeSpace's half-open `startDate` / `endDateExclusive` semantics and convert the exclusive end date to HomeMew's inclusive form end date for display/editing.
 
 ## Boundary rule
 
-This mapping belongs in HomeMew's Mini Program service layer. LifeSpace remains authoritative for model fields and time semantics; HomeMew must not require LifeSpace to emit UI-specific fields such as `startTime` or an invented default duration.
+This mapping belongs in HomeMew's Mini Program service layer. LifeSpace remains authoritative for model fields and time semantics; HomeMew may apply product-specific form defaults without requiring LifeSpace to emit UI-specific fields such as `startTime` or to change the platform's nullable `endAt` semantics.
