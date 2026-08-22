@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "homemew-web",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-22",
+  "workers_dev": false,
+  "observability": {
+    "enabled": true
+  },
+  "env": {
+    "staging": {
+      "workers_dev": false,
+      "routes": [
+        { "pattern": "homemew-web-staging.aisr.online", "custom_domain": true }
+      ],
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "LIFESPACE_IDENTITY_URL": "https://auth-staging.aisr.online",
+        "LIFESPACE_CORE_URL": "https://core-staging.aisr.online"
+      }
+    },
+    "production": {
+      "workers_dev": false,
+      "vars": {
+        "ENVIRONMENT": "production",
+        "LIFESPACE_IDENTITY_URL": "https://auth.aisr.online",
+        "LIFESPACE_CORE_URL": "https://core.aisr.online"
+      }
+    }
+  }
+}
