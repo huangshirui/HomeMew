@@ -133,3 +133,15 @@ The legacy HomeMew Mini Program also contains an administrator UI that creates â
 ## 11. LifeSpace change boundary
 
 If HomeMew discovers a missing platform capability, finish independent HomeMew work and document the gap. Any LifeSpace repository modification requires explicit user approval first and must then follow LifeSpace's own `AGENTS.md`.
+
+## 12. Web and display surfaces
+
+`apps/web/` is the primary HomeMew browser application and is intended for `homemew.aisr.online`. It is a client-rendered React SPA deployed with Cloudflare Workers Static Assets. Normal household functions and household-admin settings live in the same Web product; household administration is authorized by the user's LifeSpace Space role and is not a separate platform-admin site.
+
+Normal Web business requests must follow the same platform boundary as the Mini Program: browser code calls LifeSpace Identity/Core with a short-lived LifeSpace user token. The Web runtime must not introduce a permanent HomeMew business BFF or store authoritative household data.
+
+The current LifeSpace Identity contract does not yet provide the approved browser-login flow required to obtain that user token for HomeMew Web. Until that platform capability is separately approved and implemented, the Web app may contain clearly labelled preview data for UI development but must not invent production authentication or embed `lsa_*`/service credentials in browser code.
+
+`apps/display/` is reserved for `homemew-display.aisr.online`. It remains separate because a household wall display/TV/Raspberry Pi should ultimately use a narrowly scoped device identity and read-only grants rather than a household administrator's long-lived browser session.
+
+See `docs/web-plan.md` for the Web information architecture, technology baseline and delivery phases.
