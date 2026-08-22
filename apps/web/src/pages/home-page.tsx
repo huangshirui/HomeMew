@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ArrowRight, CalendarDays, Check, Clock3, Plus, Sparkles } from 'lucide-react';
 import { browserAuthCapability } from '../lib/platform';
 import { Button } from '../components/ui/button';
@@ -101,7 +102,7 @@ function CheckSquareSummary() {
   return <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">1 / 3</span>;
 }
 
-function MiniCard({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string; detail: string }) {
+function MiniCard({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail: string }) {
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between">
