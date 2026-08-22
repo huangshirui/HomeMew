@@ -15,6 +15,8 @@ type LifeSpaceEventDraft = {
   attendeeIds?: unknown;
 };
 
+const DEFAULT_EVENT_DURATION_MS = 60 * 60 * 1000;
+
 function object(value: unknown): LifeSpaceEventDraft {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as LifeSpaceEventDraft
@@ -40,6 +42,19 @@ function localInstant(value: unknown, timezone: string): { date: string; time: s
   }
 }
 
+function defaultEndFromStart(
+  startAt: unknown,
+  timezone: string,
+): { date: string; time: string } | null {
+  if (typeof startAt !== 'string' || !startAt) return null;
+  const start = new Date(startAt);
+  if (Number.isNaN(start.getTime())) return null;
+  return localInstant(
+    new Date(start.getTime() + DEFAULT_EVENT_DURATION_MS).toISOString(),
+    timezone,
+  );
+}
+
 /**
  * Convert the LifeSpace event model draft into HomeMew's form-friendly draft.
  *
@@ -47,10 +62,10 @@ function localInstant(value: unknown, timezone: string): { date: string; time: s
  * form edits wall-clock date/time fields, so the service boundary performs the
  * conversion in the same viewing timezone used for interpretation.
  *
- * An absent `endAt` stays unknown: the adapter carries the start date forward
- * but uses an empty `endTime`. The existing form treats an empty time as
- * incomplete and refuses to create until the user supplies it, so no duration
- * is invented by the adapter or page defaults.
+ * If LifeSpace does not supply `endAt`, HomeMew applies its product default of
+ * a 60-minute duration. An explicit LifeSpace `endAt` always wins. The default
+ * is calculated from the start instant, so date rollover (for example 23:30 ->
+ * 00:30 the next day) is preserved correctly before converting to wall time.
  */
 export function adaptLifeSpaceEventDraft(
   input: unknown,
@@ -88,7 +103,10 @@ export function adaptLifeSpaceEventDraft(
     const startZone = startTimezone ?? viewingTimezone;
     const endZone = endTimezone ?? startZone;
     const start = localInstant(draft.startAt, startZone);
-    const end = localInstant(draft.endAt, endZone);
+    const explicitEndAt = nullableString(draft.endAt);
+    const end = explicitEndAt
+      ? localInstant(explicitEndAt, endZone)
+      : defaultEndFromStart(draft.startAt, endZone);
     return {
       summary,
       description,
