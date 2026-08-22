@@ -18,11 +18,17 @@ WeChat Mini Program
   ├─ profile/avatar + user token ─> LifeSpace Identity
   └─ household business + token ──> LifeSpace Core
 
+HomeMew Web Browser
+  └─ homemew.aisr.online
+       ├─ React SPA static assets
+       └─ same-origin /api/* session/API gateway
+            └─ LifeSpace Identity/Core
+
 n8n / Agents / other applications
   └─ their own LifeSpace application/service identity + Data Grants ─> LifeSpace
 ```
 
-There is no WeChat Cloud Development dependency and no permanent HomeMew compatibility BFF for normal business APIs.
+There is no WeChat Cloud Development dependency and no permanent HomeMew compatibility BFF for normal business APIs. The Web same-origin gateway is an authentication/session edge boundary, not a second business API or Core.
 
 ## 3. HomeMew Cloudflare application backend
 
@@ -73,6 +79,10 @@ An existing mapping is authoritative. If LifeSpace later refuses token issuance 
 
 The access token represents the LifeSpace user, has the HomeMew application as its authorized party, and carries only the scopes granted to that application. Token refresh repeats this flow with a fresh WeChat code.
 
+The approved target browser flow is centralized LifeSpace Identity Authorization Code + PKCE / redirect SSO. Identity owns its host-only session cookie at `auth.aisr.online`; HomeMew Web owns a separate host-only app session cookie at `homemew.aisr.online`. The browser does not receive HomeMew application credentials or persistent service credentials.
+
+The current LifeSpace Identity public contract does not yet expose that browser authorization flow. HomeMew must not substitute the trusted `/internal/v1/tokens` exchange as a browser login mechanism. The missing browser-auth contract requires a separately approved LifeSpace change.
+
 ## 5. Household model mapping
 
 HomeMew keeps product-friendly terms in the UI but maps them explicitly at the client service boundary:
@@ -115,6 +125,8 @@ HomeMew-owned Durable Object storage may hold provider/application integration m
 
 Authoritative household data and authorization live in LifeSpace. Mini Program storage is cache/UI state only.
 
+The HomeMew Web session/API gateway may hold only application/session security state needed for the browser flow. It must not persist or become authoritative for household business records.
+
 ## 9. External systems
 
 LifeSpace Data Grants are the target authorization mechanism for n8n, Agents, devices and other software principals.
@@ -138,9 +150,11 @@ If HomeMew discovers a missing platform capability, finish independent HomeMew w
 
 `apps/web/` is the primary HomeMew browser application and is intended for `homemew.aisr.online`. It is a client-rendered React SPA deployed with Cloudflare Workers Static Assets. Normal household functions and household-admin settings live in the same Web product; household administration is authorized by the user's LifeSpace Space role and is not a separate platform-admin site.
 
-Normal Web business requests must follow the same platform boundary as the Mini Program: browser code calls LifeSpace Identity/Core with a short-lived LifeSpace user token. The Web runtime must not introduce a permanent HomeMew business BFF or store authoritative household data.
+Phase W1 is assets-only. Once the LifeSpace browser authorization contract exists, the same Cloudflare Web deployment gains a thin same-origin `/api/*` Worker session/API gateway. The gateway establishes the app-local browser session and forwards authenticated requests to LifeSpace Identity/Core. It keeps application credentials and server-side tokens out of frontend JavaScript, applies Origin/CSRF protections for cookie-authenticated writes, and propagates LifeSpace request IDs.
 
-The current LifeSpace Identity contract does not yet provide the approved browser-login flow required to obtain that user token for HomeMew Web. Until that platform capability is separately approved and implemented, the Web app may contain clearly labelled preview data for UI development but must not invent production authentication or embed `lsa_*`/service credentials in browser code.
+This gateway is not a compatibility or business BFF: it must not define a second household business contract, persist authoritative household data, duplicate LifeSpace model validation, or make authorization decisions that replace LifeSpace Space/Grant checks.
+
+Until the browser-auth platform capability is separately approved and implemented, the Web app may contain clearly labelled preview data for UI development but must not invent production authentication or embed `lsa_*`/service credentials in browser code.
 
 `apps/display/` is reserved for `homemew-display.aisr.online`. It remains separate because a household wall display/TV/Raspberry Pi should ultimately use a narrowly scoped device identity and read-only grants rather than a household administrator's long-lived browser session.
 
