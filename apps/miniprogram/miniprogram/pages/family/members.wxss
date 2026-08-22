@@ -30,14 +30,6 @@
   border-bottom: none;
 }
 
-.member-avatar {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 50%;
-  background-color: var(--color-bg);
-  flex-shrink: 0;
-}
-
 .member-info {
   flex: 1;
   min-width: 0;

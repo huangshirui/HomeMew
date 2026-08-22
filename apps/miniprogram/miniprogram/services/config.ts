@@ -89,6 +89,11 @@ export function normalizeBaseUrl(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
+/** LifeSpace Identity exposes a stable public avatar URL per global user. */
+export function buildUserAvatarUrl(identityBaseUrl: string, userId: string): string {
+  return `${normalizeBaseUrl(identityBaseUrl)}/assets/users/${encodeURIComponent(userId)}/avatar`;
+}
+
 function environmentSafeUrl(cached: string, expected: string): string {
   const normalized = normalizeBaseUrl(cached);
   // 服务 URL 由受信 HomeMew backend 下发，但缓存必须属于当前运行环境。
@@ -134,6 +139,10 @@ export function getCoreBaseUrl(): string {
 
 export function getIdentityBaseUrl(): string {
   return getRuntimeServiceUrls().identityApiUrl;
+}
+
+export function getUserAvatarUrl(userId: string): string {
+  return buildUserAvatarUrl(getIdentityBaseUrl(), userId);
 }
 
 export function getLoginBackendUrl(): string {

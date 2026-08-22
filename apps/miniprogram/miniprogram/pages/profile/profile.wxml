@@ -3,7 +3,14 @@
   <!-- 用户信息卡片 -->
   <block wx:if="{{userInfo}}">
     <view class="user-card card">
-      <image class="avatar" src="{{userInfo.avatarUrl || '/assets/images/default-avatar.png'}}" mode="aspectFill" />
+      <view class="profile-avatar">
+        <user-avatar
+          user-id="{{userInfo.id}}"
+          src="{{userInfo.avatarUrl}}"
+          size="{{120}}"
+          alt="{{userInfo.displayName}}的头像"
+        />
+      </view>
       <view class="user-info">
         <text class="nickname">{{userInfo.displayName}}</text>
         <text class="user-id">ID: {{userInfo.id}}</text>
