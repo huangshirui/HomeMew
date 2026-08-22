@@ -1,0 +1,8 @@
+<image
+  class="user-avatar"
+  src="{{resolvedSrc}}"
+  mode="aspectFill"
+  alt="{{alt}}"
+  style="width: {{size}}rpx; height: {{size}}rpx;"
+  binderror="onAvatarError"
+/>

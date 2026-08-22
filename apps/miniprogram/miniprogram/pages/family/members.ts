@@ -33,8 +33,6 @@ import {
 } from '../../utils/index';
 import { FamilyMember } from '../../types/index';
 
-const DEFAULT_AVATAR_URL = '/assets/images/default-avatar.png';
-
 type MemberView = FamilyMember & { joinedAtText: string; isSelf: boolean };
 
 Page({
@@ -87,18 +85,6 @@ Page({
       showError(getErrorMessage(err.code, err.message));
       this.setData({ loaded: true });
     }
-  },
-
-  onAvatarError(e: WechatMiniprogram.CustomEvent): void {
-    const index = Number(e.currentTarget.dataset.index);
-    if (!Number.isInteger(index) || index < 0 || index >= this.data.members.length) return;
-    const member = this.data.members[index];
-    if (!member || member.avatarUrl === DEFAULT_AVATAR_URL) return;
-    this.setData({
-      members: this.data.members.map((item, itemIndex) => (
-        itemIndex === index ? { ...item, avatarUrl: DEFAULT_AVATAR_URL } : item
-      )),
-    });
   },
 
   async onPromote(e: WechatMiniprogram.TouchEvent): Promise<void> {

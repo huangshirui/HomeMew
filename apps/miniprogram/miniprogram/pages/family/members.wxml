@@ -11,12 +11,11 @@
       wx:for="{{members}}"
       wx:key="userId"
     >
-      <image
-        class="member-avatar"
-        src="{{item.avatarUrl || '/assets/images/default-avatar.png'}}"
-        mode="aspectFill"
-        data-index="{{index}}"
-        binderror="onAvatarError"
+      <user-avatar
+        user-id="{{item.userId}}"
+        src="{{item.avatarUrl}}"
+        size="{{80}}"
+        alt="{{item.displayName}}的头像"
       />
       <view class="member-info">
         <view class="member-top">

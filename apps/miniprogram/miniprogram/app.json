@@ -32,6 +32,9 @@
     "pages/wishes/detail",
     "pages/wishes/edit"
   ],
+  "usingComponents": {
+    "user-avatar": "/components/user-avatar/index"
+  },
   "window": {
     "navigationBarBackgroundColor": "#43A047",
     "navigationBarTitleText": "家事喵",
