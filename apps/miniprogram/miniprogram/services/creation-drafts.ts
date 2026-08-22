@@ -4,6 +4,7 @@
  */
 
 import { request } from './api';
+import { adaptLifeSpaceEventDraft } from './creation-draft-adapter';
 import type { CreationKind, CreationDraftResult } from '../types/index';
 import type {
   CreateCreationDraftJobRequest,
@@ -40,7 +41,7 @@ type LifeSpaceDraft = {
   error?: { code: string };
 };
 
-function toHomeMewDraft(raw: LifeSpaceDraft): CreationDraftJob {
+function toHomeMewDraft(raw: LifeSpaceDraft, viewingTimezone: string): CreationDraftJob {
   if (raw.status === 'processing') {
     return { draftId: raw.draftId, status: 'processing', expiresAt: raw.expiresAt };
   }
@@ -65,12 +66,15 @@ function toHomeMewDraft(raw: LifeSpaceDraft): CreationDraftJob {
 
   const kind = raw.kind ?? (raw.modelKey ? MODEL_TO_KIND[raw.modelKey] : undefined);
   if (!kind) throw new Error('LifeSpace 返回了 HomeMew 不支持的模型草稿');
+  const draft = kind === 'event'
+    ? adaptLifeSpaceEventDraft(raw.draft, viewingTimezone)
+    : raw.draft;
   return {
     draftId: raw.draftId,
     expiresAt: raw.expiresAt,
     status: 'ready',
     kind,
-    draft: raw.draft,
+    draft,
     missingFields: raw.missingFields ?? [],
     warnings: raw.warnings ?? [],
   } as CreationDraftJob;
@@ -86,24 +90,26 @@ export async function createCreationDraftJob(
     skipRetry: true,
     timeout: 10000,
   });
-  return toHomeMewDraft(raw) as CreationDraftJobProcessing;
+  return toHomeMewDraft(raw, payload.viewingTimezone) as CreationDraftJobProcessing;
 }
 
 export async function getCreationDraftJob(
   familyId: string,
   draftId: string,
+  viewingTimezone: string,
 ): Promise<CreationDraftJob> {
   const raw = await request<LifeSpaceDraft>(
     `${spacePath(familyId, 'creation-drafts')}/${encodeURIComponent(draftId)}`,
     { method: 'GET', timeout: 10000 },
   );
-  return toHomeMewDraft(raw);
+  return toHomeMewDraft(raw, viewingTimezone);
 }
 
 export async function chooseCreationDraftKind(
   familyId: string,
   draftId: string,
   targetKind: CreationKind,
+  viewingTimezone: string,
 ): Promise<CreationDraftJobProcessing> {
   const raw = await request<LifeSpaceDraft>(
     `${spacePath(familyId, 'creation-drafts')}/${encodeURIComponent(draftId)}/choose-model`,
@@ -114,5 +120,5 @@ export async function chooseCreationDraftKind(
       timeout: 10000,
     },
   );
-  return toHomeMewDraft(raw) as CreationDraftJobProcessing;
+  return toHomeMewDraft(raw, viewingTimezone) as CreationDraftJobProcessing;
 }

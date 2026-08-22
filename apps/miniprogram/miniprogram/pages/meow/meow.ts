@@ -142,18 +142,19 @@ Page({
     this.startThinking();
 
     try {
+      const viewingTimezone = getViewingTimeZone(family.timezone);
       const job = await createCreationDraftJob(familyId, {
         text,
-        viewingTimezone: getViewingTimeZone(family.timezone),
+        viewingTimezone,
       });
       this._draftId = job.draftId;
-      this.startPolling(familyId, job.draftId);
+      this.startPolling(familyId, job.draftId, viewingTimezone);
     } catch (error: unknown) {
       this.fail(error);
     }
   },
 
-  startPolling(familyId: string, draftId: string): void {
+  startPolling(familyId: string, draftId: string, viewingTimezone: string): void {
     this.stopPolling();
     const token = this._pollToken;
     this._pollStartedAt = Date.now();
@@ -165,7 +166,7 @@ Page({
         return;
       }
       try {
-        const job = await getCreationDraftJob(familyId, draftId);
+        const job = await getCreationDraftJob(familyId, draftId, viewingTimezone);
         if (token !== this._pollToken) return;
         if (job.status === 'processing') {
           this._pollTimer = setTimeout(poll, POLL_INTERVAL_MS) as unknown as number;
@@ -232,9 +233,10 @@ Page({
 
   async onChooseKind(e: WechatMiniprogram.TouchEvent): Promise<void> {
     const kind = e.currentTarget.dataset.kind as CreationKind;
-    const familyId = currentFamilyStore.value?.id;
+    const family = currentFamilyStore.value;
+    const familyId = family?.id;
     const draftId = this._draftId;
-    if (!familyId || !draftId) {
+    if (!familyId || !family || !draftId) {
       this.fail({ code: 'CREATION_DRAFT_NOT_FOUND' });
       return;
     }
@@ -242,8 +244,9 @@ Page({
     this.setData({ sheetOpen: false, submitting: true, error: '' });
     this.startThinking();
     try {
-      await chooseCreationDraftKind(familyId, draftId, kind);
-      this.startPolling(familyId, draftId);
+      const viewingTimezone = getViewingTimeZone(family.timezone);
+      await chooseCreationDraftKind(familyId, draftId, kind, viewingTimezone);
+      this.startPolling(familyId, draftId, viewingTimezone);
     } catch (error: unknown) {
       this.fail(error);
     }
