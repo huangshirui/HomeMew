@@ -48,8 +48,9 @@ function localInstant(value: unknown, timezone: string): { date: string; time: s
  * conversion in the same viewing timezone used for interpretation.
  *
  * An absent `endAt` stays unknown: the adapter carries the start date forward
- * for form validation but leaves `endTime` null. The page must ask the user for
- * an end time before creating the event instead of inventing a duration.
+ * but uses an empty `endTime`. The existing form treats an empty time as
+ * incomplete and refuses to create until the user supplies it, so no duration
+ * is invented by the adapter or page defaults.
  */
 export function adaptLifeSpaceEventDraft(
   input: unknown,
@@ -92,11 +93,11 @@ export function adaptLifeSpaceEventDraft(
       summary,
       description,
       isAllDay: false,
-      startDate: start?.date ?? null,
-      endDate: end?.date ?? start?.date ?? null,
+      startDate: start?.date ?? '',
+      endDate: end?.date ?? start?.date ?? '',
       endDateExclusive: null,
-      startTime: start?.time ?? null,
-      endTime: end?.time ?? null,
+      startTime: start?.time ?? '',
+      endTime: end?.time ?? '',
       startTimezone,
       endTimezone,
       location,
