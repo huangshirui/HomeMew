@@ -13,26 +13,29 @@ WeChat Mini Program
   ├─ wx.login code ───────────────> HomeMew Cloudflare application backend
   │                                  ├─ WeChat jscode2session
   │                                  ├─ Durable Object: openid -> LifeSpace usr_*
-  │                                  └─ LifeSpace Identity internal token exchange
+  │                                  └─ LifeSpace Identity trusted application exchange
   │
   ├─ profile/avatar + user token ─> LifeSpace Identity
   └─ household business + token ──> LifeSpace Core
 
-HomeMew Web Browser
-  └─ homemew.aisr.online
-       ├─ React SPA static assets
-       └─ same-origin /api/* session/API gateway
-            └─ LifeSpace Identity/Core
+HomeMew Web browser
+  -> Cloudflare Access
+  -> HomeMew Web Worker / same-origin BFF
+      ├─ original Cf-Access-Jwt-Assertion
+      ├─ dedicated HomeMew-Web lsa_* credential
+      ├─ LifeSpace Identity Access principal exchange/linking
+      └─ signed host-only HttpOnly application session
+  -> LifeSpace Identity/Core
 
 n8n / Agents / other applications
   └─ their own LifeSpace application/service identity + Data Grants ─> LifeSpace
 ```
 
-There is no WeChat Cloud Development dependency and no permanent HomeMew compatibility BFF for normal business APIs. The Web same-origin gateway is an authentication/session edge boundary, not a second business API or Core.
+There is no WeChat Cloud Development dependency and no permanent HomeMew compatibility BFF for normal business APIs. The HomeMew Web BFF is an application/browser trust boundary only; it does not persist household business data or implement a second authorization model.
 
 ## 3. HomeMew Cloudflare application backend
 
-`apps/backend/` is a narrow trusted adapter, not a second Core.
+`apps/backend/` is a narrow trusted WeChat adapter, not a second Core and not the Web Access-principal authority.
 
 Responsibilities:
 
@@ -40,7 +43,7 @@ Responsibilities:
 - call the WeChat `jscode2session` server API with the server-only app secret;
 - resolve and persist `openid -> LifeSpace user_id` in a HomeMew-owned SQLite-backed Durable Object;
 - create a LifeSpace Identity user when the provider identity is first seen;
-- authenticate as the registered HomeMew LifeSpace application using a server-only `lsa_*` credential;
+- authenticate as the registered HomeMew Mini Program LifeSpace application using a server-only `lsa_*` credential;
 - request a short-lived LifeSpace user token and return it to the Mini Program.
 
 The Durable Object is keyed by `WeChat appid + openid`, so each external identity has its own coordination/storage unit. Concurrent first-login requests to the same live object share one in-flight user-creation promise before the mapping is persisted. A dedicated HomeMew D1 is intentionally not provisioned for this small identity mapping.
@@ -60,7 +63,7 @@ Required secrets/configuration:
 
 The Mini Program never receives `openid`, the WeChat app secret, or the LifeSpace application credential.
 
-## 4. Identity flow
+## 4. Mini Program identity flow
 
 ```text
 Mini Program
@@ -77,13 +80,61 @@ Mini Program
 
 An existing mapping is authoritative. If LifeSpace later refuses token issuance for a mapped user, HomeMew does not silently create a replacement user and overwrite the mapping; the inconsistency must be investigated instead.
 
-The access token represents the LifeSpace user, has the HomeMew application as its authorized party, and carries only the scopes granted to that application. Token refresh repeats this flow with a fresh WeChat code.
+The access token represents the LifeSpace user, has the HomeMew Mini Program application as its authorized party, and carries only the scopes granted to that application. Token refresh repeats this flow with a fresh WeChat code.
 
-The approved target browser flow is centralized LifeSpace Identity Authorization Code + PKCE / redirect SSO. Identity owns its host-only session cookie at `auth.aisr.online`; HomeMew Web owns a separate host-only app session cookie at `homemew.aisr.online`. The browser does not receive HomeMew application credentials or persistent service credentials.
+## 5. HomeMew Web authentication and BFF
 
-The current LifeSpace Identity public contract does not yet expose that browser authorization flow. HomeMew must not substitute the trusted `/internal/v1/tokens` exchange as a browser login mechanism. The missing browser-auth contract requires a separately approved LifeSpace change.
+`apps/web/` is the HomeMew browser application plus its same-origin BFF. It is separate from `apps/backend/` because Cloudflare Access is a platform Web authentication boundary, while WeChat `openid` remains application-provider mapping owned by the Mini Program adapter.
 
-## 5. Household model mapping
+Target Web stack:
+
+- React + TypeScript;
+- Vite + the official Cloudflare Vite plugin;
+- Cloudflare Worker serving the Web assets and same-origin API/BFF;
+- Cloudflare Access protecting the Web application;
+- LifeSpace Identity 0.5.0+ for Access principal verification, audience registration, exchange and account linking.
+
+Authentication flow:
+
+```text
+Browser
+-> Cloudflare Access login / SSO
+-> HomeMew Web Worker receives Cf-Access-Jwt-Assertion
+-> Worker authenticates to Identity with the dedicated HomeMew-Web lsa_*
+-> POST /internal/v1/access/tokens
+-> Identity independently verifies Access JWT signature / issuer / expiry / audience
+-> Identity resolves verified (iss, sub) -> global usr_*
+-> Identity issues short-lived HomeMew-Web-scoped LifeSpace user token
+-> Web Worker stores it only in a signed host-only HttpOnly application session
+-> browser calls same-origin /api/lifespace/* BFF paths
+-> BFF calls LifeSpace Identity/Core with the LifeSpace user bearer
+```
+
+The Web BFF never accepts a browser-supplied `sub`, Access email or target LifeSpace `userId` as identity authority. It forwards the original Cloudflare Access assertion only to the approved Identity Access exchange/linking contract. It does not maintain its own Access principal mapping table.
+
+The HomeMew application session uses a dedicated `WEB_SESSION_SECRET`, `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/` and no parent-domain `Domain` attribute. The signed session is bound to a SHA-256 fingerprint of the Access assertion that produced it. If the current Access assertion changes, the old LifeSpace bearer is not reused; the BFF performs a new Identity exchange. This prevents a stale HomeMew session from crossing an Access-user switch in the same browser.
+
+State-changing same-origin BFF/proxy routes require an exact `Origin` match. This remains necessary because cookie SameSite behavior is not an application authorization boundary between sibling subdomains.
+
+Unknown Access principals are explicit flows, never email merges:
+
+```text
+unlinked Access principal
+  ├─ link existing LifeSpace account
+  │    -> Web creates Identity one-time link challenge
+  │    -> already-authenticated Mini Program confirms challenge
+  │    -> Identity derives usr_* from Mini Program bearer
+  │
+  └─ create new LifeSpace account
+       -> explicit Identity Access registration
+       -> create usr_* + bind verified (iss, sub) atomically
+```
+
+The target user ID for account linking is never supplied by Web. Identity owns the Access-principal -> `usr_*` relationship.
+
+The final Web domain is `homemew.aisr.online`. That hostname currently also carries the production Mini Program login endpoint through `homemew-backend-production`. A later controlled production Web cutover must preserve `/api/v1/login/wechat`, preferably by routing that application-provider endpoint from the Web front-door Worker to `apps/backend/` through an explicit service binding. Until that is proven in staging, the Web Worker uses an isolated staging hostname/Access application and does not take production Mini Program traffic.
+
+## 6. Household model mapping
 
 HomeMew keeps product-friendly terms in the UI but maps them explicitly at the client service boundary:
 
@@ -101,7 +152,7 @@ HomeMew keeps product-friendly terms in the UI but maps them explicitly at the c
 
 HomeMew services may expose `familyId`, `attendeeIds`, `assigneeIds` and similar product DTOs to pages, but translate them to Space IDs/Person IDs before calling LifeSpace.
 
-## 6. Normal Mini Program requests
+## 7. Normal Mini Program requests
 
 ```text
 Mini Program
@@ -113,49 +164,52 @@ The shared request client selects Identity or Core explicitly, parses standard L
 
 `currentFamilyId` remains UI state only. LifeSpace Space membership and grant checks are authoritative.
 
-## 7. Media
+## 8. Normal Web requests
+
+```text
+Browser
+-> same-origin /api/lifespace/core/v1/* or /api/lifespace/identity/v1/*
+-> HomeMew Web BFF resolves the current Access-bound application session
+-> Authorization: Bearer <short-lived LifeSpace user token>
+-> LifeSpace Core/Identity
+```
+
+The browser never receives the LifeSpace user bearer or the HomeMew-Web `lsa_*` application credential. The BFF is a narrow authenticated transport boundary; it does not translate LifeSpace authorization into a separate HomeMew server authorization model.
+
+## 9. Media
 
 - Current-user avatar: `PUT LifeSpace Identity /api/v1/me/avatar`.
 - Family avatar: `PUT LifeSpace Core /api/v1/spaces/{spaceId}/avatar`, including the current Space `version` in multipart data.
 - Household images do not use WeChat Cloud Storage.
 
-## 8. Data ownership
+Web uploads go through the same-origin BFF and preserve the LifeSpace multipart contract rather than storing media in HomeMew.
+
+## 10. Data ownership
 
 HomeMew-owned Durable Object storage may hold provider/application integration metadata such as the WeChat identity mapping. It must not become an authoritative household data store.
 
-Authoritative household data and authorization live in LifeSpace. Mini Program storage is cache/UI state only.
+The Web BFF may hold only short-lived browser application-session state. It must not persist an Access-principal mapping or household business records.
 
-The HomeMew Web session/API gateway may hold only application/session security state needed for the browser flow. It must not persist or become authoritative for household business records.
+Authoritative household data and authorization live in LifeSpace. Mini Program/browser storage is cache/UI state only.
 
-## 9. External systems
+## 11. External systems
 
 LifeSpace Data Grants are the target authorization mechanism for n8n, Agents, devices and other software principals.
 
 The legacy HomeMew Mini Program also contains an administrator UI that creates “external systems” and issues API tokens/client secrets. At the time of this cutover, LifeSpace exposes Data Grant management but does not yet expose an equivalent end-user flow for provisioning a new service principal plus its credential. Do not recreate this as a HomeMew-only credential authority. Keep that surface unavailable until a separately approved LifeSpace capability is defined.
 
-## 10. Migration/cutover rules
+The confirmed Web product route remains `/settings/integrations`, but it must stay unavailable/read-only until the corresponding LifeSpace provisioning capability exists.
+
+## 12. Migration/cutover rules
 
 - Do not dual-write HomeMew Core and LifeSpace.
 - Do not keep a permanent `/api/v1/families/...` facade in front of LifeSpace.
-- Migrate data once, validate, then cut the Mini Program over.
-- Staging and production HomeMew Workers use separate Durable Object namespaces and separate secrets.
-- Production provider mapping and a production `lsa_*` credential are application secrets and must be established only during an explicitly authorized production cutover.
-- The old HomeMew Core domain may continue to exist temporarily for rollback/reference, but post-cutover Mini Program business traffic must not use it.
+- HomeMew production business data is authoritative in LifeSpace after the completed production cutover.
+- Staging and production HomeMew Workers use separate Durable Object namespaces, application credentials, Access applications/audiences and session secrets.
+- `apps/backend/` keeps the application-owned WeChat identity mapping; `apps/web/` never duplicates it.
+- Production Web activation must not break the existing Mini Program `/api/v1/login/wechat` application-provider endpoint.
+- The old HomeMew Core/D1 remains frozen/read-only only for the explicit stabilization/rollback-evidence window and must not receive new normal writes.
 
-## 11. LifeSpace change boundary
+## 13. LifeSpace change boundary
 
 If HomeMew discovers a missing platform capability, finish independent HomeMew work and document the gap. Any LifeSpace repository modification requires explicit user approval first and must then follow LifeSpace's own `AGENTS.md`.
-
-## 12. Web and display surfaces
-
-`apps/web/` is the primary HomeMew browser application and is intended for `homemew.aisr.online`. It is a client-rendered React SPA deployed with Cloudflare Workers Static Assets. Normal household functions and household-admin settings live in the same Web product; household administration is authorized by the user's LifeSpace Space role and is not a separate platform-admin site.
-
-Phase W1 is assets-only. Once the LifeSpace browser authorization contract exists, the same Cloudflare Web deployment gains a thin same-origin `/api/*` Worker session/API gateway. The gateway establishes the app-local browser session and forwards authenticated requests to LifeSpace Identity/Core. It keeps application credentials and server-side tokens out of frontend JavaScript, applies Origin/CSRF protections for cookie-authenticated writes, and propagates LifeSpace request IDs.
-
-This gateway is not a compatibility or business BFF: it must not define a second household business contract, persist authoritative household data, duplicate LifeSpace model validation, or make authorization decisions that replace LifeSpace Space/Grant checks.
-
-Until the browser-auth platform capability is separately approved and implemented, the Web app may contain clearly labelled preview data for UI development but must not invent production authentication or embed `lsa_*`/service credentials in browser code.
-
-`apps/display/` is reserved for `homemew-display.aisr.online`. It remains separate because a household wall display/TV/Raspberry Pi should ultimately use a narrowly scoped device identity and read-only grants rather than a household administrator's long-lived browser session.
-
-See `docs/web-plan.md` for the Web information architecture, technology baseline and delivery phases.
