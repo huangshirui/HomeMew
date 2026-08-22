@@ -28,6 +28,7 @@ apps/
   backend/      微信 provider 信任适配器；维护 openid -> LifeSpace usr_* 映射
   miniprogram/  微信小程序
   web/          HomeMew Web + same-origin BFF；Cloudflare Access 登录
+  display/      未来独立家庭大屏
   core/         旧 HomeMew Core，仅用于历史/迁移参考
 ```
 
@@ -51,32 +52,35 @@ homemew.aisr.online -> homemew-backend-production
 
 微信 `openid` 是 HomeMew 应用自己的 provider identity，不进入 LifeSpace Identity。`apps/backend` 使用 SQLite-backed Durable Object 保存 `openid -> usr_*`，并使用 server-only `lsa_*` 向 LifeSpace Identity 换取短期用户 Token。
 
-小程序永远不能获得：
-
-- 微信 `appsecret`；
-- `openid` 映射存储；
-- LifeSpace `lsa_*` application credential；
-- service credentials / signing keys。
-
 ### Web
 
 Cloudflare Access 是 HomeMew Web 的长期登录/SSO 层。HomeMew Web 不保存 `Access sub -> usr_*` 映射；它把原始 `Cf-Access-Jwt-Assertion` 交给 LifeSpace Identity 独立验证，由 Identity 负责 `(iss, sub) -> usr_*` 解析和账户链接。
 
 Web BFF 使用独立的 HomeMew-Web `lsa_*`，不能复用 Mini Program application credential。LifeSpace user bearer 只保存在签名、host-only、HttpOnly 的短期应用 session 中，不暴露给浏览器 JavaScript。
 
-## HomeMew Web
+## HomeMew Web 技术栈
 
-确认的长期技术路线是 React + TypeScript + Vite + Cloudflare Worker，并采用 same-origin BFF。
+当前 Web foundation 已采用：
 
-第一个 Web 切片先实现 Identity × Access 边界：
+```text
+React 19
+TypeScript
+Vite
+React Router（SPA / library mode）
+Tailwind CSS
+shadcn/ui 风格的本地基础组件
+Lucide Icons
 
-- Access session exchange；
-- explicit new-user registration；
-- one-time existing-account link challenge；
-- same-origin LifeSpace Core/Identity proxy；
-- Cookie session + exact Origin CSRF protection。
+Cloudflare Vite Plugin
+Cloudflare Workers + Static Assets
+pnpm workspace
+```
 
-之后再接 React 页面。首期产品路由：
+暂不引入 TanStack Query、Schedule-X、Redux/Zustand。TanStack Query 在真实 LifeSpace server-state 接入时再加；Schedule-X 在 `/calendar` 真正开发时再加；全局状态优先 URL、Context 和浏览器本地 UI state。
+
+不使用 Next.js / SSR。HomeMew 是登录后的家庭应用，SEO 价值有限，不承担 SSR/RSC/Server Actions 的额外维护复杂度。
+
+首期产品路由：
 
 ```text
 /
@@ -90,6 +94,20 @@ Web BFF 使用独立的 HomeMew-Web `lsa_*`，不能复用 Mini Program applicat
 ```
 
 Desktop 使用 Sidebar，Mobile 使用 Bottom Navigation；视觉保持家庭、温暖、轻量，不做企业 ERP/管理后台风格。
+
+## Web BFF
+
+同一个 Cloudflare 部署物同时承载 React SPA 与极薄 Worker：
+
+```text
+homemew.aisr.online
+  = Workers Static Assets
+  + /api/* same-origin session/API gateway
+```
+
+BFF 只负责 Access assertion、App Session、HttpOnly Cookie、Origin/CSRF 防护、凭据隔离和 LifeSpace 请求转发；不建立 `/families/...` 兼容 API，不保存家庭业务数据，也不复制 LifeSpace 授权逻辑。
+
+当前已实现 Access session exchange、explicit registration、one-time link challenge、same-origin Core/Identity proxy 和自动测试。真实 staging rollout 仍需 Identity 0.5.0/schema v5、Access application/AUD 和独立 Web `lsa_*` 配置。
 
 ## LifeSpace 模型映射
 
@@ -105,8 +123,6 @@ Desktop 使用 Sidebar，Mobile 使用 Bottom Navigation；视觉保持家庭、
 | wish | `wish` + Actions |
 | 喵一下 | Registry Creation Draft capability |
 
-HomeMew 可以在 UI DTO 中保留 `familyId`、`assigneeIds` 等产品语言，但必须在客户端/BFF 边界显式映射到 LifeSpace contract；不能重新建立第二套后端领域模型。
-
 ## 本地检查
 
 要求 Node.js 24+，并使用仓库固定的 pnpm 版本。
@@ -117,9 +133,12 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm check
 ```
 
-Web BFF 测试可单独运行：
+Web 可单独运行：
 
 ```bash
+corepack pnpm dev:web
+corepack pnpm typecheck:web
+corepack pnpm build:web
 corepack pnpm test:web
 ```
 
@@ -128,5 +147,6 @@ corepack pnpm test:web
 - `AGENTS.md`
 - `docs/architecture.md`
 - `docs/product-rules.md`
-- `apps/web/README.md`（Web 工作）
+- `docs/web-plan.md`
+- `apps/web/README.md`
 - 当前 LifeSpace 对应 contract / architecture（平台 API 与权限的唯一源码来源）
