@@ -1,0 +1,92 @@
+name: Deploy HomeMew Web staging
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - apps/web/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/web-staging-deploy.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homemew-web-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy HomeMew Web staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ENV: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Validate Cloudflare deployment credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN is not configured" >&2; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID is not configured" >&2; exit 1; }
+
+      - name: Validate HomeMew Web
+        run: |
+          corepack pnpm test:web
+          corepack pnpm typecheck:web
+
+      - name: Deploy HomeMew Web staging
+        run: corepack pnpm deploy:web:staging
+
+      - name: Verify staging hostname is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 20); do
+            if code="$(curl --silent --show-error --head --output /dev/null --write-out '%{http_code}' --connect-timeout 5 --max-time 10 https://homemew-web-staging.aisr.online/health)"; then
+              if [ "$code" -ge 200 ] && [ "$code" -lt 500 ]; then
+                echo "homemew-web-staging.aisr.online is reachable (HTTP $code; Cloudflare Access may redirect/deny unauthenticated CI)"
+                exit 0
+              fi
+            fi
+            echo "Waiting for HomeMew Web staging hostname (${attempt}/20)"
+            sleep 3
+          done
+          echo "HomeMew Web staging hostname did not become reachable" >&2
+          exit 1
+
+      - name: Summarize staging deployment
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## HomeMew Web staging
+
+          - Worker: `homemew-web-staging`
+          - Hostname: `homemew-web-staging.aisr.online`
+          - Build/deploy environment: `CLOUDFLARE_ENV=staging`
+          - Existing Worker Secrets are preserved by normal Wrangler deploys.
+          - LifeSpace bootstrap authority is not present in this repository/workflow.
+          - Production routes/configuration: untouched.
+          EOF
