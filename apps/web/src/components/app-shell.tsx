@@ -1,7 +1,6 @@
 import {
   CalendarDays,
   CheckSquare2,
-  ChevronDown,
   Clock3,
   Heart,
   Home,
@@ -13,19 +12,20 @@ import {
 } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '../lib/cn';
+import { useHousehold } from './household-provider';
 import { Button } from './ui/button';
 
 const navigation = [
   { to: '/', label: '今天', icon: Home, end: true },
+  { to: '/family', label: '家庭', icon: Users },
+  { to: '/settings', label: '设置', icon: Settings },
   { to: '/calendar', label: '日程', icon: CalendarDays },
   { to: '/tasks', label: '待办', icon: CheckSquare2 },
   { to: '/days', label: '日子', icon: Clock3 },
   { to: '/wishes', label: '许愿', icon: Heart },
-  { to: '/family', label: '家庭', icon: Users },
-  { to: '/settings', label: '设置', icon: Settings },
 ];
 
-const mobileNavigation = navigation.slice(0, 5);
+const mobileNavigation = [navigation[0], navigation[3], navigation[4], navigation[1], navigation[2]];
 
 function Brand() {
   return (
@@ -42,19 +42,32 @@ function Brand() {
 }
 
 function DesktopNav() {
+  const { families, currentFamily, members, setCurrentFamilyId } = useHousehold();
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-stone-200/80 bg-[#fbfcfa] px-4 py-5 lg:flex lg:flex-col">
       <div className="px-2"><Brand /></div>
-      <button className="mt-7 flex items-center justify-between rounded-2xl bg-white px-3 py-3 text-left shadow-sm ring-1 ring-stone-200/80">
-        <span className="flex min-w-0 items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-amber-100 text-sm font-semibold text-amber-800">黄</span>
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-stone-800">我们的家</span>
-            <span className="block truncate text-xs text-stone-400">4 位成员 · 界面预览</span>
+      <div className="mt-7 rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-stone-200/80">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-amber-100 text-sm font-semibold text-amber-800">
+            {(currentFamily?.name || '家').slice(0, 1)}
           </span>
-        </span>
-        <ChevronDown className="size-4 text-stone-400" />
-      </button>
+          <span className="min-w-0 flex-1">
+            {families.length > 1 ? (
+              <select
+                className="block w-full bg-transparent text-sm font-semibold text-stone-800 outline-none"
+                value={currentFamily?.id || ''}
+                onChange={(event) => setCurrentFamilyId(event.target.value)}
+                aria-label="切换家庭"
+              >
+                {families.map((family) => <option key={family.id} value={family.id}>{family.name}</option>)}
+              </select>
+            ) : (
+              <span className="block truncate text-sm font-semibold text-stone-800">{currentFamily?.name || '暂无家庭'}</span>
+            )}
+            <span className="block truncate text-xs text-stone-400">{currentFamily ? `${members.length} 位成员` : '请先创建或加入家庭'}</span>
+          </span>
+        </div>
+      </div>
       <nav className="mt-6 space-y-1">
         {navigation.map(({ to, label, icon: Icon, end }) => (
           <NavLink
@@ -73,7 +86,7 @@ function DesktopNav() {
       </nav>
       <div className="mt-auto rounded-3xl bg-emerald-950 p-4 text-emerald-50">
         <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4" /> 喵一下</div>
-        <p className="mt-2 text-xs leading-5 text-emerald-100/70">未来在这里快速创建日程、待办、日子和愿望。</p>
+        <p className="mt-2 text-xs leading-5 text-emerald-100/70">日程、待办、日子和愿望将在家庭管理与外部系统之后继续接入。</p>
       </div>
     </aside>
   );
@@ -101,6 +114,7 @@ function MobileBottomNav() {
 }
 
 export function AppShell() {
+  const { user, currentFamily } = useHousehold();
   return (
     <div className="min-h-screen bg-[#f6f8f4] text-stone-900">
       <DesktopNav />
@@ -110,12 +124,14 @@ export function AppShell() {
             <div className="lg:hidden"><Brand /></div>
             <div className="hidden lg:block">
               <p className="text-xs font-medium text-stone-400">家庭空间</p>
-              <p className="text-sm font-semibold text-stone-800">我们的家</p>
+              <p className="text-sm font-semibold text-stone-800">{currentFamily?.name || '暂无家庭'}</p>
             </div>
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" size="icon" aria-label="搜索"><Search className="size-[18px]" /></Button>
               <Button variant="ghost" size="icon" aria-label="更多菜单" className="lg:hidden"><Menu className="size-[19px]" /></Button>
-              <button className="ml-1 grid size-9 place-items-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800 ring-2 ring-white">锐</button>
+              <div className="ml-1 grid size-9 place-items-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800 ring-2 ring-white" title={user?.displayName || ''}>
+                {(user?.displayName || '我').slice(0, 1)}
+              </div>
             </div>
           </div>
         </header>
