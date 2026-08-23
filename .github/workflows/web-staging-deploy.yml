@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: homemew-web-staging
@@ -33,6 +34,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Report deployment started
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          echo "starting" > "$RUNNER_TEMP/homemew-web-deploy-stage"
+          node --input-type=module <<'NODE'
+          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          const response = await fetch(`${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/statuses/${process.env.GITHUB_SHA}`, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+              accept: 'application/vnd.github+json',
+              'x-github-api-version': '2022-11-28',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              state: 'pending',
+              target_url: runUrl,
+              description: 'HomeMew Web staging deployment started',
+              context: 'homemew-web-staging/deploy',
+            }),
+          });
+          if (!response.ok) throw new Error(`Could not publish pending commit status: ${response.status}`);
+          NODE
+
       - name: Set up Node.js 24
         uses: actions/setup-node@v7
         with:
@@ -42,26 +69,33 @@ jobs:
         run: corepack enable
 
       - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: |
+          echo "install" > "$RUNNER_TEMP/homemew-web-deploy-stage"
+          corepack pnpm install --frozen-lockfile
 
       - name: Validate Cloudflare deployment credentials
         shell: bash
         run: |
+          echo "validate-authority" > "$RUNNER_TEMP/homemew-web-deploy-stage"
           set -euo pipefail
           test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN is not configured" >&2; exit 1; }
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID is not configured" >&2; exit 1; }
 
       - name: Validate HomeMew Web
         run: |
+          echo "validate-web" > "$RUNNER_TEMP/homemew-web-deploy-stage"
           corepack pnpm test:web
           corepack pnpm typecheck:web
 
       - name: Deploy HomeMew Web staging
-        run: corepack pnpm deploy:web:staging
+        run: |
+          echo "deploy" > "$RUNNER_TEMP/homemew-web-deploy-stage"
+          corepack pnpm deploy:web:staging
 
       - name: Verify staging hostname is reachable
         shell: bash
         run: |
+          echo "verify-domain" > "$RUNNER_TEMP/homemew-web-deploy-stage"
           set -euo pipefail
           for attempt in $(seq 1 20); do
             if code="$(curl --silent --show-error --head --output /dev/null --write-out '%{http_code}' --connect-timeout 5 --max-time 10 https://homemew-web-staging.aisr.online/health)"; then
@@ -76,6 +110,37 @@ jobs:
           echo "HomeMew Web staging hostname did not become reachable" >&2
           exit 1
 
+      - name: Report deployment result
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const stagePath = `${process.env.RUNNER_TEMP}/homemew-web-deploy-stage`;
+          const stage = fs.existsSync(stagePath) ? fs.readFileSync(stagePath, 'utf8').trim() : 'unknown';
+          const succeeded = process.env.JOB_STATUS === 'success';
+          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          const response = await fetch(`${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/statuses/${process.env.GITHUB_SHA}`, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+              accept: 'application/vnd.github+json',
+              'x-github-api-version': '2022-11-28',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              state: succeeded ? 'success' : 'failure',
+              target_url: runUrl,
+              description: succeeded ? 'HomeMew Web staging deployment succeeded' : `HomeMew Web staging failed at ${stage}`,
+              context: 'homemew-web-staging/deploy',
+            }),
+          });
+          if (!response.ok) throw new Error(`Could not publish final commit status: ${response.status}`);
+          NODE
+
       - name: Summarize staging deployment
         if: ${{ success() }}
         shell: bash
@@ -86,7 +151,8 @@ jobs:
           - Worker: `homemew-web-staging`
           - Hostname: `homemew-web-staging.aisr.online`
           - Build/deploy environment: `CLOUDFLARE_ENV=staging`
-          - Existing Worker Secrets are preserved by normal Wrangler deploys.
+          - First deployment may bootstrap the Worker before LifeSpace runtime secrets are installed.
+          - Once the Worker exists, subsequent deployments fail closed if either required runtime secret is missing.
           - LifeSpace bootstrap authority is not present in this repository/workflow.
           - Production routes/configuration: untouched.
           EOF
