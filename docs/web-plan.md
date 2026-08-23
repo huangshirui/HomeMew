@@ -4,7 +4,7 @@
 
 Build the primary HomeMew Web application at `homemew.aisr.online` as a household product surface, not an enterprise admin dashboard.
 
-The Web app combines normal household use and household-admin settings in one product. The separate household display remains a different runtime because its device identity and read-only authorization model differ from a normal signed-in user.
+The Web app combines normal household use and household-admin settings in one product. LifeSpace remains authoritative for Identity, Spaces/Data Grants, domain models and household data.
 
 ## 2. Product surfaces
 
@@ -13,29 +13,26 @@ The Web app combines normal household use and household-admin settings in one pr
 - `apps/miniprogram/` -> WeChat Mini Program
 - `apps/backend/` -> narrow trusted WeChat provider adapter only; it is not a HomeMew business Core
 
-LifeSpace remains authoritative for Identity, Spaces/Grants, domain models and household data.
-
-## 3. First Web information architecture
+## 3. Information architecture
 
 - `/` - Today / household home
+- `/family` - family members and household profile
+- `/settings` - household/application settings
+- `/settings/integrations` - external-system management
 - `/calendar` - household calendar
 - `/tasks` - tasks
 - `/days` - day records and anniversaries
 - `/wishes` - wish pool
-- `/family` - family members and household profile
-- `/settings` - household/application settings
-- `/settings/integrations` - external-system management when the required LifeSpace end-user provisioning capability exists
 
-Desktop uses a persistent sidebar. Mobile uses a compact header and bottom navigation. Tablet adapts between the two without a separate codebase.
+Desktop uses a persistent sidebar. Mobile uses a compact header and bottom navigation. The current delivery priority deliberately puts Family and Settings/Integrations ahead of Calendar/Tasks/Days/Wishes.
 
 ## 4. UX requirements
 
 - Consumer household-product feel; avoid ERP/admin-template visual language.
 - Warm, calm, readable and friendly; retain the HomeMew green identity without making every surface green.
 - Responsive from phone width through large desktop.
-- Fast common actions: see today, add event/task, check upcoming items, switch family.
 - Accessibility first: semantic controls, keyboard-visible focus, sufficient contrast, reduced-motion friendly behavior.
-- Dark mode is allowed later but is not a first-slice dependency.
+- Do not show fake household data once a real LifeSpace surface is wired.
 
 ## 5. Technical baseline
 
@@ -46,14 +43,12 @@ Use a deliberately small SPA stack:
 - Vite
 - React Router in library/SPA mode
 - Tailwind CSS
-- shadcn/ui conventions with local component source; add only primitives actually needed
+- local shadcn/ui-style primitives
 - Lucide icons
 - Cloudflare Vite plugin + Workers Static Assets
 - pnpm workspace
 
-Do not use Next.js / SSR / RSC for this signed-in household app.
-
-Add TanStack Query when real LifeSpace server-state integration starts. Add Schedule-X when the Calendar page starts. Do not add Redux/Zustand or another global state library unless concrete client-state complexity proves it necessary. Prefer URL state, React Context and local UI/browser state first.
+Do not use Next.js / SSR / RSC for this signed-in household app. Add TanStack Query only when current React context/local-state patterns stop being sufficient. Add Schedule-X only when the real Calendar surface begins.
 
 ## 6. Cloudflare runtime and same-origin BFF boundary
 
@@ -63,114 +58,118 @@ HomeMew Web is a client-rendered SPA deployed as one Cloudflare Worker applicati
 Browser
   -> homemew.aisr.online
        -> static React SPA
-       -> /api/* thin Web session/API gateway
+       -> /api/* Web trust/session boundary
             -> LifeSpace Identity/Core
 ```
 
-`assets.not_found_handling` is `single-page-application`. `assets.run_worker_first` explicitly sends `/api/*` and `/health` to the Worker before static-asset fallback.
-
-The gateway exists only to establish/hold the app-local browser session, keep server-side credentials and LifeSpace user tokens out of frontend JavaScript, validate exact Origin / CSRF protections, propagate request IDs and forward authenticated requests to LifeSpace.
-
-It is **not** a compatibility or business BFF:
-
-- it does not expose a second `/families/...` business contract;
-- it does not persist Spaces, events, tasks, day records, wishes or other household business data;
-- it does not duplicate LifeSpace authorization or model validation;
-- it does not become another Core.
+The gateway keeps server-side credentials and LifeSpace user tokens out of browser JavaScript, validates exact Origin for state-changing requests, propagates request IDs and forwards authenticated requests to LifeSpace. It is not a second business Core, does not persist household records, and does not create a `/families/...` compatibility contract.
 
 ## 7. Authentication architecture
 
-The final browser architecture is **Cloudflare Access × LifeSpace Identity**, not Authorization Code + PKCE.
+The final browser architecture is Cloudflare Access × LifeSpace Identity.
 
 ```text
 Browser
-  -> Cloudflare Access authentication / SSO
+  -> Cloudflare Access / SSO
   -> HomeMew Web Worker receives Cf-Access-Jwt-Assertion
-  -> Worker authenticates to LifeSpace Identity with dedicated HomeMew-Web lsa_*
-  -> Identity independently verifies Access JWT signature / issuer / expiry / audience
-  -> Identity resolves verified (iss, sub) -> global usr_*
-  -> Identity issues short-lived HomeMew-Web-scoped LifeSpace user token
-  -> Worker keeps that bearer in a signed host-only HttpOnly app session
-  -> browser uses same-origin /api/* only
+  -> dedicated HomeMew-Web lsa_*
+  -> LifeSpace Identity verifies Access JWT + registered audience
+  -> Identity resolves (iss, sub) -> global usr_*
+  -> short-lived HomeMew-Web-scoped LifeSpace user token
+  -> signed host-only HttpOnly HomeMew session
 ```
 
-The app-local session is HMAC-authenticated and bound to a SHA-256 fingerprint of the current Access assertion. If the Access principal changes, the previous LifeSpace session cannot be reused.
+Unknown Access principals use explicit link-existing or create-new flows. Email equality is never sufficient to merge identities and Web never submits a target LifeSpace user ID for linking.
 
-Never expose `lsa_*`, service credentials or LifeSpace user bearer tokens to browser JavaScript.
+## 8. Real household context
 
-Unknown Access principals use explicit Identity flows only:
+The Web must load the current user and accessible `Space(kind=family)` records from LifeSpace after the application session is established. `currentFamilyId` is only a browser UI preference; LifeSpace authorization remains authoritative.
 
-- **link existing account**: Web creates a one-time Identity link challenge; an already-authenticated HomeMew client confirms it as its current LifeSpace user;
-- **create new account**: Web explicitly registers a new LifeSpace user bound to the verified Access principal.
+Family/member management uses the current LifeSpace contracts directly through the same-origin proxy:
 
-Email equality is never sufficient to merge identities and Web never submits the target LifeSpace user ID for linking.
+- list accessible family Spaces;
+- switch current family locally;
+- list members/Space Persons;
+- invite members;
+- update non-owner member roles;
+- remove members subject to LifeSpace last-manager/owner rules.
 
-## 8. External integrations
+No HomeMew database or duplicated authorization state is introduced.
 
-HomeMew family admins should eventually manage integrations under `/settings/integrations`. LifeSpace authorization remains authoritative.
+## 9. External integrations — current top priority
 
-The existing platform gap for end-user provisioning of a new service principal plus credential must not be recreated as a HomeMew credential authority. Until the approved LifeSpace capability exists, the Web surface may explain that the function is unavailable but must not issue replacement credentials itself.
+External-system management under `/settings/integrations` is the next primary feature after the minimum family/member context needed to select and administer a household.
 
-## 9. Delivery phases
+Target first UX:
 
-### Phase W1 - foundation — complete in code
+- create one external system for one family;
+- issue a long-lived opaque `lsp_pat_*` Service API Token by default;
+- show credential plaintext exactly once;
+- list non-secret credential metadata;
+- rotate by creating a replacement before revoking the old token;
+- disable an external system and revoke its Data Grants/credentials;
+- OAuth `client_credentials` remains an optional later/advanced mode, not the default for owner-controlled n8n/scripts.
 
-- Convert `apps/web` from the old display placeholder into the real Web app.
-- Create `apps/display` placeholder for the future device-oriented display.
-- Add React/Vite/Cloudflare SPA runtime.
-- Add responsive HomeMew App Shell and Today preview page.
-- Add routes for Calendar, Tasks, Days, Wishes, Family and Settings.
-- Add repository scripts and CI/typecheck/build coverage.
+LifeSpace already owns Service Principals, opaque Service API Tokens and Space Data Grant lifecycle. HomeMew must not recreate a credential authority.
 
-### Phase W2 - Access identity, same-origin gateway and family context — in progress
+The remaining platform gap is **model/collection-scoped Data Grants**. The current product grant creation API creates a Space-wide grant, which is too broad for HomeMew permissions such as `event:write`, `task:read`, or no `day_record` access. External-token issuance must remain unavailable until LifeSpace can express that fine-grained current-state authorization.
 
-Completed in repository code:
+The preferred target is a dedicated HomeMew integrations application context rather than reusing the browser application's service authority. This keeps external-system Application × Model Access independent from the Web UI application and supports least privilege.
 
-- LifeSpace Identity 0.5.0 Access principal exchange/link/registration contract;
-- thin HomeMew Web same-origin Worker BFF;
-- host-only signed app session and exact-Origin protection;
-- Access registration/link-challenge BFF routes;
-- same-origin LifeSpace Core/Identity proxy;
-- staging LifeSpace Web application/AUD provisioning script.
+## 10. Delivery phases
 
-Remaining real staging rollout:
+### W1 — foundation — complete
 
-- deploy LifeSpace Identity schema v5 / contract 0.5.0 to staging;
-- configure `ACCESS_TEAM_DOMAIN`;
-- create/protect `homemew-web-staging.aisr.online` in Cloudflare Access and obtain its AUD;
-- provision `app_homemew_web_staging` and install its dedicated `lsa_*` in the Web Worker secret store;
-- install `WEB_SESSION_SECRET` and deploy the staging Web Worker;
-- prove real Access exchange, explicit registration, link challenge and authenticated Core requests;
-- then replace preview data with LifeSpace-backed profile/family/Space context.
+React/Vite/Cloudflare SPA, responsive shell, routes, repository scripts and CI.
 
-### Phase W3 - core household pages
+### W2 — Access identity and staging runtime — complete
 
-- Calendar with Schedule-X and LifeSpace Calendar/event capability.
-- Tasks with LifeSpace task Actions.
-- Day records/anniversaries.
+- LifeSpace Identity Access principal exchange/link/registration;
+- HomeMew same-origin Worker BFF;
+- signed host-only application session;
+- explicit account linking/registration UI;
+- isolated `homemew-web-staging.aisr.online` Access application;
+- staging LifeSpace application/AUD/credential provisioning;
+- staging Worker deployment and real Access -> LifeSpace session verification.
+
+### W3 — minimum real household administration — current
+
+- real current user + family Space context;
+- family switcher;
+- member list;
+- invite, role update and removal;
+- enough household administration to select the target family for integrations.
+
+### W4 — external integrations — next and highest priority
+
+- LifeSpace model/collection-scoped Data Grant capability;
+- dedicated HomeMew integrations application/service authority;
+- HomeMew Web BFF orchestration that verifies the current family administrator with the user session, then manages service principals/credentials server-side;
+- integration list/create/edit/disable;
+- fixed API Token create/list/rotate/revoke;
+- per-model read/write permission editor;
+- real n8n/curl staging E2E.
+
+### W5 — household domain pages — deferred
+
+- Calendar + Schedule-X + LifeSpace event capability;
+- Tasks;
+- Day records/anniversaries;
 - Wishes.
-- Family/member management.
-- Add TanStack Query when this real server-state integration begins.
 
-### Phase W4 - household admin settings
-
-- Family settings and permissions-aware controls.
-- External integrations only after the required LifeSpace provisioning contract is approved.
-- Diagnostics should expose request IDs without leaking tokens or secrets.
-
-## 10. Production routing constraint
+## 11. Production routing constraint
 
 The final Web domain remains `homemew.aisr.online`, but that hostname currently serves the production Mini Program login endpoint through `homemew-backend-production`.
 
-Do not transfer the production hostname to the Web Worker until the Web front-door can preserve `/api/v1/login/wechat` through an explicit HomeMew backend Service Binding/pass-through and the full Web Access path has passed staging verification.
+Do not transfer the production hostname to the Web Worker until the Web front-door preserves `/api/v1/login/wechat` through an explicit backend Service Binding/pass-through and the full Web path has passed staging verification.
 
-The isolated first Web hostname is `homemew-web-staging.aisr.online`.
+The isolated first Web hostname remains `homemew-web-staging.aisr.online`.
 
-## 11. Non-goals
+## 12. Non-goals
 
 - SSR/SEO framework complexity for the signed-in household app.
 - A second HomeMew business database.
-- A permanent compatibility/business BFF or `/families/...` facade.
+- A permanent compatibility/business BFF.
 - A HomeMew-owned credential authority.
 - Separate desktop/mobile Web codebases.
-- Authorization Code + PKCE as a parallel LifeSpace browser login architecture while Cloudflare Access remains the approved long-term Web SSO layer.
+- Broad Space-wide external-system access as a shortcut around missing model-grant support.
