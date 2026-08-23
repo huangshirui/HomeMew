@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy:staging": "vite build && wrangler deploy --env staging"
+    "deploy:staging": "node scripts/deploy-staging.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.33.0",
