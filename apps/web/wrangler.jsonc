@@ -25,12 +25,6 @@
         "ENVIRONMENT": "staging",
         "LIFESPACE_IDENTITY_URL": "https://auth-staging.aisr.online",
         "LIFESPACE_CORE_URL": "https://core-staging.aisr.online"
-      },
-      "secrets": {
-        "required": [
-          "LIFESPACE_APPLICATION_CREDENTIAL",
-          "WEB_SESSION_SECRET"
-        ]
       }
     },
     "production": {
