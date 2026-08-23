@@ -97,12 +97,36 @@ State-changing BFF/proxy requests require an exact same-origin `Origin` header. 
 - `/api/lifespace/core/v1/*`
 - `/api/lifespace/identity/v1/*`
 
-An unknown Access principal is never silently merged by email. The UI will expose two explicit paths:
+An unknown Access principal is never silently merged by email. The UI exposes two explicit paths:
 
-1. **Link existing account** — Web creates a one-time link challenge; an already-authenticated HomeMew Mini Program later confirms it as its current LifeSpace user.
+1. **Link existing account** — Web creates a one-time link challenge; an already-authenticated HomeMew Mini Program confirms it as its current LifeSpace user.
 2. **Create new account** — Web explicitly calls Access registration with the chosen display name.
 
 Identity derives the target `usr_*`; Web never submits a target user ID.
+
+### Existing-account linking UX
+
+The first staging/MVP UX intentionally keeps the security contract visible and simple:
+
+```text
+HomeMew Web
+  -> POST /api/access/link-challenge
+  -> show alc_... one-time challenge
+
+HomeMew Mini Program
+  -> 我的 -> 设置 -> 关联 Web 登录
+  -> paste alc_...
+  -> POST LifeSpace Identity /api/v1/me/access-link-challenges/{challengeId}/confirm
+     with the Mini Program's existing LifeSpace user bearer
+
+HomeMew Web
+  -> GET /api/session again
+  -> same global usr_* session
+```
+
+The challenge is high-entropy, short-lived and single-use. The Mini Program never accepts or sends a target `userId`; the authenticated bearer is the only proof of which LifeSpace user is confirming the link.
+
+Manual copy/paste is the staging/MVP confirmation UX. A later QR code or Mini Program deep-link may carry the same `challengeId`, but it must not weaken or replace the Identity challenge/confirmation contract.
 
 ## Required configuration
 

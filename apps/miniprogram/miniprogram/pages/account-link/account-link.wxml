@@ -1,0 +1,44 @@
+<view class="container account-link-page">
+  <view class="card link-card">
+    <view class="link-header">
+      <text class="link-title">关联 Web 登录</text>
+      <text class="link-desc">将浏览器中的 Cloudflare Access 登录关联到你当前的家事喵账号。</text>
+    </view>
+
+    <view class="security-note">
+      <text class="security-title">关联后会发生什么？</text>
+      <text class="security-text">Web 和小程序会使用同一个 LifeSpace 用户、家庭和数据，不会创建第二个账号。</text>
+    </view>
+
+    <view class="field">
+      <text class="field-label">一次性关联码</text>
+      <textarea
+        class="challenge-input"
+        value="{{challengeId}}"
+        maxlength="80"
+        auto-height
+        placeholder="alc_..."
+        bindinput="onChallengeInput"
+      />
+      <button class="paste-button" bindtap="pasteChallenge">从剪贴板粘贴</button>
+    </view>
+
+    <view class="steps">
+      <text class="step">1. 在 HomeMew Web 点击“生成一次性关联码”。</text>
+      <text class="step">2. 把关联码粘贴到这里。</text>
+      <text class="step">3. 确认后回到 Web 点击“我已在小程序确认”。</text>
+    </view>
+
+    <button
+      class="confirm-button"
+      type="primary"
+      loading="{{submitting}}"
+      disabled="{{submitting || !challengeId}}"
+      bindtap="confirmLink"
+    >
+      确认关联
+    </button>
+
+    <text class="expiry-note">关联码约 10 分钟有效且只能使用一次。不要关联来源不明的登录请求。</text>
+  </view>
+</view>
