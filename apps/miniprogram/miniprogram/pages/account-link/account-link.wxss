@@ -1,0 +1,119 @@
+.account-link-page {
+  padding-bottom: 48rpx;
+}
+
+.link-card {
+  padding: 32rpx;
+}
+
+.link-header {
+  margin-bottom: 28rpx;
+}
+
+.link-title {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.link-desc {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+.security-note {
+  padding: 24rpx;
+  border-radius: 18rpx;
+  background: var(--color-primary-tint);
+}
+
+.security-title,
+.security-text,
+.field-label,
+.step,
+.expiry-note {
+  display: block;
+}
+
+.security-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--color-primary-dark);
+}
+
+.security-text {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+.field {
+  margin-top: 28rpx;
+}
+
+.field-label {
+  margin-bottom: 12rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.challenge-input {
+  width: 100%;
+  min-height: 118rpx;
+  padding: 20rpx;
+  border: 2rpx solid var(--color-border);
+  border-radius: 16rpx;
+  background: #ffffff;
+  font-family: monospace;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  box-sizing: border-box;
+}
+
+.paste-button {
+  margin: 14rpx 0 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 24rpx;
+  line-height: 1.8;
+  text-align: left;
+}
+
+.paste-button::after {
+  border: 0;
+}
+
+.steps {
+  margin-top: 28rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 16rpx;
+  background: #f8faf8;
+}
+
+.step {
+  margin: 8rpx 0;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+.confirm-button {
+  margin-top: 30rpx;
+  border-radius: 16rpx;
+  background: var(--color-primary);
+}
+
+.expiry-note {
+  margin-top: 20rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--color-text-hint);
+}

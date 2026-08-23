@@ -1,5 +1,18 @@
 <!-- 设置页 -->
 <view class="container">
+  <view class="section card account-section">
+    <view class="section-header">
+      <text class="section-title">账号与登录</text>
+    </view>
+    <navigator class="settings-link" url="/pages/account-link/account-link" hover-class="settings-link-active">
+      <view>
+        <text class="settings-link-title">关联 Web 登录</text>
+        <text class="settings-link-desc">确认浏览器中的一次性关联码，让 Web 使用当前账号</text>
+      </view>
+      <text class="settings-link-arrow">›</text>
+    </navigator>
+  </view>
+
   <view class="section card">
     <view class="section-header">
       <text class="section-title">设备时区</text>

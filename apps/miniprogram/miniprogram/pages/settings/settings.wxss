@@ -4,6 +4,10 @@
   padding: 0 8rpx;
 }
 
+.account-section {
+  margin-bottom: 24rpx;
+}
+
 .section-header {
   padding: 20rpx 16rpx;
   border-bottom: 2rpx solid var(--color-divider);
@@ -13,6 +17,43 @@
   font-size: 32rpx;
   font-weight: 600;
   color: var(--color-text-primary);
+}
+
+.settings-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 24rpx 16rpx;
+  border-radius: 14rpx;
+}
+
+.settings-link-active {
+  background: var(--color-primary-tint);
+}
+
+.settings-link-title,
+.settings-link-desc {
+  display: block;
+}
+
+.settings-link-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.settings-link-desc {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--color-text-hint);
+}
+
+.settings-link-arrow {
+  flex: 0 0 auto;
+  font-size: 40rpx;
+  color: var(--color-text-hint);
 }
 
 /* 模式选择 */

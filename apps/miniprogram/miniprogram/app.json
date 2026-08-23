@@ -15,6 +15,7 @@
     "pages/profile/profile",
     "pages/about/about",
     "pages/settings/settings",
+    "pages/account-link/account-link",
     "pages/family/join",
     "pages/family/detail",
     "pages/family/members",
