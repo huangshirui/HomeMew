@@ -107,6 +107,7 @@ The HomeMew representation is:
 ```text
 one external system
   = one LifeSpace Service Principal
+  + one explicit owning family Space binding on that Principal
   + one or more lsp_pat_* Service API Tokens
   + per-family model-collection Data Grants
 
@@ -120,14 +121,24 @@ model identity and permission
 
 Do not restore legacy token scopes such as `events:write` or `tasks:read`.
 
+The owning family binding and Data Grants solve different problems:
+
+- the binding says which HomeMew family may manage the Principal and its globally usable credentials;
+- Data Grants say what the service may access in a Space;
+- receiving a Data Grant from another Space must never transfer credential-management ownership to that Space.
+
+Because the current LifeSpace Service Principal schema has no application metadata field, HomeMew stores this binding as a namespaced marker inside the authoritative LifeSpace Principal description: `homemew:v1:space=<spc_*>`. The BFF strips that marker from user-facing DTOs and preserves it on edits. HomeMew does not create a second ownership database.
+
 The first HomeMew Web surface supports:
 
-- list external systems associated with the current family through current or historical Data Grants;
-- create one Service Principal for one family;
+- list HomeMew-bound external systems for the current family;
+- surface migrated unbound systems read-only when the current family has a historical/current Grant to them;
+- never expose token metadata or destructive credential controls for an unbound migrated Principal;
+- create one Service Principal for one family and write the ownership binding at creation;
 - choose `none/read/write` for `event`, `task`, and `day_record`;
 - issue a long-lived opaque `lsp_pat_*` Service API Token by default;
 - show credential plaintext exactly once and never persist it in browser storage;
-- list non-secret credential metadata;
+- list non-secret credential metadata for bound Principals;
 - rotate by creating a replacement before revoking the old token;
 - revoke individual tokens;
 - edit name/description/model Grants;
@@ -142,6 +153,8 @@ LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL=lsa_...
 It must be a separate application context from the HomeMew Web browser application and should have only the stable service scope ceiling required by HomeMew integrations. Core Application × Model Access for that application should allow only the HomeMew models intentionally exposed to external systems.
 
 The current UI does not create whole-Space Grants for new integrations. A migrated integration that still has a whole-Space `read/write/manage` Grant is surfaced explicitly as legacy broad authority; the UI does not pretend model-level `none` can narrow that fallback Grant. Fine-grained edits stay blocked for that integration until the broad Grant is deliberately reviewed/migrated.
+
+A migrated Principal without the HomeMew Space ownership binding is also read-only. It cannot be safely “claimed” merely because a current Space has a Grant to it, because the same Principal may have authority in another Space. Establishing that ownership requires a controlled migration that can prove the one-family invariant.
 
 ## 10. Delivery phases
 
@@ -174,6 +187,8 @@ Platform prerequisite is complete in LifeSpace Kernel 0.13.0: model-collection D
 HomeMew implementation scope:
 
 - bounded integration BFF orchestration using current Access user proof + dedicated integrations `lsa_*`;
+- explicit family-Space management ownership binding for each HomeMew-created Service Principal;
+- read-only handling for migrated unbound Principals;
 - integration list/create/edit/disable;
 - fixed API Token create/list/rotate/revoke;
 - per-model read/write permission editor for `event`, `task`, `day_record`;
@@ -206,3 +221,4 @@ The isolated first Web hostname remains `homemew-web-staging.aisr.online`.
 - A HomeMew-owned credential authority.
 - Separate desktop/mobile Web codebases.
 - Broad Space-wide external-system access as a shortcut around model-grant authorization.
+- Treating possession of a Data Grant as authority to rotate a Service Principal's global credentials.
