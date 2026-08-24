@@ -50,7 +50,7 @@ Use a deliberately small SPA stack:
 
 Do not use Next.js / SSR / RSC for this signed-in household app. Add TanStack Query only when current React context/local-state patterns stop being sufficient.
 
-Schedule-X remains the intended richer Calendar renderer, but it is not a correctness prerequisite. The first real Calendar slice intentionally proves LifeSpace range/CRUD/time semantics with the existing UI primitives before adding another dependency.
+Schedule-X remains the intended richer Calendar renderer, but it is not a correctness prerequisite. The current Calendar surface first proves and converges LifeSpace range/CRUD/time semantics with the existing UI primitives; the richer renderer belongs after staging acceptance.
 
 ## 6. Cloudflare runtime and same-origin BFF boundary
 
@@ -209,22 +209,25 @@ Before that credential exists, normal HomeMew Web remains available and `/api/in
 
 Implemented directly against LifeSpace through the same-origin BFF:
 
-- Calendar: month view, timed/all-day event CRUD, family timezone, Space Person attendees, optimistic version concurrency;
+- Calendar: 42-cell visible-grid overlap query, timed/all-day event CRUD, family-local display, independent endpoint timezone preservation, Space Person attendees and optimistic version concurrency;
 - Tasks: pending/completed, overdue/today/upcoming/undated grouping, search, CRUD, complete/reopen Actions, assignees;
-- Days: elapsed/countdown/cycle records, LifeSpace Temporal computed state, CRUD, archive/restore and record-occurrence;
+- Days: elapsed/countdown/cycle records, LifeSpace Temporal computed state, CRUD, archive/restore and an in-product date/note record-occurrence dialog;
 - Wishes: open/claimed/fulfilled/archived views, owner edit/delete and lifecycle Actions;
 - Home/Today: real family-local events, due/overdue tasks, Temporal attention and quick task completion; all preview/fake household data removed.
 
-Follow-up polish includes the richer Schedule-X Calendar renderer, a proper Day occurrence modal instead of `window.prompt`, adjacent-month Calendar range polish, and general responsive/empty/error-state refinement.
+Remaining product polish is primarily richer Calendar presentation (Schedule-X after staging acceptance) plus general responsive/empty/error-state refinement.
 
 ### W6 — staging acceptance and product convergence — current
 
 - keep `main` continuously deployable to `homemew-web-staging.aisr.online`;
 - run real household CRUD/action smoke tests through Cloudflare Access;
 - finish W4 integrations runtime activation and service-token E2E;
+- make staging deployment output explicitly report base runtime readiness and whether the optional W4 integrations Worker secret binding is present, without exposing secret values;
 - fix UX states that can currently submit requests the server will deterministically reject;
 - converge Calendar/Tasks/Days/Wishes/Home interaction and visual behavior;
 - only after staging acceptance, design the production front-door cutover that preserves Mini Program backend routes.
+
+Until W4 staging activation is complete, a missing integrations credential is reported as `not configured / fail-closed` rather than failing the otherwise healthy HomeMew Web deployment. After the real integration E2E passes, promote that credential to a required staging deployment prerequisite.
 
 ## 11. Production routing constraint
 
