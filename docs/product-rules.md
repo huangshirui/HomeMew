@@ -1,6 +1,6 @@
 # HomeMew Product Rules
 
-This document defines product and business rules that clients and Core must follow. API syntax is defined in `apps/core/openapi.yaml`; architecture boundaries are defined in `docs/architecture.md`.
+This document defines HomeMew product and business rules. Current platform API syntax, authentication, authorization, IDs, model fields and runtime behavior are defined by the LifeSpace contracts/implementation; architecture boundaries and explicit HomeMew -> LifeSpace mappings are defined in `docs/architecture.md`. The legacy `apps/core/openapi.yaml` is migration/reference material only and is not a current platform contract.
 
 ## 1. Users
 
@@ -193,7 +193,7 @@ The first version has one task-level completion state. It does not track complet
 - Past countdowns remain critical until a household member archives them.
 - Any active member may read, create, edit, record, archive, restore, and soft-delete day records. Archived records are read-only except for restore and delete.
 - `subjectUserId`, when set or changed, must be an active member of the same family; historical references remain after membership removal.
-- External systems use `day-records:read` and `day-records:write`; write requires read, and systems cannot use `subjectUserId=me`.
+- HomeMew-managed external systems access the LifeSpace `day_record` model through stable `resources:read` / `resources:write` credential scopes plus the corresponding model-scoped Data Grant; they do not use legacy `day-records:*` scopes, and they cannot use user-relative `subjectUserId=me` semantics.
 - Day records are lightweight time state, not household asset files. Models, costs, attachments, mileage triggers, and maintenance projects are out of scope.
 
 ## 8. Wishes
@@ -247,21 +247,21 @@ The first version has one task-level completion state. It does not track complet
 
 ## 13. External systems
 
-- Only an active family administrator may create, edit, disable, delete, or
-  rotate credentials for an external system.
-- An external system belongs to one family, is not a member, and cannot manage
-  users, members, invitations, family settings, or avatars.
-- Available permissions are `family:read`, `events:read`, `events:write`,
-  `tasks:read`, `tasks:write`, `day-records:read`, and `day-records:write`;
-  write requires the matching read permission.
-- Systems use the same event, task, and day-record resources as users.
-  `attendeeId=me`, `assigneeId=me`, and `subjectUserId=me` are invalid for systems.
-- Client secrets and API tokens are returned only at creation. Multiple active
-  credentials may coexist for rotation; revocation is immediate.
-- Deleting an integration is a soft deletion and does not delete events or
-  tasks it created. Historical actor names remain available.
-- Event/task creation, update, completion, reopening, and deletion record the
-  true `user` or `system` actor.
+- Only a current family administrator may manage HomeMew external integrations. The client role check is UX only; the Web BFF must obtain an on-demand LifeSpace user token with `grants:manage`, and LifeSpace Core must verify current `manage` authority on the selected family `Space(kind=family)` before any integration-management operation proceeds.
+- One HomeMew external system maps to one LifeSpace Service Principal and one explicit owning family Space. The service is not a Space member and receives no user/member/invitation/family-settings/avatar administration authority by default.
+- Credential scope names are stable platform scopes, currently `resources:read` and `resources:write`. Model permission is not encoded as legacy scopes such as `events:write`, `tasks:read`, or `day-records:write`.
+- The first HomeMew Web integration editor exposes `none`, `read`, or `write` for LifeSpace models `event`, `task`, and `day_record`. Effective data access remains Service Principal ∩ credential scope ∩ Application × Model Access ∩ current model-scoped Data Grant.
+- `write` permission implies that the issued credential also carries `resources:read`; Data Grants still independently determine which model collection may be read or written in the target Space.
+- HomeMew does not create a whole-Space Grant for a new external system. A migrated whole-Space `read`, `write`, or `manage` Grant is broader fallback authority and must be shown explicitly; the UI must not claim model-level `none` is effective while that broad Grant remains active.
+- A Data Grant proves what a service may access; it does **not** prove which Space owns the Service Principal or may rotate its globally usable credentials. Every HomeMew-created Principal therefore carries an explicit owning-Space binding stored as HomeMew-namespaced application metadata on the authoritative LifeSpace Principal. With the current LifeSpace schema this is encoded in the description as `homemew:v1:space=<spc_*>` and stripped from the user-facing description by the BFF.
+- Another Space receiving a Data Grant to the same `svc_*` does not gain Token creation/revocation, Principal editing, or disable rights. A Principal explicitly bound to another Space is not surfaced as manageable merely because the current Space has granted it data access.
+- A migrated Principal without the HomeMew owning-Space binding may be shown read-only when the current family has a current or historical Grant to it, but HomeMew must not expose its Token metadata, rotate/revoke its credentials, edit it, disable it, or automatically claim it. Ownership migration requires a controlled process that can prove the intended one-family ownership invariant.
+- Service Principal and Token lifecycle operations run only on the server with a dedicated HomeMew integrations LifeSpace application credential. Browser code never receives either `lsa_*` application credential or LifeSpace user Bearer tokens.
+- `lsp_pat_*` plaintext is returned only when created. HomeMew may render it once in current in-memory UI state but must not persist it in localStorage, sessionStorage, a HomeMew database, logs, analytics, or telemetry. Multiple active Tokens may coexist to support create-new-then-revoke-old rotation; revocation is immediate.
+- Disabling an integration disables its Service Principal first, then attempts to revoke active Tokens and current-family Data Grants. If cleanup partially fails, the Principal remains disabled so the fail-safe state removes effective service access until cleanup is repaired.
+- Systems use the same LifeSpace event, task, and day-record resources as users. User-relative aliases such as `attendeeId=me`, `assigneeId=me`, or `subjectUserId=me` are invalid for service principals where the active LifeSpace contract does not define them.
+- `wish` is not exposed to service principals in the first HomeMew Web external-integration slice.
+- Disabling or deleting an integration does not delete historical events, tasks, or day records it created. Audit fields preserve the true service principal as actor where the LifeSpace model supports actor audit.
 
 ## 14. AI creation drafts
 
