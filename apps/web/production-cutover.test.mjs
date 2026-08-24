@@ -19,6 +19,7 @@ test('production cutover preserves Mini Program login and supports rollback', ()
   assert.match(script, /homemew-web-production/);
   assert.match(script, /movedByThisRun/);
   assert.match(script, /attachDomain\(OLD_SERVICE\)/);
+  assert.match(script, /override_existing_origin:\s*true/);
   assert.match(script, /INVALID_REQUEST/);
 });
 
