@@ -10,7 +10,7 @@
     "dev": "pnpm --filter @homemew/core dev",
     "dev:web": "pnpm --filter @homemew/web dev",
     "test": "pnpm --filter @homemew/core test",
-    "test:web": "node --test apps/web/worker.test.mjs",
+    "test:web": "node --test apps/web/*.test.mjs",
     "typecheck": "pnpm --filter @homemew/core typecheck",
     "typecheck:miniprogram": "pnpm --filter homemew-miniprogram typecheck",
     "typecheck:web": "pnpm --filter @homemew/web typecheck",

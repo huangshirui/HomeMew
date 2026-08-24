@@ -81,6 +81,8 @@ Browser
 
 Unknown Access principals use explicit link-existing or create-new flows. Email equality is never sufficient to merge identities and Web never submits a target LifeSpace user ID for linking.
 
+Normal HomeMew browser sessions deliberately do not request `grants:manage`. Integration-management BFF operations perform a fresh Access -> LifeSpace exchange for the minimum `profile:read grants:manage` scope set, then Core independently requires current `manage` authority on the selected Space. This keeps household Grant administration out of the ambient browser application session.
+
 ## 8. Real household context
 
 The Web must load the current user and accessible `Space(kind=family)` records from LifeSpace after the application session is established. `currentFamilyId` is only a browser UI preference; LifeSpace authorization remains authoritative.
@@ -98,23 +100,61 @@ No HomeMew database or duplicated authorization state is introduced.
 
 ## 9. External integrations — current top priority
 
-External-system management under `/settings/integrations` is the next primary feature after the minimum family/member context needed to select and administer a household.
+LifeSpace Kernel 0.13.0 now supports model-collection Data Grants, closing the platform authorization gap that previously blocked least-privilege external-system issuance.
 
-Target first UX:
+The HomeMew representation is:
 
-- create one external system for one family;
+```text
+one external system
+  = one LifeSpace Service Principal
+  + one explicit owning family Space binding on that Principal
+  + one or more lsp_pat_* Service API Tokens
+  + per-family model-collection Data Grants
+
+stable credential scopes
+  = resources:read / resources:write
+
+model identity and permission
+  = Application × Model Access
+  ∩ current model Data Grant
+```
+
+Do not restore legacy token scopes such as `events:write` or `tasks:read`.
+
+The owning family binding and Data Grants solve different problems:
+
+- the binding says which HomeMew family may manage the Principal and its globally usable credentials;
+- Data Grants say what the service may access in a Space;
+- receiving a Data Grant from another Space must never transfer credential-management ownership to that Space.
+
+Because the current LifeSpace Service Principal schema has no application metadata field, HomeMew stores this binding as a namespaced marker inside the authoritative LifeSpace Principal description: `homemew:v1:space=<spc_*>`. The BFF strips that marker from user-facing DTOs and preserves it on edits. HomeMew does not create a second ownership database.
+
+The first HomeMew Web surface supports:
+
+- list HomeMew-bound external systems for the current family;
+- surface migrated unbound systems read-only when the current family has a historical/current Grant to them;
+- never expose token metadata or destructive credential controls for an unbound migrated Principal;
+- create one Service Principal for one family and write the ownership binding at creation;
+- choose `none/read/write` for `event`, `task`, and `day_record`;
 - issue a long-lived opaque `lsp_pat_*` Service API Token by default;
-- show credential plaintext exactly once;
-- list non-secret credential metadata;
+- show credential plaintext exactly once and never persist it in browser storage;
+- list non-secret credential metadata for bound Principals;
 - rotate by creating a replacement before revoking the old token;
-- disable an external system and revoke its Data Grants/credentials;
-- OAuth `client_credentials` remains an optional later/advanced mode, not the default for owner-controlled n8n/scripts.
+- revoke individual tokens;
+- edit name/description/model Grants;
+- disable a Service Principal first, then revoke its current family Grants and active tokens.
 
-LifeSpace already owns Service Principals, opaque Service API Tokens and Space Data Grant lifecycle. HomeMew must not recreate a credential authority.
+Service-principal/token lifecycle uses a dedicated HomeMew integrations LifeSpace application credential held only by the Web Worker:
 
-The remaining platform gap is **model/collection-scoped Data Grants**. The current product grant creation API creates a Space-wide grant, which is too broad for HomeMew permissions such as `event:write`, `task:read`, or no `day_record` access. External-token issuance must remain unavailable until LifeSpace can express that fine-grained current-state authorization.
+```text
+LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL=lsa_...
+```
 
-The preferred target is a dedicated HomeMew integrations application context rather than reusing the browser application's service authority. This keeps external-system Application × Model Access independent from the Web UI application and supports least privilege.
+It must be a separate application context from the HomeMew Web browser application and should have only the stable service scope ceiling required by HomeMew integrations. Core Application × Model Access for that application should allow only the HomeMew models intentionally exposed to external systems.
+
+The current UI does not create whole-Space Grants for new integrations. A migrated integration that still has a whole-Space `read/write/manage` Grant is surfaced explicitly as legacy broad authority; the UI does not pretend model-level `none` can narrow that fallback Grant. Fine-grained edits stay blocked for that integration until the broad Grant is deliberately reviewed/migrated.
+
+A migrated Principal without the HomeMew Space ownership binding is also read-only. It cannot be safely “claimed” merely because a current Space has a Grant to it, because the same Principal may have authority in another Space. Establishing that ownership requires a controlled migration that can prove the one-family invariant.
 
 ## 10. Delivery phases
 
@@ -132,7 +172,7 @@ React/Vite/Cloudflare SPA, responsive shell, routes, repository scripts and CI.
 - staging LifeSpace application/AUD/credential provisioning;
 - staging Worker deployment and real Access -> LifeSpace session verification.
 
-### W3 — minimum real household administration — current
+### W3 — minimum real household administration — complete
 
 - real current user + family Space context;
 - family switcher;
@@ -140,15 +180,23 @@ React/Vite/Cloudflare SPA, responsive shell, routes, repository scripts and CI.
 - invite, role update and removal;
 - enough household administration to select the target family for integrations.
 
-### W4 — external integrations — next and highest priority
+### W4 — external integrations — current
 
-- LifeSpace model/collection-scoped Data Grant capability;
-- dedicated HomeMew integrations application/service authority;
-- HomeMew Web BFF orchestration that verifies the current family administrator with the user session, then manages service principals/credentials server-side;
+Platform prerequisite is complete in LifeSpace Kernel 0.13.0: model-collection Data Grants are supported.
+
+HomeMew implementation scope:
+
+- bounded integration BFF orchestration using current Access user proof + dedicated integrations `lsa_*`;
+- explicit family-Space management ownership binding for each HomeMew-created Service Principal;
+- read-only handling for migrated unbound Principals;
 - integration list/create/edit/disable;
 - fixed API Token create/list/rotate/revoke;
-- per-model read/write permission editor;
+- per-model read/write permission editor for `event`, `task`, `day_record`;
+- one-time secret handling and deny-path tests;
+- staging provisioning of the dedicated integrations application credential and Web app `grants:manage` ceiling;
 - real n8n/curl staging E2E.
+
+The code is safe to deploy before the integrations credential exists: normal HomeMew Web remains available, `/health` reports `integrationsReady=false`, and integration endpoints fail closed with `INTEGRATIONS_NOT_CONFIGURED`. Once staging is provisioned and verified, make the integration credential a required deployment secret.
 
 ### W5 — household domain pages — deferred
 
@@ -172,4 +220,5 @@ The isolated first Web hostname remains `homemew-web-staging.aisr.online`.
 - A permanent compatibility/business BFF.
 - A HomeMew-owned credential authority.
 - Separate desktop/mobile Web codebases.
-- Broad Space-wide external-system access as a shortcut around missing model-grant support.
+- Broad Space-wide external-system access as a shortcut around model-grant authorization.
+- Treating possession of a Data Grant as authority to rotate a Service Principal's global credentials.

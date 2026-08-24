@@ -50,6 +50,7 @@ test('health reports Access BFF readiness without exposing secrets', async () =>
     service: 'homemew-web',
     environment: 'test',
     ready: true,
+    integrationsReady: false,
     accessMode: 'cloudflare-access',
   });
 });
