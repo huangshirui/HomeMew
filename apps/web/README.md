@@ -52,9 +52,7 @@ Browser
        -> /api/* and /health -> Worker BFF
 ```
 
-Wrangler uses `assets.not_found_handling = "single-page-application"` and selective `assets.run_worker_first` for `/api/*` and `/health`. With the Cloudflare Vite plugin, the asset directory is generated from the Vite client build and does not need to be hard-coded.
-
-The Worker BFF is an authentication/session edge boundary only. It must not:
+The Worker BFF is an authentication/session/application-orchestration boundary only. It must not:
 
 - create a HomeMew `/families/...` business contract;
 - persist Spaces, events, tasks, day records, wishes or other household data;
@@ -94,6 +92,7 @@ State-changing BFF/proxy requests require an exact same-origin `Origin` header. 
 - `POST /api/session/logout`
 - `POST /api/access/register`
 - `POST /api/access/link-challenge`
+- `/api/integrations*` bounded external-system orchestration
 - `/api/lifespace/core/v1/*`
 - `/api/lifespace/identity/v1/*`
 
@@ -128,12 +127,45 @@ The challenge is high-entropy, short-lived and single-use. The Mini Program neve
 
 Manual copy/paste is the staging/MVP confirmation UX. A later QR code or Mini Program deep-link may carry the same `challengeId`, but it must not weaken or replace the Identity challenge/confirmation contract.
 
+## External integrations boundary
+
+`/settings/integrations` uses LifeSpace Service Principals, Service API Tokens and model-scoped Data Grants directly; HomeMew does not own a credential store or permission table.
+
+Two separate LifeSpace application contexts are involved:
+
+```text
+HomeMew Web application
+  lsa_* -> Access exchange for the current human
+  normal session scopes do not include grants:manage
+
+HomeMew integrations application
+  separate lsa_* held only by the Worker
+  -> create/update Service Principals
+  -> create/list/revoke lsp_pat_* credentials
+```
+
+For every integration-management request the Worker performs a fresh Access exchange for only `profile:read grants:manage`, obtains the current `usr_*`, and calls `GET /api/v1/spaces/{spaceId}/grants?includeRevoked=true`. Core therefore proves both the `grants:manage` credential scope and the user's current `manage` authority on the selected Space before the BFF performs any service-principal operation.
+
+The first UI exposes model collection permissions for `event`, `task`, and `day_record`. Stable service token scopes remain `resources:read` / `resources:write`; model identity belongs to Application × Model Access and Data Grants.
+
+New integrations do not receive whole-Space Grants. Migrated principals that still have a whole-Space `read/write/manage` Grant are surfaced as broad legacy authority and are not falsely represented as model-restricted.
+
+Token plaintext is returned once by Identity and rendered only in current React memory. It is not written to localStorage/sessionStorage or a HomeMew database.
+
 ## Required configuration
 
-Server-only secrets:
+Base server-only secrets:
 
 - `LIFESPACE_APPLICATION_CREDENTIAL` — dedicated trusted **HomeMew Web** LifeSpace application credential (`lsa_*`), not the Mini Program credential;
 - `WEB_SESSION_SECRET` — at least 32 characters.
+
+External integrations additionally require:
+
+- `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` — a separate trusted LifeSpace application credential used only for HomeMew-managed service principals and credentials.
+
+The HomeMew Web LifeSpace application must allow `grants:manage` so the BFF can request the narrow on-demand manager token. The normal ambient Web session intentionally does not request that scope.
+
+The integrations LifeSpace application should have only the stable service scope ceiling needed by the product (currently `resources:read` / `resources:write`) and Core Application × Model Access for the explicitly supported HomeMew models.
 
 Non-secret configuration:
 
@@ -142,6 +174,8 @@ Non-secret configuration:
 - `LIFESPACE_CORE_URL`
 
 The Worker must sit behind the intended Cloudflare Access application. The original assertion comes from `Cf-Access-Jwt-Assertion`; browser JSON must never be accepted as an assertion source.
+
+`/health` reports base `ready` and separate `integrationsReady`. Before the integrations credential is installed, normal HomeMew Web remains usable while `/api/integrations*` fails closed with `INTEGRATIONS_NOT_CONFIGURED`.
 
 ## Staging and production
 
@@ -171,4 +205,6 @@ pnpm test:web
 pnpm check
 ```
 
-The root check includes Mini Program typecheck, Web typecheck/build, the dependency-free BFF tests, legacy Core contract/tests/typecheck/build and therefore treats the Web application as a first-class repository surface.
+`pnpm test:web` runs dependency-free Worker/BFF tests for both the normal Access session boundary and the external-integration orchestration boundary.
+
+The root check includes Mini Program typecheck, Web typecheck/build, BFF tests, legacy Core contract/tests/typecheck/build and therefore treats the Web application as a first-class repository surface.
