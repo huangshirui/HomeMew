@@ -40,6 +40,8 @@ type EventDraft = {
   endTime: string;
   timezone: string;
   endTimezone: string;
+  startTimezoneMetadata: string | null;
+  endTimezoneMetadata: string | null;
   attendeePersonIds: string[];
 };
 
@@ -143,6 +145,8 @@ function defaultDraft(timeZone: string, date?: string): EventDraft {
     endTime: '10:00',
     timezone: timeZone,
     endTimezone: timeZone,
+    startTimezoneMetadata: timeZone,
+    endTimezoneMetadata: timeZone,
     attendeePersonIds: [],
   };
 }
@@ -160,12 +164,14 @@ function draftFromEvent(event: EventRecord, fallbackTimezone: string): EventDraf
       endTime: '10:00',
       timezone: fallbackTimezone,
       endTimezone: fallbackTimezone,
+      startTimezoneMetadata: fallbackTimezone,
+      endTimezoneMetadata: fallbackTimezone,
       attendeePersonIds: event.attendeePersonIds ?? [],
     };
   }
-  const timezone = event.startTimezone || fallbackTimezone;
+  const timezone = event.startTimezone ?? fallbackTimezone;
+  const endTimezone = event.endTimezone ?? fallbackTimezone;
   const start = event.startAt ? localDateParts(new Date(event.startAt), timezone) : { date: currentDateInZone(timezone), time: '09:00' };
-  const endTimezone = event.endTimezone || timezone;
   const end = event.endAt ? localDateParts(new Date(event.endAt), endTimezone) : { date: start.date, time: '10:00' };
   return {
     summary: event.summary,
@@ -178,6 +184,8 @@ function draftFromEvent(event: EventRecord, fallbackTimezone: string): EventDraf
     endTime: end.time,
     timezone,
     endTimezone,
+    startTimezoneMetadata: event.startTimezone,
+    endTimezoneMetadata: event.endTimezone,
     attendeePersonIds: event.attendeePersonIds ?? [],
   };
 }
@@ -213,8 +221,8 @@ function eventPayload(draft: EventDraft) {
     isAllDay: false,
     startAt,
     endAt,
-    startTimezone: draft.timezone,
-    endTimezone: draft.endTimezone,
+    startTimezone: draft.startTimezoneMetadata,
+    endTimezone: draft.endTimezoneMetadata,
     startDate: null,
     endDateExclusive: null,
   };
