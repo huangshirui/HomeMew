@@ -197,6 +197,10 @@ The Web BFF may hold only short-lived browser application-session state and serv
 
 Authoritative household data, service-principal state, credentials and authorization live in LifeSpace. Mini Program/browser storage is cache/UI state only.
 
+For a HomeMew-created external system, the owning family Space is recorded as a HomeMew-namespaced binding in the LifeSpace Service Principal description (`homemew:v1:space=<spc_*>`) because the current LifeSpace Service Principal schema has no application metadata field. This is application ownership metadata stored on the authoritative LifeSpace principal, not a second HomeMew permission store. The user-facing description is stored after the marker and the BFF strips the marker before returning the DTO.
+
+A Data Grant by itself is deliberately **not** treated as credential-management ownership. Data Grants express what the service may access; they do not prove which Space may rotate a globally usable credential for that Service Principal.
+
 ## 11. External systems
 
 LifeSpace Kernel 0.13.0 and Identity 0.5.0 provide the approved HomeMew external-system authority:
@@ -214,6 +218,7 @@ current Access-authenticated family administrator
   -> Core verifies current family Space manage authority
 
 HomeMew integrations BFF
+  -> verifies Service Principal HomeMew Space ownership binding
   -> separate LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL (lsa_*)
   -> Identity self-service Service Principal / Token APIs
 
@@ -226,12 +231,14 @@ resulting service
 
 Rules:
 
-- one external system gets one independent Service Principal;
+- one HomeMew external system gets one independent Service Principal and one explicit owning family Space binding;
+- a Data Grant from another Space does not transfer Service Principal or Token management rights to that Space;
 - Token plaintext is returned once and must never be persisted by HomeMew;
 - new integrations receive only explicit model-collection Grants, currently for `event`, `task`, and `day_record`;
 - `wish` is not exposed to external systems in this first Web slice;
 - disabling a system disables the Service Principal first, then attempts to revoke its current family Grants and active Tokens;
-- historical/revoked Grants may be used only to associate a disabled Service Principal back to the family for UI/history; they do not restore authority;
+- a migrated Service Principal without the HomeMew Space ownership binding may be surfaced read-only when the current family has a historical/current Grant to it, but HomeMew must not list its Token metadata, rotate/revoke credentials, edit it, or disable it until a controlled migration establishes ownership;
+- a Service Principal explicitly bound to a different Space is never surfaced merely because the current Space also has a Data Grant to it;
 - a migrated whole-Space `read/write/manage` Grant remains broader than per-model Grants and is surfaced explicitly; HomeMew must not claim a model is denied while that fallback Grant is active;
 - the browser never receives either the Web `lsa_*` or the integrations `lsa_*`.
 
