@@ -33,6 +33,14 @@ Mini Program
 
 Do not add a transparent HomeMew `/families/...` proxy/BFF. HomeMew product terms are adapted explicitly in `miniprogram/services/` to LifeSpace APIs.
 
+## Product surface boundary
+
+The Mini Program is intentionally the lightweight, high-frequency household client. External-system administration is an advanced capability and is Web-only.
+
+Do not add Mini Program pages, settings, service adapters, credential buffers, or secret-display flows for Service Principals, Data Grants, API Tokens, OAuth Client Credentials, n8n/Agent integration setup, credential rotation, or integration disable/revoke operations. These belong to HomeMew Web `/settings/integrations`.
+
+The Mini Program may display audit actors that happen to be external systems when returned by LifeSpace business models, but it must not manage those external systems or their credentials.
+
 ## Source of truth
 
 - Platform API/auth/model behavior: `huangshirui/LifeSpace`.

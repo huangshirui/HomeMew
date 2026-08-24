@@ -29,10 +29,6 @@
       <text class="menu-text">邀请家人加入</text>
       <text class="arrow">›</text>
     </view>
-    <view wx:if="{{detail.currentUserRole === 'admin'}}" class="menu-item" bindtap="onViewIntegrations">
-      <text class="menu-text">外部系统</text>
-      <text class="arrow">›</text>
-    </view>
   </view>
 
   <!-- 危险操作 -->

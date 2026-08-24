@@ -8,6 +8,8 @@ const ENV = {
   LIFESPACE_IDENTITY_URL: 'https://auth.example.test',
   LIFESPACE_CORE_URL: 'https://core.example.test',
 };
+const ASSERTION = 'access-assertion';
+const REQUEST_ID = 'req_integrations';
 
 function request(path, { method = 'GET', body, origin = 'https://homemew.example.test' } = {}) {
   const headers = new Headers();
@@ -31,217 +33,280 @@ async function payload(value) {
   return value.json();
 }
 
-const ASSERTION = 'access-assertion';
-const REQUEST_ID = 'req_integrations';
-
-function managerResponses(url, init) {
-  if (url === 'https://auth.example.test/internal/v1/access/tokens') {
-    assert.equal(init.headers.authorization, `Bearer ${ENV.LIFESPACE_APPLICATION_CREDENTIAL}`);
-    assert.deepEqual(JSON.parse(init.body).requestedScopes, ['profile:read', 'grants:manage']);
-    return response(200, { data: { accessToken: 'manager-token', expiresIn: 300 } });
-  }
-  if (url === 'https://auth.example.test/api/v1/me') {
-    assert.equal(init.headers.authorization, 'Bearer manager-token');
-    return response(200, { data: { id: 'usr_manager', displayName: 'Manager' } });
-  }
-  return null;
+function createState({ principals = [], grants = [], tokens = [], oauth = [] } = {}) {
+  return { principals, grants, tokens, oauth, counter: 0 };
 }
 
-test('integration list uses explicit HomeMew Space ownership before exposing credential controls', async () => {
-  const calls = [];
-  const grants = [
-    {
-      id: 'grt_1', sourceSpaceId: 'spc_family', granteeType: 'service', granteeId: 'svc_family',
-      resourceType: 'model', resourceId: 'event', permission: 'write', expiresAt: null, revokedAt: null,
-    },
-    {
-      id: 'grt_2', sourceSpaceId: 'spc_family', granteeType: 'service', granteeId: 'svc_other',
-      resourceType: 'model', resourceId: 'event', permission: 'read', expiresAt: null, revokedAt: null,
-    },
-    {
-      id: 'grt_3', sourceSpaceId: 'spc_family', granteeType: 'service', granteeId: 'svc_legacy',
-      resourceType: 'model', resourceId: 'task', permission: 'read', expiresAt: null, revokedAt: null,
-    },
-  ];
-  const fetcher = async (input, init = {}) => {
+function makeFetcher(state) {
+  return async (input, init = {}) => {
     const url = String(input);
-    calls.push({ url, init });
-    const manager = managerResponses(url, init);
-    if (manager) return manager;
-    if (url === 'https://core.example.test/api/v1/spaces/spc_family/grants?includeRevoked=true') {
+    const method = init.method ?? 'GET';
+    if (url === 'https://auth.example.test/internal/v1/access/tokens') {
+      assert.equal(init.headers.authorization, `Bearer ${ENV.LIFESPACE_APPLICATION_CREDENTIAL}`);
+      assert.deepEqual(JSON.parse(init.body).requestedScopes, ['profile:read', 'grants:manage']);
+      return response(200, { data: { accessToken: 'manager-token', expiresIn: 300 } });
+    }
+    if (url === 'https://auth.example.test/api/v1/me') {
       assert.equal(init.headers.authorization, 'Bearer manager-token');
-      return response(200, { data: grants });
+      return response(200, { data: { id: 'usr_manager', displayName: 'Manager' } });
     }
-    if (url === 'https://auth.example.test/api/v1/service-principals') {
-      assert.equal(init.headers.authorization, `Bearer ${ENV.LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL}`);
-      return response(200, { data: [
-        {
-          id: 'svc_family', displayName: 'Family n8n', description: 'homemew:v1:space=spc_family\nAutomation', status: 'active',
-          maxScopes: ['resources:read', 'resources:write'], createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z',
-        },
-        {
-          id: 'svc_other', displayName: 'Other family', description: 'homemew:v1:space=spc_other\nOther', status: 'active',
-          maxScopes: ['resources:read'], createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z',
-        },
-        {
-          id: 'svc_legacy', displayName: 'Legacy integration', description: 'Migrated before binding', status: 'active',
-          maxScopes: ['resources:read'], createdAt: '2026-08-23T00:00:00Z', updatedAt: '2026-08-23T00:00:00Z',
-        },
-      ] });
+    if (url === 'https://core.example.test/api/v1/spaces/spc_family/grants?includeRevoked=true') {
+      return response(200, { data: state.grants });
     }
-    if (url === 'https://auth.example.test/api/v1/service-principals/svc_family/tokens') {
-      assert.equal(init.headers.authorization, `Bearer ${ENV.LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL}`);
-      return response(200, { data: [] });
+    if (url === 'https://core.example.test/api/v1/spaces/spc_family/grants' && method === 'POST') {
+      const body = JSON.parse(init.body);
+      const grant = {
+        id: `grt_${++state.counter}`,
+        sourceSpaceId: 'spc_family',
+        ...body,
+        revokedAt: null,
+      };
+      state.grants.push(grant);
+      return response(201, { data: grant });
     }
-    assert.fail(`unexpected upstream ${url}`);
+    const grantMatch = url.match(/^https:\/\/core\.example\.test\/api\/v1\/spaces\/spc_family\/grants\/(grt_[A-Za-z0-9_-]+)$/u);
+    if (grantMatch && method === 'DELETE') {
+      const grant = state.grants.find((item) => item.id === grantMatch[1] && !item.revokedAt);
+      if (!grant) return response(404, { error: { code: 'NOT_FOUND', message: 'grant missing' } });
+      grant.revokedAt = '2026-08-24T01:00:00Z';
+      return response(204);
+    }
+    if (grantMatch && method === 'PATCH') {
+      const grant = state.grants.find((item) => item.id === grantMatch[1] && !item.revokedAt);
+      if (!grant) return response(404, { error: { code: 'NOT_FOUND', message: 'grant missing' } });
+      Object.assign(grant, JSON.parse(init.body));
+      return response(200, { data: grant });
+    }
+    if (url === 'https://auth.example.test/api/v1/service-principals' && method === 'GET') {
+      return response(200, { data: state.principals });
+    }
+    if (url === 'https://auth.example.test/api/v1/service-principals' && method === 'POST') {
+      const body = JSON.parse(init.body);
+      const principal = {
+        id: `svc_${++state.counter}`,
+        displayName: body.displayName,
+        description: body.description,
+        status: 'active',
+        maxScopes: body.maxScopes,
+        createdByUserId: body.createdByUserId,
+        createdAt: `2026-08-24T00:00:0${state.counter}Z`,
+        updatedAt: `2026-08-24T00:00:0${state.counter}Z`,
+      };
+      state.principals.push(principal);
+      return response(201, { data: principal });
+    }
+    const principalMatch = url.match(/^https:\/\/auth\.example\.test\/api\/v1\/service-principals\/(svc_[A-Za-z0-9_-]+)$/u);
+    if (principalMatch && method === 'PATCH') {
+      const principal = state.principals.find((item) => item.id === principalMatch[1]);
+      if (!principal) return response(404, { error: { code: 'SERVICE_PRINCIPAL_NOT_FOUND', message: 'missing' } });
+      Object.assign(principal, JSON.parse(init.body), { updatedAt: '2026-08-24T02:00:00Z' });
+      return response(200, { data: principal });
+    }
+    const tokenListMatch = url.match(/^https:\/\/auth\.example\.test\/api\/v1\/service-principals\/(svc_[A-Za-z0-9_-]+)\/tokens$/u);
+    if (tokenListMatch && method === 'GET') {
+      return response(200, { data: state.tokens.filter((item) => item.principalId === tokenListMatch[1]) });
+    }
+    if (tokenListMatch && method === 'POST') {
+      const body = JSON.parse(init.body);
+      const token = {
+        id: `sat_${++state.counter}`,
+        principalId: tokenListMatch[1],
+        displayPrefix: `lsp_pat_${state.counter}`,
+        lastFour: `${1000 + state.counter}`,
+        label: body.label,
+        scopes: body.scopes,
+        expiresAt: null,
+        createdAt: `2026-08-24T00:10:${String(state.counter).padStart(2, '0')}Z`,
+        lastUsedAt: null,
+        revokedAt: null,
+      };
+      state.tokens.push(token);
+      return response(201, { data: { ...token, token: `lsp_pat_plain_${state.counter}` } });
+    }
+    const tokenDeleteMatch = url.match(/^https:\/\/auth\.example\.test\/api\/v1\/service-principals\/(svc_[A-Za-z0-9_-]+)\/tokens\/(sat_[A-Za-z0-9_-]+)$/u);
+    if (tokenDeleteMatch && method === 'DELETE') {
+      const token = state.tokens.find((item) => item.id === tokenDeleteMatch[2] && !item.revokedAt);
+      if (!token) return response(404, { error: { code: 'SERVICE_TOKEN_NOT_FOUND', message: 'missing' } });
+      token.revokedAt = '2026-08-24T03:00:00Z';
+      return response(204);
+    }
+    const oauthListMatch = url.match(/^https:\/\/auth\.example\.test\/api\/v1\/service-principals\/(svc_[A-Za-z0-9_-]+)\/oauth-credentials$/u);
+    if (oauthListMatch && method === 'GET') {
+      return response(200, { data: state.oauth.filter((item) => item.principalId === oauthListMatch[1]) });
+    }
+    if (oauthListMatch && method === 'POST') {
+      const body = JSON.parse(init.body);
+      const credential = {
+        id: `soc_${++state.counter}`,
+        principalId: oauthListMatch[1],
+        secretSuffix: `secret${state.counter}`,
+        label: body.label,
+        status: 'active',
+        createdAt: `2026-08-24T00:20:${String(state.counter).padStart(2, '0')}Z`,
+        lastUsedAt: null,
+        revokedAt: null,
+      };
+      state.oauth.push(credential);
+      return response(201, { data: { ...credential, clientId: oauthListMatch[1], clientSecret: `lsp_client_plain_${state.counter}` } });
+    }
+    const oauthDeleteMatch = url.match(/^https:\/\/auth\.example\.test\/api\/v1\/service-principals\/(svc_[A-Za-z0-9_-]+)\/oauth-credentials\/(soc_[A-Za-z0-9_-]+)$/u);
+    if (oauthDeleteMatch && method === 'DELETE') {
+      const credential = state.oauth.find((item) => item.id === oauthDeleteMatch[2] && item.status === 'active');
+      if (!credential) return response(404, { error: { code: 'OAUTH_CREDENTIAL_NOT_FOUND', message: 'missing' } });
+      credential.status = 'revoked';
+      credential.revokedAt = '2026-08-24T03:00:00Z';
+      return response(204);
+    }
+    assert.fail(`unexpected upstream ${method} ${url}`);
   };
+}
 
+function boundPrincipal(id = 'svc_family') {
+  return {
+    id,
+    displayName: 'Family automation',
+    description: 'homemew:v1:space=spc_family\nAutomation',
+    status: 'active',
+    maxScopes: ['resources:read', 'resources:write'],
+    createdByUserId: 'usr_manager',
+    createdAt: '2026-08-24T00:00:00Z',
+    updatedAt: '2026-08-24T00:00:00Z',
+  };
+}
+
+function grant(principalId, id = 'grt_event') {
+  return {
+    id, sourceSpaceId: 'spc_family', granteeType: 'service', granteeId: principalId,
+    resourceType: 'model', resourceId: 'event', permission: 'write', expiresAt: null, revokedAt: null,
+  };
+}
+
+function apiToken(principalId, id, createdAt) {
+  return {
+    id, principalId, displayPrefix: 'lsp_pat_demo', lastFour: id.slice(-4), label: 'API Token',
+    scopes: ['resources:read', 'resources:write'], expiresAt: null, createdAt, lastUsedAt: null, revokedAt: null,
+  };
+}
+
+test('integration list exposes credentials only for the explicitly bound family principal', async () => {
+  const state = createState({
+    principals: [
+      boundPrincipal('svc_family'),
+      { ...boundPrincipal('svc_other'), description: 'homemew:v1:space=spc_other\nOther' },
+      { ...boundPrincipal('svc_legacy'), description: 'Migrated before binding' },
+    ],
+    grants: [grant('svc_family', 'grt_1'), grant('svc_other', 'grt_2'), grant('svc_legacy', 'grt_3')],
+    tokens: [apiToken('svc_family', 'sat_family', '2026-08-24T00:10:00Z'), apiToken('svc_other', 'sat_other', '2026-08-24T00:10:00Z')],
+  });
   const result = await handleIntegrationRequest(request('/api/integrations?spaceId=spc_family'), ENV, {
-    fetcher,
-    assertion: ASSERTION,
-    id: REQUEST_ID,
+    fetcher: makeFetcher(state), assertion: ASSERTION, id: REQUEST_ID,
   });
   assert.equal(result.status, 200);
   const data = (await payload(result)).data;
   assert.equal(data.length, 2);
   assert.equal(data[0].id, 'svc_family');
-  assert.equal(data[0].bindingStatus, 'bound');
-  assert.equal(data[0].description, 'Automation');
-  assert.equal(data[0].permissions.event, 'write');
+  assert.equal(data[0].credentials.length, 1);
+  assert.equal(data[0].credentialMode, 'api_token');
   assert.equal(data[1].id, 'svc_legacy');
-  assert.equal(data[1].bindingStatus, 'legacy_unbound');
-  assert.deepEqual(data[1].tokens, []);
-  assert.equal(data.some((item) => item.id === 'svc_other'), false, 'a Grant must not transfer credential ownership across Spaces');
-  assert.equal(calls.some((call) => call.url.includes('svc_other/tokens')), false);
-  assert.equal(calls.some((call) => call.url.includes('svc_legacy/tokens')), false);
+  assert.deepEqual(data[1].credentials, []);
+  assert.equal(data.some((item) => item.id === 'svc_other'), false);
 });
 
-test('creating an integration persists a Space ownership binding inside the LifeSpace principal metadata', async () => {
-  const grants = [];
-  const tokens = [];
-  const principal = {
-    id: 'svc_new', displayName: 'Home n8n', description: 'homemew:v1:space=spc_family\nAutomation', status: 'active',
-    maxScopes: ['resources:read', 'resources:write'], createdByUserId: 'usr_manager',
-    createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z',
-  };
-  let principalCreated = false;
-  const fetcher = async (input, init = {}) => {
-    const url = String(input);
-    const manager = managerResponses(url, init);
-    if (manager) return manager;
-    if (url === 'https://core.example.test/api/v1/spaces/spc_family/grants?includeRevoked=true') {
-      assert.equal(init.headers.authorization, 'Bearer manager-token');
-      return response(200, { data: grants });
-    }
-    if (url === 'https://auth.example.test/api/v1/service-principals' && init.method === 'POST') {
-      assert.equal(init.headers.authorization, `Bearer ${ENV.LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL}`);
-      const body = JSON.parse(init.body);
-      assert.equal(body.createdByUserId, 'usr_manager');
-      assert.equal(body.description, 'homemew:v1:space=spc_family\nAutomation');
-      assert.deepEqual(body.maxScopes, ['resources:read', 'resources:write']);
-      principalCreated = true;
-      return response(201, { data: principal });
-    }
-    if (url === 'https://core.example.test/api/v1/spaces/spc_family/grants' && init.method === 'POST') {
-      assert.equal(init.headers.authorization, 'Bearer manager-token');
-      const body = JSON.parse(init.body);
-      assert.equal(body.granteeId, 'svc_new');
-      assert.equal(body.resourceType, 'model');
-      const grant = {
-        id: `grt_${body.resourceId}`,
-        sourceSpaceId: 'spc_family',
-        granteeType: 'service',
-        granteeId: 'svc_new',
-        resourceType: 'model',
-        resourceId: body.resourceId,
-        permission: body.permission,
-        expiresAt: null,
-        revokedAt: null,
-      };
-      grants.push(grant);
-      return response(201, { data: grant });
-    }
-    if (url === 'https://auth.example.test/api/v1/service-principals/svc_new/tokens' && init.method === 'POST') {
-      assert.equal(init.headers.authorization, `Bearer ${ENV.LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL}`);
-      const metadata = {
-        id: 'sat_new', principalId: 'svc_new', displayPrefix: 'lsp_pat_abcd', lastFour: '1234',
-        label: 'Home n8n API Token', scopes: ['resources:read', 'resources:write'], audience: 'lifespace-core',
-        expiresAt: null, createdAt: '2026-08-24T00:01:00Z', createdByUserId: 'usr_manager', lastUsedAt: null, revokedAt: null,
-      };
-      tokens.push(metadata);
-      return response(201, { data: { ...metadata, token: 'lsp_pat_plaintext_once' } });
-    }
-    if (url === 'https://auth.example.test/api/v1/service-principals' && (init.method ?? 'GET') === 'GET') {
-      return response(200, { data: principalCreated ? [principal] : [] });
-    }
-    if (url === 'https://auth.example.test/api/v1/service-principals/svc_new/tokens' && (init.method ?? 'GET') === 'GET') {
-      return response(200, { data: tokens });
-    }
-    assert.fail(`unexpected upstream ${url}`);
-  };
-
+test('creating an API-token integration returns one plaintext token and one active credential', async () => {
+  const state = createState();
   const result = await handleIntegrationRequest(request('/api/integrations', {
     method: 'POST',
     body: {
-      spaceId: 'spc_family',
-      displayName: 'Home n8n',
-      description: 'Automation',
+      spaceId: 'spc_family', displayName: 'Home n8n', description: 'Automation', credentialMode: 'api_token',
       permissions: { event: 'write', task: 'read', day_record: null },
     },
-  }), ENV, { fetcher, assertion: ASSERTION, id: REQUEST_ID });
-
+  }), ENV, { fetcher: makeFetcher(state), assertion: ASSERTION, id: REQUEST_ID });
   assert.equal(result.status, 201);
   const data = (await payload(result)).data;
-  assert.equal(data.integration.id, 'svc_new');
-  assert.equal(data.integration.bindingStatus, 'bound');
-  assert.equal(data.integration.description, 'Automation');
-  assert.equal(data.integration.permissions.event, 'write');
-  assert.equal(data.integration.permissions.task, 'read');
-  assert.equal(data.token, 'lsp_pat_plaintext_once');
-  assert.equal(grants.length, 2);
+  assert.equal(data.credential.type, 'api_token');
+  assert.match(data.credential.token, /^lsp_pat_plain_/u);
+  assert.equal(data.integration.credentialMode, 'api_token');
+  assert.equal(data.integration.rotationPending, false);
+  assert.equal(data.integration.credentials.filter((item) => item.active).length, 1);
+  assert.equal(state.oauth.length, 0);
 });
 
-test('legacy unbound principals are read-only even when the current Space has a Data Grant', async () => {
-  let tokenCreateCalled = false;
-  const grants = [{
-    id: 'grt_legacy', sourceSpaceId: 'spc_family', granteeType: 'service', granteeId: 'svc_legacy',
-    resourceType: 'model', resourceId: 'event', permission: 'read', expiresAt: null, revokedAt: null,
-  }];
-  const fetcher = async (input, init = {}) => {
-    const url = String(input);
-    const manager = managerResponses(url, init);
-    if (manager) return manager;
-    if (url === 'https://core.example.test/api/v1/spaces/spc_family/grants?includeRevoked=true') return response(200, { data: grants });
-    if (url === 'https://auth.example.test/api/v1/service-principals') {
-      return response(200, { data: [{
-        id: 'svc_legacy', displayName: 'Legacy', description: 'No binding', status: 'active', maxScopes: ['resources:read'],
-        createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z',
-      }] });
-    }
-    if (url.includes('/svc_legacy/tokens')) tokenCreateCalled = true;
-    assert.fail(`unexpected upstream ${url}`);
-  };
-
-  const result = await handleIntegrationRequest(request('/api/integrations/svc_legacy/tokens', {
+test('creating an OAuth integration returns client credentials and keeps API tokens absent', async () => {
+  const state = createState();
+  const result = await handleIntegrationRequest(request('/api/integrations', {
     method: 'POST',
-    body: { spaceId: 'spc_family', label: 'Rotate' },
-  }), ENV, { fetcher, assertion: ASSERTION, id: REQUEST_ID });
+    body: {
+      spaceId: 'spc_family', displayName: 'Home agent', credentialMode: 'oauth_client_credentials',
+      permissions: { event: 'read', task: null, day_record: null },
+    },
+  }), ENV, { fetcher: makeFetcher(state), assertion: ASSERTION, id: REQUEST_ID });
+  assert.equal(result.status, 201);
+  const data = (await payload(result)).data;
+  assert.equal(data.credential.type, 'oauth_client_credentials');
+  assert.match(data.credential.clientId, /^svc_/u);
+  assert.match(data.credential.clientSecret, /^lsp_client_plain_/u);
+  assert.equal(data.integration.credentialMode, 'oauth_client_credentials');
+  assert.equal(state.tokens.length, 0);
+});
 
-  assert.equal(result.status, 409);
-  assert.equal((await payload(result)).error.code, 'INTEGRATION_BINDING_REQUIRED');
-  assert.equal(tokenCreateCalled, false);
+test('token rotation temporarily allows two credentials then completes by keeping only the new token', async () => {
+  const principal = boundPrincipal();
+  const oldToken = apiToken(principal.id, 'sat_old', '2026-08-24T00:01:00Z');
+  const state = createState({ principals: [principal], grants: [grant(principal.id)], tokens: [oldToken] });
+  const fetcher = makeFetcher(state);
+  const started = await handleIntegrationRequest(request(`/api/integrations/${principal.id}/credential-rotation`, {
+    method: 'POST', body: { spaceId: 'spc_family', credentialMode: 'api_token' },
+  }), ENV, { fetcher, assertion: ASSERTION, id: REQUEST_ID });
+  assert.equal(started.status, 201);
+  const startedData = (await payload(started)).data;
+  assert.equal(startedData.integration.rotationPending, true);
+  assert.equal(startedData.integration.credentials.filter((item) => item.active).length, 2);
+  const keepId = startedData.credential.credentialId;
+
+  const completed = await handleIntegrationRequest(request(`/api/integrations/${principal.id}/credential-rotation/complete`, {
+    method: 'POST', body: { spaceId: 'spc_family', keepCredentialId: keepId },
+  }), ENV, { fetcher, assertion: ASSERTION, id: REQUEST_ID });
+  assert.equal(completed.status, 200);
+  const integration = (await payload(completed)).data;
+  assert.equal(integration.rotationPending, false);
+  assert.equal(integration.credentials.filter((item) => item.active).length, 1);
+  assert.equal(integration.credentials.find((item) => item.id === 'sat_old').active, false);
+  assert.equal(integration.credentials.find((item) => item.id === keepId).active, true);
+});
+
+test('switching from API token to OAuth can be cancelled by revoking only the newest candidate', async () => {
+  const principal = boundPrincipal();
+  const state = createState({
+    principals: [principal], grants: [grant(principal.id)],
+    tokens: [apiToken(principal.id, 'sat_old', '2026-08-24T00:01:00Z')],
+  });
+  const fetcher = makeFetcher(state);
+  const started = await handleIntegrationRequest(request(`/api/integrations/${principal.id}/credential-rotation`, {
+    method: 'POST', body: { spaceId: 'spc_family', credentialMode: 'oauth_client_credentials' },
+  }), ENV, { fetcher, assertion: ASSERTION, id: REQUEST_ID });
+  const startedData = (await payload(started)).data;
+  assert.equal(startedData.integration.rotationPending, true);
+  assert.equal(startedData.integration.credentialMode, 'oauth_client_credentials');
+  const candidateId = startedData.credential.credentialId;
+
+  const cancelled = await handleIntegrationRequest(request(`/api/integrations/${principal.id}/credential-rotation/cancel`, {
+    method: 'POST', body: { spaceId: 'spc_family', candidateCredentialId: candidateId },
+  }), ENV, { fetcher, assertion: ASSERTION, id: REQUEST_ID });
+  assert.equal(cancelled.status, 200);
+  const integration = (await payload(cancelled)).data;
+  assert.equal(integration.rotationPending, false);
+  assert.equal(integration.credentialMode, 'api_token');
+  assert.equal(integration.credentials.filter((item) => item.active).length, 1);
+  assert.equal(integration.credentials.find((item) => item.id === candidateId).active, false);
 });
 
 test('state-changing integration routes reject cross-origin requests before touching LifeSpace', async () => {
   let called = false;
   const result = await handleIntegrationRequest(request('/api/integrations', {
-    method: 'POST',
-    origin: 'https://evil.example.test',
+    method: 'POST', origin: 'https://evil.example.test',
     body: { spaceId: 'spc_family', displayName: 'Bad', permissions: { event: 'read' } },
   }), ENV, {
-    fetcher: async () => { called = true; return response(500, {}); },
-    assertion: ASSERTION,
-    id: REQUEST_ID,
+    fetcher: async () => { called = true; return response(500, {}); }, assertion: ASSERTION, id: REQUEST_ID,
   });
   assert.equal(result.status, 403);
   assert.equal((await payload(result)).error.code, 'INVALID_ORIGIN');
@@ -253,9 +318,7 @@ test('integration endpoints fail closed when the dedicated application credentia
   delete env.LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL;
   let called = false;
   const result = await handleIntegrationRequest(request('/api/integrations?spaceId=spc_family'), env, {
-    fetcher: async () => { called = true; return response(500, {}); },
-    assertion: ASSERTION,
-    id: REQUEST_ID,
+    fetcher: async () => { called = true; return response(500, {}); }, assertion: ASSERTION, id: REQUEST_ID,
   });
   assert.equal(result.status, 503);
   assert.equal((await payload(result)).error.code, 'INTEGRATIONS_NOT_CONFIGURED');

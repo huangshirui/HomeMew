@@ -10,6 +10,7 @@
  * - 邀请家人加入（仅管理员）
  * - 退出家庭（危险操作）
  *
+ * 高级外部系统接入统一在 HomeMew Web 管理，小程序不提供凭据或集成配置能力。
  * 编辑名称与图片统一在独立「编辑家庭资料」页完成。
  * 唯一管理员退出失败时提示：请先将其他成员设为管理员，再退出家庭。
  */
@@ -88,12 +89,6 @@ Page({
 
   onViewInvites(): void {
     wx.navigateTo({ url: `/pages/family/invites?familyId=${this.data.familyId}` });
-  },
-
-  /** 外部系统管理（仅管理员） */
-  onViewIntegrations(): void {
-    if (!this.isAdmin()) return;
-    wx.navigateTo({ url: `/pages/integrations/list?familyId=${this.data.familyId}` });
   },
 
   async onLeave(): Promise<void> {

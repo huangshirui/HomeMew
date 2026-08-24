@@ -3,6 +3,7 @@ const MODEL_KEYS = ['event', 'task', 'day_record'];
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
 const BINDING_PREFIX = 'homemew:v1:space=';
 const MAX_USER_DESCRIPTION_LENGTH = 400;
+const CREDENTIAL_MODES = ['api_token', 'oauth_client_credentials'];
 
 class IntegrationError extends Error {
   constructor(status, code, message) {
@@ -99,9 +100,20 @@ function parsePrincipalId(value) {
   return value;
 }
 
-function parseTokenId(value) {
-  if (typeof value !== 'string' || !/^sat_[A-Za-z0-9_-]+$/u.test(value)) {
-    throw new IntegrationError(404, 'NOT_FOUND', 'API Token not found');
+function parseCredentialId(value) {
+  if (typeof value !== 'string' || !/^(sat|soc)_[A-Za-z0-9_-]+$/u.test(value)) {
+    throw new IntegrationError(404, 'NOT_FOUND', 'Credential not found');
+  }
+  return value;
+}
+
+function parseCredentialMode(value, fallback = null) {
+  if (value === undefined || value === null || value === '') {
+    if (fallback) return fallback;
+    throw new IntegrationError(422, 'VALIDATION_ERROR', 'credentialMode is required');
+  }
+  if (!CREDENTIAL_MODES.includes(value)) {
+    throw new IntegrationError(422, 'VALIDATION_ERROR', 'credentialMode must be api_token or oauth_client_credentials');
   }
   return value;
 }
@@ -139,14 +151,6 @@ function decodeBoundDescription(value) {
   if (!isSpaceId(spaceId)) return { spaceId: null, description: value.trim() || null };
   const description = newline < 0 ? '' : value.slice(newline + 1).trim();
   return { spaceId, description: description || null };
-}
-
-function parseLabel(value, fallback) {
-  if (value === undefined || value === null || value === '') return fallback;
-  if (typeof value !== 'string' || !value.trim() || value.trim().length > 100) {
-    throw new IntegrationError(422, 'VALIDATION_ERROR', 'Token 名称需要 1-100 个字符');
-  }
-  return value.trim();
 }
 
 function parsePermissions(value) {
@@ -204,12 +208,49 @@ function modelPermission(grants, modelKey, includeWholeSpace = false) {
   return best === 'read' || best === 'write' ? best : null;
 }
 
-function integrationDto(principal, grants, tokens, bindingStatus = 'bound') {
+function tokenCredentialDto(token) {
+  return {
+    id: token.id,
+    type: 'api_token',
+    label: token.label,
+    displayPrefix: token.displayPrefix,
+    suffix: token.lastFour,
+    scopes: token.scopes ?? [],
+    createdAt: token.createdAt,
+    lastUsedAt: token.lastUsedAt ?? null,
+    revokedAt: token.revokedAt ?? null,
+    active: !token.revokedAt,
+  };
+}
+
+function oauthCredentialDto(credential, principalId) {
+  return {
+    id: credential.id,
+    type: 'oauth_client_credentials',
+    label: credential.label,
+    clientId: principalId,
+    suffix: credential.secretSuffix,
+    scopes: [],
+    createdAt: credential.createdAt,
+    lastUsedAt: credential.lastUsedAt ?? null,
+    revokedAt: credential.revokedAt ?? null,
+    active: credential.status === 'active' && !credential.revokedAt,
+  };
+}
+
+function sortCredentials(credentials) {
+  return [...credentials].sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
+}
+
+function integrationDto(principal, grants, credentials, bindingStatus = 'bound') {
   const decoded = decodeBoundDescription(principal.description);
   const activeWholeSpaceGrants = grants.filter((grant) => activeGrant(grant)
     && grant.resourceType === 'space'
     && grant.resourceId === null
     && ['read', 'write', 'manage'].includes(grant.permission));
+  const visibleCredentials = bindingStatus === 'bound' ? sortCredentials(credentials) : [];
+  const activeCredentials = visibleCredentials.filter((credential) => credential.active);
+  const candidate = activeCredentials[0] ?? null;
   return {
     id: principal.id,
     displayName: principal.displayName,
@@ -223,7 +264,10 @@ function integrationDto(principal, grants, tokens, bindingStatus = 'bound') {
     permissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants, modelKey, false)])),
     effectivePermissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants, modelKey, true)])),
     hasWholeSpaceGrant: activeWholeSpaceGrants.length > 0,
-    tokens: bindingStatus === 'bound' && Array.isArray(tokens) ? tokens : [],
+    credentialMode: candidate?.type ?? null,
+    rotationPending: activeCredentials.length > 1,
+    rotationCandidateId: activeCredentials.length > 1 ? candidate.id : null,
+    credentials: visibleCredentials,
   };
 }
 
@@ -344,6 +388,25 @@ async function listTokens(env, fetcher, principalId, id) {
   return Array.isArray(tokens) ? tokens : [];
 }
 
+async function listOAuthCredentials(env, fetcher, principalId, id) {
+  const credentials = await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principalId)}/oauth-credentials`, {
+    id,
+    fallbackCode: 'INTEGRATION_OAUTH_CREDENTIALS_FAILED',
+  });
+  return Array.isArray(credentials) ? credentials : [];
+}
+
+async function listCredentials(env, fetcher, principalId, id) {
+  const [tokens, oauthCredentials] = await Promise.all([
+    listTokens(env, fetcher, principalId, id),
+    listOAuthCredentials(env, fetcher, principalId, id),
+  ]);
+  return sortCredentials([
+    ...tokens.map(tokenCredentialDto),
+    ...oauthCredentials.map((credential) => oauthCredentialDto(credential, principalId)),
+  ]);
+}
+
 async function resolveBoundIntegration(env, fetcher, spaceId, principalId, id) {
   const principals = await listPrincipals(env, fetcher, id);
   const principal = principals.find((item) => item.id === principalId);
@@ -406,11 +469,52 @@ async function reconcileModelGrants(env, fetcher, managerToken, spaceId, princip
   }
 }
 
+async function createServiceCredential(env, fetcher, principal, managerUserId, mode, id) {
+  const scopes = Array.isArray(principal.maxScopes) ? principal.maxScopes : [];
+  if (!scopes.length) throw new IntegrationError(409, 'INTEGRATION_HAS_NO_SCOPES', '外部系统当前没有可签发的权限');
+  if (mode === 'api_token') {
+    const token = await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}/tokens`, {
+      method: 'POST',
+      body: { label: `${principal.displayName} API Token`, scopes, expiresAt: null, createdByUserId: managerUserId },
+      id,
+      fallbackCode: 'INTEGRATION_TOKEN_CREATE_FAILED',
+    });
+    return {
+      type: 'api_token',
+      credentialId: token?.id ?? null,
+      token: token?.token ?? null,
+    };
+  }
+  const credential = await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}/oauth-credentials`, {
+    method: 'POST',
+    body: { label: `${principal.displayName} OAuth Client`, createdByUserId: managerUserId },
+    id,
+    fallbackCode: 'INTEGRATION_OAUTH_CREATE_FAILED',
+  });
+  return {
+    type: 'oauth_client_credentials',
+    credentialId: credential?.id ?? null,
+    clientId: credential?.clientId ?? principal.id,
+    clientSecret: credential?.clientSecret ?? null,
+  };
+}
+
+async function revokeServiceCredential(env, fetcher, principalId, credential, id) {
+  const path = credential.type === 'api_token'
+    ? `/api/v1/service-principals/${encodeURIComponent(principalId)}/tokens/${encodeURIComponent(credential.id)}`
+    : `/api/v1/service-principals/${encodeURIComponent(principalId)}/oauth-credentials/${encodeURIComponent(credential.id)}`;
+  await identityIntegrationRequest(env, fetcher, path, {
+    method: 'DELETE',
+    id,
+    fallbackCode: credential.type === 'api_token' ? 'INTEGRATION_TOKEN_REVOKE_FAILED' : 'INTEGRATION_OAUTH_REVOKE_FAILED',
+  });
+}
+
 async function readIntegration(env, fetcher, managerToken, spaceId, principalId, id) {
   const grants = await listSpaceGrants(env, fetcher, managerToken, spaceId, id);
   const principal = await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
-  const tokens = await listTokens(env, fetcher, principalId, id);
-  return integrationDto(principal, grantsForPrincipal(grants, principalId), tokens, 'bound');
+  const credentials = await listCredentials(env, fetcher, principalId, id);
+  return integrationDto(principal, grantsForPrincipal(grants, principalId), credentials, 'bound');
 }
 
 async function handleList(request, env, fetcher, assertion, id) {
@@ -427,7 +531,7 @@ async function handleList(request, env, fetcher, assertion, id) {
       integrations.push(integrationDto(
         principal,
         grantsForPrincipal(grants, principal.id),
-        await listTokens(env, fetcher, principal.id, id),
+        await listCredentials(env, fetcher, principal.id, id),
         'bound',
       ));
       continue;
@@ -451,6 +555,7 @@ async function handleCreate(request, env, fetcher, assertion, id) {
   const displayName = parseName(body.displayName);
   const description = parseDescription(body.description);
   const permissions = parsePermissions(body.permissions);
+  const credentialMode = parseCredentialMode(body.credentialMode, 'api_token');
   const scopes = scopesForPermissions(permissions);
   const { manager } = await managementContext(env, fetcher, assertion, spaceId, id);
 
@@ -487,15 +592,21 @@ async function handleCreate(request, env, fetcher, assertion, id) {
     throw error;
   }
 
-  const tokenLabel = parseLabel(body.tokenLabel, `${displayName} API Token`);
-  const token = await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}/tokens`, {
-    method: 'POST',
-    body: { label: tokenLabel, scopes, expiresAt: null, createdByUserId: manager.userId },
-    id,
-    fallbackCode: 'INTEGRATION_TOKEN_CREATE_FAILED',
-  });
+  let credential;
+  try {
+    credential = await createServiceCredential(env, fetcher, principal, manager.userId, credentialMode, id);
+  } catch (error) {
+    await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}`, {
+      method: 'PATCH',
+      body: { status: 'disabled' },
+      id,
+      fallbackCode: 'INTEGRATION_COMPENSATION_FAILED',
+    }).catch(() => undefined);
+    throw error;
+  }
+
   const integration = await readIntegration(env, fetcher, manager.accessToken, spaceId, principal.id, id);
-  return json({ data: { integration, token: token?.token ?? null } }, 201, id);
+  return json({ data: { integration, credential } }, 201, id);
 }
 
 async function handleUpdate(request, env, fetcher, assertion, id, principalId) {
@@ -539,37 +650,62 @@ async function handleUpdate(request, env, fetcher, assertion, id, principalId) {
   return json({ data: await readIntegration(env, fetcher, manager.accessToken, spaceId, principalId, id) }, 200, id);
 }
 
-async function handleCreateToken(request, env, fetcher, assertion, id, principalId) {
+async function handleStartCredentialRotation(request, env, fetcher, assertion, id, principalId) {
   requireSameOrigin(request);
   const body = await readJson(request);
   const spaceId = parseSpaceId(body.spaceId);
   const { manager } = await managementContext(env, fetcher, assertion, spaceId, id);
   const principal = await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
-  if (principal.status !== 'active') throw new IntegrationError(409, 'INTEGRATION_DISABLED', '已禁用的外部系统不能签发 Token');
-  const scopes = Array.isArray(principal.maxScopes) ? principal.maxScopes : [];
-  if (!scopes.length) throw new IntegrationError(409, 'INTEGRATION_HAS_NO_SCOPES', '外部系统当前没有可签发的权限');
-  const label = parseLabel(body.label, `${principal.displayName} API Token`);
-  const token = await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principalId)}/tokens`, {
-    method: 'POST',
-    body: { label, scopes, expiresAt: null, createdByUserId: manager.userId },
-    id,
-    fallbackCode: 'INTEGRATION_TOKEN_CREATE_FAILED',
-  });
-  return json({ data: { token: token?.token ?? null, metadata: token ?? null } }, 201, id);
+  if (principal.status !== 'active') throw new IntegrationError(409, 'INTEGRATION_DISABLED', '已禁用的外部系统不能签发凭据');
+
+  const credentials = await listCredentials(env, fetcher, principalId, id);
+  const activeCredentials = credentials.filter((credential) => credential.active);
+  if (activeCredentials.length > 1) {
+    throw new IntegrationError(409, 'CREDENTIAL_ROTATION_PENDING', '已有一次凭据轮换尚未完成，请先完成或取消');
+  }
+  const mode = parseCredentialMode(body.credentialMode, activeCredentials[0]?.type ?? 'api_token');
+  const credential = await createServiceCredential(env, fetcher, principal, manager.userId, mode, id);
+  const integration = await readIntegration(env, fetcher, manager.accessToken, spaceId, principalId, id);
+  return json({ data: { integration, credential } }, 201, id);
 }
 
-async function handleRevokeToken(request, env, fetcher, assertion, id, principalId, tokenId) {
+async function handleCompleteCredentialRotation(request, env, fetcher, assertion, id, principalId) {
   requireSameOrigin(request);
   const body = await readJson(request);
   const spaceId = parseSpaceId(body.spaceId);
-  await managementContext(env, fetcher, assertion, spaceId, id);
+  const keepCredentialId = parseCredentialId(body.keepCredentialId);
+  const { manager } = await managementContext(env, fetcher, assertion, spaceId, id);
   await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
-  await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principalId)}/tokens/${encodeURIComponent(tokenId)}`, {
-    method: 'DELETE',
-    id,
-    fallbackCode: 'INTEGRATION_TOKEN_REVOKE_FAILED',
-  });
-  return new Response(null, { status: 204, headers: { 'x-request-id': id } });
+
+  const credentials = await listCredentials(env, fetcher, principalId, id);
+  const activeCredentials = credentials.filter((credential) => credential.active);
+  const keep = activeCredentials.find((credential) => credential.id === keepCredentialId);
+  if (!keep) throw new IntegrationError(404, 'CREDENTIAL_NOT_FOUND', '要保留的新凭据不存在或已失效');
+  for (const credential of activeCredentials) {
+    if (credential.id === keepCredentialId) continue;
+    await revokeServiceCredential(env, fetcher, principalId, credential, id);
+  }
+  return json({ data: await readIntegration(env, fetcher, manager.accessToken, spaceId, principalId, id) }, 200, id);
+}
+
+async function handleCancelCredentialRotation(request, env, fetcher, assertion, id, principalId) {
+  requireSameOrigin(request);
+  const body = await readJson(request);
+  const spaceId = parseSpaceId(body.spaceId);
+  const candidateCredentialId = parseCredentialId(body.candidateCredentialId);
+  const { manager } = await managementContext(env, fetcher, assertion, spaceId, id);
+  await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
+
+  const activeCredentials = (await listCredentials(env, fetcher, principalId, id)).filter((credential) => credential.active);
+  if (activeCredentials.length < 2) {
+    throw new IntegrationError(409, 'NO_CREDENTIAL_ROTATION_PENDING', '当前没有待完成的凭据轮换');
+  }
+  const candidate = activeCredentials[0];
+  if (candidate.id !== candidateCredentialId) {
+    throw new IntegrationError(409, 'INVALID_ROTATION_CANDIDATE', '只能撤销本次轮换中新创建的凭据');
+  }
+  await revokeServiceCredential(env, fetcher, principalId, candidate, id);
+  return json({ data: await readIntegration(env, fetcher, manager.accessToken, spaceId, principalId, id) }, 200, id);
 }
 
 async function handleDisable(request, env, fetcher, assertion, id, principalId) {
@@ -594,16 +730,12 @@ async function handleDisable(request, env, fetcher, assertion, id, principalId) 
       cleanupWarnings.push(`grant:${grant.id}`);
     }
   }
-  const tokens = await listTokens(env, fetcher, principalId, id).catch(() => []);
-  for (const token of tokens.filter((item) => !item.revokedAt)) {
+  const credentials = await listCredentials(env, fetcher, principalId, id).catch(() => []);
+  for (const credential of credentials.filter((item) => item.active)) {
     try {
-      await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principalId)}/tokens/${encodeURIComponent(token.id)}`, {
-        method: 'DELETE',
-        id,
-        fallbackCode: 'INTEGRATION_TOKEN_REVOKE_FAILED',
-      });
+      await revokeServiceCredential(env, fetcher, principalId, credential, id);
     } catch {
-      cleanupWarnings.push(`token:${token.id}`);
+      cleanupWarnings.push(`credential:${credential.id}`);
     }
   }
   return json({ data: { disabled: true, cleanupWarnings } }, 200, id);
@@ -627,11 +759,14 @@ export async function handleIntegrationRequest(request, env, { fetcher = fetch, 
     if (parts.length === 3 && request.method === 'PATCH') {
       return await handleUpdate(request, env, fetcher, assertion, id, principalId);
     }
-    if (parts.length === 4 && parts[3] === 'tokens' && request.method === 'POST') {
-      return await handleCreateToken(request, env, fetcher, assertion, id, principalId);
+    if (parts.length === 5 && parts[3] === 'credential-rotation' && parts[4] === 'complete' && request.method === 'POST') {
+      return await handleCompleteCredentialRotation(request, env, fetcher, assertion, id, principalId);
     }
-    if (parts.length === 5 && parts[3] === 'tokens' && request.method === 'DELETE') {
-      return await handleRevokeToken(request, env, fetcher, assertion, id, principalId, parseTokenId(decodeURIComponent(parts[4])));
+    if (parts.length === 5 && parts[3] === 'credential-rotation' && parts[4] === 'cancel' && request.method === 'POST') {
+      return await handleCancelCredentialRotation(request, env, fetcher, assertion, id, principalId);
+    }
+    if (parts.length === 4 && parts[3] === 'credential-rotation' && request.method === 'POST') {
+      return await handleStartCredentialRotation(request, env, fetcher, assertion, id, principalId);
     }
     if (parts.length === 4 && parts[3] === 'disable' && request.method === 'POST') {
       return await handleDisable(request, env, fetcher, assertion, id, principalId);
