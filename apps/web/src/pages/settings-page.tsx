@@ -5,7 +5,7 @@ import { IntegrationsPage } from './integrations-page';
 
 const settings = [
   { icon: Users, title: '家庭与成员', description: '家庭资料、成员和角色权限。', to: '/family', enabled: true },
-  { icon: ExternalLink, title: '外部系统', description: 'n8n、Agent、脚本与长期 API Token。', to: '/settings/integrations', enabled: true },
+  { icon: ExternalLink, title: '外部系统', description: 'n8n、Agent、脚本的 API Token / OAuth 接入。', to: '/settings/integrations', enabled: true },
   { icon: ShieldCheck, title: '权限与安全', description: '由 LifeSpace Space/Data Grant 作为最终授权依据。', enabled: false },
 ];
 
