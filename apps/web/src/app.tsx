@@ -7,6 +7,7 @@ import { FamilyPage } from './pages/family-page';
 import { FeaturePage } from './pages/feature-page';
 import { HomePage } from './pages/home-page';
 import { SettingsPage } from './pages/settings-page';
+import { TasksPage } from './pages/tasks-page';
 
 export function App() {
   return (
@@ -16,7 +17,7 @@ export function App() {
           <Route element={<AppShell />}>
             <Route index element={<HomePage />} />
             <Route path="calendar" element={<CalendarPage />} />
-            <Route path="tasks" element={<FeaturePage kind="tasks" />} />
+            <Route path="tasks" element={<TasksPage />} />
             <Route path="days" element={<FeaturePage kind="days" />} />
             <Route path="wishes" element={<FeaturePage kind="wishes" />} />
             <Route path="family" element={<FamilyPage />} />
