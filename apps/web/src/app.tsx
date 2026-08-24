@@ -6,6 +6,7 @@ import { CalendarPage } from './pages/calendar-page';
 import { DaysPage } from './pages/days-page';
 import { FamilyPage } from './pages/family-page';
 import { HomePage } from './pages/home-page';
+import { MorePage } from './pages/more-page';
 import { SettingsPage } from './pages/settings-page';
 import { TasksPage } from './pages/tasks-page';
 import { WishesPage } from './pages/wishes-page';
@@ -22,6 +23,7 @@ export function App() {
             <Route path="days" element={<DaysPage />} />
             <Route path="wishes" element={<WishesPage />} />
             <Route path="family" element={<FamilyPage />} />
+            <Route path="more" element={<MorePage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/integrations" element={<SettingsPage section="integrations" />} />
           </Route>
