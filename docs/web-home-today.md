@@ -13,3 +13,5 @@ Current Today surface:
 - counts and navigation are derived only from those real responses.
 
 The selected Space timezone defines today's date and the timed-event query boundary. HomeMew stores no aggregation copy.
+
+This is the first post-W5 aggregation slice and is verified against the stacked Calendar/Tasks/Days/Wishes implementation rather than the old preview page.
