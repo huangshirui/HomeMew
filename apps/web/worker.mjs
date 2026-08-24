@@ -1,3 +1,5 @@
+import { handleIntegrationRequest, integrationsReady } from './integration-api.mjs';
+
 const ACCESS_ASSERTION_HEADER = 'cf-access-jwt-assertion';
 const SESSION_COOKIE = '__Host-homemew_session';
 const SESSION_VERSION = 1;
@@ -380,6 +382,7 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
               service: 'homemew-web',
               environment: env.ENVIRONMENT ?? 'unknown',
               ready: isReady(env),
+              integrationsReady: integrationsReady(env),
               accessMode: 'cloudflare-access',
             },
           }, 200, {}, id);
@@ -404,6 +407,9 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         }
         if (request.method === 'POST' && url.pathname === '/api/access/link-challenge') {
           return await createLinkChallenge(request, env, fetcher, assertion, id);
+        }
+        if (url.pathname === '/api/integrations' || url.pathname.startsWith('/api/integrations/')) {
+          return await handleIntegrationRequest(request, env, { fetcher, assertion, id });
         }
         if (url.pathname.startsWith('/api/lifespace/core/')) {
           return await proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, 'core');
