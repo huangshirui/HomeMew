@@ -6,9 +6,12 @@ HomeMew is the household product/application layer. **LifeSpace is the platform 
 
 1. `docs/architecture.md`
 2. `docs/product-rules.md`
-3. The README and nested `AGENTS.md` for the HomeMew surface being changed
-4. The current LifeSpace contracts/implementation relevant to the change (read-only unless the user separately authorizes a LifeSpace change)
-5. Relevant tests and implementation files
+3. Accepted decisions under `docs/decisions/` that apply to the surface being changed
+4. The README and nested `AGENTS.md` for the HomeMew surface being changed
+5. The current LifeSpace contracts/implementation relevant to the change (read-only unless the user separately authorizes a LifeSpace change)
+6. Relevant tests and implementation files
+
+Accepted decisions are binding for their explicitly scoped topic and supersede older conflicting planning/reference wording until that wording is synchronized.
 
 ## Sources of truth
 
@@ -27,6 +30,8 @@ When HomeMew needs a capability LifeSpace does not provide, do not invent a hidd
 - A small HomeMew Cloudflare application backend handles WeChat provider trust only: `wx.login` code exchange, `openid -> LifeSpace user_id` mapping, and exchange of the server-only LifeSpace application credential for a short-lived user token.
 - The WeChat identity mapping is stored in a SQLite-backed Durable Object keyed per WeChat application identity; do not provision a dedicated HomeMew D1 merely for this mapping.
 - Never expose WeChat `appsecret`, LifeSpace `lsa_*` application credentials, service credentials, signing keys, or other backend secrets to Mini Program code.
+- External-system administration is an advanced Web-only capability. Follow `docs/decisions/2026-08-24-external-integrations-web-only.md`: do not add Service Principal, Data Grant, API Token, OAuth Client Credentials, credential rotation/revocation, or n8n/Agent integration-management surfaces back to the Mini Program.
+- A HomeMew external system has one authentication mode and one active credential at steady state. Temporary multiple credentials are permitted only inside the controlled Web credential-rotation flow described by the accepted decision.
 - Do not reintroduce WeChat Cloud Development as an application dependency.
 - Do not add a permanent `/families/...` compatibility BFF in front of LifeSpace. Product DTO adaptation belongs at explicit HomeMew client/application boundaries.
 - LifeSpace authorization is authoritative. Client role checks are UX only.
