@@ -5,10 +5,10 @@ import { SessionGate } from './components/session-gate';
 import { CalendarPage } from './pages/calendar-page';
 import { DaysPage } from './pages/days-page';
 import { FamilyPage } from './pages/family-page';
-import { FeaturePage } from './pages/feature-page';
 import { HomePage } from './pages/home-page';
 import { SettingsPage } from './pages/settings-page';
 import { TasksPage } from './pages/tasks-page';
+import { WishesPage } from './pages/wishes-page';
 
 export function App() {
   return (
@@ -20,7 +20,7 @@ export function App() {
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="days" element={<DaysPage />} />
-            <Route path="wishes" element={<FeaturePage kind="wishes" />} />
+            <Route path="wishes" element={<WishesPage />} />
             <Route path="family" element={<FamilyPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/integrations" element={<SettingsPage section="integrations" />} />
