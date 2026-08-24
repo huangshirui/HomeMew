@@ -109,9 +109,9 @@ jobs:
           code="$(curl --silent --show-error --output "$tmp" --write-out '%{http_code}' --connect-timeout 5 --max-time 15 \
             -X POST -H 'content-type: application/json' --data '{}' https://homemew.aisr.online/api/v1/login/wechat)"
           test "$code" = "400" || { echo "Expected public login validation HTTP 400, got $code" >&2; cat "$tmp" >&2; exit 1; }
-          node --input-type=module "$tmp" <<'NODE'
+          TMP_PATH="$tmp" node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          const payload = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const payload = JSON.parse(fs.readFileSync(process.env.TMP_PATH, 'utf8'));
           if (payload?.error?.code !== 'INVALID_REQUEST') throw new Error('Mini Program login did not reach the HomeMew backend');
           NODE
 
