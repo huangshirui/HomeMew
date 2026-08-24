@@ -25,8 +25,17 @@ External-system administration is Web-only per `docs/decisions/2026-08-24-extern
 - `/tasks` - tasks
 - `/days` - day records and anniversaries
 - `/wishes` - wish pool
+- `/more` - compact mobile hub for lower-frequency product areas
 
-Desktop uses a persistent sidebar. Mobile uses a compact header and bottom navigation.
+Desktop uses a persistent sidebar and keeps all primary household areas visible.
+
+Mobile deliberately keeps the bottom bar to five high-frequency entries rather than mirroring the desktop sidebar:
+
+```text
+今天 / 日程 / 待办 / 日子 / 更多
+```
+
+`更多` contains the lower-frequency `许愿池 / 家庭与成员 / 设置` entry points. This keeps Wishes reachable without overcrowding the mobile bottom navigation and keeps Family/Settings out of the high-frequency task path.
 
 ## 4. UX requirements
 
@@ -231,7 +240,8 @@ Completed during W6 so far:
 - fix first-family onboarding so a fresh Web user can create/join a family;
 - fix deterministic integration-editor reject states;
 - converge Days occurrence entry and Calendar visible-range/timezone correctness;
-- establish Web-only external integration administration with one-mode/one-active-credential steady state.
+- establish Web-only external integration administration with one-mode/one-active-credential steady state;
+- keep the mobile bottom bar to five high-frequency entries and move Wishes/Family/Settings into a dedicated More hub.
 
 Remaining W6 work:
 
