@@ -4,8 +4,6 @@ import {
   Clock3,
   Heart,
   Home,
-  Menu,
-  Search,
   Settings,
   Sparkles,
   Users,
@@ -13,7 +11,6 @@ import {
 import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '../lib/cn';
 import { useHousehold } from './household-provider';
-import { Button } from './ui/button';
 
 const navigation = [
   { to: '/', label: '今天', icon: Home, end: true },
@@ -86,7 +83,7 @@ function DesktopNav() {
       </nav>
       <div className="mt-auto rounded-3xl bg-emerald-950 p-4 text-emerald-50">
         <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4" /> 喵一下</div>
-        <p className="mt-2 text-xs leading-5 text-emerald-100/70">日程、待办、日子和愿望将在家庭管理与外部系统之后继续接入。</p>
+        <p className="mt-2 text-xs leading-5 text-emerald-100/70">日程、待办、日子和愿望已经接入 LifeSpace；Web 的智能创建入口后续单独收敛。</p>
       </div>
     </aside>
   );
@@ -126,12 +123,8 @@ export function AppShell() {
               <p className="text-xs font-medium text-stone-400">家庭空间</p>
               <p className="text-sm font-semibold text-stone-800">{currentFamily?.name || '暂无家庭'}</p>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Button variant="ghost" size="icon" aria-label="搜索"><Search className="size-[18px]" /></Button>
-              <Button variant="ghost" size="icon" aria-label="更多菜单" className="lg:hidden"><Menu className="size-[19px]" /></Button>
-              <div className="ml-1 grid size-9 place-items-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800 ring-2 ring-white" title={user?.displayName || ''}>
-                {(user?.displayName || '我').slice(0, 1)}
-              </div>
+            <div className="ml-auto grid size-9 place-items-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800 ring-2 ring-white" title={user?.displayName || ''}>
+              {(user?.displayName || '我').slice(0, 1)}
             </div>
           </div>
         </header>
