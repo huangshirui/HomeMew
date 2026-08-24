@@ -39,6 +39,9 @@ type EventDraft = {
   startTime: string;
   endTime: string;
   timezone: string;
+  endTimezone: string;
+  startTimezoneMetadata: string | null;
+  endTimezoneMetadata: string | null;
   attendeePersonIds: string[];
 };
 
@@ -141,6 +144,9 @@ function defaultDraft(timeZone: string, date?: string): EventDraft {
     startTime: '09:00',
     endTime: '10:00',
     timezone: timeZone,
+    endTimezone: timeZone,
+    startTimezoneMetadata: timeZone,
+    endTimezoneMetadata: timeZone,
     attendeePersonIds: [],
   };
 }
@@ -157,12 +163,15 @@ function draftFromEvent(event: EventRecord, fallbackTimezone: string): EventDraf
       startTime: '09:00',
       endTime: '10:00',
       timezone: fallbackTimezone,
+      endTimezone: fallbackTimezone,
+      startTimezoneMetadata: fallbackTimezone,
+      endTimezoneMetadata: fallbackTimezone,
       attendeePersonIds: event.attendeePersonIds ?? [],
     };
   }
-  const timezone = event.startTimezone || fallbackTimezone;
+  const timezone = event.startTimezone ?? fallbackTimezone;
+  const endTimezone = event.endTimezone ?? fallbackTimezone;
   const start = event.startAt ? localDateParts(new Date(event.startAt), timezone) : { date: currentDateInZone(timezone), time: '09:00' };
-  const endTimezone = event.endTimezone || timezone;
   const end = event.endAt ? localDateParts(new Date(event.endAt), endTimezone) : { date: start.date, time: '10:00' };
   return {
     summary: event.summary,
@@ -174,6 +183,9 @@ function draftFromEvent(event: EventRecord, fallbackTimezone: string): EventDraf
     startTime: start.time,
     endTime: end.time,
     timezone,
+    endTimezone,
+    startTimezoneMetadata: event.startTimezone,
+    endTimezoneMetadata: event.endTimezone,
     attendeePersonIds: event.attendeePersonIds ?? [],
   };
 }
@@ -202,15 +214,15 @@ function eventPayload(draft: EventDraft) {
   }
   if (!draft.startTime || !draft.endTime) throw new Error('请选择开始和结束时间');
   const startAt = localDateTimeToIso(draft.startDate, draft.startTime, draft.timezone);
-  const endAt = localDateTimeToIso(draft.endDate, draft.endTime, draft.timezone);
+  const endAt = localDateTimeToIso(draft.endDate, draft.endTime, draft.endTimezone);
   if (endAt <= startAt) throw new Error('结束时间必须晚于开始时间');
   return {
     ...common,
     isAllDay: false,
     startAt,
     endAt,
-    startTimezone: draft.timezone,
-    endTimezone: draft.timezone,
+    startTimezone: draft.startTimezoneMetadata,
+    endTimezone: draft.endTimezoneMetadata,
     startDate: null,
     endDateExclusive: null,
   };
@@ -261,18 +273,17 @@ export function CalendarPage() {
     setLoading(true);
     setError(null);
     try {
-      const range = monthRange(month);
-      const broadStart = `${addDays(range.startDate, -2)}T00:00:00.000Z`;
-      const broadEnd = `${addDays(range.endDateExclusive, 2)}T00:00:00.000Z`;
+      const rangeStart = localDateTimeToIso(gridStart, '00:00', currentFamily.timezone);
+      const rangeEnd = localDateTimeToIso(gridEndExclusive, '00:00', currentFamily.timezone);
       const collected: EventRecord[] = [];
       let cursor: string | null = null;
       do {
         const params = new URLSearchParams({
           status: 'active',
-          rangeStart: broadStart,
-          rangeEnd: broadEnd,
-          dateStart: range.startDate,
-          dateEndExclusive: range.endDateExclusive,
+          rangeStart,
+          rangeEnd,
+          dateStart: gridStart,
+          dateEndExclusive: gridEndExclusive,
           sort: 'calendarStart:asc',
           limit: '200',
         });
@@ -288,7 +299,7 @@ export function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentFamily, month]);
+  }, [currentFamily, gridEndExclusive, gridStart]);
 
   useEffect(() => {
     void refreshToken;
@@ -298,6 +309,8 @@ export function CalendarPage() {
   useEffect(() => {
     if (!currentFamily) return;
     setMonth(currentDateInZone(currentFamily.timezone).slice(0, 7));
+    setEditing(null);
+    setDraft(null);
   }, [currentFamily?.id, currentFamily?.timezone]);
 
   const eventsByDay = useMemo(() => {
@@ -526,7 +539,7 @@ function EventEditor({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '日程详情' : '编辑日程') : '新建日程'}</p>
-            <p className="mt-1 text-xs text-stone-500">{draft.timezone}</p>
+            <p className="mt-1 text-xs text-stone-500">{draft.timezone}{draft.endTimezone !== draft.timezone ? ` → ${draft.endTimezone}` : ''}</p>
           </div>
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
