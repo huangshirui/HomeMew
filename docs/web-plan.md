@@ -24,7 +24,7 @@ The Web app combines normal household use and household-admin settings in one pr
 - `/days` - day records and anniversaries
 - `/wishes` - wish pool
 
-Desktop uses a persistent sidebar. Mobile uses a compact header and bottom navigation. The current delivery priority deliberately puts Family and Settings/Integrations ahead of Calendar/Tasks/Days/Wishes.
+Desktop uses a persistent sidebar. Mobile uses a compact header and bottom navigation.
 
 ## 4. UX requirements
 
@@ -48,7 +48,9 @@ Use a deliberately small SPA stack:
 - Cloudflare Vite plugin + Workers Static Assets
 - pnpm workspace
 
-Do not use Next.js / SSR / RSC for this signed-in household app. Add TanStack Query only when current React context/local-state patterns stop being sufficient. Add Schedule-X only when the real Calendar surface begins.
+Do not use Next.js / SSR / RSC for this signed-in household app. Add TanStack Query only when current React context/local-state patterns stop being sufficient.
+
+Schedule-X remains the intended richer Calendar renderer, but it is not a correctness prerequisite. The first real Calendar slice intentionally proves LifeSpace range/CRUD/time semantics with the existing UI primitives before adding another dependency.
 
 ## 6. Cloudflare runtime and same-origin BFF boundary
 
@@ -98,9 +100,9 @@ Family/member management uses the current LifeSpace contracts directly through t
 
 No HomeMew database or duplicated authorization state is introduced.
 
-## 9. External integrations — current top priority
+## 9. External integrations
 
-LifeSpace Kernel 0.13.0 now supports model-collection Data Grants, closing the platform authorization gap that previously blocked least-privilege external-system issuance.
+LifeSpace Kernel 0.13.0 supports model-collection Data Grants, closing the platform authorization gap that previously blocked least-privilege external-system issuance.
 
 The HomeMew representation is:
 
@@ -180,11 +182,9 @@ React/Vite/Cloudflare SPA, responsive shell, routes, repository scripts and CI.
 - invite, role update and removal;
 - enough household administration to select the target family for integrations.
 
-### W4 — external integrations — current
+### W4 — external integrations — code complete, staging activation pending
 
-Platform prerequisite is complete in LifeSpace Kernel 0.13.0: model-collection Data Grants are supported.
-
-HomeMew implementation scope:
+Implemented in HomeMew and deployed fail-closed to staging:
 
 - bounded integration BFF orchestration using current Access user proof + dedicated integrations `lsa_*`;
 - explicit family-Space management ownership binding for each HomeMew-created Service Principal;
@@ -192,18 +192,39 @@ HomeMew implementation scope:
 - integration list/create/edit/disable;
 - fixed API Token create/list/rotate/revoke;
 - per-model read/write permission editor for `event`, `task`, `day_record`;
-- one-time secret handling and deny-path tests;
-- staging provisioning of the dedicated integrations application credential and Web app `grants:manage` ceiling;
-- real n8n/curl staging E2E.
+- one-time secret handling and deny-path tests.
 
-The code is safe to deploy before the integrations credential exists: normal HomeMew Web remains available, `/health` reports `integrationsReady=false`, and integration endpoints fail closed with `INTEGRATIONS_NOT_CONFIGURED`. Once staging is provisioned and verified, make the integration credential a required deployment secret.
+Remaining activation/E2E work:
 
-### W5 — household domain pages — deferred
+- ensure the HomeMew Web LifeSpace application's allowed scope ceiling includes `grants:manage` while ambient sessions still do not request it;
+- provision the dedicated integrations LifeSpace application with only `resources:read` / `resources:write`;
+- grant Application × Model Access only to `event`, `task`, and `day_record`;
+- install `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` in the staging Web Worker;
+- verify `/health` reports `integrationsReady=true`;
+- run real Access-admin + n8n/curl read/write/deny-path/token rotate/revoke/disable E2E.
 
-- Calendar + Schedule-X + LifeSpace event capability;
-- Tasks;
-- Day records/anniversaries;
-- Wishes.
+Before that credential exists, normal HomeMew Web remains available and `/api/integrations*` fails closed with `INTEGRATIONS_NOT_CONFIGURED`.
+
+### W5 — household domain pages — first real-data pass complete
+
+Implemented directly against LifeSpace through the same-origin BFF:
+
+- Calendar: month view, timed/all-day event CRUD, family timezone, Space Person attendees, optimistic version concurrency;
+- Tasks: pending/completed, overdue/today/upcoming/undated grouping, search, CRUD, complete/reopen Actions, assignees;
+- Days: elapsed/countdown/cycle records, LifeSpace Temporal computed state, CRUD, archive/restore and record-occurrence;
+- Wishes: open/claimed/fulfilled/archived views, owner edit/delete and lifecycle Actions;
+- Home/Today: real family-local events, due/overdue tasks, Temporal attention and quick task completion; all preview/fake household data removed.
+
+Follow-up polish includes the richer Schedule-X Calendar renderer, a proper Day occurrence modal instead of `window.prompt`, adjacent-month Calendar range polish, and general responsive/empty/error-state refinement.
+
+### W6 — staging acceptance and product convergence — current
+
+- keep `main` continuously deployable to `homemew-web-staging.aisr.online`;
+- run real household CRUD/action smoke tests through Cloudflare Access;
+- finish W4 integrations runtime activation and service-token E2E;
+- fix UX states that can currently submit requests the server will deterministically reject;
+- converge Calendar/Tasks/Days/Wishes/Home interaction and visual behavior;
+- only after staging acceptance, design the production front-door cutover that preserves Mini Program backend routes.
 
 ## 11. Production routing constraint
 
