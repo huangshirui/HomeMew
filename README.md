@@ -6,10 +6,11 @@ HomeMew 是构建在 LifeSpace 平台之上的家庭事务应用。LifeSpace 是
 
 ```text
 WeChat Mini Program
-  -> HomeMew Cloudflare backend
-       -> WeChat jscode2session
-       -> Durable Object: openid -> LifeSpace usr_*
-       -> LifeSpace Identity trusted application exchange
+  -> HomeMew Web front door
+       -> /api/v1/login/wechat -> HomeMew Cloudflare backend
+            -> WeChat jscode2session
+            -> Durable Object: openid -> LifeSpace usr_*
+            -> LifeSpace Identity trusted application exchange
   -> LifeSpace Identity / Core
 
 HomeMew Web
@@ -36,15 +37,18 @@ apps/
 
 HomeMew 生产业务数据已经完成一次性迁移并切换到 LifeSpace。当前权威业务数据位于 LifeSpace production；旧 HomeMew Core/D1 仅在稳定化和回滚证据窗口内冻结保留，不再作为正常写入源。
 
-当前生产入口：
+2026-08-24，HomeMew Web 已正式接管生产前门：
 
 ```text
-homemew.aisr.online -> homemew-backend-production
-                       -> auth.aisr.online
-                       -> core.aisr.online
+homemew.aisr.online -> homemew-web-production
+  -> Web / same-origin BFF -> auth.aisr.online / core.aisr.online
+  -> POST /api/v1/login/wechat
+       -> HOMEMEW_BACKEND Service Binding
+       -> homemew-backend-production
+       -> auth.aisr.online / core.aisr.online
 ```
 
-生产域名目前仍承载小程序 `/api/v1/login/wechat`。HomeMew Web 在独立 staging hostname 验证 Cloudflare Access + LifeSpace Identity 0.5.0 流程之前，不接管该生产域名。
+生产 Web 根路径由 Cloudflare Access 保护；小程序登录路径使用精确 Access bypass，并继续由既有 `homemew-backend-production` 提供微信 provider 适配。最终 cutover 已通过 Web Access、Mini Program login、LifeSpace production runtime 与 Worker secret-binding 验证。
 
 ## Identity 边界
 
@@ -76,7 +80,7 @@ Cloudflare Workers + Static Assets
 pnpm workspace
 ```
 
-暂不引入 TanStack Query、Schedule-X、Redux/Zustand。TanStack Query 在真实 LifeSpace server-state 接入时再加；Schedule-X 在 `/calendar` 真正开发时再加；全局状态优先 URL、Context 和浏览器本地 UI state。
+暂不引入 TanStack Query、Schedule-X、Redux/Zustand。TanStack Query 在真实 LifeSpace server-state 接入时再加；Schedule-X 仅在现有日历展示确实需要更丰富能力时再引入；全局状态优先 URL、Context 和浏览器本地 UI state。
 
 不使用 Next.js / SSR。HomeMew 是登录后的家庭应用，SEO 价值有限，不承担 SSR/RSC/Server Actions 的额外维护复杂度。
 
@@ -103,11 +107,12 @@ Desktop 使用 Sidebar，Mobile 使用 Bottom Navigation；视觉保持家庭、
 homemew.aisr.online
   = Workers Static Assets
   + /api/* same-origin session/API gateway
+  + /api/v1/login/wechat provider pass-through
 ```
 
 BFF 只负责 Access assertion、App Session、HttpOnly Cookie、Origin/CSRF 防护、凭据隔离和 LifeSpace 请求转发；不建立 `/families/...` 兼容 API，不保存家庭业务数据，也不复制 LifeSpace 授权逻辑。
 
-当前已实现 Access session exchange、explicit registration、one-time link challenge、same-origin Core/Identity proxy 和自动测试。真实 staging rollout 仍需 Identity 0.5.0/schema v5、Access application/AUD 和独立 Web `lsa_*` 配置。
+生产已实现并验证 Access session exchange、explicit registration、one-time link challenge、same-origin Core/Identity proxy、外部系统管理编排与微信登录 provider pass-through。
 
 ## LifeSpace 模型映射
 
