@@ -14,3 +14,5 @@ Current slice:
 - optimistic `version` concurrency on all writes.
 
 HomeMew does not reproduce the Wish state machine. UI controls are only a convenience; LifeSpace policy and Action guards remain authoritative.
+
+With this slice, the first real-data pass for W5 Calendar, Tasks, Days and Wishes is complete; the next product slice is the Home/Today aggregation and cross-page polish.
