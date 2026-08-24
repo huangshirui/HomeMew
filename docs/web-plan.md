@@ -13,6 +13,8 @@ The Web app combines normal household use and household-admin settings in one pr
 - `apps/miniprogram/` -> WeChat Mini Program
 - `apps/backend/` -> narrow trusted WeChat provider adapter only; it is not a HomeMew business Core
 
+External-system administration is Web-only per `docs/decisions/2026-08-24-external-integrations-web-only.md`.
+
 ## 3. Information architecture
 
 - `/` - Today / household home
@@ -87,10 +89,11 @@ Normal HomeMew browser sessions deliberately do not request `grants:manage`. Int
 
 ## 8. Real household context
 
-The Web must load the current user and accessible `Space(kind=family)` records from LifeSpace after the application session is established. `currentFamilyId` is only a browser UI preference; LifeSpace authorization remains authoritative.
+The Web loads the current user and accessible `Space(kind=family)` records from LifeSpace after the application session is established. `currentFamilyId` is only a browser UI preference; LifeSpace authorization remains authoritative.
 
 Family/member management uses the current LifeSpace contracts directly through the same-origin proxy:
 
+- create or join the first family;
 - list accessible family Spaces;
 - switch current family locally;
 - list members/Space Persons;
@@ -102,7 +105,7 @@ No HomeMew database or duplicated authorization state is introduced.
 
 ## 9. External integrations
 
-LifeSpace Kernel 0.13.0 supports model-collection Data Grants, closing the platform authorization gap that previously blocked least-privilege external-system issuance.
+LifeSpace Kernel 0.13.0 supports model-collection Data Grants and LifeSpace Identity owns Service Principals plus both API Token and OAuth Client Credentials authentication.
 
 The HomeMew representation is:
 
@@ -110,7 +113,10 @@ The HomeMew representation is:
 one external system
   = one LifeSpace Service Principal
   + one explicit owning family Space binding on that Principal
-  + one or more lsp_pat_* Service API Tokens
+  + exactly one authentication mode at steady state
+      - api_token
+      - oauth_client_credentials
+  + exactly one active credential at steady state
   + per-family model-collection Data Grants
 
 stable credential scopes
@@ -125,34 +131,35 @@ Do not restore legacy token scopes such as `events:write` or `tasks:read`.
 
 The owning family binding and Data Grants solve different problems:
 
-- the binding says which HomeMew family may manage the Principal and its globally usable credentials;
+- the binding says which HomeMew family may manage the Principal and its globally usable credential;
 - Data Grants say what the service may access in a Space;
 - receiving a Data Grant from another Space must never transfer credential-management ownership to that Space.
 
 Because the current LifeSpace Service Principal schema has no application metadata field, HomeMew stores this binding as a namespaced marker inside the authoritative LifeSpace Principal description: `homemew:v1:space=<spc_*>`. The BFF strips that marker from user-facing DTOs and preserves it on edits. HomeMew does not create a second ownership database.
 
-The first HomeMew Web surface supports:
+The current HomeMew Web surface supports:
 
 - list HomeMew-bound external systems for the current family;
 - surface migrated unbound systems read-only when the current family has a historical/current Grant to them;
-- never expose token metadata or destructive credential controls for an unbound migrated Principal;
+- never expose credential metadata or destructive credential controls for an unbound migrated Principal;
 - create one Service Principal for one family and write the ownership binding at creation;
 - choose `none/read/write` for `event`, `task`, and `day_record`;
-- issue a long-lived opaque `lsp_pat_*` Service API Token by default;
-- show credential plaintext exactly once and never persist it in browser storage;
-- list non-secret credential metadata for bound Principals;
-- rotate by creating a replacement before revoking the old token;
-- revoke individual tokens;
+- choose exactly one authentication mode: fixed API Token or OAuth 2.0 Client Credentials;
+- show API Token / Client Secret plaintext exactly once and never persist it in browser storage;
+- expose one active credential at steady state rather than arbitrary multi-key management;
+- rotate with create-new -> update external system -> verify -> explicit complete;
+- cancel a failed rotation by revoking only the candidate and retaining the previous credential;
+- use the same controlled transition when switching authentication mode;
 - edit name/description/model Grants;
-- disable a Service Principal first, then revoke its current family Grants and active tokens.
+- disable a Service Principal first, then revoke its current family Grants and all active API Token/OAuth credentials.
 
-Service-principal/token lifecycle uses a dedicated HomeMew integrations LifeSpace application credential held only by the Web Worker:
+Service-principal/credential lifecycle uses a dedicated HomeMew integrations LifeSpace application credential held only by the Web Worker:
 
 ```text
 LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL=lsa_...
 ```
 
-It must be a separate application context from the HomeMew Web browser application and should have only the stable service scope ceiling required by HomeMew integrations. Core Application × Model Access for that application should allow only the HomeMew models intentionally exposed to external systems.
+It is a separate application context from the HomeMew Web browser application and has only the stable service scope ceiling required by HomeMew integrations. Core Application × Model Access for that application allows only the HomeMew models intentionally exposed to external systems.
 
 The current UI does not create whole-Space Grants for new integrations. A migrated integration that still has a whole-Space `read/write/manage` Grant is surfaced explicitly as legacy broad authority; the UI does not pretend model-level `none` can narrow that fallback Grant. Fine-grained edits stay blocked for that integration until the broad Grant is deliberately reviewed/migrated.
 
@@ -177,33 +184,30 @@ React/Vite/Cloudflare SPA, responsive shell, routes, repository scripts and CI.
 ### W3 — minimum real household administration — complete
 
 - real current user + family Space context;
+- first-family create/join onboarding;
 - family switcher;
 - member list;
 - invite, role update and removal;
 - enough household administration to select the target family for integrations.
 
-### W4 — external integrations — code complete, staging activation pending
+### W4 — external integrations — complete and staging accepted
 
-Implemented in HomeMew and deployed fail-closed to staging:
+Completed and verified through the real staging chain:
 
 - bounded integration BFF orchestration using current Access user proof + dedicated integrations `lsa_*`;
 - explicit family-Space management ownership binding for each HomeMew-created Service Principal;
 - read-only handling for migrated unbound Principals;
-- integration list/create/edit/disable;
-- fixed API Token create/list/rotate/revoke;
-- per-model read/write permission editor for `event`, `task`, `day_record`;
-- one-time secret handling and deny-path tests.
+- `event`, `task`, `day_record` model-scoped Data Grants;
+- API Token and OAuth Client Credentials authentication modes;
+- one active credential at steady state with controlled complete/cancel rotation;
+- one-time plaintext handling;
+- direct LifeSpace Core household API guidance including the current `spaceId`;
+- real n8n/curl allowed read/write verification;
+- deny-path verification for ungranted access;
+- credential rotation/revocation verification;
+- Service Principal disable verification.
 
-Remaining activation/E2E work:
-
-- ensure the HomeMew Web LifeSpace application's allowed scope ceiling includes `grants:manage` while ambient sessions still do not request it;
-- provision the dedicated integrations LifeSpace application with only `resources:read` / `resources:write`;
-- grant Application × Model Access only to `event`, `task`, and `day_record`;
-- install `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` in the staging Web Worker;
-- verify `/health` reports `integrationsReady=true`;
-- run real Access-admin + n8n/curl read/write/deny-path/token rotate/revoke/disable E2E.
-
-Before that credential exists, normal HomeMew Web remains available and `/api/integrations*` fails closed with `INTEGRATIONS_NOT_CONFIGURED`.
+Staging provisioning now supplies the dedicated integrations application and its model ceiling. After E2E acceptance, `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` was promoted from optional/fail-closed to a required `homemew-web-staging` runtime secret; staging deployment fails if it or either base Web runtime secret is absent.
 
 ### W5 — household domain pages — first real-data pass complete
 
@@ -219,15 +223,22 @@ Remaining product polish is primarily richer Calendar presentation (Schedule-X a
 
 ### W6 — staging acceptance and product convergence — current
 
-- keep `main` continuously deployable to `homemew-web-staging.aisr.online`;
-- run real household CRUD/action smoke tests through Cloudflare Access;
-- finish W4 integrations runtime activation and service-token E2E;
-- make staging deployment output explicitly report base runtime readiness and whether the optional W4 integrations Worker secret binding is present, without exposing secret values;
-- fix UX states that can currently submit requests the server will deterministically reject;
-- converge Calendar/Tasks/Days/Wishes/Home interaction and visual behavior;
-- only after staging acceptance, design the production front-door cutover that preserves Mini Program backend routes.
+Completed during W6 so far:
 
-Until W4 staging activation is complete, a missing integrations credential is reported as `not configured / fail-closed` rather than failing the otherwise healthy HomeMew Web deployment. After the real integration E2E passes, promote that credential to a required staging deployment prerequisite.
+- keep `main` continuously deployable to `homemew-web-staging.aisr.online`;
+- make deployment output report runtime readiness without exposing secret values;
+- complete W4 real service-credential E2E and promote integrations runtime to a required staging prerequisite;
+- fix first-family onboarding so a fresh Web user can create/join a family;
+- fix deterministic integration-editor reject states;
+- converge Days occurrence entry and Calendar visible-range/timezone correctness;
+- establish Web-only external integration administration with one-mode/one-active-credential steady state.
+
+Remaining W6 work:
+
+- run/finish real household CRUD/action acceptance through Cloudflare Access across Calendar/Tasks/Days/Wishes/Home;
+- continue responsive/empty/error-state and interaction convergence;
+- only after staging acceptance, add the richer Calendar renderer if it improves the product without changing LifeSpace semantics;
+- only after staging acceptance, design the production front-door cutover that preserves Mini Program backend routes.
 
 ## 11. Production routing constraint
 
@@ -246,3 +257,5 @@ The isolated first Web hostname remains `homemew-web-staging.aisr.online`.
 - Separate desktop/mobile Web codebases.
 - Broad Space-wide external-system access as a shortcut around model-grant authorization.
 - Treating possession of a Data Grant as authority to rotate a Service Principal's global credentials.
+- External-system administration in the Mini Program.
+- Normal multi-key management for one external system.
