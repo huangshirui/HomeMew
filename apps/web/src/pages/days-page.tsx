@@ -50,6 +50,11 @@ type DayDraft = {
   attentionDays: string;
   cycleDays: string;
 };
+type OccurrenceDraft = {
+  record: DayRecord;
+  occurredOn: string;
+  note: string;
+};
 
 const inputClass = 'h-10 w-full rounded-2xl border border-stone-200 bg-white px-3 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 const textareaClass = 'min-h-24 w-full resize-y rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
@@ -167,6 +172,7 @@ export function DaysPage() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [editing, setEditing] = useState<DayRecord | null>(null);
   const [draft, setDraft] = useState<DayDraft | null>(null);
+  const [occurrence, setOccurrence] = useState<OccurrenceDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
   const canWrite = currentFamily ? currentFamily.role !== 'viewer' : false;
@@ -206,6 +212,7 @@ export function DaysPage() {
   useEffect(() => {
     setEditing(null);
     setDraft(null);
+    setOccurrence(null);
   }, [currentFamily?.id]);
 
   const attentionCount = useMemo(() => records.filter((record) => record.computed?.temporal?.isAttentionRequired).length, [records]);
@@ -226,6 +233,17 @@ export function DaysPage() {
     if (saving) return;
     setEditing(null);
     setDraft(null);
+  }
+
+  function openOccurrence(record: DayRecord) {
+    if (!canWrite || record.kind === 'countdown') return;
+    setOccurrence({ record, occurredOn: today, note: '' });
+    setError(null);
+  }
+
+  function closeOccurrence() {
+    if (occurrence && actingId === occurrence.record.id) return;
+    setOccurrence(null);
   }
 
   async function saveRecord(event: FormEvent) {
@@ -290,16 +308,18 @@ export function DaysPage() {
     }
   }
 
-  async function recordOccurrence(record: DayRecord) {
-    if (!currentFamily || !canWrite || record.kind === 'countdown') return;
-    const occurredOn = window.prompt('记录发生日期（YYYY-MM-DD）', today);
-    if (!occurredOn) return;
+  async function submitOccurrence(event: FormEvent) {
+    event.preventDefault();
+    if (!currentFamily || !canWrite || !occurrence || !occurrence.occurredOn) return;
+    const record = occurrence.record;
     setActingId(record.id);
     setError(null);
     try {
       await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/day-records/${encodeURIComponent(record.id)}/actions/record-occurrence`, {
-        method: 'POST', body: JSON.stringify({ version: record.version, occurredOn, note: null }),
+        method: 'POST',
+        body: JSON.stringify({ version: record.version, occurredOn: occurrence.occurredOn, note: occurrence.note.trim() || null }),
       });
+      setOccurrence(null);
       setRefreshToken((value) => value + 1);
     } catch (cause) {
       setError(messageOf(cause, '记录发生日期失败'));
@@ -361,7 +381,7 @@ export function DaysPage() {
                   </button>
                   {canWrite ? (
                     <div className="mt-4 flex gap-2 border-t border-stone-100 pt-3">
-                      {record.status === 'active' && record.kind !== 'countdown' ? <Button variant="secondary" disabled={actingId === record.id} onClick={() => void recordOccurrence(record)}>记录一次</Button> : null}
+                      {record.status === 'active' && record.kind !== 'countdown' ? <Button variant="secondary" disabled={actingId === record.id} onClick={() => openOccurrence(record)}>记录一次</Button> : null}
                       <Button variant="ghost" disabled={actingId === record.id} onClick={() => void action(record, record.status === 'active' ? 'archive' : 'restore')}>
                         {record.status === 'active' ? <Archive className="size-4" /> : <RotateCcw className="size-4" />}{record.status === 'active' ? '归档' : '恢复'}
                       </Button>
@@ -375,6 +395,40 @@ export function DaysPage() {
       )}
 
       {draft ? <DayEditor draft={draft} editing={editing} members={members.filter((member) => member.personId)} canWrite={canWrite} saving={saving} onChange={setDraft} onClose={closeEditor} onSave={saveRecord} onDelete={editing ? deleteRecord : undefined} /> : null}
+      {occurrence ? <OccurrenceEditor value={occurrence} saving={actingId === occurrence.record.id} onChange={setOccurrence} onClose={closeOccurrence} onSave={submitOccurrence} /> : null}
+    </div>
+  );
+}
+
+function OccurrenceEditor({ value, saving, onChange, onClose, onSave }: {
+  value: OccurrenceDraft;
+  saving: boolean;
+  onChange: (value: OccurrenceDraft) => void;
+  onClose: () => void;
+  onSave: (event: FormEvent) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/30 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`记录 ${value.record.name} 的发生日期`}>
+      <form onSubmit={onSave} className="w-full max-w-md rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700"><Clock3 className="size-5" /></span>
+            <div>
+              <p className="text-lg font-semibold text-stone-950">记录一次</p>
+              <p className="mt-1 text-sm text-stone-500">{value.record.icon ? `${value.record.icon} ` : ''}{value.record.name}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" aria-label="关闭" disabled={saving} onClick={onClose}><X className="size-4" /></Button>
+        </div>
+        <div className="mt-5 grid gap-4">
+          <label className="grid gap-1.5 text-sm font-medium text-stone-700">发生日期<input type="date" required className={inputClass} disabled={saving} value={value.occurredOn} onChange={(event) => onChange({ ...value, occurredOn: event.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm font-medium text-stone-700">备注（可选）<textarea className={textareaClass} maxLength={5000} disabled={saving} value={value.note} onChange={(event) => onChange({ ...value, note: event.target.value })} placeholder="例如：已更换滤芯、完成保养……" /></label>
+        </div>
+        <div className="mt-6 flex justify-end gap-2 border-t border-stone-200 pt-4">
+          <Button variant="secondary" disabled={saving} onClick={onClose}>取消</Button>
+          <Button type="submit" variant="primary" disabled={saving || !value.occurredOn}>{saving ? '记录中…' : '确认记录'}</Button>
+        </div>
+      </form>
     </div>
   );
 }
