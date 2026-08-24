@@ -94,7 +94,7 @@ function parseOptionalInteger(raw: string, minimum: number, label: string) {
   return value;
 }
 
-function createPayload(draft: DayDraft) {
+function createPayload(draft: DayDraft): Record<string, unknown> {
   const name = draft.name.trim();
   if (!name) throw new Error('请输入名称');
   if (!draft.anchorDate) throw new Error('请选择日期');
