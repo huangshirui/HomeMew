@@ -191,14 +191,24 @@ function IntegrationCard({
   const activeTokens = useMemo(() => integration.tokens.filter((token) => !token.revokedAt), [integration.tokens]);
   const bound = integration.bindingStatus === 'bound';
   const editable = bound && integration.status === 'active';
+  const hasPermissions = Object.values(permissions).some(Boolean);
+  const canSave = Boolean(name.trim()) && hasPermissions && !integration.hasWholeSpaceGrant;
 
   async function save() {
+    if (!name.trim()) {
+      setError('请输入外部系统名称。');
+      return;
+    }
+    if (!hasPermissions) {
+      setError('至少保留一个模型权限；如需全部撤权，请直接禁用这个外部系统。');
+      return;
+    }
     setBusy('save');
     setError(null);
     try {
       await apiRequest(`/api/integrations/${encodeURIComponent(integration.id)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ spaceId, displayName: name, description, permissions }),
+        body: JSON.stringify({ spaceId, displayName: name.trim(), description, permissions }),
       });
       await onChanged();
     } catch (cause) {
@@ -317,6 +327,9 @@ function IntegrationCard({
                 <span className="text-xs text-stone-400">LifeSpace Data Grant</span>
               </div>
               <PermissionEditor value={permissions} onChange={setPermissions} disabled={integration.hasWholeSpaceGrant} />
+              {!hasPermissions && !integration.hasWholeSpaceGrant ? (
+                <p className="rounded-2xl bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">至少保留一个模型权限；如需撤销全部访问，请使用“禁用”。</p>
+              ) : null}
             </div>
           </div>
         ) : (
@@ -370,7 +383,7 @@ function IntegrationCard({
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-4">
             <p className="text-xs text-stone-400">有效权限 = Token scope ∩ Application × Model Access ∩ 当前家庭 Data Grant。</p>
             <div className="flex gap-2">
-              <Button disabled={busy !== null || integration.hasWholeSpaceGrant} onClick={() => void save()}>
+              <Button disabled={busy !== null || !canSave} onClick={() => void save()}>
                 {busy === 'save' ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}
                 保存
               </Button>
@@ -430,7 +443,7 @@ export function IntegrationsPage() {
         method: 'POST',
         body: JSON.stringify({
           spaceId: currentFamily.id,
-          displayName: name,
+          displayName: name.trim(),
           description,
           permissions,
         }),
