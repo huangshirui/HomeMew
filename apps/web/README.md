@@ -18,12 +18,12 @@ Cloudflare Workers + Static Assets
 pnpm workspace
 ```
 
-The foundation already includes the responsive App Shell, Today preview and the first product routes. Do not introduce Next.js, SSR/RSC or another framework layer for the signed-in household app.
+The foundation already includes the responsive App Shell, Today and the real household routes. Do not introduce Next.js, SSR/RSC or another framework layer for the signed-in household app.
 
 Keep dependencies demand-driven:
 
-- add TanStack Query when real LifeSpace server-state integration begins;
-- add Schedule-X when `/calendar` becomes a real calendar surface;
+- add TanStack Query only when current React context/local-state patterns stop being sufficient;
+- add Schedule-X only after staging acceptance if a richer Calendar renderer materially improves the product;
 - prefer URL state, React Context and local browser/UI state before adding Redux/Zustand or another global state library.
 
 ## Product routes
@@ -40,6 +40,8 @@ Keep dependencies demand-driven:
 Desktop uses a sidebar. Mobile uses bottom navigation. Tablet adapts within the same codebase. The visual direction is warm, calm and household-oriented rather than enterprise-admin/ERP styled.
 
 `apps/display/` is a separate future household-display runtime and is not implemented as a mode inside the normal signed-in Web app.
+
+External-system administration is intentionally Web-only. The accepted product boundary is recorded in `docs/decisions/2026-08-24-external-integrations-web-only.md`.
 
 ## Cloudflare deployment model
 
@@ -105,7 +107,7 @@ Identity derives the target `usr_*`; Web never submits a target user ID.
 
 ### Existing-account linking UX
 
-The first staging/MVP UX intentionally keeps the security contract visible and simple:
+The staging/MVP UX intentionally keeps the security contract visible and simple:
 
 ```text
 HomeMew Web
@@ -129,7 +131,7 @@ Manual copy/paste is the staging/MVP confirmation UX. A later QR code or Mini Pr
 
 ## External integrations boundary
 
-`/settings/integrations` uses LifeSpace Service Principals, Service API Tokens and model-scoped Data Grants directly; HomeMew does not own a credential store or permission table.
+`/settings/integrations` uses LifeSpace Service Principals, API Tokens / OAuth Client Credentials and model-scoped Data Grants directly; HomeMew does not own a credential store or permission table.
 
 Two separate LifeSpace application contexts are involved:
 
@@ -141,31 +143,39 @@ HomeMew Web application
 HomeMew integrations application
   separate lsa_* held only by the Worker
   -> create/update Service Principals
-  -> create/list/revoke lsp_pat_* credentials
+  -> create/list/revoke service credentials
 ```
 
 For every integration-management request the Worker performs a fresh Access exchange for only `profile:read grants:manage`, obtains the current `usr_*`, and calls `GET /api/v1/spaces/{spaceId}/grants?includeRevoked=true`. Core therefore proves both the `grants:manage` credential scope and the user's current `manage` authority on the selected Space before the BFF performs any service-principal operation.
 
-The first UI exposes model collection permissions for `event`, `task`, and `day_record`. Stable service token scopes remain `resources:read` / `resources:write`; model identity belongs to Application × Model Access and Data Grants.
+The UI exposes model collection permissions for `event`, `task`, and `day_record`. Stable service credential scopes remain `resources:read` / `resources:write`; model identity belongs to Application × Model Access and Data Grants.
+
+One HomeMew external system has exactly one selected authentication mode and one active credential at steady state:
+
+- `api_token` -> long-lived opaque `lsp_pat_*` bearer;
+- `oauth_client_credentials` -> OAuth 2.0 Client Credentials.
+
+LifeSpace may hold multiple credential rows, but HomeMew does not expose arbitrary multi-key management. Rotation is a controlled temporary exception: create a candidate, update and verify the external system, then explicitly complete by revoking the previous credential(s). Cancel revokes the candidate and keeps the previous credential. Switching authentication mode uses the same controlled flow.
 
 New integrations do not receive whole-Space Grants. Migrated principals that still have a whole-Space `read/write/manage` Grant are surfaced as broad legacy authority and are not falsely represented as model-restricted.
 
-Token plaintext is returned once by Identity and rendered only in current React memory. It is not written to localStorage/sessionStorage or a HomeMew database.
+Credential plaintext is returned once by LifeSpace and rendered only in current React memory. API Tokens and OAuth Client Secrets are not written to localStorage/sessionStorage or a HomeMew database.
+
+The external-system page also shows the household Core API Base URL including the current `spaceId`, plus direct model paths. Machine clients call LifeSpace Core directly with the service credential; they do not call the Cloudflare Access-protected HomeMew Web hostname.
 
 ## Required configuration
 
-Base server-only secrets:
+Server-only Worker secrets:
 
 - `LIFESPACE_APPLICATION_CREDENTIAL` — dedicated trusted **HomeMew Web** LifeSpace application credential (`lsa_*`), not the Mini Program credential;
-- `WEB_SESSION_SECRET` — at least 32 characters.
-
-External integrations additionally require:
-
-- `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` — a separate trusted LifeSpace application credential used only for HomeMew-managed service principals and credentials.
+- `WEB_SESSION_SECRET` — at least 32 characters;
+- `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` — separate trusted LifeSpace application credential used only for HomeMew-managed service principals and credentials.
 
 The HomeMew Web LifeSpace application must allow `grants:manage` so the BFF can request the narrow on-demand manager token. The normal ambient Web session intentionally does not request that scope.
 
-The integrations LifeSpace application should have only the stable service scope ceiling needed by the product (currently `resources:read` / `resources:write`) and Core Application × Model Access for the explicitly supported HomeMew models.
+The integrations LifeSpace application has only the stable service scope ceiling needed by the product (`resources:read` / `resources:write`) and Core Application × Model Access for the explicitly supported HomeMew models.
+
+After the real W4 staging E2E passed, all three Worker secrets above became required staging runtime prerequisites. The staging deployment inspects Cloudflare Worker secret binding names after deployment and fails if any required binding is missing; it never prints secret values.
 
 Non-secret configuration:
 
@@ -175,11 +185,11 @@ Non-secret configuration:
 
 The Worker must sit behind the intended Cloudflare Access application. The original assertion comes from `Cf-Access-Jwt-Assertion`; browser JSON must never be accepted as an assertion source.
 
-`/health` reports base `ready` and separate `integrationsReady`. Before the integrations credential is installed, normal HomeMew Web remains usable while `/api/integrations*` fails closed with `INTEGRATIONS_NOT_CONFIGURED`.
+`/health` reports base `ready` and separate `integrationsReady`; healthy staging is expected to have both ready.
 
 ## Staging and production
 
-The isolated first Web environment is:
+The isolated Web staging environment is:
 
 ```text
 homemew-web-staging.aisr.online
@@ -191,7 +201,7 @@ The final user-facing domain remains:
 homemew.aisr.online
 ```
 
-That production hostname currently also serves the Mini Program login endpoint through `homemew-backend-production`. Do not move the production domain to the Web Worker until staging proves the Access flow and the Web front-door preserves `/api/v1/login/wechat` through an explicit backend service-binding/pass-through.
+That production hostname currently also serves the Mini Program login endpoint through `homemew-backend-production`. Do not move the production domain to the Web Worker until staging proves the full Web path and the Web front-door preserves `/api/v1/login/wechat` through an explicit backend service-binding/pass-through.
 
 Production configuration intentionally contains no Web custom-domain route yet.
 
@@ -205,6 +215,6 @@ pnpm test:web
 pnpm check
 ```
 
-`pnpm test:web` runs dependency-free Worker/BFF tests for both the normal Access session boundary and the external-integration orchestration boundary.
+`pnpm test:web` runs dependency-free Worker/BFF tests for both the normal Access session boundary and the external-integration orchestration boundary, including credential mode/rotation behavior.
 
 The root check includes Mini Program typecheck, Web typecheck/build, BFF tests, legacy Core contract/tests/typecheck/build and therefore treats the Web application as a first-class repository surface.
