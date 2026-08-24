@@ -9,7 +9,7 @@ test('production cutover stays manual and confirmation-gated', () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /\n\s+push:/);
   assert.match(workflow, /CUTOVER_HOMEMEW_WEB_PRODUCTION/);
-  assert.match(workflow, /github\.ref_name.*main/);
+  assert.match(workflow, /GITHUB_REF_NAME.*main/);
 });
 
 test('production cutover preserves Mini Program login and supports rollback', () => {
