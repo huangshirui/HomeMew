@@ -28,13 +28,16 @@ HomeMew Web browser
   -> LifeSpace Identity/Core
 
 HomeMew-managed n8n / Agents / scripts
-  -> dedicated LifeSpace Service Principal + lsp_pat_*
+  -> dedicated LifeSpace Service Principal
+  -> one active API Token OR OAuth Client Credentials at steady state
   -> HomeMew integrations application context
   -> model-scoped Data Grants for the intended family
   -> LifeSpace Core
 ```
 
 There is no WeChat Cloud Development dependency and no permanent HomeMew compatibility BFF for normal business APIs. The HomeMew Web BFF is an application/browser trust and orchestration boundary only; it does not persist household business data or implement a second authorization model.
+
+External-system administration is an advanced HomeMew Web capability. The Mini Program remains a lightweight household client and does not create, configure, rotate, revoke or display service credentials or Data Grants. This product boundary is fixed by `docs/decisions/2026-08-24-external-integrations-web-only.md`.
 
 ## 3. HomeMew Cloudflare application backend
 
@@ -193,7 +196,7 @@ Web uploads go through the same-origin BFF and preserve the LifeSpace multipart 
 
 HomeMew-owned Durable Object storage may hold provider/application integration metadata such as the WeChat identity mapping. It must not become an authoritative household data store.
 
-The Web BFF may hold only short-lived browser application-session state and server-only application credentials. It must not persist an Access-principal mapping, service-token plaintext, a HomeMew integration permission table, or household business records.
+The Web BFF may hold only short-lived browser application-session state and server-only application credentials. It must not persist an Access-principal mapping, service-token/client-secret plaintext, a HomeMew integration permission table, or household business records.
 
 Authoritative household data, service-principal state, credentials and authorization live in LifeSpace. Mini Program/browser storage is cache/UI state only.
 
@@ -205,12 +208,12 @@ A Data Grant by itself is deliberately **not** treated as credential-management 
 
 LifeSpace Kernel 0.13.0 and Identity 0.5.0 provide the approved HomeMew external-system authority:
 
-- Identity owns Service Principals and `lsp_pat_*` / OAuth service credentials;
+- Identity owns Service Principals, `lsp_pat_*` API Tokens and OAuth Client Credentials;
 - Core owns Data Grants and Application × Model Access;
 - model-collection Data Grants can target a published `modelKey` with `read`, `write` or `manage`;
 - stable credential scopes remain `resources:read`, `resources:write`, and where needed `resources:manage`.
 
-The HomeMew Web route `/settings/integrations` is therefore a real LifeSpace-backed surface rather than a HomeMew credential authority.
+The HomeMew Web route `/settings/integrations` is therefore a real LifeSpace-backed surface rather than a HomeMew credential authority. It is the only HomeMew client surface that manages external-system configuration.
 
 ```text
 current Access-authenticated family administrator
@@ -220,10 +223,10 @@ current Access-authenticated family administrator
 HomeMew integrations BFF
   -> verifies Service Principal HomeMew Space ownership binding
   -> separate LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL (lsa_*)
-  -> Identity self-service Service Principal / Token APIs
+  -> Identity Service Principal / API Token / OAuth credential APIs
 
 resulting service
-  -> stable token scopes
+  -> stable credential scopes
   ∩ integrations Application × Model Access
   ∩ current per-family model Data Grants
   -> LifeSpace Core
@@ -232,15 +235,20 @@ resulting service
 Rules:
 
 - one HomeMew external system gets one independent Service Principal and one explicit owning family Space binding;
-- a Data Grant from another Space does not transfer Service Principal or Token management rights to that Space;
-- Token plaintext is returned once and must never be persisted by HomeMew;
+- steady state is exactly one authentication mode (`api_token` or `oauth_client_credentials`) and one active credential;
+- the platform's 1:N credential storage is not exposed as normal multi-key management;
+- rotation is create-new -> update external system -> verify -> explicitly complete; only during this transition may old and new credentials coexist;
+- switching authentication mode uses the same controlled transition and may briefly have both modes active until completion; cancel revokes the new candidate and keeps the previous credential;
+- API Token or Client Secret plaintext is returned once and must never be persisted by HomeMew;
 - new integrations receive only explicit model-collection Grants, currently for `event`, `task`, and `day_record`;
 - `wish` is not exposed to external systems in this first Web slice;
-- disabling a system disables the Service Principal first, then attempts to revoke its current family Grants and active Tokens;
-- a migrated Service Principal without the HomeMew Space ownership binding may be surfaced read-only when the current family has a historical/current Grant to it, but HomeMew must not list its Token metadata, rotate/revoke credentials, edit it, or disable it until a controlled migration establishes ownership;
+- disabling a system disables the Service Principal first, then attempts to revoke its current family Grants and all active API Token/OAuth credentials;
+- a Data Grant from another Space does not transfer Service Principal or credential management rights to that Space;
+- a migrated Service Principal without the HomeMew Space ownership binding may be surfaced read-only when the current family has a historical/current Grant to it, but HomeMew must not list its credential metadata, rotate/revoke credentials, edit it, or disable it until a controlled migration establishes ownership;
 - a Service Principal explicitly bound to a different Space is never surfaced merely because the current Space also has a Data Grant to it;
 - a migrated whole-Space `read/write/manage` Grant remains broader than per-model Grants and is surfaced explicitly; HomeMew must not claim a model is denied while that fallback Grant is active;
-- the browser never receives either the Web `lsa_*` or the integrations `lsa_*`.
+- the browser never receives either the Web `lsa_*` or the integrations `lsa_*`;
+- the Mini Program does not expose external-system administration or secret handling.
 
 The integrations application must be separately registered/configured in LifeSpace and should have only the intended stable scope ceiling and Application × Model Access. The HomeMew Web application must allow on-demand `grants:manage`; the normal ambient browser session still does not request it.
 
