@@ -92,6 +92,44 @@ jobs:
           echo "deploy" > "$RUNNER_TEMP/homemew-web-deploy-stage"
           corepack pnpm deploy:web:staging
 
+      - name: Inspect staging runtime readiness
+        run: |
+          echo "inspect-runtime" > "$RUNNER_TEMP/homemew-web-deploy-stage"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const workerName = 'homemew-web-staging';
+          const baseRequired = ['LIFESPACE_APPLICATION_CREDENTIAL', 'WEB_SESSION_SECRET'];
+          const integrationsSecret = 'LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL';
+          const response = await fetch(
+            `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(process.env.CLOUDFLARE_ACCOUNT_ID)}/workers/scripts/${encodeURIComponent(workerName)}/secrets`,
+            {
+              headers: {
+                authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+                accept: 'application/json',
+              },
+            },
+          );
+          const payload = await response.json().catch(() => null);
+          if (!response.ok || payload?.success !== true || !Array.isArray(payload?.result)) {
+            throw new Error(`Could not inspect ${workerName} Worker secret bindings after deployment (HTTP ${response.status})`);
+          }
+
+          const names = new Set(payload.result.map((entry) => entry?.name).filter(Boolean));
+          const missingBase = baseRequired.filter((name) => !names.has(name));
+          if (missingBase.length) {
+            throw new Error(`${workerName} is missing required base Worker Secrets after deployment: ${missingBase.join(', ')}`);
+          }
+
+          const integrationsConfigured = names.has(integrationsSecret);
+          fs.writeFileSync(
+            `${process.env.RUNNER_TEMP}/homemew-web-runtime-readiness.json`,
+            JSON.stringify({ baseReady: true, integrationsConfigured }),
+          );
+          console.log(`Base runtime secrets: ready`);
+          console.log(`W4 integrations runtime: ${integrationsConfigured ? 'configured' : 'not configured (fail-closed)'}`);
+          NODE
+
       - name: Verify staging hostname is reachable
         shell: bash
         run: |
@@ -145,14 +183,12 @@ jobs:
         if: ${{ success() }}
         shell: bash
         run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          ## HomeMew Web staging
-
-          - Worker: `homemew-web-staging`
-          - Hostname: `homemew-web-staging.aisr.online`
-          - Build/deploy environment: `CLOUDFLARE_ENV=staging`
-          - First deployment may bootstrap the Worker before LifeSpace runtime secrets are installed.
-          - Once the Worker exists, subsequent deployments fail closed if either required runtime secret is missing.
-          - LifeSpace bootstrap authority is not present in this repository/workflow.
-          - Production routes/configuration: untouched.
-          EOF
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const readinessPath = `${process.env.RUNNER_TEMP}/homemew-web-runtime-readiness.json`;
+          const readiness = JSON.parse(fs.readFileSync(readinessPath, 'utf8'));
+          const integrations = readiness.integrationsConfigured
+            ? 'configured — dedicated Worker secret binding is present'
+            : 'not configured — integration routes remain fail-closed until W4 staging provisioning is completed';
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## HomeMew Web staging\n\n- Worker: \`homemew-web-staging\`\n- Hostname: \`homemew-web-staging.aisr.online\`\n- Build/deploy environment: \`CLOUDFLARE_ENV=staging\`\n- Base runtime secrets: ready\n- W4 integrations runtime: ${integrations}\n- LifeSpace bootstrap authority is not present in this repository/workflow.\n- Production routes/configuration: untouched.\n`);
+          NODE
