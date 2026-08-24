@@ -47,12 +47,20 @@ function managerResponses(url, init) {
   return null;
 }
 
-test('integration list proves current Space management and only exposes principals associated by Data Grant', async () => {
+test('integration list uses explicit HomeMew Space ownership before exposing credential controls', async () => {
   const calls = [];
   const grants = [
     {
       id: 'grt_1', sourceSpaceId: 'spc_family', granteeType: 'service', granteeId: 'svc_family',
       resourceType: 'model', resourceId: 'event', permission: 'write', expiresAt: null, revokedAt: null,
+    },
+    {
+      id: 'grt_2', sourceSpaceId: 'spc_family', granteeType: 'service', granteeId: 'svc_other',
+      resourceType: 'model', resourceId: 'event', permission: 'read', expiresAt: null, revokedAt: null,
+    },
+    {
+      id: 'grt_3', sourceSpaceId: 'spc_family', granteeType: 'service', granteeId: 'svc_legacy',
+      resourceType: 'model', resourceId: 'task', permission: 'read', expiresAt: null, revokedAt: null,
     },
   ];
   const fetcher = async (input, init = {}) => {
@@ -67,8 +75,18 @@ test('integration list proves current Space management and only exposes principa
     if (url === 'https://auth.example.test/api/v1/service-principals') {
       assert.equal(init.headers.authorization, `Bearer ${ENV.LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL}`);
       return response(200, { data: [
-        { id: 'svc_family', displayName: 'Family n8n', description: null, status: 'active', maxScopes: ['resources:read', 'resources:write'], createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z' },
-        { id: 'svc_other', displayName: 'Other', description: null, status: 'active', maxScopes: ['resources:read'], createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z' },
+        {
+          id: 'svc_family', displayName: 'Family n8n', description: 'homemew:v1:space=spc_family\nAutomation', status: 'active',
+          maxScopes: ['resources:read', 'resources:write'], createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z',
+        },
+        {
+          id: 'svc_other', displayName: 'Other family', description: 'homemew:v1:space=spc_other\nOther', status: 'active',
+          maxScopes: ['resources:read'], createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z',
+        },
+        {
+          id: 'svc_legacy', displayName: 'Legacy integration', description: 'Migrated before binding', status: 'active',
+          maxScopes: ['resources:read'], createdAt: '2026-08-23T00:00:00Z', updatedAt: '2026-08-23T00:00:00Z',
+        },
       ] });
     }
     if (url === 'https://auth.example.test/api/v1/service-principals/svc_family/tokens') {
@@ -85,18 +103,24 @@ test('integration list proves current Space management and only exposes principa
   });
   assert.equal(result.status, 200);
   const data = (await payload(result)).data;
-  assert.equal(data.length, 1);
+  assert.equal(data.length, 2);
   assert.equal(data[0].id, 'svc_family');
+  assert.equal(data[0].bindingStatus, 'bound');
+  assert.equal(data[0].description, 'Automation');
   assert.equal(data[0].permissions.event, 'write');
-  assert.equal(data[0].effectivePermissions.task, null);
+  assert.equal(data[1].id, 'svc_legacy');
+  assert.equal(data[1].bindingStatus, 'legacy_unbound');
+  assert.deepEqual(data[1].tokens, []);
+  assert.equal(data.some((item) => item.id === 'svc_other'), false, 'a Grant must not transfer credential ownership across Spaces');
   assert.equal(calls.some((call) => call.url.includes('svc_other/tokens')), false);
+  assert.equal(calls.some((call) => call.url.includes('svc_legacy/tokens')), false);
 });
 
-test('creating an integration separates human Grant authority from the integrations application credential', async () => {
+test('creating an integration persists a Space ownership binding inside the LifeSpace principal metadata', async () => {
   const grants = [];
   const tokens = [];
   const principal = {
-    id: 'svc_new', displayName: 'Home n8n', description: 'Automation', status: 'active',
+    id: 'svc_new', displayName: 'Home n8n', description: 'homemew:v1:space=spc_family\nAutomation', status: 'active',
     maxScopes: ['resources:read', 'resources:write'], createdByUserId: 'usr_manager',
     createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z',
   };
@@ -113,6 +137,7 @@ test('creating an integration separates human Grant authority from the integrati
       assert.equal(init.headers.authorization, `Bearer ${ENV.LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL}`);
       const body = JSON.parse(init.body);
       assert.equal(body.createdByUserId, 'usr_manager');
+      assert.equal(body.description, 'homemew:v1:space=spc_family\nAutomation');
       assert.deepEqual(body.maxScopes, ['resources:read', 'resources:write']);
       principalCreated = true;
       return response(201, { data: principal });
@@ -168,10 +193,43 @@ test('creating an integration separates human Grant authority from the integrati
   assert.equal(result.status, 201);
   const data = (await payload(result)).data;
   assert.equal(data.integration.id, 'svc_new');
+  assert.equal(data.integration.bindingStatus, 'bound');
+  assert.equal(data.integration.description, 'Automation');
   assert.equal(data.integration.permissions.event, 'write');
   assert.equal(data.integration.permissions.task, 'read');
   assert.equal(data.token, 'lsp_pat_plaintext_once');
   assert.equal(grants.length, 2);
+});
+
+test('legacy unbound principals are read-only even when the current Space has a Data Grant', async () => {
+  let tokenCreateCalled = false;
+  const grants = [{
+    id: 'grt_legacy', sourceSpaceId: 'spc_family', granteeType: 'service', granteeId: 'svc_legacy',
+    resourceType: 'model', resourceId: 'event', permission: 'read', expiresAt: null, revokedAt: null,
+  }];
+  const fetcher = async (input, init = {}) => {
+    const url = String(input);
+    const manager = managerResponses(url, init);
+    if (manager) return manager;
+    if (url === 'https://core.example.test/api/v1/spaces/spc_family/grants?includeRevoked=true') return response(200, { data: grants });
+    if (url === 'https://auth.example.test/api/v1/service-principals') {
+      return response(200, { data: [{
+        id: 'svc_legacy', displayName: 'Legacy', description: 'No binding', status: 'active', maxScopes: ['resources:read'],
+        createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z',
+      }] });
+    }
+    if (url.includes('/svc_legacy/tokens')) tokenCreateCalled = true;
+    assert.fail(`unexpected upstream ${url}`);
+  };
+
+  const result = await handleIntegrationRequest(request('/api/integrations/svc_legacy/tokens', {
+    method: 'POST',
+    body: { spaceId: 'spc_family', label: 'Rotate' },
+  }), ENV, { fetcher, assertion: ASSERTION, id: REQUEST_ID });
+
+  assert.equal(result.status, 409);
+  assert.equal((await payload(result)).error.code, 'INTEGRATION_BINDING_REQUIRED');
+  assert.equal(tokenCreateCalled, false);
 });
 
 test('state-changing integration routes reject cross-origin requests before touching LifeSpace', async () => {
