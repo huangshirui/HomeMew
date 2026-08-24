@@ -64,6 +64,13 @@ function formatTime(value: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false });
 }
 
+function familyApiBaseUrl(spaceId: string) {
+  const coreOrigin = window.location.hostname === 'homemew.aisr.online'
+    ? 'https://core.aisr.online'
+    : 'https://core-staging.aisr.online';
+  return `${coreOrigin}/api/v1/spaces/${encodeURIComponent(spaceId)}`;
+}
+
 function displayError(cause: unknown, fallback: string) {
   if (cause instanceof ApiError && cause.code === 'INTEGRATIONS_NOT_CONFIGURED') {
     return '外部系统运行凭据尚未配置到 HomeMew Web staging。代码能力已就绪，但当前环境还不能签发服务凭据。';
@@ -125,6 +132,51 @@ function PermissionSummary({ value }: { value: PermissionMap }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function ApiAccessGuide({ spaceId }: { spaceId: string }) {
+  const [copied, setCopied] = useState(false);
+  const baseUrl = familyApiBaseUrl(spaceId);
+
+  async function copyBaseUrl() {
+    try {
+      await navigator.clipboard.writeText(baseUrl);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <Card className="border-sky-100 bg-sky-50/40">
+      <CardContent className="space-y-4 pt-6">
+        <div>
+          <p className="text-sm font-semibold text-stone-900">外部系统接入信息</p>
+          <p className="mt-1 text-sm leading-6 text-stone-500">
+            n8n、Agent 和脚本使用 `lsp_pat_*` 直接调用 LifeSpace Core。不要请求当前 HomeMew Web 域名；Web 域名受 Cloudflare Access 保护。
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-stone-500">家庭 API Base URL</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <code className="min-w-0 flex-1 select-all break-all rounded-xl bg-white px-3 py-2 text-sm text-stone-800 ring-1 ring-stone-200">{baseUrl}</code>
+            <Button onClick={() => void copyBaseUrl()}>
+              {copied ? <Check className="size-4" /> : <Clipboard className="size-4" />}
+              {copied ? '已复制' : '复制 Base URL'}
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-2 text-sm sm:grid-cols-3">
+          <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-stone-100"><span className="text-stone-400">日程</span><code className="ml-2 text-stone-700">/events</code></div>
+          <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-stone-100"><span className="text-stone-400">待办</span><code className="ml-2 text-stone-700">/tasks</code></div>
+          <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-stone-100"><span className="text-stone-400">日子</span><code className="ml-2 text-stone-700">/day-records</code></div>
+        </div>
+        <p className="text-xs leading-5 text-stone-500">
+          请求头：<code className="rounded bg-white px-1.5 py-0.5 text-stone-700">Authorization: Bearer &lt;lsp_pat_*&gt;</code>。具体可访问模型仍以这个外部系统当前的 Data Grant 为准。
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -492,6 +544,7 @@ export function IntegrationsPage() {
       )}
 
       {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {manager && <ApiAccessGuide spaceId={currentFamily.id} />}
       {revealedToken && <TokenReveal value={revealedToken} onClose={() => setRevealedToken(null)} />}
 
       {manager && showCreate && (
