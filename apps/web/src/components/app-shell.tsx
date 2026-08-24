@@ -2,6 +2,7 @@ import {
   CalendarDays,
   CheckSquare2,
   Clock3,
+  Ellipsis,
   Heart,
   Home,
   Settings,
@@ -22,7 +23,13 @@ const navigation = [
   { to: '/wishes', label: '许愿', icon: Heart },
 ];
 
-const mobileNavigation = [navigation[0], navigation[3], navigation[4], navigation[1], navigation[2]];
+const mobileNavigation = [
+  { to: '/', label: '今天', icon: Home, end: true },
+  { to: '/calendar', label: '日程', icon: CalendarDays },
+  { to: '/tasks', label: '待办', icon: CheckSquare2 },
+  { to: '/days', label: '日子', icon: Clock3 },
+  { to: '/more', label: '更多', icon: Ellipsis },
+];
 
 function Brand() {
   return (
