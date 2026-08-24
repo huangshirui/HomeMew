@@ -105,7 +105,12 @@ async function currentDomain() {
 async function attachDomain(service) {
   await cloudflare('/workers/domains', {
     method: 'PUT',
-    body: { hostname: HOSTNAME, service, zone_name: ZONE_NAME },
+    body: {
+      hostname: HOSTNAME,
+      service,
+      zone_name: ZONE_NAME,
+      override_existing_origin: true,
+    },
   });
 }
 
