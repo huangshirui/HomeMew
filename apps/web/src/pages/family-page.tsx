@@ -1,5 +1,5 @@
-import { Check, Clipboard, LoaderCircle, ShieldCheck, UserMinus, Users } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Check, Clipboard, LoaderCircle, LogIn, Plus, ShieldCheck, UserMinus, Users } from 'lucide-react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useHousehold, type FamilyMember } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -12,23 +12,113 @@ const roleLabel: Record<FamilyMember['role'], string> = {
   viewer: '只读成员',
 };
 
+type InvitePreview = {
+  space: {
+    id: string;
+    name: string;
+    kind: string;
+    timezone: string;
+    memberCount: number;
+  };
+  role: 'admin' | 'editor' | 'viewer';
+  expiresAt: string;
+  canJoin: boolean;
+};
+
 function canManage(role: string | undefined) {
   return role === 'owner' || role === 'admin';
 }
 
 export function FamilyPage() {
-  const { user, families, currentFamily, members, loading, error, setCurrentFamilyId, refreshMembers } = useHousehold();
+  const { user, families, currentFamily, members, loading, error, setCurrentFamilyId, refresh, refreshMembers } = useHousehold();
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [familyName, setFamilyName] = useState('');
+  const [joinToken, setJoinToken] = useState('');
+  const [createFamilyBusy, setCreateFamilyBusy] = useState(false);
+  const [joinFamilyBusy, setJoinFamilyBusy] = useState(false);
 
   const manager = canManage(currentFamily?.role);
   const sortedMembers = useMemo(() => [...members].sort((a, b) => {
     const rank = { owner: 0, admin: 1, editor: 2, viewer: 3 } as const;
     return rank[a.role] - rank[b.role];
   }), [members]);
+
+  async function createFamily(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = familyName.trim();
+    const displayName = user?.displayName.trim() || '';
+    if (!name) {
+      setActionError('请输入家庭名称');
+      return;
+    }
+    if (!displayName) {
+      setActionError('当前账号缺少显示名称，请先完善个人资料');
+      return;
+    }
+
+    setCreateFamilyBusy(true);
+    setActionError(null);
+    try {
+      await apiRequest('/api/lifespace/core/v1/spaces', {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'family',
+          name,
+          ownerDisplayName: displayName,
+          timezone: 'Asia/Shanghai',
+        }),
+      });
+      setFamilyName('');
+      await refresh();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : '创建家庭失败');
+    } finally {
+      setCreateFamilyBusy(false);
+    }
+  }
+
+  async function joinFamily(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const token = joinToken.trim();
+    const displayName = user?.displayName.trim() || '';
+    if (!token) {
+      setActionError('请输入家庭邀请码');
+      return;
+    }
+    if (!displayName) {
+      setActionError('当前账号缺少显示名称，请先完善个人资料');
+      return;
+    }
+
+    setJoinFamilyBusy(true);
+    setActionError(null);
+    try {
+      const pathToken = encodeURIComponent(token);
+      const preview = await apiRequest<InvitePreview>(`/api/lifespace/core/v1/space-invites/${pathToken}`);
+      if (preview.space.kind !== 'family') {
+        setActionError('这个邀请码不是 HomeMew 家庭邀请');
+        return;
+      }
+      if (!preview.canJoin) {
+        setActionError('这个家庭邀请码当前不可加入');
+        return;
+      }
+      await apiRequest(`/api/lifespace/core/v1/space-invites/${pathToken}/join`, {
+        method: 'POST',
+        body: JSON.stringify({ displayName }),
+      });
+      setJoinToken('');
+      await refresh();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : '加入家庭失败');
+    } finally {
+      setJoinFamilyBusy(false);
+    }
+  }
 
   async function updateRole(member: FamilyMember, role: 'admin' | 'editor' | 'viewer') {
     if (!currentFamily || member.role === 'owner' || member.role === role) return;
@@ -99,11 +189,71 @@ export function FamilyPage() {
 
   if (!currentFamily) {
     return (
-      <Card className="p-8 text-center">
-        <Users className="mx-auto size-8 text-stone-400" />
-        <h1 className="mt-4 text-xl font-semibold">还没有家庭</h1>
-        <p className="mt-2 text-sm text-stone-500">当前 Web 先完成已有家庭的管理；创建/加入家庭会继续接入同一套 LifeSpace Space 能力。</p>
-      </Card>
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><Users className="size-5" /></span>
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight">开始使用家事喵</h1>
+          <p className="mt-2 text-sm text-stone-500">创建一个新家庭，或使用家人发来的邀请码加入已有家庭。</p>
+        </div>
+
+        {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+        {actionError && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</p>}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardContent className="space-y-5 pt-6">
+              <div>
+                <span className="grid size-10 place-items-center rounded-2xl bg-amber-100 text-amber-800"><Plus className="size-4" /></span>
+                <h2 className="mt-4 text-lg font-semibold text-stone-900">创建家庭</h2>
+                <p className="mt-1 text-sm leading-6 text-stone-500">你会自动成为家庭所有者。家庭时区默认使用 Asia/Shanghai。</p>
+              </div>
+              <form className="space-y-4" onSubmit={(event) => void createFamily(event)}>
+                <label className="block text-sm font-medium text-stone-700">
+                  家庭名称
+                  <input
+                    className="mt-2 h-11 w-full rounded-2xl border border-stone-200 bg-white px-3 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/10"
+                    value={familyName}
+                    onChange={(event) => setFamilyName(event.target.value)}
+                    placeholder="例如：我们家"
+                    maxLength={100}
+                    autoComplete="off"
+                  />
+                </label>
+                <Button className="w-full" variant="primary" type="submit" disabled={createFamilyBusy || joinFamilyBusy || !familyName.trim()}>
+                  {createFamilyBusy ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                  创建家庭
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-5 pt-6">
+              <div>
+                <span className="grid size-10 place-items-center rounded-2xl bg-sky-100 text-sky-700"><LogIn className="size-4" /></span>
+                <h2 className="mt-4 text-lg font-semibold text-stone-900">加入家庭</h2>
+                <p className="mt-1 text-sm leading-6 text-stone-500">粘贴家庭管理员生成的一次性邀请码；加入前会先验证它确实指向家庭空间。</p>
+              </div>
+              <form className="space-y-4" onSubmit={(event) => void joinFamily(event)}>
+                <label className="block text-sm font-medium text-stone-700">
+                  家庭邀请码
+                  <input
+                    className="mt-2 h-11 w-full rounded-2xl border border-stone-200 bg-white px-3 font-mono text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/10"
+                    value={joinToken}
+                    onChange={(event) => setJoinToken(event.target.value)}
+                    placeholder="粘贴邀请码"
+                    autoComplete="off"
+                  />
+                </label>
+                <Button className="w-full" type="submit" disabled={joinFamilyBusy || createFamilyBusy || !joinToken.trim()}>
+                  {joinFamilyBusy ? <LoaderCircle className="size-4 animate-spin" /> : <LogIn className="size-4" />}
+                  加入家庭
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     );
   }
 
