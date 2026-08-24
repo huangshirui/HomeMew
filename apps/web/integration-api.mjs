@@ -1,6 +1,8 @@
 const MANAGER_SCOPES = ['profile:read', 'grants:manage'];
 const MODEL_KEYS = ['event', 'task', 'day_record'];
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
+const BINDING_PREFIX = 'homemew:v1:space=';
+const MAX_USER_DESCRIPTION_LENGTH = 400;
 
 class IntegrationError extends Error {
   constructor(status, code, message) {
@@ -81,10 +83,12 @@ async function readJson(request) {
   return body;
 }
 
+function isSpaceId(value) {
+  return typeof value === 'string' && /^spc_[A-Za-z0-9_-]+$/u.test(value);
+}
+
 function parseSpaceId(value) {
-  if (typeof value !== 'string' || !/^spc_[A-Za-z0-9_-]+$/u.test(value)) {
-    throw new IntegrationError(422, 'VALIDATION_ERROR', 'spaceId is invalid');
-  }
+  if (!isSpaceId(value)) throw new IntegrationError(422, 'VALIDATION_ERROR', 'spaceId is invalid');
   return value;
 }
 
@@ -110,10 +114,31 @@ function parseName(value) {
 
 function parseDescription(value) {
   if (value === undefined || value === null || value === '') return null;
-  if (typeof value !== 'string' || value.trim().length > 500) {
-    throw new IntegrationError(422, 'VALIDATION_ERROR', '说明不能超过 500 个字符');
+  if (typeof value !== 'string') throw new IntegrationError(422, 'VALIDATION_ERROR', '说明格式无效');
+  const description = value.trim();
+  if (description.length > MAX_USER_DESCRIPTION_LENGTH) {
+    throw new IntegrationError(422, 'VALIDATION_ERROR', `说明不能超过 ${MAX_USER_DESCRIPTION_LENGTH} 个字符`);
   }
-  return value.trim() || null;
+  if (description.startsWith(BINDING_PREFIX)) {
+    throw new IntegrationError(422, 'VALIDATION_ERROR', '说明使用了 HomeMew 保留前缀');
+  }
+  return description || null;
+}
+
+function encodeBoundDescription(spaceId, description) {
+  return `${BINDING_PREFIX}${spaceId}\n${description ?? ''}`;
+}
+
+function decodeBoundDescription(value) {
+  if (typeof value !== 'string' || !value.startsWith(BINDING_PREFIX)) {
+    return { spaceId: null, description: typeof value === 'string' && value.trim() ? value.trim() : null };
+  }
+  const newline = value.indexOf('\n');
+  const marker = newline < 0 ? value : value.slice(0, newline);
+  const spaceId = marker.slice(BINDING_PREFIX.length);
+  if (!isSpaceId(spaceId)) return { spaceId: null, description: value.trim() || null };
+  const description = newline < 0 ? '' : value.slice(newline + 1).trim();
+  return { spaceId, description: description || null };
 }
 
 function parseLabel(value, fallback) {
@@ -179,7 +204,8 @@ function modelPermission(grants, modelKey, includeWholeSpace = false) {
   return best === 'read' || best === 'write' ? best : null;
 }
 
-function integrationDto(principal, grants, tokens) {
+function integrationDto(principal, grants, tokens, bindingStatus = 'bound') {
+  const decoded = decodeBoundDescription(principal.description);
   const activeWholeSpaceGrants = grants.filter((grant) => activeGrant(grant)
     && grant.resourceType === 'space'
     && grant.resourceId === null
@@ -187,8 +213,9 @@ function integrationDto(principal, grants, tokens) {
   return {
     id: principal.id,
     displayName: principal.displayName,
-    description: principal.description ?? null,
+    description: decoded.description,
     status: principal.status,
+    bindingStatus,
     maxScopes: principal.maxScopes ?? [],
     createdByUserId: principal.createdByUserId ?? null,
     createdAt: principal.createdAt,
@@ -196,7 +223,7 @@ function integrationDto(principal, grants, tokens) {
     permissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants, modelKey, false)])),
     effectivePermissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants, modelKey, true)])),
     hasWholeSpaceGrant: activeWholeSpaceGrants.length > 0,
-    tokens: Array.isArray(tokens) ? tokens : [],
+    tokens: bindingStatus === 'bound' && Array.isArray(tokens) ? tokens : [],
   };
 }
 
@@ -317,12 +344,15 @@ async function listTokens(env, fetcher, principalId, id) {
   return Array.isArray(tokens) ? tokens : [];
 }
 
-async function resolveIntegration(env, fetcher, grants, principalId, id) {
-  const ids = associatedPrincipalIds(grants);
-  if (!ids.has(principalId)) throw new IntegrationError(404, 'INTEGRATION_NOT_FOUND', '当前家庭没有这个外部系统');
+async function resolveBoundIntegration(env, fetcher, spaceId, principalId, id) {
   const principals = await listPrincipals(env, fetcher, id);
   const principal = principals.find((item) => item.id === principalId);
   if (!principal) throw new IntegrationError(404, 'INTEGRATION_NOT_FOUND', '当前家庭没有这个外部系统');
+  const binding = decodeBoundDescription(principal.description);
+  if (!binding.spaceId) {
+    throw new IntegrationError(409, 'INTEGRATION_BINDING_REQUIRED', '这个迁移外部系统尚未建立 HomeMew 家庭管理归属，当前仅可查看');
+  }
+  if (binding.spaceId !== spaceId) throw new IntegrationError(404, 'INTEGRATION_NOT_FOUND', '当前家庭没有这个外部系统');
   return principal;
 }
 
@@ -378,23 +408,35 @@ async function reconcileModelGrants(env, fetcher, managerToken, spaceId, princip
 
 async function readIntegration(env, fetcher, managerToken, spaceId, principalId, id) {
   const grants = await listSpaceGrants(env, fetcher, managerToken, spaceId, id);
-  const principal = await resolveIntegration(env, fetcher, grants, principalId, id);
+  const principal = await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
   const tokens = await listTokens(env, fetcher, principalId, id);
-  return integrationDto(principal, grantsForPrincipal(grants, principalId), tokens);
+  return integrationDto(principal, grantsForPrincipal(grants, principalId), tokens, 'bound');
 }
 
 async function handleList(request, env, fetcher, assertion, id) {
   const url = new URL(request.url);
   const spaceId = parseSpaceId(url.searchParams.get('spaceId'));
-  const { manager, grants } = await managementContext(env, fetcher, assertion, spaceId, id);
-  void manager;
-  const ids = associatedPrincipalIds(grants);
-  const principals = (await listPrincipals(env, fetcher, id)).filter((principal) => ids.has(principal.id));
-  const integrations = await Promise.all(principals.map(async (principal) => integrationDto(
-    principal,
-    grantsForPrincipal(grants, principal.id),
-    await listTokens(env, fetcher, principal.id, id),
-  )));
+  const { grants } = await managementContext(env, fetcher, assertion, spaceId, id);
+  const associated = associatedPrincipalIds(grants);
+  const principals = await listPrincipals(env, fetcher, id);
+  const integrations = [];
+
+  for (const principal of principals) {
+    const binding = decodeBoundDescription(principal.description);
+    if (binding.spaceId === spaceId) {
+      integrations.push(integrationDto(
+        principal,
+        grantsForPrincipal(grants, principal.id),
+        await listTokens(env, fetcher, principal.id, id),
+        'bound',
+      ));
+      continue;
+    }
+    if (!binding.spaceId && associated.has(principal.id)) {
+      integrations.push(integrationDto(principal, grantsForPrincipal(grants, principal.id), [], 'legacy_unbound'));
+    }
+  }
+
   integrations.sort((a, b) => {
     if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
     return String(b.createdAt).localeCompare(String(a.createdAt));
@@ -410,12 +452,16 @@ async function handleCreate(request, env, fetcher, assertion, id) {
   const description = parseDescription(body.description);
   const permissions = parsePermissions(body.permissions);
   const scopes = scopesForPermissions(permissions);
-  const { manager, grants: initialGrants } = await managementContext(env, fetcher, assertion, spaceId, id);
-  void initialGrants;
+  const { manager } = await managementContext(env, fetcher, assertion, spaceId, id);
 
   const principal = await identityIntegrationRequest(env, fetcher, '/api/v1/service-principals', {
     method: 'POST',
-    body: { displayName, description, maxScopes: scopes, createdByUserId: manager.userId },
+    body: {
+      displayName,
+      description: encodeBoundDescription(spaceId, description),
+      maxScopes: scopes,
+      createdByUserId: manager.userId,
+    },
     id,
     fallbackCode: 'INTEGRATION_CREATE_FAILED',
   });
@@ -457,7 +503,7 @@ async function handleUpdate(request, env, fetcher, assertion, id, principalId) {
   const body = await readJson(request);
   const spaceId = parseSpaceId(body.spaceId);
   const { manager, grants } = await managementContext(env, fetcher, assertion, spaceId, id);
-  const principal = await resolveIntegration(env, fetcher, grants, principalId, id);
+  const principal = await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
   if (principal.status !== 'active') throw new IntegrationError(409, 'INTEGRATION_DISABLED', '已禁用的外部系统不能继续编辑');
 
   const principalGrants = grantsForPrincipal(grants, principalId);
@@ -471,7 +517,7 @@ async function handleUpdate(request, env, fetcher, assertion, id, principalId) {
 
   const patch = {};
   if (body.displayName !== undefined) patch.displayName = parseName(body.displayName);
-  if (body.description !== undefined) patch.description = parseDescription(body.description);
+  if (body.description !== undefined) patch.description = encodeBoundDescription(spaceId, parseDescription(body.description));
   let permissions = null;
   if (body.permissions !== undefined) {
     permissions = parsePermissions(body.permissions);
@@ -497,8 +543,8 @@ async function handleCreateToken(request, env, fetcher, assertion, id, principal
   requireSameOrigin(request);
   const body = await readJson(request);
   const spaceId = parseSpaceId(body.spaceId);
-  const { manager, grants } = await managementContext(env, fetcher, assertion, spaceId, id);
-  const principal = await resolveIntegration(env, fetcher, grants, principalId, id);
+  const { manager } = await managementContext(env, fetcher, assertion, spaceId, id);
+  const principal = await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
   if (principal.status !== 'active') throw new IntegrationError(409, 'INTEGRATION_DISABLED', '已禁用的外部系统不能签发 Token');
   const scopes = Array.isArray(principal.maxScopes) ? principal.maxScopes : [];
   if (!scopes.length) throw new IntegrationError(409, 'INTEGRATION_HAS_NO_SCOPES', '外部系统当前没有可签发的权限');
@@ -516,8 +562,8 @@ async function handleRevokeToken(request, env, fetcher, assertion, id, principal
   requireSameOrigin(request);
   const body = await readJson(request);
   const spaceId = parseSpaceId(body.spaceId);
-  const { grants } = await managementContext(env, fetcher, assertion, spaceId, id);
-  await resolveIntegration(env, fetcher, grants, principalId, id);
+  await managementContext(env, fetcher, assertion, spaceId, id);
+  await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
   await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principalId)}/tokens/${encodeURIComponent(tokenId)}`, {
     method: 'DELETE',
     id,
@@ -531,7 +577,7 @@ async function handleDisable(request, env, fetcher, assertion, id, principalId) 
   const body = await readJson(request);
   const spaceId = parseSpaceId(body.spaceId);
   const { manager, grants } = await managementContext(env, fetcher, assertion, spaceId, id);
-  await resolveIntegration(env, fetcher, grants, principalId, id);
+  await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
 
   await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principalId)}`, {
     method: 'PATCH',
