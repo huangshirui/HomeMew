@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/app-shell';
 import { HouseholdProvider } from './components/household-provider';
 import { SessionGate } from './components/session-gate';
+import { CalendarPage } from './pages/calendar-page';
 import { FamilyPage } from './pages/family-page';
 import { FeaturePage } from './pages/feature-page';
 import { HomePage } from './pages/home-page';
@@ -14,7 +15,7 @@ export function App() {
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<HomePage />} />
-            <Route path="calendar" element={<FeaturePage kind="calendar" />} />
+            <Route path="calendar" element={<CalendarPage />} />
             <Route path="tasks" element={<FeaturePage kind="tasks" />} />
             <Route path="days" element={<FeaturePage kind="days" />} />
             <Route path="wishes" element={<FeaturePage kind="wishes" />} />
