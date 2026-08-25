@@ -15,7 +15,7 @@ const REQUIRED_WORKER_SECRETS = [
   'LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL',
 ];
 const REQUIRED_IDENTITY_CONTRACT = '0.5.0';
-const REQUIRED_CORE_CONTRACT = '0.14.0';
+const REQUIRED_CORE_CONTRACT = '0.15.0';
 
 if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required');
 if (!apiToken) throw new Error('CLOUDFLARE_API_TOKEN is required');
