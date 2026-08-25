@@ -5,9 +5,9 @@ Status: Accepted
 
 ## Decision
 
-LifeSpace owns the platform eventing capability. HomeMew owns only the product-facing configuration experience.
+LifeSpace owns the platform Eventing capability. HomeMew owns only the product-facing configuration experience.
 
-Event subscription is a capability of a concrete **external system**, not a standalone HomeMew setting. HomeMew external-system administration therefore uses a low-frequency, extensible list/detail structure:
+Event push is a capability of a concrete **external system**, not a standalone HomeMew setting. HomeMew external-system administration therefore keeps the existing list/detail structure:
 
 ```text
 /settings/integrations
@@ -16,13 +16,23 @@ Event subscription is a capability of a concrete **external system**, not a stan
 /settings/integrations/:integrationId
   -> external-system detail
        -> authentication and data access
-       -> event subscriptions
+       -> event push
        -> future integration capabilities
 ```
 
-The list page shows only operational summaries. Editable details are not expanded by default; a family administrator enters a specific system and explicitly starts editing when needed.
+The product-facing mental model is:
 
-Future external-system-specific capabilities such as synchronization rules, notification channels or Agent/MCP integration settings belong on this same detail surface rather than becoming additional top-level Settings entries.
+```text
+External system
+  -> one Webhook Endpoint
+       -> one Webhook URL
+       -> one signing secret
+       -> selected subscriptions
+            -> 日程: created / updated / deleted
+            -> 待办: created / updated / deleted
+```
+
+A user must not be required to configure another callback URL or another signing secret merely because another LifeSpace model is selected.
 
 ## Platform ownership
 
@@ -30,25 +40,64 @@ LifeSpace is authoritative for:
 
 - model-agnostic ordinary-record change events (`record.created`, `record.updated`, `record.deleted`);
 - durable event outbox state;
-- Space/model subscriptions managed by an application and bound to one subscriber Service Principal;
+- reusable Webhook Endpoints bound to a Space and subscriber Service Principal;
+- model/event subscription filters attached to an Endpoint;
 - Webhook signing, queueing, retries, dead-letter handling and delivery history;
 - current authorization checks.
 
-HomeMew must not create a parallel event, subscription, Webhook-secret, retry or delivery-log store.
+HomeMew must not create a parallel event, endpoint, subscription, Webhook-secret, retry or delivery-log store.
 
-## External-system binding
+## Endpoint and subscription boundary
 
-One HomeMew external system maps to one LifeSpace Service Principal. An event subscription created in that external system's detail page carries the actual subscriber Service Principal ID.
+The accepted LifeSpace boundary separates transport from filtering:
 
-Creating, enabling, materially editing or test-sending a subscription requires the subscriber Service Principal to have a current Data Grant from the family Space that permits access to the selected model. LifeSpace re-checks that Data Grant again before matching and delivering real events.
+```text
+Webhook Endpoint
+  -> Space
+  -> subscriber Service Principal
+  -> Webhook URL
+  -> signing secret
+  -> enabled state
 
-Consequences:
+Event Subscription
+  -> endpointId
+  -> modelKey
+  -> eventTypes[]
+  -> enabled state
+```
 
-- a subscription cannot be visually attached to one external system while being platform-global underneath;
-- revoking or expiring the external system's model Data Grant stops new event delivery;
-- disabling a HomeMew external system naturally stops its subscriptions when the integration flow revokes its Data Grants;
-- the event subscription itself grants no data access;
-- Identity remains authoritative for the Service Principal and credentials; Core stores only the stable subscriber-principal reference needed by Eventing.
+The Endpoint answers **where to send and how to verify**. The Subscription answers **which changes to send**.
+
+HomeMew intentionally exposes one Eventing Endpoint per external system in the current product UI, even though LifeSpace may support more than one Endpoint for applications that genuinely need multiple destinations.
+
+Endpoint-level operations are shown only once:
+
+- configure/edit Webhook URL;
+- enable/disable all push delivery;
+- test Webhook transport/signature;
+- rotate the shared signing secret;
+- inspect recent delivery history;
+- remove the Endpoint and its filters.
+
+Model-level configuration contains only the subscription choice and event-type filtering.
+
+## External-system binding and authorization
+
+One HomeMew external system maps to one LifeSpace Service Principal. The Webhook Endpoint carries that Service Principal ID and the current family Space.
+
+Creating the Endpoint itself grants no business-data access. Selecting a model subscription requires:
+
+- the managing HomeMew application/user context to retain current read access to that model;
+- the external system's Service Principal to have a current model `read`, `write` or `manage` Data Grant, or an equivalent whole-Space Grant.
+
+LifeSpace re-checks current Application × Model Access and subscriber Data Grant state before matching/delivering events. Therefore:
+
+- revoking or expiring a model Grant stops new delivery for that model;
+- disabling the external system and revoking its Grants stops its event delivery;
+- an Event Subscription itself grants no data access;
+- Identity remains authoritative for the Service Principal and credentials.
+
+Endpoint test-send is deliberately only a transport/signature test; it does not imply that every model filter currently has valid data authority.
 
 ## Current HomeMew slice
 
@@ -57,26 +106,21 @@ The current HomeMew Web milestone exposes two LifeSpace ordinary models:
 - `event`, labeled `日程`;
 - `task`, labeled `待办`.
 
-Both models use the same LifeSpace Eventing contract and the same external-system detail UI. The event-subscription section supports:
+Both use the same Endpoint. The user simply checks which models should be pushed and, for each selected model, which ordinary changes are relevant:
 
-- create/edit/delete subscription;
-- select `日程` or `待办` when creating a subscription;
-- choose created/updated/deleted changes;
-- enable/disable;
-- HTTPS Webhook URL;
-- one-time display of a generated signing secret and explicit rotation;
-- test delivery;
-- recent delivery history.
+- 创建 -> `record.created`
+- 修改 -> `record.updated`
+- 删除 -> `record.deleted`
 
-The subscription model is immutable after creation because the current LifeSpace update contract does not change `modelKey`. To switch models, create a new subscription and remove the old one.
-
-HomeMew uses its existing same-origin Web BFF proxy to call the LifeSpace Core Kernel API. LifeSpace user bearer credentials remain server-side and are never returned to browser JavaScript.
-
-With both `event` and `task` wired into HomeMew Web, the current event-subscription milestone is considered complete for now. `day_record` and future models are **not** automatically exposed merely because LifeSpace Eventing is model-agnostic; adding another product-facing subscription model requires a later explicit product decision.
+`day_record` and future models are **not** automatically exposed merely because LifeSpace Eventing is model-agnostic. Adding another product-facing subscription model remains an explicit product decision.
 
 ## Secret handling
 
-Service credentials and Webhook signing secrets are one-time plaintext values. They may exist only in current React/module memory while the user is actively saving them. They must not be placed in URLs, React Router history state, localStorage, sessionStorage, HomeMew databases, logs or analytics.
+The Webhook signing secret belongs to the Endpoint. It is returned by LifeSpace only when the Endpoint is created or the secret is explicitly rotated.
+
+HomeMew may keep that plaintext only in current React/module memory while showing it to the administrator. It must not be placed in URLs, React Router history state, localStorage, sessionStorage, a HomeMew database, logs, analytics or telemetry.
+
+Adding/removing a model subscription does not generate or rotate the Endpoint secret.
 
 ## Payload and external access
 
@@ -84,6 +128,12 @@ Webhook delivery is reference-only. The outbound event identifies the event, Spa
 
 A receiving n8n/Agent/backend that needs the current record authenticates to LifeSpace with the same external system's Service Principal credential and passes the normal credential scope, Application × Model Access and current Space/Data Grant checks.
 
-## Rollout
+Endpoint-level delivery history includes the source `modelKey`, so a shared Webhook remains diagnosable across multiple model filters.
 
-The HomeMew detail UI depends on the LifeSpace Core Kernel event-subscription API with subscriber-Service-Principal binding. Both sides must be deployed and verified together in staging before production promotion.
+## Compatibility and rollout
+
+This decision supersedes the earlier same-day product shape where each model subscription owned its own Webhook URL and signing secret.
+
+At the time of this correction there is no real production Eventing subscription configuration data to preserve. LifeSpace may therefore replace/reset the pre-Endpoint Eventing subscription/delivery configuration tables rather than building a compatibility migration for the abandoned shape. Staging/test subscriptions may be recreated.
+
+HomeMew Web depends on LifeSpace Core Kernel `0.15.0+` for the Endpoint/filter split. LifeSpace must reach staging before the HomeMew staging UI is promoted against the new contract.
