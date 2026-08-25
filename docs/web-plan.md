@@ -241,22 +241,23 @@ Completed during W6 so far:
 - fix deterministic integration-editor reject states;
 - converge Days occurrence entry and Calendar visible-range/timezone correctness;
 - establish Web-only external integration administration with one-mode/one-active-credential steady state;
-- keep the mobile bottom bar to five high-frequency entries and move Wishes/Family/Settings into a dedicated More hub.
+- keep the mobile bottom bar to five high-frequency entries and move Wishes/Family/Settings into a dedicated More hub;
+- production front-door cutover completed on 2026-08-24: `homemew.aisr.online` is owned by `homemew-web-production`, with Cloudflare Access on Web traffic and exact Mini Program login pass-through via `HOMEMEW_BACKEND`.
 
 Remaining W6 work:
 
 - run/finish real household CRUD/action acceptance through Cloudflare Access across Calendar/Tasks/Days/Wishes/Home;
 - continue responsive/empty/error-state and interaction convergence;
-- only after staging acceptance, add the richer Calendar renderer if it improves the product without changing LifeSpace semantics;
-- only after staging acceptance, design the production front-door cutover that preserves Mini Program backend routes.
+- only after household browser acceptance, add the richer Calendar renderer if it improves the product without changing LifeSpace semantics;
+- keep production front-door and Mini Program login compatibility as release invariants; normal Web deploys must not implicitly transfer the production Custom Domain.
 
-## 11. Production routing constraint
+## 11. Production routing state
 
-The final Web domain remains `homemew.aisr.online`, but that hostname currently serves the production Mini Program login endpoint through `homemew-backend-production`.
+The final Web domain `homemew.aisr.online` is currently owned by `homemew-web-production`, following the accepted 2026-08-24 production cutover. Browser Web traffic stays behind Cloudflare Access; the exact Mini Program provider route `POST /api/v1/login/wechat` uses the Access bypass and `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`.
 
-Do not transfer the production hostname to the Web Worker until the Web front-door preserves `/api/v1/login/wechat` through an explicit backend Service Binding/pass-through and the full Web path has passed staging verification.
+Normal `homemew-web-production` deployments intentionally do not claim or move the Custom Domain. Any future ownership transfer or rollback remains a manual, confirmation-gated release operation and must re-verify Access protection, Mini Program login pass-through, LifeSpace production runtime and required Worker bindings.
 
-The isolated first Web hostname remains `homemew-web-staging.aisr.online`.
+The isolated staging hostname remains `homemew-web-staging.aisr.online`. See `docs/decisions/2026-08-24-web-production-cutover.md`.
 
 ## 12. Non-goals
 
