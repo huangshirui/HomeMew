@@ -16,14 +16,17 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '../lib/cn';
 import { useHousehold } from './household-provider';
 
-const navigation = [
+const dailyNavigation = [
   { to: '/', label: '今天', icon: Home, end: true },
-  { to: '/family', label: '家庭', icon: Users },
-  { to: '/settings', label: '设置', icon: Settings },
   { to: '/calendar', label: '日程', icon: CalendarDays },
   { to: '/tasks', label: '待办', icon: CheckSquare2 },
   { to: '/days', label: '日子', icon: Clock3 },
   { to: '/wishes', label: '许愿', icon: Heart },
+];
+
+const managementNavigation = [
+  { to: '/family', label: '家庭与成员', icon: Users },
+  { to: '/settings', label: '设置', icon: Settings },
 ];
 
 const mobileNavigation = [
@@ -94,21 +97,41 @@ function DesktopNav() {
           </span>
         </div>
       </div>
-      <nav className="mt-6 space-y-1">
-        {navigation.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) => cn(
-              'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',
-              isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',
-            )}
-          >
-            <Icon className="size-[18px]" />
-            {label}
-          </NavLink>
-        ))}
+      <nav className="mt-6">
+        <div className="space-y-1">
+          {dailyNavigation.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) => cn(
+                'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',
+                isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',
+              )}
+            >
+              <Icon className="size-[18px]" />
+              {label}
+            </NavLink>
+          ))}
+        </div>
+        <div className="mt-6 border-t border-stone-200/80 pt-5">
+          <p className="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400">家庭管理</p>
+          <div className="mt-2 space-y-1">
+            {managementNavigation.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) => cn(
+                  'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',
+                  isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',
+                )}
+              >
+                <Icon className="size-[18px]" />
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        </div>
       </nav>
       <div className="mt-auto rounded-3xl bg-emerald-950 p-4 text-emerald-50">
         <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4" /> 喵一下</div>
