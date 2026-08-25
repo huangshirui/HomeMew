@@ -124,21 +124,18 @@ State-changing same-origin BFF/proxy routes require an exact `Origin` match. Thi
 
 Normal Web sessions intentionally do not carry `grants:manage`. `/api/integrations*` performs a fresh Access exchange for only `profile:read grants:manage` when an administrator starts an integration-management operation. Core then independently requires current `manage` authority on the selected family Space before the BFF may create/update service credentials with the separate HomeMew integrations application credential. This is privilege-on-demand, not a second HomeMew role check.
 
-Unknown Access principals are explicit flows, never email merges:
+For HomeMew, an unknown Access principal has exactly one onboarding path: link the already-existing HomeMew/LifeSpace account through the Mini Program. HomeMew Web does not expose LifeSpace Access registration and does not create a new LifeSpace user. LifeSpace Identity may retain explicit Access registration as a platform capability for other applications.
 
 ```text
 unlinked Access principal
-  ├─ link existing LifeSpace account
-  │    -> Web creates Identity one-time link challenge
-  │    -> already-authenticated Mini Program confirms challenge
-  │    -> Identity derives usr_* from Mini Program bearer
-  │
-  └─ create new LifeSpace account
-       -> explicit Identity Access registration
-       -> create usr_* + bind verified (iss, sub) atomically
+  -> Web creates Identity one-time link challenge
+  -> already-authenticated Mini Program confirms challenge
+  -> Identity derives usr_* from Mini Program bearer
+  -> Identity binds the verified Access principal to that existing usr_*
+  -> Web retries /api/session
 ```
 
-The target user ID for account linking is never supplied by Web. Identity owns the Access-principal -> `usr_*` relationship.
+The target user ID for account linking is never supplied by Web. Identity owns the Access-principal -> `usr_*` relationship. This HomeMew product policy is fixed by `docs/decisions/2026-08-25-web-existing-user-link-only.md`.
 
 The final Web domain is `homemew.aisr.online`. That hostname currently also carries the production Mini Program login endpoint through `homemew-backend-production`. A later controlled production Web cutover must preserve `/api/v1/login/wechat`, preferably by routing that application-provider endpoint from the Web front-door Worker to `apps/backend/` through an explicit service binding. Until that is proven in staging, the Web Worker uses an isolated staging hostname/Access application and does not take production Mini Program traffic.
 
