@@ -14,7 +14,6 @@ import {
   Webhook,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { ApiError, apiRequest } from '../lib/api-client';
@@ -24,6 +23,7 @@ type EventType = 'record.created' | 'record.updated' | 'record.deleted';
 type EventSubscription = {
   id: string;
   spaceId: string;
+  subscriberServicePrincipalId: string;
   name: string;
   modelKey: string;
   eventTypes: EventType[];
@@ -73,6 +73,7 @@ function displayError(cause: unknown, fallback: string) {
   if (cause instanceof ApiError && cause.code === 'FORBIDDEN') return '当前账号没有这个家庭的事件订阅管理权限。';
   if (cause instanceof ApiError && cause.code === 'INVALID_WEBHOOK_URL') return 'Webhook 必须是可公开访问的 HTTPS 地址。';
   if (cause instanceof ApiError && cause.code === 'MODEL_ACCESS_DENIED') return 'HomeMew 当前没有日程模型的读取权限，暂时不能创建订阅。';
+  if (cause instanceof ApiError && cause.code === 'EVENT_SUBSCRIBER_ACCESS_DENIED') return '这个外部系统当前没有日程读取权限。请先在“认证与数据访问”中授予日程只读或读写权限。';
   return cause instanceof Error ? cause.message : fallback;
 }
 
@@ -86,7 +87,7 @@ function EventTypePicker({ value, onChange, disabled = false }: {
       {eventOptions.map((option) => {
         const checked = value.includes(option.key);
         return (
-          <label key={option.key} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${checked ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-stone-200 bg-white text-stone-500'}`}>
+          <label key={option.key} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${disabled ? 'cursor-default opacity-60' : 'cursor-pointer'} ${checked ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-stone-200 bg-white text-stone-500'}`}>
             <input
               className="size-4 accent-emerald-600"
               type="checkbox"
@@ -148,6 +149,7 @@ function DeliveryList({ subscriptionId }: { subscriptionId: string }) {
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setError(null);
     apiRequest<{ items: EventDelivery[] }>(`/api/lifespace/core/v1/event-subscriptions/${encodeURIComponent(subscriptionId)}/deliveries`)
       .then((result) => {
         if (active) setItems(result.items);
@@ -184,7 +186,13 @@ function DeliveryList({ subscriptionId }: { subscriptionId: string }) {
               <td className="px-3 py-2"><code className="text-xs text-stone-500">{item.recordId}</code></td>
               <td className="px-3 py-2">
                 <span className={item.status === 'succeeded' ? 'text-emerald-700' : item.status === 'failed' ? 'text-red-700' : 'text-stone-500'}>
-                  {item.status === 'succeeded' ? `成功 · ${item.lastStatusCode ?? 200}` : item.status === 'failed' ? `失败 · ${item.lastStatusCode ?? '网络'}` : item.status}
+                  {item.status === 'succeeded'
+                    ? `成功 · ${item.lastStatusCode ?? 200}`
+                    : item.status === 'failed'
+                      ? `失败 · ${item.lastStatusCode ?? '网络'}`
+                      : item.status === 'cancelled'
+                        ? '已取消'
+                        : item.status}
                 </span>
               </td>
             </tr>
@@ -195,8 +203,9 @@ function DeliveryList({ subscriptionId }: { subscriptionId: string }) {
   );
 }
 
-function SubscriptionCard({ value, onChanged, onReveal }: {
+function SubscriptionCard({ value, readOnly, onChanged, onReveal }: {
   value: EventSubscription;
+  readOnly: boolean;
   onChanged: () => Promise<void>;
   onReveal: (value: SecretReveal) => void;
 }) {
@@ -245,7 +254,10 @@ function SubscriptionCard({ value, onChanged, onReveal }: {
     setBusy('test');
     setError(null);
     try {
-      const result = await apiRequest<{ ok: boolean; statusCode: number }>(`/api/lifespace/core/v1/event-subscriptions/${encodeURIComponent(value.id)}/test`, { method: 'POST', body: '{}' });
+      const result = await apiRequest<{ ok: boolean; statusCode: number }>(`/api/lifespace/core/v1/event-subscriptions/${encodeURIComponent(value.id)}/test`, {
+        method: 'POST',
+        body: '{}',
+      });
       if (!result.ok) setError(`Webhook 已连接，但接收端返回 HTTP ${result.statusCode}。`);
       else window.alert(`测试事件发送成功，接收端返回 HTTP ${result.statusCode}。`);
     } catch (cause) {
@@ -284,24 +296,26 @@ function SubscriptionCard({ value, onChanged, onReveal }: {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-semibold text-stone-900">{value.name}</h2>
+              <h3 className="font-semibold text-stone-900">{value.name}</h3>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${value.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'}`}>{value.enabled ? '启用' : '已停用'}</span>
               <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">日程</span>
             </div>
             <p className="mt-1 break-all text-sm text-stone-500">{value.destination.url}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button disabled={busy !== null} onClick={() => void test()}>
-              {busy === 'test' ? <LoaderCircle className="size-4 animate-spin" /> : <FlaskConical className="size-4" />}
-              测试
-            </Button>
-            <Button disabled={busy !== null} onClick={() => setEditing((current) => !current)}><Pencil className="size-4" />编辑</Button>
+            {!readOnly && (
+              <Button disabled={busy !== null} onClick={() => void test()}>
+                {busy === 'test' ? <LoaderCircle className="size-4 animate-spin" /> : <FlaskConical className="size-4" />}
+                测试
+              </Button>
+            )}
+            {!readOnly && <Button disabled={busy !== null} onClick={() => setEditing((current) => !current)}><Pencil className="size-4" />编辑</Button>}
           </div>
         </div>
 
-        <p className="text-sm leading-6 text-stone-600">当当前家庭的日程被 {value.eventTypes.map(eventLabel).join('、')} 时，将引用型事件发送到此 Webhook。</p>
+        <p className="text-sm leading-6 text-stone-600">日程被 {value.eventTypes.map(eventLabel).join('、')} 时，将引用型事件发送到这个外部系统的 Webhook。</p>
 
-        {editing && (
+        {editing && !readOnly && (
           <div className="grid gap-4 rounded-2xl bg-stone-50 p-4">
             <label className="text-sm font-medium text-stone-700">订阅名称
               <input className="mt-2 h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" maxLength={80} value={name} onChange={(event) => setName(event.target.value)} />
@@ -314,7 +328,9 @@ function SubscriptionCard({ value, onChanged, onReveal }: {
               <EventTypePicker value={eventTypes} onChange={setEventTypes} />
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary" disabled={busy !== null || !eventTypes.length} onClick={() => void save()}>{busy === 'save' ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}保存</Button>
+              <Button variant="primary" disabled={busy !== null || !eventTypes.length} onClick={() => void save()}>
+                {busy === 'save' ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}保存
+              </Button>
               <Button disabled={busy !== null} onClick={() => setEditing(false)}>取消</Button>
             </div>
           </div>
@@ -324,11 +340,25 @@ function SubscriptionCard({ value, onChanged, onReveal }: {
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-4">
           <div className="flex flex-wrap gap-2">
-            <Button disabled={busy !== null} onClick={() => void patch({ enabled: !value.enabled }, 'toggle')}>{busy === 'toggle' ? <LoaderCircle className="size-4 animate-spin" /> : null}{value.enabled ? '停用' : '启用'}</Button>
-            <Button disabled={busy !== null} onClick={() => void patch({ rotateSigningSecret: true }, 'rotate')}>{busy === 'rotate' ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}重新生成签名密钥</Button>
-            <Button disabled={busy !== null} onClick={() => setShowDeliveries((current) => !current)}><Activity className="size-4" />{showDeliveries ? '收起投递记录' : '最近投递'}</Button>
+            {!readOnly && (
+              <Button disabled={busy !== null} onClick={() => void patch({ enabled: !value.enabled }, 'toggle')}>
+                {busy === 'toggle' ? <LoaderCircle className="size-4 animate-spin" /> : null}{value.enabled ? '停用' : '启用'}
+              </Button>
+            )}
+            {!readOnly && (
+              <Button disabled={busy !== null} onClick={() => void patch({ rotateSigningSecret: true }, 'rotate')}>
+                {busy === 'rotate' ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}重新生成签名密钥
+              </Button>
+            )}
+            <Button disabled={busy !== null} onClick={() => setShowDeliveries((current) => !current)}>
+              <Activity className="size-4" />{showDeliveries ? '收起投递记录' : '最近投递'}
+            </Button>
           </div>
-          <Button variant="ghost" disabled={busy !== null} onClick={() => void remove()}>{busy === 'delete' ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}删除</Button>
+          {!readOnly && (
+            <Button variant="ghost" disabled={busy !== null} onClick={() => void remove()}>
+              {busy === 'delete' ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}删除
+            </Button>
+          )}
         </div>
 
         {showDeliveries && <DeliveryList subscriptionId={value.id} />}
@@ -337,8 +367,19 @@ function SubscriptionCard({ value, onChanged, onReveal }: {
   );
 }
 
-export function EventSubscriptionsPage() {
-  const { currentFamily } = useHousehold();
+export function EventSubscriptionsSection({
+  spaceId,
+  familyName,
+  subscriberServicePrincipalId,
+  integrationName,
+  readOnly = false,
+}: {
+  spaceId: string;
+  familyName: string;
+  subscriberServicePrincipalId: string;
+  integrationName: string;
+  readOnly?: boolean;
+}) {
   const [items, setItems] = useState<EventSubscription[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -349,18 +390,14 @@ export function EventSubscriptionsPage() {
   const [eventTypes, setEventTypes] = useState<EventType[]>(eventOptions.map((item) => item.key));
   const [revealedSecret, setRevealedSecret] = useState<SecretReveal | null>(null);
 
-  const manager = currentFamily?.role === 'owner' || currentFamily?.role === 'admin';
-
   async function load() {
-    if (!currentFamily || !manager) {
-      setItems([]);
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
-      const result = await apiRequest<{ items: EventSubscription[] }>(`/api/lifespace/core/v1/event-subscriptions?spaceId=${encodeURIComponent(currentFamily.id)}`);
-      setItems(result.items.filter((item) => item.modelKey === 'event'));
+      const result = await apiRequest<{ items: EventSubscription[] }>(
+        `/api/lifespace/core/v1/event-subscriptions?spaceId=${encodeURIComponent(spaceId)}&subscriberServicePrincipalId=${encodeURIComponent(subscriberServicePrincipalId)}`,
+      );
+      setItems(result.items.filter((item) => item.modelKey === 'event' && item.subscriberServicePrincipalId === subscriberServicePrincipalId));
     } catch (cause) {
       setError(displayError(cause, '加载事件订阅失败'));
     } finally {
@@ -370,10 +407,9 @@ export function EventSubscriptionsPage() {
 
   useEffect(() => {
     void load();
-  }, [currentFamily?.id, manager]);
+  }, [spaceId, subscriberServicePrincipalId]);
 
   async function create() {
-    if (!currentFamily) return;
     if (!name.trim() || !webhookUrl.trim() || !eventTypes.length) {
       setError('名称、Webhook URL 和至少一种变化类型都是必填项。');
       return;
@@ -384,7 +420,8 @@ export function EventSubscriptionsPage() {
       const result = await apiRequest<EventSubscription & { signingSecret: string }>('/api/lifespace/core/v1/event-subscriptions', {
         method: 'POST',
         body: JSON.stringify({
-          spaceId: currentFamily.id,
+          spaceId,
+          subscriberServicePrincipalId,
           name: name.trim(),
           modelKey: 'event',
           eventTypes,
@@ -404,44 +441,48 @@ export function EventSubscriptionsPage() {
     }
   }
 
-  if (!currentFamily) return <Card className="p-8 text-center text-sm text-stone-500">请先创建或加入一个家庭。</Card>;
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <section className="space-y-4" id="event-subscriptions">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="grid size-11 place-items-center rounded-2xl bg-sky-100 text-sky-800"><BellRing className="size-5" /></span>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight">事件订阅</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">当“{currentFamily.name}”的日程发生变化时，由 LifeSpace 可靠地向 n8n、Agent 或其他 HTTPS Webhook 发送事件。</p>
+          <div className="flex items-center gap-2">
+            <span className="grid size-9 place-items-center rounded-xl bg-sky-100 text-sky-800"><BellRing className="size-4" /></span>
+            <div>
+              <h2 className="text-xl font-semibold text-stone-900">事件订阅</h2>
+              <p className="mt-0.5 text-sm text-stone-500">由 {integrationName} 接收“{familyName}”的业务变化通知。</p>
+            </div>
+          </div>
         </div>
-        {manager && <Button variant="primary" onClick={() => setShowCreate((current) => !current)}><Plus className="size-4" />新建订阅</Button>}
+        {!readOnly && <Button variant="primary" onClick={() => setShowCreate((current) => !current)}><Plus className="size-4" />新建订阅</Button>}
       </div>
 
-      {!manager && (
-        <Card className="p-6"><div className="flex gap-3 text-sm leading-6 text-stone-600"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-stone-400" /><p>只有家庭所有者或管理员可以管理事件订阅。</p></div></Card>
-      )}
+      <Card className="border-sky-100 bg-sky-50/40">
+        <CardContent className="flex gap-3 pt-6">
+          <Webhook className="mt-0.5 size-5 shrink-0 text-sky-700" />
+          <div>
+            <p className="text-sm font-semibold text-stone-900">第一版仅开放“日程”</p>
+            <p className="mt-1 text-sm leading-6 text-stone-500">
+              Webhook 只收到 Space、模型、recordId/version 等引用信息，不包含完整日程。此订阅明确绑定到当前外部系统的 Service Principal；其日程 Data Grant 被撤销后，LifeSpace 会停止新的投递。
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
-      {manager && (
-        <Card className="border-sky-100 bg-sky-50/40">
-          <CardContent className="flex gap-3 pt-6">
-            <Webhook className="mt-0.5 size-5 shrink-0 text-sky-700" />
-            <div>
-              <p className="text-sm font-semibold text-stone-900">第一版仅开放“日程”</p>
-              <p className="mt-1 text-sm leading-6 text-stone-500">Webhook 只收到 eventId、Space、模型、recordId/version 等引用信息，不包含完整日程内容。接收系统如需读取详情，仍需使用自己的 LifeSpace Service Principal 与 Data Grant。</p>
-            </div>
-          </CardContent>
-        </Card>
+      {readOnly && (
+        <p className="rounded-2xl bg-stone-100 px-4 py-3 text-sm leading-6 text-stone-600">
+          当前外部系统处于只读或禁用状态，已有订阅可查看，但不能新建、测试或修改。
+        </p>
       )}
 
       {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       {revealedSecret && <SecretRevealCard value={revealedSecret} onClose={() => setRevealedSecret(null)} />}
 
-      {manager && showCreate && (
+      {!readOnly && showCreate && (
         <Card>
           <CardContent className="space-y-5 pt-6">
             <div>
-              <h2 className="text-lg font-semibold text-stone-900">新建日程订阅</h2>
-              <p className="mt-1 text-sm text-stone-500">当“{currentFamily.name}”中的日程发生选中的变化时，把事件发送到指定 Webhook。</p>
+              <h3 className="text-lg font-semibold text-stone-900">新建日程订阅</h3>
+              <p className="mt-1 text-sm text-stone-500">当“{familyName}”中的日程发生选中的变化时，把事件发送到 {integrationName} 的指定 Webhook。</p>
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-4">
@@ -456,25 +497,33 @@ export function EventSubscriptionsPage() {
                 <p className="text-sm font-medium text-stone-700">什么变化需要通知</p>
                 <div className="mt-2"><EventTypePicker value={eventTypes} onChange={setEventTypes} /></div>
                 <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
-                  当“{currentFamily.name}”中的“日程”被 {eventTypes.length ? eventTypes.map(eventLabel).join('、') : '（请选择变化）'} 时，将事件发送到此 Webhook。
+                  日程被 {eventTypes.length ? eventTypes.map(eventLabel).join('、') : '（请选择变化）'} 时发送通知。
                 </div>
               </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-4">
               <Button disabled={creating} onClick={() => setShowCreate(false)}>取消</Button>
-              <Button variant="primary" disabled={creating || !name.trim() || !webhookUrl.trim() || !eventTypes.length} onClick={() => void create()}>{creating ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />}保存订阅</Button>
+              <Button variant="primary" disabled={creating || !name.trim() || !webhookUrl.trim() || !eventTypes.length} onClick={() => void create()}>
+                {creating ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />}保存订阅
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {manager && loading && <div className="flex min-h-40 items-center justify-center gap-3 text-sm text-stone-500"><LoaderCircle className="size-5 animate-spin" />正在加载事件订阅…</div>}
+      {loading && <div className="flex min-h-28 items-center justify-center gap-3 text-sm text-stone-500"><LoaderCircle className="size-5 animate-spin" />正在加载事件订阅…</div>}
 
-      {manager && !loading && !items.length && !error && (
-        <Card className="p-8 text-center"><BellRing className="mx-auto size-8 text-stone-300" /><p className="mt-4 font-medium text-stone-800">还没有事件订阅</p><p className="mt-1 text-sm text-stone-500">创建一个订阅，让日程变化自动触发 n8n 或其他系统。</p></Card>
+      {!loading && !items.length && !error && (
+        <Card className="p-7 text-center">
+          <BellRing className="mx-auto size-7 text-stone-300" />
+          <p className="mt-3 font-medium text-stone-800">还没有事件订阅</p>
+          <p className="mt-1 text-sm text-stone-500">需要自动触发 n8n 或其它服务时，再为这个外部系统添加即可。</p>
+        </Card>
       )}
 
-      {manager && !loading && items.map((item) => <SubscriptionCard key={item.id} value={item} onChanged={load} onReveal={setRevealedSecret} />)}
-    </div>
+      {!loading && items.map((item) => (
+        <SubscriptionCard key={item.id} value={item} readOnly={readOnly} onChanged={load} onReveal={setRevealedSecret} />
+      ))}
+    </section>
   );
 }
