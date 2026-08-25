@@ -6,8 +6,10 @@ export function bufferIntegrationCredential(integrationId: string, credential: R
   pending.set(integrationId, credential);
 }
 
-export function takeBufferedIntegrationCredential(integrationId: string) {
-  const value = pending.get(integrationId) ?? null;
+export function getBufferedIntegrationCredential(integrationId: string) {
+  return pending.get(integrationId) ?? null;
+}
+
+export function clearBufferedIntegrationCredential(integrationId: string) {
   pending.delete(integrationId);
-  return value;
 }
