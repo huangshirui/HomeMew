@@ -3,6 +3,7 @@ import { Check, CheckSquare2, Circle, Clock3, Plus, RefreshCw, RotateCcw, Search
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
+import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
 
 type TaskRecord = {
@@ -273,12 +274,13 @@ export function TasksPage() {
 
           {loading && !tasks.length ? <Card className="grid min-h-52 place-items-center p-8 text-sm text-stone-500">正在加载待办…</Card> : null}
           {!loading && !tasks.length ? (
-            <Card className="grid min-h-52 place-items-center p-8 text-center">
-              <div>
-                <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-stone-100 text-stone-400"><CheckSquare2 className="size-5" /></div>
-                <p className="mt-4 font-medium text-stone-700">{query ? '没有找到匹配的待办' : tab === 'pending' ? '暂时没有未完成待办' : '暂时没有已完成待办'}</p>
-              </div>
-            </Card>
+            <EmptyState
+              icon={<CheckSquare2 className="size-5" />}
+              title={query ? '没有找到匹配的待办' : tab === 'pending' ? '暂时没有未完成待办' : '暂时没有已完成待办'}
+              description={query ? '换个关键词试试，或者清除当前搜索。' : tab === 'pending' ? '现在没有需要处理的家庭待办。' : '完成过的待办会出现在这里。'}
+              actionLabel={query ? '清除搜索' : tab === 'pending' && canWrite ? '新建待办' : undefined}
+              onAction={query ? () => { setQueryInput(''); setQuery(''); } : tab === 'pending' && canWrite ? openCreate : undefined}
+            />
           ) : null}
 
           <div className="space-y-5">
