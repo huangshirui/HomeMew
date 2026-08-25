@@ -4,6 +4,7 @@ import { HouseholdProvider } from './components/household-provider';
 import { SessionGate } from './components/session-gate';
 import { CalendarPage } from './pages/calendar-page';
 import { DaysPage } from './pages/days-page';
+import { EventSubscriptionsPage } from './pages/event-subscriptions-page';
 import { FamilyPage } from './pages/family-page';
 import { HomePage } from './pages/home-page';
 import { MorePage } from './pages/more-page';
@@ -26,6 +27,7 @@ export function App() {
             <Route path="more" element={<MorePage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/integrations" element={<SettingsPage section="integrations" />} />
+            <Route path="settings/event-subscriptions" element={<EventSubscriptionsPage />} />
           </Route>
           <Route path="*" element={<Navigate replace to="/" />} />
         </Routes>
