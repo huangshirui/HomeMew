@@ -230,7 +230,7 @@ Implemented directly against LifeSpace through the same-origin BFF:
 
 Remaining product polish is primarily richer Calendar presentation (Schedule-X after staging acceptance) plus general responsive/empty/error-state refinement.
 
-### W6 — staging acceptance and product convergence — current
+### W6 — staging acceptance and product convergence — acceptance complete, polish ongoing
 
 Completed during W6 so far:
 
@@ -243,12 +243,12 @@ Completed during W6 so far:
 - establish Web-only external integration administration with one-mode/one-active-credential steady state;
 - keep the mobile bottom bar to five high-frequency entries and move Wishes/Family/Settings into a dedicated More hub;
 - production front-door cutover completed on 2026-08-24: `homemew.aisr.online` is owned by `homemew-web-production`, with Cloudflare Access on Web traffic and exact Mini Program login pass-through via `HOMEMEW_BACKEND`.
+- real Cloudflare Access household CRUD/action acceptance completed on 2026-08-25 across Calendar / Tasks / Days / Wishes / Home, including the cross-client, optimistic-concurrency, viewer deny-path and multi-member checks defined in `docs/web-staging-acceptance.md`.
 
 Remaining W6 work:
 
-- run/finish real household CRUD/action acceptance through Cloudflare Access across Calendar/Tasks/Days/Wishes/Home;
 - continue responsive/empty/error-state and interaction convergence;
-- only after household browser acceptance, add the richer Calendar renderer if it improves the product without changing LifeSpace semantics;
+- consider a richer Calendar renderer only if it materially improves the product without changing LifeSpace semantics;
 - keep production front-door and Mini Program login compatibility as release invariants; normal Web deploys must not implicitly transfer the production Custom Domain.
 
 ## 11. Production routing state
