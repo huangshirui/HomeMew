@@ -3,6 +3,7 @@ import { Archive, CalendarClock, Clock3, Plus, RefreshCw, RotateCcw, Sparkles, T
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
+import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
 
 type DayKind = 'elapsed' | 'countdown' | 'cycle';
@@ -355,7 +356,15 @@ export function DaysPage() {
           </div>
 
           {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">{error}</div> : null}
-          {!loading && !records.length ? <Card className="grid min-h-52 place-items-center p-8 text-sm text-stone-500">{status === 'active' ? '还没有日子记录。' : '没有已归档记录。'}</Card> : null}
+          {!loading && !records.length ? (
+            <EmptyState
+              icon={<CalendarClock className="size-5" />}
+              title={status === 'active' ? '还没有日子记录' : '没有已归档记录'}
+              description={status === 'active' ? '记录已经多久、还有多久，或者需要按周期关注的家庭事项。' : '归档的日子会保留在这里，方便以后恢复。'}
+              actionLabel={status === 'active' && canWrite ? '新建日子' : undefined}
+              onAction={status === 'active' && canWrite ? openCreate : undefined}
+            />
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {records.map((record) => {
