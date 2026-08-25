@@ -23,6 +23,31 @@ At steady state, one external system has:
 
 The LifeSpace platform may store multiple credential rows for a Service Principal, but HomeMew does not expose that as normal multi-key management.
 
+## LifeSpace Connection UX
+
+HomeMew Web is the configuration surface for the Space-bound external-system connection. Machine clients must not ask the operator to enter a separate LifeSpace `Space ID` after that connection has already been configured in Web.
+
+For direct LifeSpace integrations, HomeMew Web exposes a copyable **Connection Base URL** that already contains the selected family Space context, for example:
+
+```text
+https://core.aisr.online/api/v1/spaces/spc_...
+```
+
+The URL is routing context only; authorization still comes from the Service Principal credential plus current LifeSpace Application × Model Access and Data Grants.
+
+The official LifeSpace n8n Community Node uses this convention. Its Credential contains:
+
+```text
+Connection Base URL
+Service API Token
+```
+
+The LifeSpace Node does not expose a separate `Space ID` field. Model and Action choices are loaded dynamically from `{Connection Base URL}/_discovery` under the credential's current effective authority.
+
+For the Community Node MVP, the supported Credential mode is the opaque Service API Token (`lsp_pat_*`). When HomeMew creates or rotates that token, Web may show the token plaintext once together with the Connection Base URL so the operator can configure n8n immediately. An already-created token plaintext is never recoverable; if it was not saved, use the controlled rotation flow rather than trying to reveal it again.
+
+OAuth Client Credentials remains a valid LifeSpace service-authentication mode for integrations that support it, but HomeMew must not imply that the Community Node's Service API Token Credential accepts OAuth client credentials unless that support is explicitly added to the node package later.
+
 ## Rotation
 
 Credential rotation is intentionally a controlled temporary exception to the one-active-credential rule:
@@ -55,4 +80,6 @@ A Data Grant does not transfer Service Principal credential-management ownership
 - Web creation explicitly asks for one authentication mode.
 - Web no longer offers arbitrary per-credential create/revoke controls as the normal UX.
 - Web detects the temporary two-credential rotation state and requires an explicit complete or cancel action.
+- Web exposes a copyable Space-bound Connection Base URL instead of requiring downstream integrations to re-enter `Space ID`.
+- The official LifeSpace n8n Community Node Credential is configured from the Web-provided Connection Base URL plus the one-time Service API Token.
 - Disabling an integration revokes both API Tokens and OAuth Client Credentials in addition to current-family Data Grants.
