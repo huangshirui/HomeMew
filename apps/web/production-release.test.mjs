@@ -20,7 +20,8 @@ test('production front door stays traffic-dark until the guarded cutover', async
 test('production cutover requires the Eventing-capable LifeSpace release', async () => {
   const source = await readFile(cutoverScriptUrl, 'utf8');
   assert.match(source, /REQUIRED_IDENTITY_CONTRACT = '0\.5\.0'/);
-  assert.match(source, /REQUIRED_CORE_CONTRACT = '0\.14\.0'/);
+  assert.match(source, /REQUIRED_CORE_CONTRACT = '0\.15\.0'/);
+  assert.doesNotMatch(source, /REQUIRED_CORE_CONTRACT = '0\.14\.0'/);
   assert.match(source, /CUTOVER_HOMEMEW_WEB_PRODUCTION/);
   assert.match(source, /verifyMiniProgramLogin\(\)/);
   assert.match(source, /verifyAccessRoot\(\)/);
