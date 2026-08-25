@@ -1,0 +1,57 @@
+name: Apply HomeMew Web desktop navigation hierarchy
+
+on:
+  push:
+    branches:
+      - feat/web-desktop-nav-hierarchy
+    paths:
+      - .github/workflows/apply-web-desktop-nav-hierarchy.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/web-desktop-nav-hierarchy
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Apply desktop navigation hierarchy
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'apps/web/src/components/app-shell.tsx';
+          let source = fs.readFileSync(path, 'utf8');
+
+          function replaceOnce(oldText, newText) {
+            const first = source.indexOf(oldText);
+            if (first < 0) throw new Error('expected app-shell text not found');
+            if (source.indexOf(oldText, first + oldText.length) >= 0) throw new Error('app-shell text matched more than once');
+            source = source.replace(oldText, newText);
+          }
+
+          replaceOnce(
+            `const navigation = [\n  { to: '/', label: '今天', icon: Home, end: true },\n  { to: '/family', label: '家庭', icon: Users },\n  { to: '/settings', label: '设置', icon: Settings },\n  { to: '/calendar', label: '日程', icon: CalendarDays },\n  { to: '/tasks', label: '待办', icon: CheckSquare2 },\n  { to: '/days', label: '日子', icon: Clock3 },\n  { to: '/wishes', label: '许愿', icon: Heart },\n];`,
+            `const dailyNavigation = [\n  { to: '/', label: '今天', icon: Home, end: true },\n  { to: '/calendar', label: '日程', icon: CalendarDays },\n  { to: '/tasks', label: '待办', icon: CheckSquare2 },\n  { to: '/days', label: '日子', icon: Clock3 },\n  { to: '/wishes', label: '许愿', icon: Heart },\n];\n\nconst managementNavigation = [\n  { to: '/family', label: '家庭与成员', icon: Users },\n  { to: '/settings', label: '设置', icon: Settings },\n];`,
+          );
+
+          replaceOnce(
+            `      <nav className="mt-6 space-y-1">\n        {navigation.map(({ to, label, icon: Icon, end }) => (\n          <NavLink\n            key={to}\n            to={to}\n            end={end}\n            className={({ isActive }) => cn(\n              'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',\n              isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',\n            )}\n          >\n            <Icon className="size-[18px]" />\n            {label}\n          </NavLink>\n        ))}\n      </nav>`,
+            `      <nav className="mt-6">\n        <div className="space-y-1">\n          {dailyNavigation.map(({ to, label, icon: Icon, end }) => (\n            <NavLink\n              key={to}\n              to={to}\n              end={end}\n              className={({ isActive }) => cn(\n                'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',\n                isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',\n              )}\n            >\n              <Icon className="size-[18px]" />\n              {label}\n            </NavLink>\n          ))}\n        </div>\n        <div className="mt-6 border-t border-stone-200/80 pt-5">\n          <p className="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400">家庭管理</p>\n          <div className="mt-2 space-y-1">\n            {managementNavigation.map(({ to, label, icon: Icon }) => (\n              <NavLink\n                key={to}\n                to={to}\n                className={({ isActive }) => cn(\n                  'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',\n                  isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',\n                )}\n              >\n                <Icon className="size-[18px]" />\n                {label}\n              </NavLink>\n            ))}\n          </div>\n        </div>\n      </nav>`,
+          );
+
+          fs.writeFileSync(path, source);
+          NODE
+      - name: Commit navigation polish
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/web/src/components/app-shell.tsx
+          git diff --cached --check
+          git commit -m "feat(web): prioritize daily desktop navigation"
+          git push origin HEAD:feat/web-desktop-nav-hierarchy
