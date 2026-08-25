@@ -50,3 +50,5 @@ replace(
 );
 
 console.log('Aligned HomeMew docs with shared Webhook Endpoint architecture');
+
+// Temporary branch helper: remove after it commits the documentation alignment.
