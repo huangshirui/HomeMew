@@ -81,8 +81,13 @@ function PermissionSummary({ value }: { value: PermissionMap }) {
   );
 }
 
-function CredentialReveal({ value, onClose }: { value: RevealedCredential; onClose: () => void }) {
+function CredentialReveal({ value, spaceId, onClose }: {
+  value: RevealedCredential;
+  spaceId: string;
+  onClose: () => void;
+}) {
   const [copied, setCopied] = useState<string | null>(null);
+  const connectionBaseUrl = familyApiBaseUrl(spaceId);
 
   async function copy(key: string, text: string) {
     try {
@@ -101,16 +106,35 @@ function CredentialReveal({ value, onClose }: { value: RevealedCredential; onClo
           <p className="mt-1 text-sm leading-6 text-emerald-900/70">明文只保留在当前页面运行期。请先保存到外部系统，再关闭这张卡片。</p>
         </div>
         {value.type === 'api_token' ? (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-emerald-900/70">API Token</p>
-            <code className="block select-all break-all rounded-2xl bg-white p-4 text-sm text-emerald-950 ring-1 ring-emerald-200">{value.token}</code>
-            <Button variant="primary" onClick={() => void copy('token', value.token)}>
-              {copied === 'token' ? <Check className="size-4" /> : <Clipboard className="size-4" />}
-              {copied === 'token' ? '已复制' : '复制 Token'}
-            </Button>
+          <div className="space-y-4">
+            <div className="rounded-2xl bg-white/70 p-4 ring-1 ring-emerald-200">
+              <p className="text-sm font-semibold text-emerald-950">用于 LifeSpace n8n Community Node</p>
+              <p className="mt-1 text-sm leading-6 text-emerald-900/70">在 n8n 的 <strong>LifeSpace Connection API</strong> Credential 中只填写下面两项，不需要再填写 Space ID。</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-emerald-900/70">Connection Base URL</p>
+              <code className="mt-1 block select-all break-all rounded-2xl bg-white p-4 text-sm text-emerald-950 ring-1 ring-emerald-200">{connectionBaseUrl}</code>
+              <Button className="mt-2" onClick={() => void copy('baseUrl', connectionBaseUrl)}>
+                {copied === 'baseUrl' ? <Check className="size-4" /> : <Clipboard className="size-4" />}
+                {copied === 'baseUrl' ? '已复制' : '复制 Connection Base URL'}
+              </Button>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-emerald-900/70">Service API Token</p>
+              <code className="mt-1 block select-all break-all rounded-2xl bg-white p-4 text-sm text-emerald-950 ring-1 ring-emerald-200">{value.token}</code>
+              <Button className="mt-2" variant="primary" onClick={() => void copy('token', value.token)}>
+                {copied === 'token' ? <Check className="size-4" /> : <Clipboard className="size-4" />}
+                {copied === 'token' ? '已复制' : '复制 Service API Token'}
+              </Button>
+            </div>
+            <p className="text-xs leading-5 text-emerald-900/60">关闭后无法再次查看这个 Token 明文；如果遗失，请通过凭据轮换生成新的 Token。</p>
           </div>
         ) : (
           <div className="grid gap-3">
+            <div className="flex gap-3 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-900 ring-1 ring-amber-100">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <p>OAuth Client Credentials 可用于支持 OAuth 的外部系统，但当前官方 LifeSpace n8n Community Node 首版 Credential 使用 Service API Token，不能把下面的 Client ID / Secret 直接填到该 Credential。</p>
+            </div>
             <div>
               <p className="text-xs font-medium text-emerald-900/70">Token URL</p>
               <code className="mt-1 block select-all break-all rounded-xl bg-white p-3 text-sm text-emerald-950 ring-1 ring-emerald-200">{oauthTokenUrl()}</code>
@@ -139,7 +163,11 @@ function CredentialReveal({ value, onClose }: { value: RevealedCredential; onClo
   );
 }
 
-function ApiAccessGuide({ spaceId }: { spaceId: string }) {
+function LifeSpaceConnectionGuide({ spaceId, credentialMode, hasCredential }: {
+  spaceId: string;
+  credentialMode: CredentialMode | null;
+  hasCredential: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const baseUrl = familyApiBaseUrl(spaceId);
 
@@ -154,15 +182,32 @@ function ApiAccessGuide({ spaceId }: { spaceId: string }) {
 
   return (
     <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
-      <p className="text-sm font-semibold text-stone-900">API 接入信息</p>
-      <p className="mt-1 text-sm leading-6 text-stone-500">外部系统直接调用 LifeSpace Core；HomeMew Web 只负责配置。</p>
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <code className="min-w-0 flex-1 select-all break-all rounded-xl bg-white px-3 py-2 text-sm text-stone-800 ring-1 ring-stone-200">{baseUrl}</code>
-        <Button onClick={() => void copyBaseUrl()}>
-          {copied ? <Check className="size-4" /> : <Clipboard className="size-4" />}
-          {copied ? '已复制' : '复制 Base URL'}
-        </Button>
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-semibold text-stone-900">LifeSpace Connection</p>
+        <p className="text-sm leading-6 text-stone-500">这个连接已经绑定当前家庭 Space。外部系统直接调用 LifeSpace Core，不需要再输入 Space ID。</p>
       </div>
+      <div className="mt-3">
+        <p className="text-xs font-medium text-stone-500">Connection Base URL</p>
+        <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <code className="min-w-0 flex-1 select-all break-all rounded-xl bg-white px-3 py-2 text-sm text-stone-800 ring-1 ring-stone-200">{baseUrl}</code>
+          <Button onClick={() => void copyBaseUrl()}>
+            {copied ? <Check className="size-4" /> : <Clipboard className="size-4" />}
+            {copied ? '已复制' : '复制 Connection Base URL'}
+          </Button>
+        </div>
+      </div>
+      {credentialMode === 'api_token' ? (
+        <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-xs leading-5 text-stone-500 ring-1 ring-sky-100">
+          官方 LifeSpace n8n Community Node 使用 <strong>Connection Base URL + Service API Token</strong>。模型和 Action 会通过 <code>/_discovery</code> 按当前授权动态加载。{hasCredential ? '已有 Token 的明文不可恢复；需要重新配置时请轮换凭据。' : '请先创建 API Token。'}
+        </div>
+      ) : credentialMode === 'oauth_client_credentials' ? (
+        <div className="mt-3 flex gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 ring-1 ring-amber-100">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <span>当前官方 LifeSpace n8n Community Node 首版使用 Service API Token Credential；OAuth Client Credentials 仍可供其它支持 OAuth 的集成使用。</span>
+        </div>
+      ) : (
+        <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-xs leading-5 text-stone-500 ring-1 ring-sky-100">创建 Service API Token 后，即可把 Connection Base URL 和一次性 Token 直接填入官方 LifeSpace n8n Community Node Credential。</div>
+      )}
     </div>
   );
 }
@@ -381,7 +426,7 @@ export function IntegrationDetailPage() {
       </div>
 
       {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-      {revealedCredential && <CredentialReveal value={revealedCredential} onClose={closeCredentialReveal} />}
+      {revealedCredential && <CredentialReveal value={revealedCredential} spaceId={currentFamily.id} onClose={closeCredentialReveal} />}
 
       {!bound && (
         <div className="flex gap-3 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
@@ -483,7 +528,11 @@ export function IntegrationDetailPage() {
               </div>
             )}
 
-            <ApiAccessGuide spaceId={currentFamily.id} />
+            <LifeSpaceConnectionGuide
+              spaceId={currentFamily.id}
+              credentialMode={integration.credentialMode}
+              hasCredential={Boolean(currentCredential)}
+            />
 
             {editing && editable && (
               <div className="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-4">
