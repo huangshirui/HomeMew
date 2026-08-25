@@ -43,6 +43,8 @@ Desktop uses a sidebar. Mobile uses bottom navigation. Tablet adapts within the 
 
 External-system administration is intentionally Web-only. The accepted product boundary is recorded in `docs/decisions/2026-08-24-external-integrations-web-only.md`.
 
+HomeMew onboarding is intentionally asymmetric across clients. The Mini Program is the base client and first-use/account-entry client; HomeMew Web is an advanced client for an existing HomeMew user. The accepted policy is recorded in `docs/decisions/2026-08-25-web-existing-user-link-only.md`.
+
 ## Cloudflare deployment model
 
 One Cloudflare Worker deployment owns both the SPA assets and the thin same-origin BFF:
@@ -92,18 +94,14 @@ State-changing BFF/proxy requests require an exact same-origin `Origin` header. 
 - `GET /health`
 - `GET /api/session`
 - `POST /api/session/logout`
-- `POST /api/access/register`
 - `POST /api/access/link-challenge`
 - `/api/integrations*` bounded external-system orchestration
 - `/api/lifespace/core/v1/*`
 - `/api/lifespace/identity/v1/*`
 
-An unknown Access principal is never silently merged by email. The UI exposes two explicit paths:
+An unknown Access principal is never silently merged by email and HomeMew Web does not create a new LifeSpace user. The only HomeMew Web onboarding path is **Link existing account**: Web creates a one-time link challenge and an already-authenticated HomeMew Mini Program confirms it as its current LifeSpace user.
 
-1. **Link existing account** — Web creates a one-time link challenge; an already-authenticated HomeMew Mini Program confirms it as its current LifeSpace user.
-2. **Create new account** — Web explicitly calls Access registration with the chosen display name.
-
-Identity derives the target `usr_*`; Web never submits a target user ID.
+Identity derives the target `usr_*`; Web never submits a target user ID. LifeSpace may retain Access registration as a platform capability for other applications, but HomeMew Web does not expose or proxy it.
 
 ### Existing-account linking UX
 
@@ -128,6 +126,8 @@ HomeMew Web
 The challenge is high-entropy, short-lived and single-use. The Mini Program never accepts or sends a target `userId`; the authenticated bearer is the only proof of which LifeSpace user is confirming the link.
 
 Manual copy/paste is the staging/MVP confirmation UX. A later QR code or Mini Program deep-link may carry the same `challengeId`, but it must not weaken or replace the Identity challenge/confirmation contract.
+
+If a person has never used HomeMew, the Web UI directs them to complete first use in the Mini Program and return to link the Web login. This avoids creating a second global LifeSpace user as a normal HomeMew onboarding outcome. Future LifeSpace user-merge capability remains a platform concern rather than a prerequisite for normal HomeMew Web onboarding.
 
 ## External integrations boundary
 
@@ -215,6 +215,6 @@ pnpm test:web
 pnpm check
 ```
 
-`pnpm test:web` runs dependency-free Worker/BFF tests for both the normal Access session boundary and the external-integration orchestration boundary, including credential mode/rotation behavior.
+`pnpm test:web` runs dependency-free Worker/BFF tests for both the normal Access session boundary and the external-integration orchestration boundary, including credential mode/rotation behavior. It also asserts that HomeMew Web does not expose the LifeSpace Access registration flow.
 
 The root check includes Mini Program typecheck, Web typecheck/build, BFF tests, legacy Core contract/tests/typecheck/build and therefore treats the Web application as a first-class repository surface.
