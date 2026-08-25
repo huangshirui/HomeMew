@@ -112,7 +112,7 @@ homemew.aisr.online
 
 BFF 只负责 Access assertion、App Session、HttpOnly Cookie、Origin/CSRF 防护、凭据隔离和 LifeSpace 请求转发；不建立 `/families/...` 兼容 API，不保存家庭业务数据，也不复制 LifeSpace 授权逻辑。
 
-生产已实现并验证 Access session exchange、explicit registration、one-time link challenge、same-origin Core/Identity proxy、外部系统管理编排与微信登录 provider pass-through。
+生产已实现并验证 Access session exchange、existing-user link challenge、same-origin Core/Identity proxy、外部系统管理编排与微信登录 provider pass-through；HomeMew Web 不暴露 LifeSpace Access registration。
 
 ## LifeSpace 模型映射
 

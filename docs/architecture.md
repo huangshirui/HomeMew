@@ -137,7 +137,7 @@ unlinked Access principal
 
 The target user ID for account linking is never supplied by Web. Identity owns the Access-principal -> `usr_*` relationship. This HomeMew product policy is fixed by `docs/decisions/2026-08-25-web-existing-user-link-only.md`.
 
-The final Web domain is `homemew.aisr.online`. That hostname currently also carries the production Mini Program login endpoint through `homemew-backend-production`. A later controlled production Web cutover must preserve `/api/v1/login/wechat`, preferably by routing that application-provider endpoint from the Web front-door Worker to `apps/backend/` through an explicit service binding. Until that is proven in staging, the Web Worker uses an isolated staging hostname/Access application and does not take production Mini Program traffic.
+The final Web domain is `homemew.aisr.online`. Since the accepted production cutover on 2026-08-24, that hostname is owned by `homemew-web-production`: browser Web traffic and the same-origin BFF remain behind Cloudflare Access, while the exact `POST /api/v1/login/wechat` provider route uses an Access bypass and the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. Normal Web deployments do not implicitly move Custom Domain ownership; domain transfer/rollback remains a separately confirmed release operation. `homemew-web-staging.aisr.online` remains the isolated staging hostname. See `docs/decisions/2026-08-24-web-production-cutover.md`.
 
 ## 6. Household model mapping
 
