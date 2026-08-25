@@ -235,9 +235,9 @@ The final user-facing domain remains:
 homemew.aisr.online
 ```
 
-That production hostname currently also serves the Mini Program login endpoint through `homemew-backend-production`. Do not move the production domain to the Web Worker until staging proves the full Web path and the Web front-door preserves `/api/v1/login/wechat` through an explicit backend service-binding/pass-through.
+Since the accepted production cutover on 2026-08-24, `homemew.aisr.online` is owned by `homemew-web-production`. Browser Web traffic remains behind Cloudflare Access, while the exact Mini Program provider route `POST /api/v1/login/wechat` uses the Access bypass and `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`.
 
-Production configuration intentionally contains no Web custom-domain route yet.
+Normal `homemew-web-production` deployment configuration intentionally does not claim or move the Custom Domain. Domain ownership transfer or rollback remains a separate confirmation-gated release operation and must preserve the Mini Program login pass-through.
 
 ## Tests and builds
 
