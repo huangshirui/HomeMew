@@ -1,12 +1,11 @@
-import { BellRing, ExternalLink, Settings2, ShieldCheck, Users } from 'lucide-react';
+import { ExternalLink, Settings2, ShieldCheck, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '../components/ui/card';
 import { IntegrationsPage } from './integrations-page';
 
 const settings = [
   { icon: Users, title: '家庭与成员', description: '家庭资料、成员和角色权限。', to: '/family', enabled: true },
-  { icon: ExternalLink, title: '外部系统', description: 'n8n、Agent、脚本的 API Token / OAuth 接入。', to: '/settings/integrations', enabled: true },
-  { icon: BellRing, title: '事件订阅', description: '当家庭日程发生变化时，通过 Webhook 通知 n8n 或其他系统。', to: '/settings/event-subscriptions', enabled: true },
+  { icon: ExternalLink, title: '外部系统', description: '管理 n8n、Agent、脚本等系统的认证、事件订阅和后续对接能力。', to: '/settings/integrations', enabled: true },
   { icon: ShieldCheck, title: '权限与安全', description: '由 LifeSpace Space/Data Grant 作为最终授权依据。', enabled: false },
 ];
 
