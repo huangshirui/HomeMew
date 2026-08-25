@@ -206,18 +206,36 @@ A Data Grant by itself is deliberately **not** treated as credential-management 
 
 ## 11. External systems
 
-LifeSpace Kernel 0.13.0 and Identity 0.5.0 provide the approved HomeMew external-system authority:
+LifeSpace Core Kernel 0.14.0 and Identity 0.5.0 provide the approved HomeMew external-system authority:
 
 - Identity owns Service Principals, `lsp_pat_*` API Tokens and OAuth Client Credentials;
-- Core owns Data Grants and Application × Model Access;
+- Core owns Data Grants, Application × Model Access and Eventing subscriptions/delivery;
 - model-collection Data Grants can target a published `modelKey` with `read`, `write` or `manage`;
 - stable credential scopes remain `resources:read`, `resources:write`, and where needed `resources:manage`.
 
-The HomeMew Web route `/settings/integrations` is therefore a real LifeSpace-backed surface rather than a HomeMew credential authority. It is the only HomeMew client surface that manages external-system configuration.
+HomeMew Web uses a low-frequency list/detail information architecture:
+
+```text
+/settings/integrations
+  -> external-system summary list
+
+/settings/integrations/:integrationId
+  -> external-system detail
+       -> Authentication
+       -> Event subscriptions
+       -> future integration capabilities
+```
+
+The list page is intentionally compact and does not expose every editable setting. A family administrator enters a specific external system before changing credentials, Data Grants or integration behavior. Future synchronization rules, notification channels, MCP/Agent settings and similar external-system-specific capabilities must be added to this detail container instead of creating new top-level Settings entries.
+
+Each HomeMew external system corresponds to one independent LifeSpace Service Principal with one explicit owning family Space binding. The external-system detail treats the following as child configuration of that same principal:
+
+- **Authentication**: credential mode, active credential, controlled rotation/mode switching, family model Data Grants and direct LifeSpace API connection information;
+- **Event subscriptions**: signed Webhook subscriptions whose `subscriberServicePrincipalId` is this external system's Service Principal ID.
 
 ```text
 current Access-authenticated family administrator
-  -> HomeMew Web lsa_* exchanges Access assertion for profile:read + grants:manage
+  -> HomeMew Web lsa_* exchanges Access assertion for profile:read + grants:manage / spaces:manage as required
   -> Core verifies current family Space manage authority
 
 HomeMew integrations BFF
@@ -229,7 +247,14 @@ resulting service
   -> stable credential scopes
   ∩ integrations Application × Model Access
   ∩ current per-family model Data Grants
-  -> LifeSpace Core
+  -> LifeSpace Core business records
+
+Event subscription
+  -> managing HomeMew application context
+  -> current family Space + model
+  -> subscriber Service Principal = this external system
+  -> current subscriber Data Grant required
+  -> LifeSpace Eventing Webhook delivery
 ```
 
 Rules:
@@ -239,7 +264,7 @@ Rules:
 - the platform's 1:N credential storage is not exposed as normal multi-key management;
 - rotation is create-new -> update external system -> verify -> explicitly complete; only during this transition may old and new credentials coexist;
 - switching authentication mode uses the same controlled transition and may briefly have both modes active until completion; cancel revokes the new candidate and keeps the previous credential;
-- API Token or Client Secret plaintext is returned once and must never be persisted by HomeMew;
+- API Token or Client Secret plaintext is returned once and may exist only in current React/module memory while being shown; it must never be persisted by HomeMew or placed in URLs/router history state;
 - new integrations receive only explicit model-collection Grants, currently for `event`, `task`, and `day_record`;
 - `wish` is not exposed to external systems in this first Web slice;
 - disabling a system disables the Service Principal first, then attempts to revoke its current family Grants and all active API Token/OAuth credentials;
@@ -247,10 +272,13 @@ Rules:
 - a migrated Service Principal without the HomeMew Space ownership binding may be surfaced read-only when the current family has a historical/current Grant to it, but HomeMew must not list its credential metadata, rotate/revoke credentials, edit it, or disable it until a controlled migration establishes ownership;
 - a Service Principal explicitly bound to a different Space is never surfaced merely because the current Space also has a Data Grant to it;
 - a migrated whole-Space `read/write/manage` Grant remains broader than per-model Grants and is surfaced explicitly; HomeMew must not claim a model is denied while that fallback Grant is active;
+- an Eventing subscription is not an authorization grant: Core requires the bound subscriber Service Principal to hold a current `read`/`write`/`manage` Data Grant for the subscribed model (or equivalent whole-Space Grant);
+- Core re-checks the subscriber Data Grant before matching and delivering events, so Grant revocation/expiry or HomeMew integration disable stops new event delivery without a duplicate HomeMew event-authority store;
+- Webhook payloads remain reference-only; the same external system uses its Service Principal credential and current Data Grant to read full business data when needed;
 - the browser never receives either the Web `lsa_*` or the integrations `lsa_*`;
 - the Mini Program does not expose external-system administration or secret handling.
 
-The integrations application must be separately registered/configured in LifeSpace and should have only the intended stable scope ceiling and Application × Model Access. The HomeMew Web application must allow on-demand `grants:manage`; the normal ambient browser session still does not request it.
+The integrations application must be separately registered/configured in LifeSpace and should have only the intended stable scope ceiling and Application × Model Access. The HomeMew Web application must allow the narrow on-demand manager scopes needed by external-system and subscription administration; the normal ambient browser session still does not request those elevated scopes.
 
 The code may be deployed before the integrations application credential is installed. In that state `/health` reports `integrationsReady=false`, normal HomeMew Web continues to operate, and integration routes fail closed with `INTEGRATIONS_NOT_CONFIGURED`. After staging provisioning and E2E verification, the integrations credential should become a required deployment secret.
 

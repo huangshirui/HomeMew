@@ -35,13 +35,14 @@ Keep dependencies demand-driven:
 - `/wishes`
 - `/family`
 - `/settings`
-- `/settings/integrations`
+- `/settings/integrations` — external-system summary list
+- `/settings/integrations/:integrationId` — one external system's authentication, event subscriptions and future integration capabilities
 
 Desktop uses a sidebar. Mobile uses bottom navigation. Tablet adapts within the same codebase. The visual direction is warm, calm and household-oriented rather than enterprise-admin/ERP styled.
 
 `apps/display/` is a separate future household-display runtime and is not implemented as a mode inside the normal signed-in Web app.
 
-External-system administration is intentionally Web-only. The accepted product boundary is recorded in `docs/decisions/2026-08-24-external-integrations-web-only.md`.
+External-system administration is intentionally Web-only. The accepted product boundary is recorded in `docs/decisions/2026-08-24-external-integrations-web-only.md` and the list/detail + event-subscription structure is recorded in `docs/decisions/2026-08-25-lifespace-event-subscriptions.md`.
 
 HomeMew onboarding is intentionally asymmetric across clients. The Mini Program is the base client and first-use/account-entry client; HomeMew Web is an advanced client for an existing HomeMew user. The accepted policy is recorded in `docs/decisions/2026-08-25-web-existing-user-link-only.md`.
 
@@ -131,7 +132,25 @@ If a person has never used HomeMew, the Web UI directs them to complete first us
 
 ## External integrations boundary
 
-`/settings/integrations` uses LifeSpace Service Principals, API Tokens / OAuth Client Credentials and model-scoped Data Grants directly; HomeMew does not own a credential store or permission table.
+`/settings/integrations` is a low-frequency external-system **list**. It shows compact operational summaries and is not a wall of editable credentials and Grants. Selecting a system opens `/settings/integrations/:integrationId`, which is the extensible detail container for all capabilities belonging to that external system.
+
+The first detail modules are:
+
+```text
+External system = one LifeSpace Service Principal
+  -> Authentication
+       -> credential mode / current credential
+       -> credential rotation or mode switch
+       -> model-scoped family Data Grants
+       -> direct LifeSpace API connection information
+  -> Event subscriptions
+       -> signed Webhook subscriptions bound to this same Service Principal
+  -> future external-system-specific capabilities
+```
+
+Future synchronization rules, notification channels, MCP/Agent configuration or similar integration features should be added to this detail surface instead of becoming new top-level Settings entries.
+
+HomeMew uses LifeSpace Service Principals, API Tokens / OAuth Client Credentials and model-scoped Data Grants directly; HomeMew does not own a credential store or permission table.
 
 Two separate LifeSpace application contexts are involved:
 
@@ -159,9 +178,19 @@ LifeSpace may hold multiple credential rows, but HomeMew does not expose arbitra
 
 New integrations do not receive whole-Space Grants. Migrated principals that still have a whole-Space `read/write/manage` Grant are surfaced as broad legacy authority and are not falsely represented as model-restricted.
 
-Credential plaintext is returned once by LifeSpace and rendered only in current React memory. API Tokens and OAuth Client Secrets are not written to localStorage/sessionStorage or a HomeMew database.
+Credential plaintext is returned once by LifeSpace and rendered only in current React/module memory. API Tokens and OAuth Client Secrets are not written to URLs, React Router history state, localStorage/sessionStorage or a HomeMew database.
 
-The external-system page also shows the household Core API Base URL including the current `spaceId`, plus direct model paths. Machine clients call LifeSpace Core directly with the service credential; they do not call the Cloudflare Access-protected HomeMew Web hostname.
+The external-system detail page shows the household Core API Base URL including the current `spaceId`. Machine clients call LifeSpace Core directly with the service credential; they do not call the Cloudflare Access-protected HomeMew Web hostname.
+
+### Event subscriptions
+
+Event subscriptions are not a standalone HomeMew setting. Each subscription is configured inside one external system and is bound in LifeSpace Core to that external system's Service Principal ID.
+
+The first HomeMew slice exposes only `event` (日程) and allows created/updated/deleted Webhook notifications. Payloads are reference-only and contain no full calendar record or actor identity.
+
+LifeSpace requires the subscriber Service Principal to retain a current Data Grant that can read the subscribed model. It re-checks that Grant before event matching and before queued delivery. Revoking/expiring the Data Grant, or disabling the HomeMew external system and revoking its Grants, therefore stops new event delivery without HomeMew maintaining a second subscription-authority table.
+
+Webhook signing secrets are generated by LifeSpace and shown only on creation or explicit rotation. HomeMew never persists them.
 
 ## Required configuration
 
