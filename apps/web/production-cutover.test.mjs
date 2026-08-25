@@ -23,6 +23,12 @@ test('production cutover preserves Mini Program login and supports rollback', ()
   assert.match(script, /INVALID_REQUEST/);
 });
 
+test('production cutover requires the Eventing-capable LifeSpace runtime', () => {
+  assert.match(script, /REQUIRED_IDENTITY_CONTRACT = '0\.5\.0'/);
+  assert.match(script, /REQUIRED_CORE_CONTRACT = '0\.15\.0'/);
+  assert.doesNotMatch(script, /REQUIRED_CORE_CONTRACT = '0\.14\.0'/);
+});
+
 test('production cutover requires all Web runtime secret bindings', () => {
   assert.match(script, /LIFESPACE_APPLICATION_CREDENTIAL/);
   assert.match(script, /WEB_SESSION_SECRET/);
