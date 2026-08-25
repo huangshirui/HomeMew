@@ -92,7 +92,7 @@ Browser
   -> signed host-only HttpOnly HomeMew session
 ```
 
-Unknown Access principals use explicit link-existing or create-new flows. Email equality is never sufficient to merge identities and Web never submits a target LifeSpace user ID for linking.
+An unknown Access principal only links an existing HomeMew/LifeSpace user through the Mini Program confirmation flow. HomeMew Web does not expose LifeSpace Access registration or create a new user. Email equality is never sufficient to merge identities and Web never submits a target LifeSpace user ID for linking.
 
 Normal HomeMew browser sessions deliberately do not request `grants:manage`. Integration-management BFF operations perform a fresh Access -> LifeSpace exchange for the minimum `profile:read grants:manage` scope set, then Core independently requires current `manage` authority on the selected Space. This keeps household Grant administration out of the ambient browser application session.
 
@@ -182,10 +182,10 @@ React/Vite/Cloudflare SPA, responsive shell, routes, repository scripts and CI.
 
 ### W2 — Access identity and staging runtime — complete
 
-- LifeSpace Identity Access principal exchange/link/registration;
+- LifeSpace Identity Access principal exchange and proof-backed link challenge;
 - HomeMew same-origin Worker BFF;
 - signed host-only application session;
-- explicit account linking/registration UI;
+- existing-account linking UI; HomeMew Web intentionally does not expose Access registration;
 - isolated `homemew-web-staging.aisr.online` Access application;
 - staging LifeSpace application/AUD/credential provisioning;
 - staging Worker deployment and real Access -> LifeSpace session verification.
@@ -237,7 +237,7 @@ Completed during W6 so far:
 - keep `main` continuously deployable to `homemew-web-staging.aisr.online`;
 - make deployment output report runtime readiness without exposing secret values;
 - complete W4 real service-credential E2E and promote integrations runtime to a required staging prerequisite;
-- fix first-family onboarding so a fresh Web user can create/join a family;
+- fix first-family onboarding so a linked existing HomeMew user with no accessible family can create/join a family;
 - fix deterministic integration-editor reject states;
 - converge Days occurrence entry and Calendar visible-range/timezone correctness;
 - establish Web-only external integration administration with one-mode/one-active-credential steady state;
