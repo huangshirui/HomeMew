@@ -1,4 +1,4 @@
-import { Check, Clipboard, Link2, LoaderCircle, RefreshCw, Smartphone, UserPlus } from 'lucide-react';
+import { Check, Clipboard, Link2, LoaderCircle, RefreshCw, Smartphone } from 'lucide-react';
 import { useCallback, useEffect, useState, type PropsWithChildren } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
@@ -35,9 +35,6 @@ export function SessionGate({ children }: PropsWithChildren) {
   const [state, setState] = useState<GateState>({ kind: 'loading' });
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [challengeBusy, setChallengeBusy] = useState(false);
-  const [registrationOpen, setRegistrationOpen] = useState(false);
-  const [displayName, setDisplayName] = useState('');
-  const [registrationBusy, setRegistrationBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -109,34 +106,6 @@ export function SessionGate({ children }: PropsWithChildren) {
     }
   }
 
-  async function registerNewAccount() {
-    const name = displayName.trim();
-    if (!name || name.length > 50) {
-      setActionError('请输入 1–50 个字符的显示名称');
-      return;
-    }
-    setRegistrationBusy(true);
-    setActionError(null);
-    try {
-      const response = await fetch('/api/access/register', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          accept: 'application/json',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ displayName: name }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error?.message || '创建账号失败');
-      await loadSession();
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : '创建账号失败');
-    } finally {
-      setRegistrationBusy(false);
-    }
-  }
-
   if (state.kind === 'authenticated') return children;
 
   if (state.kind === 'loading') {
@@ -179,16 +148,19 @@ export function SessionGate({ children }: PropsWithChildren) {
           </div>
           <div>
             <p className="text-sm font-medium text-emerald-700">Cloudflare Access 登录成功</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-stone-900">把 Web 登录关联到家事喵账号</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-stone-900">关联你的家事喵小程序账号</h1>
           </div>
         </div>
 
         <Card>
           <CardContent className="space-y-6 pt-6">
             <div>
-              <h2 className="text-lg font-semibold text-stone-900">已有家事喵小程序账号</h2>
+              <h2 className="text-lg font-semibold text-stone-900">HomeMew Web 需要已有家事喵账号</h2>
               <p className="mt-2 text-sm leading-6 text-stone-600">
-                推荐使用这个方式。关联完成后，Web 和小程序会使用同一个 LifeSpace 用户、家庭和数据，不会创建第二个账号。
+                家事喵小程序是基础客户端和账号入口，Web 提供更完整的家庭管理与高级功能。首次使用 Web 时，请把当前 Web 登录关联到你已经在小程序中使用的账号。
+              </p>
+              <p className="mt-2 text-sm leading-6 text-stone-500">
+                如果你还没有家事喵账号，请先在微信小程序完成首次使用，再回到这里关联。Web 不会单独创建新的 LifeSpace 用户。
               </p>
             </div>
 
@@ -228,38 +200,6 @@ export function SessionGate({ children }: PropsWithChildren) {
                 </Button>
               </div>
             )}
-
-            <div className="border-t border-stone-100 pt-5">
-              {!registrationOpen ? (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-stone-500 hover:text-stone-800"
-                  onClick={() => setRegistrationOpen(true)}
-                >
-                  <UserPlus className="size-4" />
-                  我没有家事喵账号，新建一个
-                </button>
-              ) : (
-                <div className="space-y-3">
-                  <label className="block text-sm font-medium text-stone-700" htmlFor="display-name">显示名称</label>
-                  <input
-                    id="display-name"
-                    value={displayName}
-                    maxLength={50}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                    className="h-11 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15"
-                    placeholder="例如：小黄"
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="primary" disabled={registrationBusy} onClick={() => void registerNewAccount()}>
-                      {registrationBusy && <LoaderCircle className="size-4 animate-spin" />}
-                      创建新账号
-                    </Button>
-                    <Button variant="ghost" onClick={() => setRegistrationOpen(false)}>取消</Button>
-                  </div>
-                </div>
-              )}
-            </div>
 
             {actionError && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>}
           </CardContent>

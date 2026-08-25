@@ -96,7 +96,7 @@ test('session exchange keeps LifeSpace bearer server-side and creates a signed h
 });
 
 test('signed session is bound to the current Access assertion', async () => {
-  const firstFetcher = async (input, init = {}) => {
+  const firstFetcher = async (input) => {
     const url = String(input);
     if (url.endsWith('/internal/v1/access/tokens')) return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
     if (url.endsWith('/api/v1/me')) return jsonResponse(200, { data: { id: 'usr_1' } });
@@ -127,7 +127,22 @@ test('signed session is bound to the current Access assertion', async () => {
   assert.equal((await payload(second)).data.user.id, 'usr_2');
 });
 
-test('state-changing routes reject cross-origin requests before Identity is called', async () => {
+test('state-changing link challenge rejects cross-origin requests before Identity is called', async () => {
+  let called = false;
+  const handler = createWebHandler({
+    fetcher: async () => { called = true; return jsonResponse(500, {}); },
+    now: () => NOW,
+  });
+  const response = await handler.fetch(request('/api/access/link-challenge', {
+    method: 'POST',
+    origin: 'https://evil.example.test',
+  }), ENV);
+  assert.equal(response.status, 403);
+  assert.equal((await payload(response)).error.code, 'INVALID_ORIGIN');
+  assert.equal(called, false);
+});
+
+test('HomeMew Web does not expose Access account registration', async () => {
   let called = false;
   const handler = createWebHandler({
     fetcher: async () => { called = true; return jsonResponse(500, {}); },
@@ -135,39 +150,11 @@ test('state-changing routes reject cross-origin requests before Identity is call
   });
   const response = await handler.fetch(request('/api/access/register', {
     method: 'POST',
-    origin: 'https://evil.example.test',
-    body: { displayName: 'Test' },
-  }), ENV);
-  assert.equal(response.status, 403);
-  assert.equal((await payload(response)).error.code, 'INVALID_ORIGIN');
-  assert.equal(called, false);
-});
-
-test('explicit Access registration creates the LifeSpace session without exposing the bearer', async () => {
-  const fetcher = async (input, init = {}) => {
-    const url = String(input);
-    assert.ok(url.endsWith('/internal/v1/access/registrations'));
-    const body = JSON.parse(init.body);
-    assert.equal(body.displayName, 'New User');
-    assert.equal(body.accessAssertion, 'access-jwt-a');
-    return jsonResponse(201, {
-      data: {
-        user: { id: 'usr_new', displayName: 'New User' },
-        accessToken: 'life-token-new',
-        expiresIn: 900,
-      },
-    });
-  };
-  const handler = createWebHandler({ fetcher, now: () => NOW });
-  const response = await handler.fetch(request('/api/access/register', {
-    method: 'POST',
     body: { displayName: 'New User' },
   }), ENV);
-  assert.equal(response.status, 201);
-  const body = await payload(response);
-  assert.equal(body.data.user.id, 'usr_new');
-  assert.equal(JSON.stringify(body).includes('life-token-new'), false);
-  assert.ok(response.headers.get('set-cookie'));
+  assert.equal(response.status, 404);
+  assert.equal((await payload(response)).error.code, 'NOT_FOUND');
+  assert.equal(called, false, 'registration must not be forwarded to LifeSpace Identity');
 });
 
 test('link challenge is created from the verified Access assertion only', async () => {
