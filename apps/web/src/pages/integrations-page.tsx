@@ -13,6 +13,7 @@ import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { apiRequest } from '../lib/api-client';
+import { bufferIntegrationCredential } from '../lib/integration-secret-buffer';
 import {
   credentialModeLabel,
   displayIntegrationError,
@@ -161,15 +162,14 @@ export function IntegrationsPage() {
           clientSecret: result.credential.clientSecret,
         };
       }
+      if (revealedCredential) bufferIntegrationCredential(result.integration.id, revealedCredential);
 
       setName('');
       setDescription('');
       setPermissions({ event: 'write', task: 'write', day_record: 'read' });
       setCredentialMode('api_token');
       setShowCreate(false);
-      navigate(`/settings/integrations/${encodeURIComponent(result.integration.id)}`, {
-        state: revealedCredential ? { revealedCredential } : undefined,
-      });
+      navigate(`/settings/integrations/${encodeURIComponent(result.integration.id)}`);
     } catch (cause) {
       setError(displayIntegrationError(cause, '创建外部系统失败'));
       await load();
