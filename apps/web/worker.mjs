@@ -105,14 +105,6 @@ function requireSameOrigin(request) {
   }
 }
 
-async function readJson(request) {
-  const value = await request.json().catch(() => null);
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new HttpError(400, 'INVALID_REQUEST', 'Request body must be a JSON object');
-  }
-  return value;
-}
-
 function cookieValue(request, name) {
   const raw = request.headers.get('cookie') || '';
   for (const part of raw.split(';')) {
@@ -230,28 +222,6 @@ async function exchangeAccess(env, fetcher, assertion, id) {
     throw upstreamError(response, payload, 'LIFESPACE_ACCESS_EXCHANGE_FAILED');
   }
   return { accessToken: data.accessToken, expiresIn: data.expiresIn };
-}
-
-async function registerAccessUser(request, env, fetcher, assertion, id, nowMs) {
-  requireSameOrigin(request);
-  const body = await readJson(request);
-  const displayName = typeof body.displayName === 'string' ? body.displayName.trim() : '';
-  if (!displayName || displayName.length > 50) {
-    throw new HttpError(422, 'VALIDATION_ERROR', 'displayName must contain 1-50 characters');
-  }
-
-  const { response, payload } = await identityApplicationRequest(env, fetcher, '/internal/v1/access/registrations', {
-    accessAssertion: assertion,
-    requestedScopes: USER_SCOPES,
-    displayName,
-  }, id);
-  const data = payload?.data;
-  if (response.status !== 201 || typeof data?.accessToken !== 'string' || typeof data?.expiresIn !== 'number') {
-    throw upstreamError(response, payload, 'LIFESPACE_ACCESS_REGISTRATION_FAILED');
-  }
-
-  const cookie = await makeSessionCookie(env, assertion, data.accessToken, data.expiresIn, nowMs);
-  return json({ data: { authenticated: true, user: data.user ?? null } }, 201, { 'set-cookie': cookie }, id);
 }
 
 async function createLinkChallenge(request, env, fetcher, assertion, id) {
@@ -401,9 +371,6 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         if (request.method === 'POST' && url.pathname === '/api/session/logout') {
           requireSameOrigin(request);
           return new Response(null, { status: 204, headers: { 'set-cookie': clearSessionCookie(), 'x-request-id': id } });
-        }
-        if (request.method === 'POST' && url.pathname === '/api/access/register') {
-          return await registerAccessUser(request, env, fetcher, assertion, id, nowMs);
         }
         if (request.method === 'POST' && url.pathname === '/api/access/link-challenge') {
           return await createLinkChallenge(request, env, fetcher, assertion, id);
