@@ -261,6 +261,9 @@ The first version has one task-level completion state. It does not track complet
 - Disabling an integration disables its Service Principal first, then attempts to revoke active Tokens and current-family Data Grants. If cleanup partially fails, the Principal remains disabled so the fail-safe state removes effective service access until cleanup is repaired.
 - Systems use the same LifeSpace event, task, and day-record resources as users. User-relative aliases such as `attendeeId=me`, `assigneeId=me`, or `subjectUserId=me` are invalid for service principals where the active LifeSpace contract does not define them.
 - `wish` is not exposed to service principals in the first HomeMew Web external-integration slice.
+- HomeMew Eventing configuration uses one Webhook Endpoint per external system in the current product UI. The Endpoint owns the shared callback URL and signing secret; selecting 日程 or 待办 only creates/enables a model/event filter under that Endpoint and never creates another secret.
+- Endpoint test, enable/disable, signing-secret rotation and delivery history are configured once for the external system, not repeated per model.
+- An Event Subscription filter grants no data authority; the Service Principal must retain the corresponding current model Data Grant and LifeSpace re-checks current authority before delivery.
 - Disabling or deleting an integration does not delete historical events, tasks, or day records it created. Audit fields preserve the true service principal as actor where the LifeSpace model supports actor audit.
 
 ## 14. AI creation drafts

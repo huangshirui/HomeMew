@@ -206,10 +206,10 @@ A Data Grant by itself is deliberately **not** treated as credential-management 
 
 ## 11. External systems
 
-LifeSpace Core Kernel 0.14.0 and Identity 0.5.0 provide the approved HomeMew external-system authority:
+LifeSpace Core Kernel 0.15.0+ and Identity 0.5.0 provide the approved HomeMew external-system authority:
 
 - Identity owns Service Principals, `lsp_pat_*` API Tokens and OAuth Client Credentials;
-- Core owns Data Grants, Application × Model Access and Eventing subscriptions/delivery;
+- Core owns Data Grants, Application × Model Access, reusable Eventing Webhook Endpoints, model/event subscription filters and delivery;
 - model-collection Data Grants can target a published `modelKey` with `read`, `write` or `manage`;
 - stable credential scopes remain `resources:read`, `resources:write`, and where needed `resources:manage`.
 
@@ -231,7 +231,7 @@ The list page is intentionally compact and does not expose every editable settin
 Each HomeMew external system corresponds to one independent LifeSpace Service Principal with one explicit owning family Space binding. The external-system detail treats the following as child configuration of that same principal:
 
 - **Authentication**: credential mode, active credential, controlled rotation/mode switching, family model Data Grants and direct LifeSpace API connection information;
-- **Event subscriptions**: signed Webhook subscriptions whose `subscriberServicePrincipalId` is this external system's Service Principal ID.
+- **Event push**: one HomeMew-managed Webhook Endpoint for this external system, with one callback URL/signing secret and selectable model/event subscription filters.
 
 ```text
 current Access-authenticated family administrator
@@ -249,11 +249,12 @@ resulting service
   ∩ current per-family model Data Grants
   -> LifeSpace Core business records
 
-Event subscription
+Event push
   -> managing HomeMew application context
-  -> current family Space + model
-  -> subscriber Service Principal = this external system
-  -> current subscriber Data Grant required
+  -> one Webhook Endpoint for current family Space + external-system Service Principal
+  -> shared Webhook URL + signing secret
+  -> Event Subscription filters select model + created/updated/deleted
+  -> current subscriber Data Grant required for every selected model
   -> LifeSpace Eventing Webhook delivery
 ```
 
@@ -272,7 +273,8 @@ Rules:
 - a migrated Service Principal without the HomeMew Space ownership binding may be surfaced read-only when the current family has a historical/current Grant to it, but HomeMew must not list its credential metadata, rotate/revoke credentials, edit it, or disable it until a controlled migration establishes ownership;
 - a Service Principal explicitly bound to a different Space is never surfaced merely because the current Space also has a Data Grant to it;
 - a migrated whole-Space `read/write/manage` Grant remains broader than per-model Grants and is surfaced explicitly; HomeMew must not claim a model is denied while that fallback Grant is active;
-- an Eventing subscription is not an authorization grant: Core requires the bound subscriber Service Principal to hold a current `read`/`write`/`manage` Data Grant for the subscribed model (or equivalent whole-Space Grant);
+- a Webhook Endpoint owns transport/signing only and grants no model authority; HomeMew configures one Endpoint per external system in the current product UI, while LifeSpace may support multiple Endpoints for applications that genuinely need multiple destinations;
+- an Event Subscription filter is not an authorization grant: Core requires the Endpoint subscriber Service Principal to hold a current `read`/`write`/`manage` Data Grant for the selected model (or equivalent whole-Space Grant);
 - Core re-checks the subscriber Data Grant before matching and delivering events, so Grant revocation/expiry or HomeMew integration disable stops new event delivery without a duplicate HomeMew event-authority store;
 - Webhook payloads remain reference-only; the same external system uses its Service Principal credential and current Data Grant to read full business data when needed;
 - the browser never receives either the Web `lsa_*` or the integrations `lsa_*`;
