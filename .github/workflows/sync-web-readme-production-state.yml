@@ -1,0 +1,46 @@
+name: Sync HomeMew Web README production state
+
+on:
+  push:
+    branches:
+      - feat/web-shell-polish
+    paths:
+      - .github/workflows/sync-web-readme-production-state.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/web-shell-polish
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Align accepted production state
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'apps/web/README.md';
+          const oldText = `That production hostname currently also serves the Mini Program login endpoint through \`homemew-backend-production\`. Do not move the production domain to the Web Worker until staging proves the full Web path and the Web front-door preserves \`/api/v1/login/wechat\` through an explicit backend service-binding/pass-through.\n\nProduction configuration intentionally contains no Web custom-domain route yet.`;
+          const newText = `Since the accepted production cutover on 2026-08-24, \`homemew.aisr.online\` is owned by \`homemew-web-production\`. Browser Web traffic remains behind Cloudflare Access, while the exact Mini Program provider route \`POST /api/v1/login/wechat\` uses the Access bypass and \`HOMEMEW_BACKEND\` Service Binding to \`homemew-backend-production\`.\n\nNormal \`homemew-web-production\` deployment configuration intentionally does not claim or move the Custom Domain. Domain ownership transfer or rollback remains a separate confirmation-gated release operation and must preserve the Mini Program login pass-through.`;
+          const source = fs.readFileSync(path, 'utf8');
+          if (!source.includes(oldText)) throw new Error('expected stale Web README production block not found');
+          if (source.indexOf(oldText) !== source.lastIndexOf(oldText)) throw new Error('stale block matched more than once');
+          fs.writeFileSync(path, source.replace(oldText, newText));
+          NODE
+
+      - name: Commit README convergence
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/web/README.md
+          git diff --cached --check
+          git commit -m "docs(web): align README with production front door"
+          git push origin HEAD:feat/web-shell-polish
