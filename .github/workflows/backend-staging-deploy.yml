@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - lifespace-cutover
+      - main
     paths:
       - apps/backend/**
       - .github/workflows/backend-staging-deploy.yml
@@ -35,9 +35,6 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
-
       - name: Validate deployment credentials
         shell: bash
         run: |
@@ -57,7 +54,7 @@ jobs:
 
       - name: Deploy staging Worker and Durable Object
         run: >-
-          corepack pnpm --dir apps/core exec wrangler deploy
+          corepack pnpm dlx wrangler@4.49.1 deploy
           --config "$GITHUB_WORKSPACE/apps/backend/wrangler.jsonc"
           --env staging
 
@@ -86,6 +83,7 @@ jobs:
             echo "- LifeSpace Identity: https://auth-staging.aisr.online"
             echo "- LifeSpace Core: https://core-staging.aisr.online"
             echo "- Identity mapping: SQLite-backed Durable Object"
+            echo "- Wrangler: pinned standalone 4.49.1 (no legacy Core dependency)"
             echo "- Runtime secrets: Cloudflare Worker Secrets (not duplicated in GitHub Actions)"
             echo "- Login ready: ${LOGIN_READY}"
             echo "- Production traffic/configuration: untouched"

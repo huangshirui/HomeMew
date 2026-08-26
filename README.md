@@ -20,7 +20,7 @@ HomeMew Web
        -> LifeSpace Identity / Core
 ```
 
-HomeMew 不再拥有独立的家庭业务 Core。`apps/core/` 仅保留为历史迁移/参考代码，不得继续新增业务行为。
+HomeMew 不再拥有独立的家庭业务 Core。旧 HomeMew Core 已在 2026-08-26 从 active tree 退休；需要追溯旧实现、OpenAPI 或 migration 时使用 Git 历史，不再把历史 Core 作为当前工作区的一部分。
 
 ## 目录
 
@@ -30,12 +30,13 @@ apps/
   miniprogram/  微信小程序
   web/          HomeMew Web + same-origin BFF；Cloudflare Access 登录
   display/      未来独立家庭大屏
-  core/         旧 HomeMew Core，仅用于历史/迁移参考
 ```
 
 ## 生产状态
 
-HomeMew 生产业务数据已经完成一次性迁移并切换到 LifeSpace。当前权威业务数据位于 LifeSpace production；旧 HomeMew Core/D1 仅在稳定化和回滚证据窗口内冻结保留，不再作为正常写入源。
+HomeMew 生产业务数据已经完成一次性迁移并切换到 LifeSpace。当前权威业务数据位于 LifeSpace production。仓库中的旧 HomeMew Core、Core Actions 和一次性迁移/切流工具已退出 active tree。
+
+旧 HomeMew Worker/D1 等运行资源不因代码清理而自动删除；如果仍处于稳定化/回滚证据窗口，应保持冻结、只读，并在后续独立运维决策中确认观察期、回滚需求和删除顺序。
 
 2026-08-24，HomeMew Web 已正式接管生产前门：
 
@@ -48,7 +49,7 @@ homemew.aisr.online -> homemew-web-production
        -> auth.aisr.online / core.aisr.online
 ```
 
-生产 Web 根路径由 Cloudflare Access 保护；小程序登录路径使用精确 Access bypass，并继续由既有 `homemew-backend-production` 提供微信 provider 适配。最终 cutover 已通过 Web Access、Mini Program login、LifeSpace production runtime 与 Worker secret-binding 验证。
+生产 Web 根路径由 Cloudflare Access 保护；小程序登录路径使用精确 Access bypass，并继续由 `homemew-backend-production` 提供微信 provider 适配。日常 production workflow 只部署现有 Worker 配置，不重新执行 Custom Domain 切流或 Access provisioning。
 
 ## Identity 边界
 
@@ -112,7 +113,7 @@ homemew.aisr.online
 
 BFF 只负责 Access assertion、App Session、HttpOnly Cookie、Origin/CSRF 防护、凭据隔离和 LifeSpace 请求转发；不建立 `/families/...` 兼容 API，不保存家庭业务数据，也不复制 LifeSpace 授权逻辑。
 
-生产已实现并验证 Access session exchange、explicit registration、one-time link challenge、same-origin Core/Identity proxy、外部系统管理编排与微信登录 provider pass-through。
+生产已实现并验证 Access session exchange、existing-user link challenge、same-origin Core/Identity proxy、外部系统管理编排与微信登录 provider pass-through；HomeMew Web 不暴露 LifeSpace Access registration。
 
 ## LifeSpace 模型映射
 

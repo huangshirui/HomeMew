@@ -9,8 +9,7 @@ on:
       - pnpm-workspace.yaml
       - .github/workflows/web-check.yml
       - .github/workflows/web-staging-deploy.yml
-      - .github/workflows/web-production-prepare.yml
-      - .github/workflows/web-production-cutover.yml
+      - .github/workflows/web-production-deploy.yml
 
 permissions:
   contents: read

@@ -92,7 +92,7 @@ Browser
   -> signed host-only HttpOnly HomeMew session
 ```
 
-Unknown Access principals use explicit link-existing or create-new flows. Email equality is never sufficient to merge identities and Web never submits a target LifeSpace user ID for linking.
+An unknown Access principal only links an existing HomeMew/LifeSpace user through the Mini Program confirmation flow. HomeMew Web does not expose LifeSpace Access registration or create a new user. Email equality is never sufficient to merge identities and Web never submits a target LifeSpace user ID for linking.
 
 Normal HomeMew browser sessions deliberately do not request `grants:manage`. Integration-management BFF operations perform a fresh Access -> LifeSpace exchange for the minimum `profile:read grants:manage` scope set, then Core independently requires current `manage` authority on the selected Space. This keeps household Grant administration out of the ambient browser application session.
 
@@ -182,10 +182,10 @@ React/Vite/Cloudflare SPA, responsive shell, routes, repository scripts and CI.
 
 ### W2 — Access identity and staging runtime — complete
 
-- LifeSpace Identity Access principal exchange/link/registration;
+- LifeSpace Identity Access principal exchange and proof-backed link challenge;
 - HomeMew same-origin Worker BFF;
 - signed host-only application session;
-- explicit account linking/registration UI;
+- existing-account linking UI; HomeMew Web intentionally does not expose Access registration;
 - isolated `homemew-web-staging.aisr.online` Access application;
 - staging LifeSpace application/AUD/credential provisioning;
 - staging Worker deployment and real Access -> LifeSpace session verification.
@@ -230,33 +230,34 @@ Implemented directly against LifeSpace through the same-origin BFF:
 
 Remaining product polish is primarily richer Calendar presentation (Schedule-X after staging acceptance) plus general responsive/empty/error-state refinement.
 
-### W6 — staging acceptance and product convergence — current
+### W6 — staging acceptance and product convergence — acceptance complete, polish ongoing
 
 Completed during W6 so far:
 
 - keep `main` continuously deployable to `homemew-web-staging.aisr.online`;
 - make deployment output report runtime readiness without exposing secret values;
 - complete W4 real service-credential E2E and promote integrations runtime to a required staging prerequisite;
-- fix first-family onboarding so a fresh Web user can create/join a family;
+- fix first-family onboarding so a linked existing HomeMew user with no accessible family can create/join a family;
 - fix deterministic integration-editor reject states;
 - converge Days occurrence entry and Calendar visible-range/timezone correctness;
 - establish Web-only external integration administration with one-mode/one-active-credential steady state;
-- keep the mobile bottom bar to five high-frequency entries and move Wishes/Family/Settings into a dedicated More hub.
+- keep the mobile bottom bar to five high-frequency entries and move Wishes/Family/Settings into a dedicated More hub;
+- production front-door cutover completed on 2026-08-24: `homemew.aisr.online` is owned by `homemew-web-production`, with Cloudflare Access on Web traffic and exact Mini Program login pass-through via `HOMEMEW_BACKEND`.
+- real Cloudflare Access household CRUD/action acceptance completed on 2026-08-25 across Calendar / Tasks / Days / Wishes / Home, including the cross-client, optimistic-concurrency, viewer deny-path and multi-member checks defined in `docs/web-staging-acceptance.md`.
 
 Remaining W6 work:
 
-- run/finish real household CRUD/action acceptance through Cloudflare Access across Calendar/Tasks/Days/Wishes/Home;
 - continue responsive/empty/error-state and interaction convergence;
-- only after staging acceptance, add the richer Calendar renderer if it improves the product without changing LifeSpace semantics;
-- only after staging acceptance, design the production front-door cutover that preserves Mini Program backend routes.
+- consider a richer Calendar renderer only if it materially improves the product without changing LifeSpace semantics;
+- keep production front-door and Mini Program login compatibility as release invariants; normal Web deploys must not implicitly transfer the production Custom Domain.
 
-## 11. Production routing constraint
+## 11. Production routing state
 
-The final Web domain remains `homemew.aisr.online`, but that hostname currently serves the production Mini Program login endpoint through `homemew-backend-production`.
+The final Web domain `homemew.aisr.online` is currently owned by `homemew-web-production`, following the accepted 2026-08-24 production cutover. Browser Web traffic stays behind Cloudflare Access; the exact Mini Program provider route `POST /api/v1/login/wechat` uses the Access bypass and `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`.
 
-Do not transfer the production hostname to the Web Worker until the Web front-door preserves `/api/v1/login/wechat` through an explicit backend Service Binding/pass-through and the full Web path has passed staging verification.
+Normal `homemew-web-production` deployments intentionally do not claim or move the Custom Domain. Any future ownership transfer or rollback remains a manual, confirmation-gated release operation and must re-verify Access protection, Mini Program login pass-through, LifeSpace production runtime and required Worker bindings.
 
-The isolated first Web hostname remains `homemew-web-staging.aisr.online`.
+The isolated staging hostname remains `homemew-web-staging.aisr.online`. See `docs/decisions/2026-08-24-web-production-cutover.md`.
 
 ## 12. Non-goals
 

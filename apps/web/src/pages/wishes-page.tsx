@@ -3,6 +3,7 @@ import { Archive, Gift, Heart, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, Use
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
+import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
 
 type WishStatus = 'open' | 'claimed' | 'fulfilled' | 'archived';
@@ -218,7 +219,15 @@ export function WishesPage() {
 
           {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">{error}</div> : null}
           {!currentPersonId ? <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-100">当前 LifeSpace 用户尚未映射到这个家庭的 Space Person，暂时只能浏览。</div> : null}
-          {!loading && !wishes.length ? <Card className="grid min-h-52 place-items-center p-8 text-sm text-stone-500">{tab === 'active' ? '还没有愿望，写下第一个吧。' : tab === 'fulfilled' ? '还没有已实现的愿望。' : '没有已归档愿望。'}</Card> : null}
+          {!loading && !wishes.length ? (
+            <EmptyState
+              icon={<Gift className="size-5" />}
+              title={tab === 'active' ? '还没有愿望' : tab === 'fulfilled' ? '还没有已实现的愿望' : '没有已归档愿望'}
+              description={tab === 'active' ? '把想做、想要或想一起实现的小愿望先放进来。' : tab === 'fulfilled' ? '实现过的愿望会留在这里。' : '归档后的愿望会保留在这里。'}
+              actionLabel={tab === 'active' && canWrite ? '写下第一个愿望' : undefined}
+              onAction={tab === 'active' && canWrite ? openCreate : undefined}
+            />
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {wishes.map((wish) => (

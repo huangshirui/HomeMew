@@ -13,6 +13,10 @@ worker-configuration.d.ts
 .pnpm-store/
 .corepack/
 
+# 微信开发者工具/本地诊断文件
+apps/miniprogram/project.private.config.json
+apps/miniprogram/tsc-out.txt
+
 # tsc 预编译产物（微信小程序用 tsc 把 TS 编译为同目录 .js，见 apps/miniprogram/package.json）
 apps/miniprogram/miniprogram/**/*.js
 apps/miniprogram/miniprogram/**/*.js.map

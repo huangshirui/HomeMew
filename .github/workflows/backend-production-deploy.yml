@@ -1,0 +1,105 @@
+name: Deploy HomeMew backend production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY_HOMEMEW_BACKEND_PRODUCTION to continue
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homemew-backend-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Validate production gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "main" || { echo "Production deploys must run from main" >&2; exit 1; }
+          test "${{ inputs.confirmation }}" = "DEPLOY_HOMEMEW_BACKEND_PRODUCTION" || { echo "Production confirmation mismatch" >&2; exit 1; }
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN is not configured" >&2; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID is not configured" >&2; exit 1; }
+
+      - name: Validate backend and production configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check apps/backend/worker.mjs
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const config = JSON.parse(fs.readFileSync('apps/backend/wrangler.jsonc', 'utf8'));
+          const production = config.env?.production;
+          if (!production) throw new Error('apps/backend/wrangler.jsonc is missing env.production');
+          if (Array.isArray(production.routes) && production.routes.length > 0) {
+            throw new Error('Backend production deploy must remain route-free; homemew.aisr.online belongs to the Web front door');
+          }
+          if (production.vars?.ENVIRONMENT !== 'production') throw new Error('Backend production ENVIRONMENT mismatch');
+          if (production.vars?.LIFESPACE_IDENTITY_URL !== 'https://auth.aisr.online') throw new Error('Unexpected production Identity URL');
+          if (production.vars?.LIFESPACE_CORE_URL !== 'https://core.aisr.online') throw new Error('Unexpected production Core URL');
+          NODE
+
+      - name: Verify LifeSpace production is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 https://auth.aisr.online/health >/dev/null
+          curl --fail --silent --show-error --retry 3 https://core.aisr.online/health >/dev/null
+
+      - name: Deploy production Worker and Durable Object
+        run: >-
+          corepack pnpm dlx wrangler@4.49.1 deploy
+          --config "$GITHUB_WORKSPACE/apps/backend/wrangler.jsonc"
+          --env production
+
+      - name: Verify Mini Program provider route
+        shell: bash
+        run: |
+          set -euo pipefail
+          BODY="$RUNNER_TEMP/wechat-login-response.json"
+          STATUS="$(curl --silent --show-error --retry 8 --retry-delay 3 --retry-all-errors \
+            -o "$BODY" -w '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -d '{}' \
+            https://homemew.aisr.online/api/v1/login/wechat)"
+          test "$STATUS" = "400" || { echo "Expected provider route HTTP 400, got ${STATUS}" >&2; cat "$BODY" >&2; exit 1; }
+          node --input-type=module - "$BODY" <<'NODE'
+          import fs from 'node:fs';
+          const body = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (body?.error?.code !== 'INVALID_REQUEST') throw new Error(`Unexpected provider response: ${JSON.stringify(body)}`);
+          NODE
+
+      - name: Summarize production deployment
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          {
+            echo "## HomeMew backend production"
+            echo
+            echo "- Worker: homemew-backend-production"
+            echo "- Public front door ownership: unchanged (homemew-web-production)"
+            echo "- Mini Program provider route: verified through the Web front door"
+            echo "- Custom Domain and Cloudflare Access configuration: untouched"
+          } >> "$GITHUB_STEP_SUMMARY"
