@@ -4,7 +4,7 @@
 
 HomeMew is a household application built on LifeSpace. LifeSpace is the platform source of truth for Identity, Spaces/authorization, domain models, Actions, contracts, migrations and business data. HomeMew owns household product UX plus provider-specific application integration.
 
-The legacy `apps/core` implementation remains in this repository only as a migration/reference source until it is explicitly retired; new HomeMew business behavior must not be added there.
+The legacy HomeMew business Core was retired from the active repository on 2026-08-26 after the completed LifeSpace production migration/cutover. Git history is the archive for its old implementation, OpenAPI and migrations; new HomeMew business behavior must use LifeSpace rather than recreate a local Core.
 
 ## 2. Target context
 
@@ -289,7 +289,7 @@ The code may be deployed before the integrations application credential is insta
 - Staging and production HomeMew Workers use separate Durable Object namespaces, application credentials, Access applications/audiences and session secrets.
 - `apps/backend/` keeps the application-owned WeChat identity mapping; `apps/web/` never duplicates it.
 - Production Web activation must not break the existing Mini Program `/api/v1/login/wechat` application-provider endpoint.
-- The old HomeMew Core/D1 remains frozen/read-only only for the explicit stabilization/rollback-evidence window and must not receive new normal writes.
+- The legacy HomeMew Core source is retired from the active repository. Any still-existing old HomeMew Worker/D1 resources remain frozen/read-only only for the explicit stabilization/rollback-evidence window and require a separate operations decision before physical deletion.
 
 ## 13. LifeSpace change boundary
 

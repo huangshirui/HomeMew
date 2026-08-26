@@ -7,17 +7,18 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm --filter @homemew/core dev",
+    "dev": "pnpm dev:web",
     "dev:web": "pnpm --filter @homemew/web dev",
-    "test": "pnpm --filter @homemew/core test",
+    "test": "pnpm test:miniprogram && pnpm test:web",
+    "test:miniprogram": "pnpm --filter homemew-miniprogram test",
     "test:web": "node --test apps/web/*.test.mjs",
-    "typecheck": "pnpm --filter @homemew/core typecheck",
+    "typecheck": "pnpm typecheck:miniprogram && pnpm typecheck:web",
     "typecheck:miniprogram": "pnpm --filter homemew-miniprogram typecheck",
     "typecheck:web": "pnpm --filter @homemew/web typecheck",
-    "build": "pnpm --filter @homemew/core build",
+    "build": "pnpm build:web",
     "build:web": "pnpm --filter @homemew/web build",
     "deploy:web:staging": "pnpm --filter @homemew/web deploy:staging",
-    "check": "pnpm test:web && pnpm typecheck:miniprogram && pnpm typecheck:web && pnpm --filter @homemew/core contract && pnpm test && pnpm typecheck && pnpm build && pnpm build:web"
+    "check": "node --check apps/backend/worker.mjs && pnpm test && pnpm typecheck && pnpm build"
   },
   "devDependencies": {
     "miniprogram-api-typings": "5.2.1"

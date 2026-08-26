@@ -17,7 +17,7 @@ Accepted decisions are binding for their explicitly scoped topic and supersede o
 
 - Platform API paths, schemas, authentication, authorization, models, Actions, migrations and runtime behavior: `huangshirui/LifeSpace`.
 - HomeMew product terminology, UX and application-specific identity/provider mapping: this repository.
-- `apps/core/` is legacy HomeMew Core retained only for migration/reference until explicitly removed. Do not add new business behavior there and do not treat its OpenAPI as the current platform contract.
+- The legacy HomeMew business Core was retired from the active repository on 2026-08-26 after the completed LifeSpace production migration/cutover. Git history is the archive; do not recreate a HomeMew business Core or treat historical HomeMew OpenAPI/migrations as the current platform contract.
 
 When HomeMew needs a capability LifeSpace does not provide, do not invent a hidden compatibility backend. Identify the exact platform gap and obtain explicit approval before modifying LifeSpace.
 
@@ -96,7 +96,7 @@ Follow the active LifeSpace model/capability contract. In particular, preserve U
 ## Repository discipline
 
 - Keep dependencies minimal.
-- Do not add new behavior to legacy `apps/core` as part of normal HomeMew feature work.
+- Do not recreate a HomeMew business Core or reintroduce migration/cutover-only contracts and workflows into active repository paths.
 - Do not place authoritative household data in HomeMew backend storage, Mini Program storage, or WeChat Cloud Database.
 - Update HomeMew architecture/product docs and affected client tests whenever the application mapping changes.
 - Important architectural decisions must be appended to the ALOHA & HomeMew engineering log.
