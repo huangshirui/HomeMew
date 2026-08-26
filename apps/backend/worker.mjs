@@ -68,7 +68,7 @@ async function lifespaceRequest(env, path, { method = 'GET', body } = {}) {
 const dataObject = payload => payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data) ? payload.data : {};
 async function createLifeSpaceUser(env, openid) {
   const result = await lifespaceRequest(env, '/internal/v1/users', {
-    method: 'POST', body: { displayName: `微信用户${openid.slice(0, 6)}` },
+    method: 'POST', body: { displayName: `微信用户${openid.slice(-6)}` },
   });
   const userId = dataObject(result.payload).id;
   if (result.status !== 201 || typeof userId !== 'string' || !userId.startsWith('usr_')) {
