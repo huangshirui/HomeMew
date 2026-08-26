@@ -1,0 +1,121 @@
+name: Deploy HomeMew Web production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY_HOMEMEW_WEB_PRODUCTION to continue
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homemew-web-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Validate production gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "main" || { echo "Production deploys must run from main" >&2; exit 1; }
+          test "${{ inputs.confirmation }}" = "DEPLOY_HOMEMEW_WEB_PRODUCTION" || { echo "Production confirmation mismatch" >&2; exit 1; }
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN is not configured" >&2; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID is not configured" >&2; exit 1; }
+
+      - name: Validate Web production configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const config = JSON.parse(fs.readFileSync('apps/web/wrangler.production.jsonc', 'utf8'));
+          if (config.name !== 'homemew-web-production') throw new Error('Unexpected production Worker name');
+          if (config.workers_dev !== false) throw new Error('Production workers_dev must remain false');
+          if (Array.isArray(config.routes) && config.routes.length > 0) {
+            throw new Error('Normal production deployment must not transfer or recreate the Custom Domain');
+          }
+          if (config.vars?.ENVIRONMENT !== 'production') throw new Error('Web production ENVIRONMENT mismatch');
+          if (config.vars?.LIFESPACE_IDENTITY_URL !== 'https://auth.aisr.online') throw new Error('Unexpected production Identity URL');
+          if (config.vars?.LIFESPACE_CORE_URL !== 'https://core.aisr.online') throw new Error('Unexpected production Core URL');
+          const backend = config.services?.find((entry) => entry.binding === 'HOMEMEW_BACKEND');
+          if (backend?.service !== 'homemew-backend-production') throw new Error('Unexpected HOMEMEW_BACKEND service binding');
+          NODE
+
+      - name: Test, typecheck and build Web
+        run: |
+          corepack pnpm test:web
+          corepack pnpm typecheck:web
+          corepack pnpm build:web
+
+      - name: Verify LifeSpace production is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 https://auth.aisr.online/health >/dev/null
+          curl --fail --silent --show-error --retry 3 https://core.aisr.online/health >/dev/null
+
+      - name: Deploy production Web Worker
+        run: >-
+          corepack pnpm --dir apps/web exec wrangler deploy
+          --config "$GITHUB_WORKSPACE/apps/web/wrangler.production.jsonc"
+
+      - name: Verify Access front door and Mini Program provider route
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT_STATUS="$(curl --silent --show-error -o /dev/null -w '%{http_code}' https://homemew.aisr.online/)"
+          case "$ROOT_STATUS" in
+            200|302|303|401|403) ;;
+            *) echo "Unexpected HomeMew Web root status: ${ROOT_STATUS}" >&2; exit 1 ;;
+          esac
+
+          BODY="$RUNNER_TEMP/wechat-login-response.json"
+          LOGIN_STATUS="$(curl --silent --show-error --retry 8 --retry-delay 3 --retry-all-errors \
+            -o "$BODY" -w '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -d '{}' \
+            https://homemew.aisr.online/api/v1/login/wechat)"
+          test "$LOGIN_STATUS" = "400" || { echo "Expected provider route HTTP 400, got ${LOGIN_STATUS}" >&2; cat "$BODY" >&2; exit 1; }
+          node --input-type=module - "$BODY" <<'NODE'
+          import fs from 'node:fs';
+          const body = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (body?.error?.code !== 'INVALID_REQUEST') throw new Error(`Unexpected provider response: ${JSON.stringify(body)}`);
+          NODE
+
+      - name: Summarize production deployment
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          {
+            echo "## HomeMew Web production"
+            echo
+            echo "- Worker: homemew-web-production"
+            echo "- LifeSpace: auth.aisr.online / core.aisr.online"
+            echo "- HOMEMEW_BACKEND binding: homemew-backend-production"
+            echo "- Existing homemew.aisr.online ownership retained"
+            echo "- Custom Domain transfer and Cloudflare Access provisioning: not performed by this workflow"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -251,4 +251,4 @@ pnpm check
 
 `pnpm test:web` runs dependency-free Worker/BFF tests for both the normal Access session boundary and the external-integration orchestration boundary, including credential mode/rotation behavior. It also asserts that HomeMew Web does not expose the LifeSpace Access registration flow.
 
-The root check includes Mini Program typecheck, Web typecheck/build, BFF tests, legacy Core contract/tests/typecheck/build and therefore treats the Web application as a first-class repository surface.
+The root check validates the active HomeMew application surfaces: backend syntax, Mini Program tests/typecheck, and Web BFF tests/typecheck/build. The retired legacy HomeMew Core is not part of the active workspace.
