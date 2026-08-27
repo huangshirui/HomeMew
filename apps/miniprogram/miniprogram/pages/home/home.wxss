@@ -95,7 +95,7 @@
   flex-direction: column;
   vertical-align: top;
   width: 46%;
-  min-height: 200rpx;
+  height: 248rpx;
   white-space: normal;
   background: var(--home-primary-tint);
   border-radius: 20rpx;
