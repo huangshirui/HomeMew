@@ -2,6 +2,7 @@ const MANAGER_SCOPES = ['profile:read', 'grants:manage'];
 const MODEL_KEYS = ['event', 'task', 'day_record'];
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
 const BINDING_PREFIX = 'homemew:v1:space=';
+const DISCARDED_PREFIX = 'homemew:v1:discarded=';
 const MAX_USER_DESCRIPTION_LENGTH = 400;
 const CREDENTIAL_MODES = ['api_token', 'oauth_client_credentials'];
 
@@ -131,7 +132,7 @@ function parseDescription(value) {
   if (description.length > MAX_USER_DESCRIPTION_LENGTH) {
     throw new IntegrationError(422, 'VALIDATION_ERROR', `说明不能超过 ${MAX_USER_DESCRIPTION_LENGTH} 个字符`);
   }
-  if (description.startsWith(BINDING_PREFIX)) {
+  if (description.startsWith(BINDING_PREFIX) || description.startsWith(DISCARDED_PREFIX)) {
     throw new IntegrationError(422, 'VALIDATION_ERROR', '说明使用了 HomeMew 保留前缀');
   }
   return description || null;
@@ -139,6 +140,14 @@ function parseDescription(value) {
 
 function encodeBoundDescription(spaceId, description) {
   return `${BINDING_PREFIX}${spaceId}\n${description ?? ''}`;
+}
+
+function encodeDiscardedDescription(spaceId, description) {
+  return `${DISCARDED_PREFIX}${spaceId}\n${description ?? ''}`;
+}
+
+function isDiscardedDescription(value) {
+  return typeof value === 'string' && value.startsWith(DISCARDED_PREFIX);
 }
 
 function decodeBoundDescription(value) {
@@ -276,6 +285,9 @@ function upstreamError(response, payload, fallbackCode) {
   if (response.status >= 400 && response.status < 500 && upstream && typeof upstream.code === 'string') {
     return new IntegrationError(response.status, upstream.code, typeof upstream.message === 'string' ? upstream.message : 'LifeSpace rejected the request');
   }
+  if (upstream && typeof upstream.code === 'string' && typeof upstream.message === 'string') {
+    return new IntegrationError(502, fallbackCode, `${upstream.message} (${upstream.code})`);
+  }
   return new IntegrationError(502, fallbackCode, 'LifeSpace 服务暂时不可用');
 }
 
@@ -286,11 +298,17 @@ async function requestJson(fetcher, url, { method = 'GET', credential, body, id,
     'x-request-id': id,
   };
   if (body !== undefined) headers['content-type'] = 'application/json';
-  const response = await fetcher(url, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response;
+  try {
+    response = await fetcher(url, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (error) {
+    console.error(`[HomeMew web integrations] ${fallbackCode} upstream fetch failed`, error instanceof Error ? error.message : 'unknown');
+    throw new IntegrationError(502, fallbackCode, '连接 LifeSpace 失败，请稍后重试');
+  }
   const payload = response.status === 204 ? {} : await response.json().catch(() => ({}));
   if (!response.ok) throw upstreamError(response, payload, fallbackCode);
   return payload?.data;
@@ -410,7 +428,9 @@ async function listCredentials(env, fetcher, principalId, id) {
 async function resolveBoundIntegration(env, fetcher, spaceId, principalId, id) {
   const principals = await listPrincipals(env, fetcher, id);
   const principal = principals.find((item) => item.id === principalId);
-  if (!principal) throw new IntegrationError(404, 'INTEGRATION_NOT_FOUND', '当前家庭没有这个外部系统');
+  if (!principal || isDiscardedDescription(principal.description)) {
+    throw new IntegrationError(404, 'INTEGRATION_NOT_FOUND', '当前家庭没有这个外部系统');
+  }
   const binding = decodeBoundDescription(principal.description);
   if (!binding.spaceId) {
     throw new IntegrationError(409, 'INTEGRATION_BINDING_REQUIRED', '这个迁移外部系统尚未建立 HomeMew 家庭管理归属，当前仅可查看');
@@ -510,6 +530,118 @@ async function revokeServiceCredential(env, fetcher, principalId, credential, id
   });
 }
 
+async function cleanupCredentialsCreatedAfter(env, fetcher, principalId, baselineIds, id) {
+  const credentials = await listCredentials(env, fetcher, principalId, id);
+  const unexpected = credentials.filter((credential) => credential.active && !baselineIds.has(credential.id));
+  for (const credential of unexpected) {
+    await revokeServiceCredential(env, fetcher, principalId, credential, id);
+  }
+}
+
+async function createServiceCredentialWithReconciliation(env, fetcher, principal, managerUserId, mode, id, baselineCredentials = []) {
+  const baselineIds = new Set(baselineCredentials.filter((credential) => credential.active).map((credential) => credential.id));
+  try {
+    return await createServiceCredential(env, fetcher, principal, managerUserId, mode, id);
+  } catch (error) {
+    if (!(error instanceof IntegrationError) || error.status < 500) throw error;
+    try {
+      await cleanupCredentialsCreatedAfter(env, fetcher, principal.id, baselineIds, id);
+    } catch {
+      throw new IntegrationError(
+        502,
+        'INTEGRATION_CREDENTIAL_RECONCILIATION_FAILED',
+        '创建凭据时连接中断，且无法确认 LifeSpace 是否已生成凭据；已停止自动重试，请稍后重试',
+      );
+    }
+  }
+
+  try {
+    return await createServiceCredential(env, fetcher, principal, managerUserId, mode, id);
+  } catch (error) {
+    await cleanupCredentialsCreatedAfter(env, fetcher, principal.id, baselineIds, id).catch(() => undefined);
+    throw error;
+  }
+}
+
+async function compensateFailedCreation(env, fetcher, managerToken, spaceId, principal, knownGrantIds, description, id) {
+  const warnings = [];
+  try {
+    await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}`, {
+      method: 'PATCH',
+      body: { status: 'disabled' },
+      id,
+      fallbackCode: 'INTEGRATION_COMPENSATION_FAILED',
+    });
+  } catch {
+    warnings.push('principal:disable');
+  }
+
+  let principalGrants = [];
+  try {
+    principalGrants = grantsForPrincipal(await listSpaceGrants(env, fetcher, managerToken, spaceId, id), principal.id).filter(activeGrant);
+  } catch {
+    principalGrants = knownGrantIds.map((grantId) => ({ id: grantId }));
+    warnings.push('grants:list');
+  }
+  const grantIds = new Set([...knownGrantIds, ...principalGrants.map((grant) => grant.id)].filter(Boolean));
+  for (const grantId of grantIds) {
+    try {
+      await revokeGrant(env, fetcher, managerToken, spaceId, grantId, id);
+    } catch {
+      warnings.push(`grant:${grantId}`);
+    }
+  }
+
+  try {
+    const credentials = await listCredentials(env, fetcher, principal.id, id);
+    for (const credential of credentials.filter((item) => item.active)) {
+      try {
+        await revokeServiceCredential(env, fetcher, principal.id, credential, id);
+      } catch {
+        warnings.push(`credential:${credential.id}`);
+      }
+    }
+  } catch {
+    warnings.push('credentials:list');
+  }
+
+  if (!warnings.length) {
+    try {
+      await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}`, {
+        method: 'PATCH',
+        body: { status: 'disabled', description: encodeDiscardedDescription(spaceId, description) },
+        id,
+        fallbackCode: 'INTEGRATION_COMPENSATION_FAILED',
+      });
+    } catch {
+      warnings.push('principal:discard');
+    }
+  }
+
+  if (warnings.length) {
+    console.error('[HomeMew web integrations] failed creation compensation incomplete', principal.id, warnings.join(','));
+  }
+  return warnings;
+}
+
+async function reconcileDisabledPartialIntegration(env, fetcher, managerToken, spaceId, principal, principalGrants, credentials, id) {
+  const activeGrants = principalGrants.filter(activeGrant);
+  const activeCredentials = credentials.filter((credential) => credential.active);
+  if (principal.status !== 'disabled' || activeCredentials.length || !activeGrants.length) return false;
+
+  for (const grant of activeGrants) {
+    await revokeGrant(env, fetcher, managerToken, spaceId, grant.id, id);
+  }
+  const description = decodeBoundDescription(principal.description).description;
+  await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}`, {
+    method: 'PATCH',
+    body: { status: 'disabled', description: encodeDiscardedDescription(spaceId, description) },
+    id,
+    fallbackCode: 'INTEGRATION_COMPENSATION_FAILED',
+  });
+  return true;
+}
+
 async function readIntegration(env, fetcher, managerToken, spaceId, principalId, id) {
   const grants = await listSpaceGrants(env, fetcher, managerToken, spaceId, id);
   const principal = await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
@@ -520,20 +652,25 @@ async function readIntegration(env, fetcher, managerToken, spaceId, principalId,
 async function handleList(request, env, fetcher, assertion, id) {
   const url = new URL(request.url);
   const spaceId = parseSpaceId(url.searchParams.get('spaceId'));
-  const { grants } = await managementContext(env, fetcher, assertion, spaceId, id);
+  const { manager, grants } = await managementContext(env, fetcher, assertion, spaceId, id);
   const associated = associatedPrincipalIds(grants);
   const principals = await listPrincipals(env, fetcher, id);
   const integrations = [];
 
   for (const principal of principals) {
+    if (isDiscardedDescription(principal.description)) continue;
     const binding = decodeBoundDescription(principal.description);
     if (binding.spaceId === spaceId) {
-      integrations.push(integrationDto(
-        principal,
-        grantsForPrincipal(grants, principal.id),
-        await listCredentials(env, fetcher, principal.id, id),
-        'bound',
-      ));
+      const principalGrants = grantsForPrincipal(grants, principal.id);
+      const credentials = await listCredentials(env, fetcher, principal.id, id);
+      if (principal.status === 'disabled' && credentials.every((credential) => !credential.active) && principalGrants.some(activeGrant)) {
+        try {
+          if (await reconcileDisabledPartialIntegration(env, fetcher, manager.accessToken, spaceId, principal, principalGrants, credentials, id)) continue;
+        } catch (error) {
+          console.error('[HomeMew web integrations] partial integration reconciliation failed', principal.id, error instanceof Error ? error.message : 'unknown');
+        }
+      }
+      integrations.push(integrationDto(principal, principalGrants, credentials, 'bound'));
       continue;
     }
     if (!binding.spaceId && associated.has(principal.id)) {
@@ -580,28 +717,15 @@ async function handleCreate(request, env, fetcher, assertion, id) {
       if (grant?.id) createdGrants.push(grant.id);
     }
   } catch (error) {
-    for (const grantId of createdGrants) {
-      await revokeGrant(env, fetcher, manager.accessToken, spaceId, grantId, id).catch(() => undefined);
-    }
-    await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}`, {
-      method: 'PATCH',
-      body: { status: 'disabled' },
-      id,
-      fallbackCode: 'INTEGRATION_COMPENSATION_FAILED',
-    }).catch(() => undefined);
+    await compensateFailedCreation(env, fetcher, manager.accessToken, spaceId, principal, createdGrants, description, id);
     throw error;
   }
 
   let credential;
   try {
-    credential = await createServiceCredential(env, fetcher, principal, manager.userId, credentialMode, id);
+    credential = await createServiceCredentialWithReconciliation(env, fetcher, principal, manager.userId, credentialMode, id, []);
   } catch (error) {
-    await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}`, {
-      method: 'PATCH',
-      body: { status: 'disabled' },
-      id,
-      fallbackCode: 'INTEGRATION_COMPENSATION_FAILED',
-    }).catch(() => undefined);
+    await compensateFailedCreation(env, fetcher, manager.accessToken, spaceId, principal, createdGrants, description, id);
     throw error;
   }
 
@@ -664,7 +788,7 @@ async function handleStartCredentialRotation(request, env, fetcher, assertion, i
     throw new IntegrationError(409, 'CREDENTIAL_ROTATION_PENDING', '已有一次凭据轮换尚未完成，请先完成或取消');
   }
   const mode = parseCredentialMode(body.credentialMode, activeCredentials[0]?.type ?? 'api_token');
-  const credential = await createServiceCredential(env, fetcher, principal, manager.userId, mode, id);
+  const credential = await createServiceCredentialWithReconciliation(env, fetcher, principal, manager.userId, mode, id, activeCredentials);
   const integration = await readIntegration(env, fetcher, manager.accessToken, spaceId, principalId, id);
   return json({ data: { integration, credential } }, 201, id);
 }
