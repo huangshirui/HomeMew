@@ -200,14 +200,16 @@ The first version has one task-level completion state. It does not track complet
 
 - A wish belongs to the active family member who creates it. Clients cannot create a wish for another member.
 - Every active family member may read the family's wishes. System and service principals cannot use wish routes in the first version.
-- Wish content is a title, optional description, and optional date-only `desiredDate`. A wish is not a task and does not imply an execution deadline.
-- The lifecycle is `open`, `claimed`, `fulfilled`, or `archived`. One wish has at most one current claimant, whose identity is visible to every family member.
-- A member cannot claim their own wish. Only the current claimant may release a claim. The owner or current claimant may mark it fulfilled.
-- Only the owner may edit, reopen, archive, restore, or soft-delete the wish. Reopening clears claim and fulfillment state.
-- Archiving retains the previous lifecycle state. Restore returns to that state, except a claim held by a removed member restores as `open`.
-- Removing or leaving the family immediately releases that member's unfinished claims and increments affected wish versions. Historical owner and fulfiller references remain.
-- Every mutation uses optimistic concurrency. Archived wishes are read-only except for restore and soft deletion.
-- Images, product links, budgets, comments, multiple claimants, and automatic task creation are outside the first version.
+- Wish content is a title, optional description, and optional date-only `desiredDate`. A wish is an aspiration, not a task, and does not imply an execution commitment or deadline.
+- The business lifecycle has exactly two states: `open` and `fulfilled`.
+- Any user that passes the normal LifeSpace Space/Application/Grant/model write authorization boundary and resolves to a Space Person may mark an `open` wish fulfilled. Fulfillment records `fulfilledAt`.
+- The same authorized writers may `reopen` a fulfilled wish only as a correction; reopening returns it to `open` and clears `fulfilledAt`.
+- Only the wish owner may edit its content or soft-delete it.
+- Claiming and archiving are deliberately not part of the Wish business model. There is no `claimed`, claimant, claim/unclaim, `archived`, archive/restore, or `fulfilledByPersonId` workflow.
+- The actor who performs a state transition remains available through normal LifeSpace audit data; that actor is not asserted to be the real-world person who made the wish happen.
+- Every mutation uses optimistic concurrency. Soft deletion is a technical/data-management lifecycle and is not a Wish business state.
+- HomeMew Mini Program gives successful creation and fulfillment restrained, warm Micro-interactions; reopening remains intentionally quiet because it is a correction.
+- Images, product links, budgets, comments, and automatic task creation are outside the first version.
 
 ## 9. Notifications
 
