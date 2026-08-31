@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '../../lib/cn';
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive';
   size?: 'default' | 'icon';
 };
 
@@ -22,6 +22,7 @@ export function Button({
         variant === 'primary' && 'bg-emerald-600 text-white hover:bg-emerald-700',
         variant === 'secondary' && 'bg-white text-stone-700 shadow-sm ring-1 ring-stone-200 hover:bg-stone-50',
         variant === 'ghost' && 'text-stone-600 hover:bg-stone-100',
+        variant === 'destructive' && 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500/50',
         className,
       )}
       {...props}
