@@ -114,6 +114,11 @@ export async function getFamily(familyId: string): Promise<FamilyDetail> {
   };
 }
 
+export async function isFamilyOwner(familyId: string): Promise<boolean> {
+  const [list, me] = await Promise.all([members(familyId), getCurrentUser()]);
+  return list.some(member => member.userId === me.id && member.role === 'owner');
+}
+
 export async function updateFamily(familyId: string, data: UpdateFamilyRequest): Promise<FamilySummary> {
   const current = await request<Space>(`/api/v1/spaces/${familyId}`);
   const updated = await request<Space>(`/api/v1/spaces/${familyId}`, {
@@ -128,6 +133,16 @@ export async function updateFamily(familyId: string, data: UpdateFamilyRequest):
     timezone: updated.timezone,
     status: 'active',
   };
+}
+
+export async function closeFamily(familyId: string): Promise<void> {
+  const current = await request<Space>(`/api/v1/spaces/${familyId}`);
+  await request<void>(`/api/v1/spaces/${familyId}/close`, {
+    method: 'POST',
+    data: { version: current.version },
+    skipRetry: true,
+  });
+  invalidateSpaceMembers(familyId);
 }
 
 export async function listFamilyMembers(familyId: string): Promise<FamilyMember[]> {

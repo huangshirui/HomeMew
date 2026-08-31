@@ -31,10 +31,14 @@
     </view>
   </view>
 
-  <!-- 危险操作 -->
+  <!-- 危险操作：Owner 注销整个家庭，其他成员只退出自己的成员关系 -->
   <view class="card group">
-    <view class="menu-item menu-item-danger" bindtap="onLeave">
+    <view wx:if="{{!isOwner}}" class="menu-item menu-item-danger" bindtap="onLeave">
       <text class="menu-text text-danger">{{leaving ? '退出中...' : '退出家庭'}}</text>
+      <text class="arrow">›</text>
+    </view>
+    <view wx:if="{{isOwner}}" class="menu-item menu-item-danger" bindtap="onClose">
+      <text class="menu-text text-danger">{{closing ? '注销中...' : '注销家庭'}}</text>
       <text class="arrow">›</text>
     </view>
   </view>
