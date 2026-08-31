@@ -157,9 +157,12 @@
 }
 
 .fab.fab-small {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 92rpx;
   height: 92rpx;
-  line-height: 92rpx;
+  line-height: normal;
   bottom: calc(48rpx + env(safe-area-inset-bottom));
 }
 
@@ -167,11 +170,30 @@
   box-shadow: 0 10rpx 30rpx rgba(67, 160, 71, 0.24);
 }
 
-.fab-text-small {
-  font-size: 52rpx;
-  color: #ffffff;
-  font-weight: 300;
-  line-height: 1;
+.fab-plus {
+  position: relative;
+  width: 34rpx;
+  height: 34rpx;
+  flex-shrink: 0;
+}
+
+.fab-plus-line {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 4rpx;
+  background-color: #ffffff;
+  transform: translate(-50%, -50%);
+}
+
+.fab-plus-horizontal {
+  width: 34rpx;
+  height: 4rpx;
+}
+
+.fab-plus-vertical {
+  width: 4rpx;
+  height: 34rpx;
 }
 
 .skeleton {
