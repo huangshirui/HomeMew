@@ -16,9 +16,10 @@ HomeMew `family` 仍然只是 LifeSpace `Space(kind=family)` 的产品映射。L
 
 - 只有 LifeSpace 当前 `owner` 可以注销家庭。
 - HomeMew 的普通 `admin` 即使拥有日常家庭管理权限，也不能注销家庭。
-- Space Owner 在家庭详情页看到“注销家庭”，不再看到“退出家庭”。
-- 非 Owner 成员仍使用现有“退出家庭”路径，只终止自己的 Space Membership（空间成员关系）。
-- 注销是高风险操作，小程序采用两次明确确认；确认文案必须说明所有成员和外部系统会立即失去访问权限。
+- Space Owner 在家庭详情/家庭管理页看到“注销家庭”，不再看到“退出家庭”。
+- 非 Owner 成员使用“退出家庭”路径，只终止自己的 Space Membership（空间成员关系）。
+- 注销是高风险操作，Mini Program 与 Web 均采用两次明确确认；确认文案必须说明所有成员和外部系统会立即失去访问权限、数据不会立即物理删除、当前版本不能自行恢复。
+- Web 的“注销家庭”使用明确的 destructive（破坏性）视觉处理；普通“退出家庭”不与注销混为同一危险等级。
 
 ## 数据与失效语义
 
@@ -36,18 +37,20 @@ HomeMew 不新增家庭业务数据库、不增加隐藏 BFF 清理逻辑，也�
 
 ## 并发与调用路径
 
-小程序通过现有共享 LifeSpace 请求层：
+HomeMew 客户端都必须在高风险关闭写入前取得当前 Space `version`，不得静默重试：
 
-1. 读取当前 Space 取得 `version`；
+1. 读取当前 Space 取得最新 `version`；
 2. `POST /api/v1/spaces/{spaceId}/close` 并提交该 `version`；
-3. LifeSpace 使用乐观并发控制执行关闭；
-4. 成功后 HomeMew 刷新可访问家庭列表并重新选择当前家庭。
+3. LifeSpace 使用 Optimistic Concurrency Control（乐观并发控制）执行关闭；
+4. 成功后 HomeMew 刷新可访问家庭列表并重新选择当前家庭，然后返回家庭首页。
+
+Mini Program 通过现有共享 LifeSpace 请求层直接调用 LifeSpace；Web 通过现有 same-origin BFF（同源 BFF）`/api/lifespace/core/v1/*` 代理调用 LifeSpace。Web BFF 只提供浏览器认证/传输边界，不增加家庭生命周期业务逻辑。
 
 `SPACE_OWNER_REQUIRED` 和 `SPACE_VERSION_CONFLICT` 必须在产品层给出明确提示，不得静默重试高风险写操作。
 
 ## 依赖与发布顺序
 
-HomeMew 此能力依赖 LifeSpace Core Kernel `0.16.0` 及其 Space lifecycle migration。LifeSpace 必须先完成迁移与 Core 部署，再发布启用“注销家庭”的 HomeMew 版本。
+HomeMew 此能力依赖 LifeSpace Core Kernel `0.16.0` 及其 Space lifecycle migration。LifeSpace 必须先完成迁移与 Core 部署，再发布启用“注销家庭”的 HomeMew 客户端版本。
 
 ## 不在本次范围
 
