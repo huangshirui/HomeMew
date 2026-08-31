@@ -134,7 +134,10 @@ module.exports.attentionClass = function (level, required) {
 
     <!-- 页面内新增入口（二级页面不显示自定义 TabBar） -->
     <view class="fab fab-small" bindtap="onCreate">
-      <text class="fab-text-small">＋</text>
+      <view class="fab-plus">
+        <view class="fab-plus-line fab-plus-horizontal"></view>
+        <view class="fab-plus-line fab-plus-vertical"></view>
+      </view>
     </view>
   </block>
 </view>
