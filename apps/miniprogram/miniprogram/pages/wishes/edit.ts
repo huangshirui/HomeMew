@@ -1,10 +1,7 @@
 /**
- * 愿望创建 / 编辑页
+ * 愿望创建 / 编辑页。
  *
- * 契约要点（见 openapi.yaml）：
- * - 创建请求只含 title / description / desiredDate；owner 由 Core 设为当前用户；
- * - 编辑请求只含 title / description / desiredDate，且必须带 version；
- * - desiredDate 为纯日期，不做 UTC 转换，直接使用家庭时区下的今天作为默认值。
+ * 创建成功后用短暂的「愿望入池」动画确认真实写入成功；编辑仍保持高效的普通反馈。
  */
 
 import { getWish, createWish, updateWish } from '../../services/wishes';
@@ -19,7 +16,7 @@ import {
   isVersionConflict,
   formatInstantInTimeZone,
 } from '../../utils/index';
-import { Wish, CreateWishRequest, UpdateWishRequest, WishCreationDraft } from '../../types/index';
+import { CreateWishRequest, UpdateWishRequest, WishCreationDraft } from '../../types/index';
 import { consumePendingDraft } from '../../stores/draft-buffer';
 
 type Mode = 'create' | 'edit';
@@ -30,18 +27,17 @@ Page({
     familyId: '',
     wishId: '',
     version: 0,
-
     loaded: false,
     loadError: false,
     submitting: false,
-
+    wishCreated: false,
     title: '',
     description: '',
-    /** 期望日期（纯日期 YYYY-MM-DD）；空串表示未设置 */
     desiredDate: '',
-    /** 家庭时区下的今天，用于 picker 默认值与边界 */
     familyToday: '',
   },
+
+  _successTimer: null as ReturnType<typeof setTimeout> | null,
 
   onLoad(options: { familyId?: string; id?: string }): void {
     const familyId = options?.familyId || currentFamilyStore.value?.id || '';
@@ -56,16 +52,17 @@ Page({
       wishId: options?.id || '',
       mode: isEdit ? 'edit' : 'create',
       familyToday: this.resolveFamilyToday(),
-      // 创建模式无需请求后端，直接进入可编辑态；编辑模式等 loadWish 完成
       loaded: !isEdit,
     });
     wx.setNavigationBarTitle({ title: isEdit ? '编辑愿望' : '许个愿望' });
-
     if (isEdit) this.loadWish();
     else this.applyConsumedDraft();
   },
 
-  /** 喵一下：消费草稿后预填愿望字段（创建模式调用） */
+  onUnload(): void {
+    if (this._successTimer) clearTimeout(this._successTimer);
+  },
+
   applyConsumedDraft(): void {
     const draft = consumePendingDraft('wish');
     if (!draft || draft.status !== 'ready' || draft.kind !== 'wish') return;
@@ -77,7 +74,6 @@ Page({
     this.setData(patch);
   },
 
-  /** 家庭时区下的今天（不使用设备本地日期，也不使用 UTC 日期） */
   resolveFamilyToday(): string {
     const timezone = currentFamilyStore.value?.timezone || 'Asia/Shanghai';
     return formatInstantInTimeZone(new Date().toISOString(), timezone).date;
@@ -89,11 +85,6 @@ Page({
     try {
       const wish = await getWish(this.data.familyId, this.data.wishId);
       hideLoading();
-      if (wish.status === 'archived') {
-        showError('已归档的愿望不可编辑');
-        setTimeout(() => wx.navigateBack(), 1200);
-        return;
-      }
       this.setData({
         title: wish.title,
         description: wish.description || '',
@@ -114,21 +105,14 @@ Page({
     if (this.data.mode === 'edit') this.loadWish();
   },
 
-  onTitleInput(e: WechatMiniprogram.Input): void {
-    this.setData({ title: e.detail.value });
-  },
-
-  onDescriptionInput(e: WechatMiniprogram.Input): void {
-    this.setData({ description: e.detail.value });
-  },
-
+  onTitleInput(e: WechatMiniprogram.Input): void { this.setData({ title: e.detail.value }); },
+  onDescriptionInput(e: WechatMiniprogram.Input): void { this.setData({ description: e.detail.value }); },
   onDesiredDateChange(e: WechatMiniprogram.PickerChange): void {
     this.setData({ desiredDate: e.detail.value as string });
   },
 
   async onSubmit(): Promise<void> {
-    if (this.data.submitting) return;
-
+    if (this.data.submitting || this.data.wishCreated) return;
     const title = (this.data.title || '').trim();
     if (!title) {
       showError('请填写愿望标题');
@@ -146,12 +130,18 @@ Page({
       if (this.data.mode === 'edit') {
         const body = { ...payload, version: this.data.version } as UpdateWishRequest;
         await updateWish(this.data.familyId, this.data.wishId, body);
-      } else {
-        await createWish(this.data.familyId, payload as CreateWishRequest);
+        markDirty('wishes');
+        this.setData({ submitting: false });
+        showSuccess('已保存');
+        this._successTimer = setTimeout(() => wx.navigateBack(), 700);
+        return;
       }
+
+      await createWish(this.data.familyId, payload as CreateWishRequest);
       markDirty('wishes');
-      showSuccess(this.data.mode === 'edit' ? '已保存' : '已许愿');
-      setTimeout(() => wx.navigateBack(), 800);
+      this.setData({ submitting: false, wishCreated: true });
+      wx.vibrateShort({ type: 'light' });
+      this._successTimer = setTimeout(() => wx.navigateBack(), 1250);
     } catch (error: unknown) {
       this.setData({ submitting: false });
       console.error('[WishEdit] Submit failed:', error);
@@ -165,6 +155,6 @@ Page({
   },
 
   onCancel(): void {
-    wx.navigateBack();
+    if (!this.data.wishCreated) wx.navigateBack();
   },
 });
