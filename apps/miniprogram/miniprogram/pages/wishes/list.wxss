@@ -1,6 +1,5 @@
 /* 许愿池列表页 */
 
-/* 顶部筛选 */
 .filter-bar {
   white-space: nowrap;
   margin-bottom: 20rpx;
@@ -28,7 +27,6 @@
   color: #ffffff;
 }
 
-/* 后台刷新提示 */
 .refresh-hint {
   display: flex;
   align-items: center;
@@ -41,29 +39,45 @@
   color: var(--color-text-secondary);
 }
 
-/* 愿望卡片 */
 .wish-card {
-  background-color: var(--color-card);
-  border-radius: 26rpx;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, #ffffff 0%, #fbfffc 100%);
+  border-radius: 28rpx;
   padding: 26rpx 24rpx;
   margin-bottom: 18rpx;
-  box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
-  border-left: 8rpx solid var(--color-primary);
+  box-shadow: 0 5rpx 18rpx rgba(67, 160, 71, 0.07);
+  border: 1rpx solid rgba(67, 160, 71, 0.08);
 }
 
-.wish-card.status-claimed {
-  border-left-color: var(--color-info);
+.wish-card.status-open .wish-glow {
+  position: absolute;
+  width: 180rpx;
+  height: 180rpx;
+  right: -70rpx;
+  top: -90rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(129, 199, 132, 0.18) 0%, rgba(129, 199, 132, 0) 72%);
+  animation: wish-breathe 4.2s ease-in-out infinite;
 }
 
 .wish-card.status-fulfilled {
-  border-left-color: var(--color-success);
+  background: linear-gradient(145deg, #fffdf6 0%, #fff9e9 100%);
+  border-color: rgba(240, 183, 65, 0.18);
+  box-shadow: 0 6rpx 22rpx rgba(209, 157, 48, 0.10);
 }
 
-.wish-card.status-archived {
-  border-left-color: var(--color-hint);
+.wish-memory-mark {
+  position: absolute;
+  right: 24rpx;
+  bottom: 18rpx;
+  color: rgba(220, 164, 43, 0.42);
+  font-size: 36rpx;
 }
 
 .wish-head {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   margin-bottom: 16rpx;
@@ -98,22 +112,14 @@
   color: var(--color-primary);
 }
 
-.wish-status.status-claimed {
-  background-color: rgba(33, 150, 243, 0.12);
-  color: var(--color-info);
-}
-
 .wish-status.status-fulfilled {
-  background-color: rgba(76, 175, 80, 0.14);
-  color: var(--color-success);
-}
-
-.wish-status.status-archived {
-  background-color: rgba(158, 158, 158, 0.16);
-  color: var(--color-hint);
+  background-color: rgba(255, 193, 7, 0.14);
+  color: #a96f00;
 }
 
 .wish-title {
+  position: relative;
+  z-index: 1;
   display: block;
   font-size: 32rpx;
   font-weight: 600;
@@ -122,6 +128,8 @@
 }
 
 .wish-desc {
+  position: relative;
+  z-index: 1;
   display: block;
   margin-top: 10rpx;
   font-size: 26rpx;
@@ -130,6 +138,8 @@
 }
 
 .wish-meta {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -141,34 +151,20 @@
   color: var(--color-text-hint);
 }
 
-.wish-claim {
-  font-size: 24rpx;
-  color: var(--color-info);
-  margin-left: 16rpx;
-}
-
-.wish-actions {
-  margin-top: 18rpx;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.claim-btn {
-  min-width: 200rpx;
-}
-
-/* 加载更多 */
 .more-hint {
   padding: 20rpx 0 8rpx;
   text-align: center;
 }
 
-/* 页面内小型 FAB（二级页面无自定义 TabBar，需自带安全区处理） */
 .fab.fab-small {
   width: 92rpx;
   height: 92rpx;
   line-height: 92rpx;
   bottom: calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.wish-fab {
+  box-shadow: 0 10rpx 30rpx rgba(67, 160, 71, 0.24);
 }
 
 .fab-text-small {
@@ -178,19 +174,21 @@
   line-height: 1;
 }
 
-/* 首屏加载骨架屏（对齐待办页） */
 .skeleton {
   padding: 8rpx 0 0;
   overflow: hidden;
 }
 
-.skel-day {
-  margin-bottom: 18rpx;
-}
+.skel-day { margin-bottom: 18rpx; }
 
 .skel-card {
   height: 120rpx;
   border-radius: 26rpx;
   background-color: #eef2ef;
   margin-bottom: 18rpx;
+}
+
+@keyframes wish-breathe {
+  0%, 100% { transform: scale(0.92); opacity: 0.58; }
+  50% { transform: scale(1.08); opacity: 0.95; }
 }

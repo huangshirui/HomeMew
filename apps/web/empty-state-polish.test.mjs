@@ -24,12 +24,12 @@ test('Tasks empty states offer the useful next step', () => {
   assert.match(tasks, /'新建待办'/u);
 });
 
-test('Days and Wishes active empty states can create directly', () => {
+test('Days active and Wishes open empty states can create directly', () => {
   const days = source('./src/pages/days-page.tsx');
   const wishes = source('./src/pages/wishes-page.tsx');
 
   assert.match(days, /actionLabel=\{status === 'active' && canWrite \? '新建日子'/u);
   assert.match(days, /onAction=\{status === 'active' && canWrite \? openCreate/u);
-  assert.match(wishes, /actionLabel=\{tab === 'active' && canWrite \? '写下第一个愿望'/u);
-  assert.match(wishes, /onAction=\{tab === 'active' && canWrite \? openCreate/u);
+  assert.match(wishes, /actionLabel=\{tab === 'open' && canWrite \? '写下第一个愿望'/u);
+  assert.match(wishes, /onAction=\{tab === 'open' && canWrite \? openCreate/u);
 });

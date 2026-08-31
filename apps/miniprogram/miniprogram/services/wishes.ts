@@ -18,9 +18,8 @@ import {
 export interface Page<T> { items: T[]; nextCursor: string | null }
 
 export interface ListWishesParams {
-  status?: string;
+  status?: 'open' | 'fulfilled';
   ownerUserId?: string;
-  claimantUserId?: string;
   desiredFrom?: string;
   desiredTo?: string;
   sort?: 'default' | 'desired_asc' | 'created_desc' | 'updated_desc';
@@ -32,11 +31,8 @@ type WishResource = ResourceBase & {
   title: string;
   description: string | null;
   desiredDate: string | null;
-  status: 'open' | 'claimed' | 'fulfilled' | 'archived';
+  status: 'open' | 'fulfilled';
   ownerPersonId: string;
-  claimantPersonId: string | null;
-  claimedAt: string | null;
-  fulfilledByPersonId: string | null;
   fulfilledAt: string | null;
 };
 
@@ -54,9 +50,6 @@ async function toWish(spaceId: string, raw: WishResource): Promise<Wish> {
     desiredDate: raw.desiredDate ?? null,
     status: raw.status,
     owner: personRef(raw.ownerPersonId, members) ?? missingPerson(),
-    claimant: personRef(raw.claimantPersonId, members),
-    claimedAt: raw.claimedAt ?? null,
-    fulfilledBy: personRef(raw.fulfilledByPersonId, members),
     fulfilledAt: raw.fulfilledAt ?? null,
     createdBy: auditActor(raw.createdBy),
     updatedBy: auditActor(raw.updatedBy),
@@ -70,10 +63,9 @@ export async function listWishes(
   familyId: string,
   params: ListWishesParams = {},
 ): Promise<Page<Wish>> {
-  const [ownerPersonId, claimantPersonId] = await Promise.all([
-    params.ownerUserId ? userIdToPersonId(familyId, params.ownerUserId) : Promise.resolve(null),
-    params.claimantUserId ? userIdToPersonId(familyId, params.claimantUserId) : Promise.resolve(null),
-  ]);
+  const ownerPersonId = params.ownerUserId
+    ? await userIdToPersonId(familyId, params.ownerUserId)
+    : null;
   const sortMap = {
     default: 'desiredDate:asc',
     desired_asc: 'desiredDate:asc',
@@ -84,7 +76,6 @@ export async function listWishes(
     `${spacePath(familyId, 'wishes')}${queryString({
       status: params.status,
       ownerPersonId: ownerPersonId ?? undefined,
-      claimantPersonId: claimantPersonId ?? undefined,
       desiredDateFrom: params.desiredFrom,
       desiredDateTo: params.desiredTo,
       sort: params.sort ? sortMap[params.sort] : 'desiredDate:asc',
@@ -140,7 +131,7 @@ export function deleteWish(familyId: string, wishId: string, version: number): P
 async function wishAction(
   familyId: string,
   wishId: string,
-  action: 'claim' | 'unclaim' | 'fulfill' | 'reopen' | 'archive' | 'restore',
+  action: 'fulfill' | 'reopen',
   version: number,
 ): Promise<Wish> {
   const raw = await request<WishResource>(
@@ -150,21 +141,10 @@ async function wishAction(
   return toWish(familyId, raw);
 }
 
-export function claimWish(familyId: string, wishId: string, version: number): Promise<Wish> {
-  return wishAction(familyId, wishId, 'claim', version);
-}
-export function unclaimWish(familyId: string, wishId: string, version: number): Promise<Wish> {
-  return wishAction(familyId, wishId, 'unclaim', version);
-}
 export function fulfillWish(familyId: string, wishId: string, version: number): Promise<Wish> {
   return wishAction(familyId, wishId, 'fulfill', version);
 }
+
 export function reopenWish(familyId: string, wishId: string, version: number): Promise<Wish> {
   return wishAction(familyId, wishId, 'reopen', version);
-}
-export function archiveWish(familyId: string, wishId: string, version: number): Promise<Wish> {
-  return wishAction(familyId, wishId, 'archive', version);
-}
-export function restoreWish(familyId: string, wishId: string, version: number): Promise<Wish> {
-  return wishAction(familyId, wishId, 'restore', version);
 }

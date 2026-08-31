@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Archive, Gift, Heart, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, UserRound, X } from 'lucide-react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Gift, Heart, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, UserRound, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
 
-type WishStatus = 'open' | 'claimed' | 'fulfilled' | 'archived';
+type WishStatus = 'open' | 'fulfilled';
 type WishRecord = {
   id: string;
   spaceId: string;
@@ -17,11 +17,7 @@ type WishRecord = {
   desiredDate: string | null;
   status: WishStatus;
   ownerPersonId: string;
-  claimantPersonId: string | null;
-  claimedAt: string | null;
-  fulfilledByPersonId: string | null;
   fulfilledAt: string | null;
-  archivedFromStatus: 'open' | 'claimed' | 'fulfilled' | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -29,7 +25,7 @@ type WishRecord = {
 
 type WishList = { items: WishRecord[]; nextCursor: string | null };
 type WishDraft = { title: string; description: string; desiredDate: string };
-type Tab = 'active' | 'fulfilled' | 'archived';
+type Tab = 'open' | 'fulfilled';
 
 const inputClass = 'h-10 w-full rounded-2xl border border-stone-200 bg-white px-3 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 const textareaClass = 'min-h-28 w-full resize-y rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
@@ -51,7 +47,7 @@ function payload(draft: WishDraft) {
 
 export function WishesPage() {
   const { currentFamily, members, user, loading: householdLoading } = useHousehold();
-  const [tab, setTab] = useState<Tab>('active');
+  const [tab, setTab] = useState<Tab>('open');
   const [wishes, setWishes] = useState<WishRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +71,7 @@ export function WishesPage() {
       let cursor: string | null = null;
       do {
         const params = new URLSearchParams({
-          status: tab === 'active' ? 'open,claimed' : tab,
+          status: tab,
           sort: tab === 'fulfilled' ? 'updatedAt:desc' : 'desiredDate:asc',
           limit: '200',
         });
@@ -102,8 +98,6 @@ export function WishesPage() {
     setEditing(null);
     setDraft(null);
   }, [currentFamily?.id]);
-
-  const counts = useMemo(() => ({ claimed: wishes.filter((wish) => wish.status === 'claimed').length }), [wishes]);
 
   function personName(personId: string | null) {
     if (!personId) return null;
@@ -143,7 +137,7 @@ export function WishesPage() {
         });
       } else {
         await apiRequest<WishRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/wishes`, {
-          method: 'POST', body: JSON.stringify({ ...fields, status: 'open', ownerPersonId: currentPersonId }),
+          method: 'POST', body: JSON.stringify({ ...fields, ownerPersonId: currentPersonId }),
         });
       }
       setEditing(null);
@@ -174,7 +168,7 @@ export function WishesPage() {
     }
   }
 
-  async function action(wish: WishRecord, actionKey: 'claim' | 'unclaim' | 'fulfill' | 'reopen' | 'archive' | 'restore') {
+  async function action(wish: WishRecord, actionKey: 'fulfill' | 'reopen') {
     if (!currentFamily || !canWrite) return;
     setActingId(wish.id);
     setError(null);
@@ -198,7 +192,7 @@ export function WishesPage() {
         <div>
           <span className="grid size-11 place-items-center rounded-2xl bg-pink-100 text-pink-700"><Heart className="size-5" /></span>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-stone-950">许愿池</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">愿望的归属、认领和实现状态全部由 LifeSpace wish Actions 管理。</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">写下想实现的事；愿望成真时，任何有写权限的家庭成员都可以把它点亮。</p>
         </div>
         <Button variant="primary" disabled={!canWrite} onClick={openCreate}><Plus className="size-4" /> 写下愿望</Button>
       </div>
@@ -207,14 +201,10 @@ export function WishesPage() {
         <>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="inline-flex rounded-2xl bg-stone-100 p-1">
-              <button type="button" className={`rounded-xl px-4 py-2 text-sm font-medium ${tab === 'active' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`} onClick={() => setTab('active')}>愿望</button>
+              <button type="button" className={`rounded-xl px-4 py-2 text-sm font-medium ${tab === 'open' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`} onClick={() => setTab('open')}>愿望</button>
               <button type="button" className={`rounded-xl px-4 py-2 text-sm font-medium ${tab === 'fulfilled' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`} onClick={() => setTab('fulfilled')}>已实现</button>
-              <button type="button" className={`rounded-xl px-4 py-2 text-sm font-medium ${tab === 'archived' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`} onClick={() => setTab('archived')}>已归档</button>
             </div>
-            <div className="flex items-center gap-3 text-xs text-stone-500">
-              {tab === 'active' && counts.claimed ? <span>{counts.claimed} 个愿望已被认领</span> : null}
-              <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefreshToken((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
-            </div>
+            <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefreshToken((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
           </div>
 
           {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">{error}</div> : null}
@@ -222,10 +212,10 @@ export function WishesPage() {
           {!loading && !wishes.length ? (
             <EmptyState
               icon={<Gift className="size-5" />}
-              title={tab === 'active' ? '还没有愿望' : tab === 'fulfilled' ? '还没有已实现的愿望' : '没有已归档愿望'}
-              description={tab === 'active' ? '把想做、想要或想一起实现的小愿望先放进来。' : tab === 'fulfilled' ? '实现过的愿望会留在这里。' : '归档后的愿望会保留在这里。'}
-              actionLabel={tab === 'active' && canWrite ? '写下第一个愿望' : undefined}
-              onAction={tab === 'active' && canWrite ? openCreate : undefined}
+              title={tab === 'open' ? '还没有等待实现的愿望' : '还没有实现的愿望'}
+              description={tab === 'open' ? '把想做、想要或想一起经历的小愿望先放进来。' : '愿望成真后，会作为一段家庭记忆留在这里。'}
+              actionLabel={tab === 'open' && canWrite ? '写下第一个愿望' : undefined}
+              onAction={tab === 'open' && canWrite ? openCreate : undefined}
             />
           ) : null}
 
@@ -238,7 +228,6 @@ export function WishesPage() {
                 canWrite={canWrite}
                 acting={actingId === wish.id}
                 ownerName={personName(wish.ownerPersonId) ?? '家庭成员'}
-                claimantName={personName(wish.claimantPersonId)}
                 onOpen={() => openEdit(wish)}
                 onAction={(key) => void action(wish, key)}
               />
@@ -264,46 +253,37 @@ export function WishesPage() {
   );
 }
 
-function WishCard({ wish, currentPersonId, canWrite, acting, ownerName, claimantName, onOpen, onAction }: {
+function WishCard({ wish, currentPersonId, canWrite, acting, ownerName, onOpen, onAction }: {
   wish: WishRecord;
   currentPersonId: string | null;
   canWrite: boolean;
   acting: boolean;
   ownerName: string;
-  claimantName: string | null;
   onOpen: () => void;
-  onAction: (key: 'claim' | 'unclaim' | 'fulfill' | 'reopen' | 'archive' | 'restore') => void;
+  onAction: (key: 'fulfill' | 'reopen') => void;
 }) {
   const isOwner = wish.ownerPersonId === currentPersonId;
-  const isClaimant = wish.claimantPersonId === currentPersonId;
-  const canClaim = canWrite && wish.status === 'open' && !isOwner;
-  const canUnclaim = canWrite && wish.status === 'claimed' && isClaimant;
-  const canFulfill = canWrite && (wish.status === 'open' || wish.status === 'claimed') && (isOwner || isClaimant);
   const busy = acting;
+  const fulfilled = wish.status === 'fulfilled';
 
   return (
-    <Card className="p-5">
+    <Card className={`p-5 ${fulfilled ? 'border-amber-100 bg-gradient-to-br from-white to-amber-50/70' : ''}`}>
       <button type="button" className="block w-full text-left" onClick={onOpen}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0"><p className="truncate font-semibold text-stone-900">{wish.title}</p><p className="mt-1 text-xs text-stone-400"><UserRound className="mr-1 inline size-3" />{ownerName}</p></div>
-          {wish.status === 'fulfilled' ? <Sparkles className="size-5 shrink-0 text-amber-500" /> : <Gift className="size-5 shrink-0 text-pink-400" />}
+          {fulfilled ? <Sparkles className="size-5 shrink-0 text-amber-500" /> : <Gift className="size-5 shrink-0 text-pink-400" />}
         </div>
         {wish.description ? <p className="mt-4 line-clamp-3 text-sm leading-6 text-stone-500">{wish.description}</p> : null}
         <div className="mt-4 flex flex-wrap gap-2 text-xs">
           {wish.desiredDate ? <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">希望 {wish.desiredDate}</span> : null}
-          {claimantName ? <span className="rounded-full bg-pink-50 px-2.5 py-1 text-pink-700">{claimantName} 已认领</span> : null}
-          {wish.status === 'fulfilled' ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">已实现</span> : null}
-          {wish.status === 'archived' ? <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-500">已归档</span> : null}
+          {fulfilled ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">愿望成真</span> : <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">等待实现</span>}
         </div>
       </button>
       {canWrite ? (
         <div className="mt-4 flex flex-wrap gap-2 border-t border-stone-100 pt-3">
-          {canClaim ? <Button variant="secondary" disabled={busy} onClick={() => onAction('claim')}>认领</Button> : null}
-          {canUnclaim ? <Button variant="ghost" disabled={busy} onClick={() => onAction('unclaim')}>放回池里</Button> : null}
-          {canFulfill ? <Button variant="secondary" disabled={busy} onClick={() => onAction('fulfill')}><Sparkles className="size-4" /> 已实现</Button> : null}
-          {wish.status === 'fulfilled' && isOwner ? <Button variant="ghost" disabled={busy} onClick={() => onAction('reopen')}><RotateCcw className="size-4" /> 重新打开</Button> : null}
-          {wish.status !== 'archived' && isOwner ? <Button variant="ghost" disabled={busy} onClick={() => onAction('archive')}><Archive className="size-4" /> 归档</Button> : null}
-          {wish.status === 'archived' && isOwner ? <Button variant="ghost" disabled={busy} onClick={() => onAction('restore')}><RotateCcw className="size-4" /> 恢复</Button> : null}
+          {!fulfilled ? <Button variant="secondary" disabled={busy} onClick={() => onAction('fulfill')}><Sparkles className="size-4" /> 实现这个愿望</Button> : null}
+          {fulfilled ? <Button variant="ghost" disabled={busy} onClick={() => onAction('reopen')}><RotateCcw className="size-4" /> 撤销实现</Button> : null}
+          {isOwner ? <span className="ml-auto self-center text-[11px] text-stone-400">愿望主人可编辑内容</span> : null}
         </div>
       ) : null}
     </Card>
@@ -322,21 +302,21 @@ function WishEditor({ draft, editing, currentPersonId, canWrite, saving, onChang
   onDelete?: () => void;
 }) {
   const isOwner = !editing || editing.ownerPersonId === currentPersonId;
-  const editable = canWrite && isOwner && editing?.status !== 'archived';
+  const editable = canWrite && isOwner;
   const set = <K extends keyof WishDraft>(key: K, value: WishDraft[K]) => onChange({ ...draft, [key]: value });
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/30 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true">
       <form onSubmit={onSave} className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <div><p className="text-lg font-semibold text-stone-950">{editing ? (editable ? '编辑愿望' : '愿望详情') : '写下愿望'}</p>{editing ? <p className="mt-1 text-xs text-stone-500">版本 {editing.version} · {editing.status}</p> : null}</div>
+          <div><p className="text-lg font-semibold text-stone-950">{editing ? (editable ? '编辑愿望' : '愿望详情') : '写下愿望'}</p>{editing ? <p className="mt-1 text-xs text-stone-500">{editing.status === 'fulfilled' ? '愿望成真' : '等待实现'} · 版本 {editing.version}</p> : null}</div>
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="mt-5 grid gap-4">
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">愿望<input className={inputClass} maxLength={100} disabled={!editable} value={draft.title} onChange={(event) => set('title', event.target.value)} autoFocus={!editing} /></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">希望日期（可空）<input type="date" className={inputClass} disabled={!editable} value={draft.desiredDate} onChange={(event) => set('desiredDate', event.target.value)} /></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">说明<textarea className={textareaClass} maxLength={5000} disabled={!editable} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
-          {editing && !isOwner ? <p className="rounded-2xl bg-stone-100 px-4 py-3 text-xs leading-5 text-stone-500">只有愿望主人可以编辑内容；认领和实现使用下方卡片上的 LifeSpace Actions。</p> : null}
+          {editing && !isOwner ? <p className="rounded-2xl bg-stone-100 px-4 py-3 text-xs leading-5 text-stone-500">只有愿望主人可以编辑内容；愿望是否实现由拥有写权限的家庭成员共同维护。</p> : null}
         </div>
         <div className="mt-6 flex items-center justify-between gap-3 border-t border-stone-200 pt-4">
           <div>{onDelete && canWrite && isOwner ? <Button variant="ghost" disabled={saving} onClick={onDelete}><Trash2 className="size-4" /> 删除</Button> : null}</div>

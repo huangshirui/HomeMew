@@ -1,6 +1,5 @@
 <!-- 愿望创建 / 编辑页 -->
 <view class="container">
-  <!-- 加载失败 -->
   <view wx:if="{{loadError}}" class="load-error-state">
     <text class="load-error-text">加载失败</text>
     <button class="btn-outline btn-sm" bindtap="onRetryLoad">重新加载</button>
@@ -11,7 +10,11 @@
   </view>
 
   <block wx:else>
-    <!-- 标题 -->
+    <view class="wish-intro" wx:if="{{mode === 'create'}}">
+      <text class="wish-intro-star">✦</text>
+      <text class="wish-intro-text">把一个小小的期待，放进许愿池</text>
+    </view>
+
     <view class="card">
       <view class="field-row">
         <text class="field-label">愿望标题</text>
@@ -25,7 +28,6 @@
       </view>
     </view>
 
-    <!-- 期望日期 -->
     <view class="card">
       <picker mode="date" value="{{desiredDate}}" bindchange="onDesiredDateChange">
         <view class="field-row">
@@ -41,7 +43,6 @@
       </view>
     </view>
 
-    <!-- 说明 -->
     <view class="card">
       <view class="field-row column">
         <text class="field-label">愿望描述</text>
@@ -59,15 +60,25 @@
     <view class="footer-spacer"></view>
   </block>
 
-  <!-- 底部操作栏 -->
-  <view wx:if="{{loaded && !loadError}}" class="footer-bar safe-area-bottom">
+  <view wx:if="{{loaded && !loadError && !wishCreated}}" class="footer-bar safe-area-bottom">
     <button class="btn-outline footer-btn" bindtap="onCancel">取消</button>
     <button
-      class="btn-primary footer-btn"
+      class="btn-primary footer-btn wish-submit-btn"
       disabled="{{submitting}}"
       bindtap="onSubmit"
     >
-      {{submitting ? '保存中...' : (mode === 'edit' ? '保存' : '许下愿望')}}
+      {{submitting ? (mode === 'edit' ? '保存中...' : '许愿中...') : (mode === 'edit' ? '保存' : '许下这个愿望 ✨')}}
     </button>
+  </view>
+</view>
+
+<view wx:if="{{wishCreated}}" class="wish-created-overlay">
+  <view class="pool-glow"></view>
+  <view class="pool-ripple ripple-one"></view>
+  <view class="pool-ripple ripple-two"></view>
+  <text class="falling-star">✦</text>
+  <view class="wish-created-copy">
+    <text class="wish-created-title">愿望收好啦</text>
+    <text class="wish-created-subtitle">✨ 等它慢慢实现</text>
   </view>
 </view>
