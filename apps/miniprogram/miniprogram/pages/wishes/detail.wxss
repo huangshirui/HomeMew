@@ -1,27 +1,42 @@
 /* 愿望详情页 */
 
 .hero {
-  background-color: var(--color-card);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, #ffffff 0%, #fbfffc 100%);
   border-radius: 30rpx;
   padding: 36rpx 32rpx;
   margin-bottom: 22rpx;
-  box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
-  border-left: 10rpx solid var(--color-primary);
+  box-shadow: 0 5rpx 18rpx rgba(67, 160, 71, 0.07);
+  border: 1rpx solid rgba(67, 160, 71, 0.08);
 }
 
-.hero.status-claimed {
-  border-left-color: var(--color-info);
+.hero.status-open .hero-light {
+  position: absolute;
+  width: 260rpx;
+  height: 260rpx;
+  right: -90rpx;
+  top: -140rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(129, 199, 132, 0.22) 0%, rgba(129, 199, 132, 0) 72%);
+  animation: hero-breathe 4.2s ease-in-out infinite;
 }
 
 .hero.status-fulfilled {
-  border-left-color: var(--color-success);
+  background: linear-gradient(145deg, #fffdf6 0%, #fff7df 100%);
+  border-color: rgba(240, 183, 65, 0.22);
+  box-shadow: 0 8rpx 26rpx rgba(209, 157, 48, 0.12);
 }
 
-.hero.status-archived {
-  border-left-color: var(--color-hint);
+.hero.status-fulfilled .hero-light {
+  position: absolute;
+  inset: -80rpx;
+  background: radial-gradient(circle at 80% 15%, rgba(255, 213, 98, 0.26), rgba(255, 213, 98, 0) 42%);
 }
 
 .hero-top {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -46,28 +61,21 @@
   color: var(--color-primary);
 }
 
-.hero.hero.status-claimed .hero-status {
-  background-color: rgba(33, 150, 243, 0.12);
-  color: var(--color-info);
-}
-
 .hero.status-fulfilled .hero-status {
-  background-color: rgba(76, 175, 80, 0.14);
-  color: var(--color-success);
+  background-color: rgba(255, 193, 7, 0.16);
+  color: #9b6800;
 }
 
-.hero.status-archived .hero-status {
-  background-color: rgba(158, 158, 158, 0.16);
-  color: var(--color-hint);
+.fulfilled-note {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 18rpx;
+  font-size: 25rpx;
+  color: #8c6a25;
+  line-height: 1.6;
 }
 
-.hero-claim {
-  margin-top: 16rpx;
-  font-size: 26rpx;
-  color: var(--color-info);
-}
-
-/* 信息行 */
 .meta-row {
   display: flex;
   align-items: center;
@@ -76,9 +84,7 @@
   border-bottom: 2rpx solid var(--color-divider);
 }
 
-.meta-row:last-child {
-  border-bottom: none;
-}
+.meta-row:last-child { border-bottom: none; }
 
 .meta-label {
   font-size: 28rpx;
@@ -100,12 +106,12 @@
   line-height: 1.7;
 }
 
-/* 主操作按钮 */
-.main-btn {
-  margin-bottom: 22rpx;
+.main-btn { margin-bottom: 22rpx; }
+
+.fulfill-btn {
+  box-shadow: 0 10rpx 28rpx rgba(67, 160, 71, 0.20);
 }
 
-/* 次级操作 */
 .actions-card {
   display: flex;
   flex-wrap: wrap;
@@ -118,4 +124,105 @@
   height: 78rpx;
   line-height: 78rpx;
   font-size: 28rpx;
+}
+
+.quiet-action { color: var(--color-text-secondary); }
+
+.wish-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(255, 252, 238, 0.18);
+  animation: celebration-backdrop 1.5s ease-out both;
+}
+
+.celebration-halo {
+  position: absolute;
+  width: 360rpx;
+  height: 360rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 218, 112, 0.48) 0%, rgba(255, 218, 112, 0.08) 48%, rgba(255, 218, 112, 0) 72%);
+  animation: celebration-halo 1.2s ease-out both;
+}
+
+.celebration-copy {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36rpx 54rpx 34rpx;
+  border-radius: 34rpx;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18rpx 60rpx rgba(146, 105, 24, 0.18);
+  animation: celebration-copy 1.35s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.celebration-emoji {
+  font-size: 60rpx;
+  line-height: 1;
+  margin-bottom: 18rpx;
+}
+
+.celebration-title {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #5f4b20;
+}
+
+.celebration-subtitle {
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  color: #9a7d43;
+}
+
+.spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  color: #e5ad2f;
+  font-size: 38rpx;
+  opacity: 0;
+}
+
+.spark-1 { --spark-x: -230rpx; --spark-y: -180rpx; animation: sparkle 1.0s 0.04s ease-out both; }
+.spark-2 { --spark-x: 220rpx; --spark-y: -150rpx; animation: sparkle 1.05s 0.10s ease-out both; }
+.spark-3 { --spark-x: -250rpx; --spark-y: 80rpx; animation: sparkle 1.05s 0.14s ease-out both; }
+.spark-4 { --spark-x: 240rpx; --spark-y: 110rpx; animation: sparkle 0.95s 0.20s ease-out both; }
+.spark-5 { --spark-x: -90rpx; --spark-y: -250rpx; animation: sparkle 1.0s 0.08s ease-out both; }
+.spark-6 { --spark-x: 90rpx; --spark-y: 240rpx; animation: sparkle 1.0s 0.16s ease-out both; }
+
+@keyframes hero-breathe {
+  0%, 100% { transform: scale(0.92); opacity: 0.58; }
+  50% { transform: scale(1.08); opacity: 0.95; }
+}
+
+@keyframes celebration-backdrop {
+  0% { opacity: 0; }
+  18%, 75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes celebration-halo {
+  0% { opacity: 0; transform: scale(0.25); }
+  45% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+
+@keyframes celebration-copy {
+  0% { opacity: 0; transform: translateY(26rpx) scale(0.88); }
+  20% { opacity: 1; transform: translateY(0) scale(1.03); }
+  72% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: translateY(-10rpx) scale(0.98); }
+}
+
+@keyframes sparkle {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.35) rotate(0deg); }
+  22% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--spark-x)), calc(-50% + var(--spark-y))) scale(1.15) rotate(90deg); }
 }
