@@ -532,7 +532,7 @@ export interface CreateDayRecordOccurrenceResult {
 
 // ==================== 许愿池（Wishes）相关 ====================
 
-export type WishStatus = 'open' | 'claimed' | 'fulfilled' | 'archived';
+export type WishStatus = 'open' | 'fulfilled';
 
 export interface Wish {
   id: string;
@@ -542,11 +542,9 @@ export interface Wish {
   /** 期望日期，纯日期，不做 UTC 转换 */
   desiredDate: string | null;
   status: WishStatus;
-  /** 许愿人，由 Core 设为创建者 */
+  /** 许愿人；创建后不可变 */
   owner: PersonRef;
-  claimant: PersonRef | null;
-  claimedAt: string | null;
-  fulfilledBy: PersonRef | null;
+  /** 愿望被标记实现的时间；未实现时为 null */
   fulfilledAt: string | null;
   createdBy: Actor;
   updatedBy: Actor;
