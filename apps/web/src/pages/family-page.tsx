@@ -1,9 +1,10 @@
-import { Check, Clipboard, LoaderCircle, LogIn, Plus, ShieldCheck, UserMinus, Users } from 'lucide-react';
+import { Check, Clipboard, LoaderCircle, LogIn, LogOut, Plus, ShieldCheck, Trash2, UserMinus, Users } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useHousehold, type FamilyMember } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
-import { apiRequest } from '../lib/api-client';
+import { ApiError, apiRequest } from '../lib/api-client';
 
 const roleLabel: Record<FamilyMember['role'], string> = {
   owner: '家庭所有者',
@@ -25,11 +26,26 @@ type InvitePreview = {
   canJoin: boolean;
 };
 
+type SpaceDetail = {
+  id: string;
+  version: number;
+};
+
 function canManage(role: string | undefined) {
   return role === 'owner' || role === 'admin';
 }
 
+function lifecycleError(cause: unknown, fallback: string) {
+  if (!(cause instanceof ApiError)) return cause instanceof Error ? cause.message : fallback;
+  if (cause.code === 'SPACE_OWNER_REQUIRED') return '只有当前家庭所有者可以注销家庭，请刷新页面后重试。';
+  if (cause.code === 'SPACE_VERSION_CONFLICT') return '家庭信息已经发生变化，本次注销没有执行。请刷新后重新确认。';
+  if (cause.code === 'LAST_SPACE_MANAGER') return '家庭必须保留至少一位所有者或管理员，请先安排其他管理员再退出。';
+  if (cause.code === 'SPACE_NOT_FOUND') return '这个家庭已关闭或你已无法访问，请刷新家庭列表。';
+  return cause.message || fallback;
+}
+
 export function FamilyPage() {
+  const navigate = useNavigate();
   const { user, families, currentFamily, members, loading, error, setCurrentFamilyId, refresh, refreshMembers } = useHousehold();
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -40,8 +56,10 @@ export function FamilyPage() {
   const [joinToken, setJoinToken] = useState('');
   const [createFamilyBusy, setCreateFamilyBusy] = useState(false);
   const [joinFamilyBusy, setJoinFamilyBusy] = useState(false);
+  const [familyActionBusy, setFamilyActionBusy] = useState<'leave' | 'close' | null>(null);
 
   const manager = canManage(currentFamily?.role);
+  const owner = currentFamily?.role === 'owner';
   const sortedMembers = useMemo(() => [...members].sort((a, b) => {
     const rank = { owner: 0, admin: 1, editor: 2, viewer: 3 } as const;
     return rank[a.role] - rank[b.role];
@@ -183,6 +201,49 @@ export function FamilyPage() {
     }
   }
 
+  async function leaveFamily() {
+    const family = currentFamily;
+    if (!family || family.role === 'owner' || familyActionBusy) return;
+    if (!window.confirm(`确认退出“${family.name}”吗？退出后你将立即失去这个家庭的数据访问权限。`)) return;
+
+    setFamilyActionBusy('leave');
+    setActionError(null);
+    try {
+      await apiRequest(`/api/lifespace/core/v1/spaces/${encodeURIComponent(family.id)}/leave`, {
+        method: 'POST',
+      });
+      await refresh();
+      navigate('/', { replace: true });
+    } catch (cause) {
+      setActionError(lifecycleError(cause, '退出家庭失败'));
+    } finally {
+      setFamilyActionBusy(null);
+    }
+  }
+
+  async function closeFamily() {
+    const family = currentFamily;
+    if (!family || family.role !== 'owner' || familyActionBusy) return;
+    if (!window.confirm('注销家庭后，所有成员和外部系统会立即失去访问权限。家庭数据不会立即物理删除，当前版本也不能自行恢复。确认继续吗？')) return;
+    if (!window.confirm(`再次确认：注销“${family.name}”？注销会立即生效。`)) return;
+
+    setFamilyActionBusy('close');
+    setActionError(null);
+    try {
+      const latest = await apiRequest<SpaceDetail>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(family.id)}`);
+      await apiRequest(`/api/lifespace/core/v1/spaces/${encodeURIComponent(family.id)}/close`, {
+        method: 'POST',
+        body: JSON.stringify({ version: latest.version }),
+      });
+      await refresh();
+      navigate('/', { replace: true });
+    } catch (cause) {
+      setActionError(lifecycleError(cause, '注销家庭失败'));
+    } finally {
+      setFamilyActionBusy(null);
+    }
+  }
+
   if (loading) {
     return <div className="flex min-h-[320px] items-center justify-center gap-3 text-sm text-stone-500"><LoaderCircle className="size-5 animate-spin" /> 正在加载家庭…</div>;
   }
@@ -314,7 +375,7 @@ export function FamilyPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <select
                           className="h-9 rounded-xl border border-stone-200 bg-white px-2 text-xs text-stone-700 disabled:opacity-50"
-                          disabled={busy}
+                          disabled={busy || familyActionBusy !== null}
                           value={member.role}
                           onChange={(event) => void updateRole(member, event.target.value as 'admin' | 'editor' | 'viewer')}
                         >
@@ -323,7 +384,7 @@ export function FamilyPage() {
                           <option value="viewer">只读成员</option>
                         </select>
                         {!isSelf && (
-                          <Button size="icon" variant="ghost" disabled={busy} aria-label="移除成员" onClick={() => void removeMember(member)}>
+                          <Button size="icon" variant="ghost" disabled={busy || familyActionBusy !== null} aria-label="移除成员" onClick={() => void removeMember(member)}>
                             {busy ? <LoaderCircle className="size-4 animate-spin" /> : <UserMinus className="size-4" />}
                           </Button>
                         )}
@@ -338,33 +399,64 @@ export function FamilyPage() {
           </CardContent>
         </Card>
 
-        <Card className="h-fit">
-          <CardContent className="space-y-4 pt-6">
-            <div>
-              <h2 className="font-semibold text-stone-900">邀请家庭成员</h2>
-              <p className="mt-1 text-sm leading-6 text-stone-500">生成一个 24 小时有效、仅可使用一次的成员邀请码。</p>
-            </div>
-            {manager ? (
-              !inviteToken ? (
-                <Button variant="primary" disabled={inviteBusy} onClick={() => void createInvite()}>
-                  {inviteBusy && <LoaderCircle className="size-4 animate-spin" />}
-                  生成邀请码
-                </Button>
-              ) : (
-                <div className="space-y-3 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
-                  <code className="block select-all break-all text-sm text-emerald-950">{inviteToken}</code>
-                  <Button onClick={() => void copyInvite()}>
-                    {copied ? <Check className="size-4" /> : <Clipboard className="size-4" />}
-                    {copied ? '已复制' : '复制邀请码'}
+        <div className="space-y-4">
+          <Card className="h-fit">
+            <CardContent className="space-y-4 pt-6">
+              <div>
+                <h2 className="font-semibold text-stone-900">邀请家庭成员</h2>
+                <p className="mt-1 text-sm leading-6 text-stone-500">生成一个 24 小时有效、仅可使用一次的成员邀请码。</p>
+              </div>
+              {manager ? (
+                !inviteToken ? (
+                  <Button variant="primary" disabled={inviteBusy || familyActionBusy !== null} onClick={() => void createInvite()}>
+                    {inviteBusy && <LoaderCircle className="size-4 animate-spin" />}
+                    生成邀请码
                   </Button>
-                  <p className="text-xs leading-5 text-stone-500">邀请码明文只在创建时返回，请只发给要加入这个家庭的人。</p>
-                </div>
-              )
-            ) : (
-              <p className="text-sm text-stone-500">只有家庭管理员可以邀请和管理成员。</p>
-            )}
-          </CardContent>
-        </Card>
+                ) : (
+                  <div className="space-y-3 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+                    <code className="block select-all break-all text-sm text-emerald-950">{inviteToken}</code>
+                    <Button disabled={familyActionBusy !== null} onClick={() => void copyInvite()}>
+                      {copied ? <Check className="size-4" /> : <Clipboard className="size-4" />}
+                      {copied ? '已复制' : '复制邀请码'}
+                    </Button>
+                    <p className="text-xs leading-5 text-stone-500">邀请码明文只在创建时返回，请只发给要加入这个家庭的人。</p>
+                  </div>
+                )
+              ) : (
+                <p className="text-sm text-stone-500">只有家庭管理员可以邀请和管理成员。</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="h-fit">
+            <CardContent className="space-y-4 pt-6">
+              {owner ? (
+                <>
+                  <div>
+                    <h2 className="font-semibold text-stone-900">注销家庭</h2>
+                    <p className="mt-1 text-sm leading-6 text-stone-500">关闭整个家庭空间。所有成员和外部系统会立即失去访问权限，现有家庭数据不会立即物理删除。</p>
+                  </div>
+                  <Button variant="destructive" disabled={familyActionBusy !== null} onClick={() => void closeFamily()}>
+                    {familyActionBusy === 'close' ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                    注销家庭
+                  </Button>
+                  <p className="text-xs leading-5 text-stone-400">当前版本不提供自行恢复已注销家庭的能力。</p>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <h2 className="font-semibold text-stone-900">退出家庭</h2>
+                    <p className="mt-1 text-sm leading-6 text-stone-500">只结束你自己的家庭成员关系，不会关闭家庭，也不会影响其他成员。</p>
+                  </div>
+                  <Button disabled={familyActionBusy !== null} onClick={() => void leaveFamily()}>
+                    {familyActionBusy === 'leave' ? <LoaderCircle className="size-4 animate-spin" /> : <LogOut className="size-4" />}
+                    退出家庭
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
