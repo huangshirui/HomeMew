@@ -45,7 +45,7 @@ test('household pages keep their LifeSpace model and Action routes', () => {
 
   requireAll(wishes, [
     /\/wishes`/u,
-    /actionKey: 'claim' \| 'unclaim' \| 'fulfill' \| 'reopen' \| 'archive' \| 'restore'/u,
+    /actionKey: 'fulfill' \| 'reopen'/u,
     /\/actions\/\$\{actionKey\}/u,
   ], 'Wishes');
 
