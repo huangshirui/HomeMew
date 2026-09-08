@@ -8,10 +8,10 @@ import {
   auditActor,
   calendarUtcRange,
   getSpaceMembers,
+  modelCollectionPath,
   modelRecordPath,
   personRefs,
   queryString,
-  spacePath,
   userIdToPersonId,
   userIdsToPersonIds,
 } from './lifespace';
@@ -90,7 +90,7 @@ export async function fetchEventsPage(
     ? await userIdToPersonId(familyId, params.attendeeId)
     : null;
   const raw = await request<LifeSpacePage<EventResource>>(
-    `${spacePath(familyId, 'events')}${queryString({
+    `${modelCollectionPath(familyId, 'event')}${queryString({
       rangeStart: range.rangeStart,
       rangeEnd: range.rangeEnd,
       dateStart: params.startDate,
@@ -125,7 +125,7 @@ export async function listEvents(
 }
 
 export async function getEvent(familyId: string, eventId: string): Promise<Event> {
-  return toEvent(familyId, await request<EventResource>(modelRecordPath(familyId, 'events', eventId)));
+  return toEvent(familyId, await request<EventResource>(modelRecordPath(familyId, 'event', eventId)));
 }
 
 function eventPayload(data: CreateEventRequest | UpdateEventRequest, attendeePersonIds?: string[]): Record<string, unknown> {
@@ -138,7 +138,7 @@ function eventPayload(data: CreateEventRequest | UpdateEventRequest, attendeePer
 
 export async function createEvent(familyId: string, data: CreateEventRequest): Promise<Event> {
   const attendeePersonIds = await userIdsToPersonIds(familyId, data.attendeeIds);
-  const raw = await request<EventResource>(spacePath(familyId, 'events'), {
+  const raw = await request<EventResource>(modelCollectionPath(familyId, 'event'), {
     method: 'POST',
     data: eventPayload(data, attendeePersonIds),
     skipRetry: true,
@@ -154,7 +154,7 @@ export async function updateEvent(
   const attendeePersonIds = data.attendeeIds === undefined
     ? undefined
     : await userIdsToPersonIds(familyId, data.attendeeIds);
-  const raw = await request<EventResource>(modelRecordPath(familyId, 'events', eventId), {
+  const raw = await request<EventResource>(modelRecordPath(familyId, 'event', eventId), {
     method: 'PATCH',
     data: eventPayload(data, attendeePersonIds),
     skipRetry: true,
@@ -163,7 +163,7 @@ export async function updateEvent(
 }
 
 export function deleteEvent(familyId: string, eventId: string, version: number): Promise<void> {
-  return request<void>(modelRecordPath(familyId, 'events', eventId), {
+  return request<void>(modelRecordPath(familyId, 'event', eventId), {
     method: 'DELETE',
     data: { version },
     skipRetry: true,
