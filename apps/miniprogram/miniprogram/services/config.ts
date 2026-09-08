@@ -31,6 +31,7 @@ export const STORAGE_KEYS = {
   tasksScope: 'tasksScope',
   timeZoneMode: 'timeZoneMode',
   timeZoneCustom: 'timeZoneCustom',
+  homeCache: 'homeCacheV1',
 } as const;
 
 export const REQUEST_TIMEOUT = 15000;
@@ -76,6 +77,7 @@ export function ensureRuntimeEnvironmentStorage(): RuntimeEnvironment {
       STORAGE_KEYS.coreApiUrl,
       STORAGE_KEYS.identityApiUrl,
       STORAGE_KEYS.loginBackendUrl,
+      STORAGE_KEYS.homeCache,
     ]) {
       wx.removeStorageSync(key);
     }
