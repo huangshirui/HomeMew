@@ -192,7 +192,7 @@ export function DaysPage() {
       do {
         const params = new URLSearchParams({ status, sort: status === 'active' ? 'attention:desc' : 'effectiveDate:desc', limit: '200' });
         if (cursor) params.set('cursor', cursor);
-        const page = await apiRequest<DayList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/day-records?${params}`);
+        const page = await apiRequest<DayList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records?${params}`);
         items.push(...page.items);
         cursor = page.nextCursor;
       } while (cursor);
@@ -254,14 +254,14 @@ export function DaysPage() {
     setError(null);
     try {
       if (editing) {
-        await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/day-records/${encodeURIComponent(editing.id)}`, {
+        await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
           body: JSON.stringify({ ...updatePayload(editing, draft), version: editing.version }),
         });
       } else {
         const payload = createPayload(draft);
         if (draft.kind === 'cycle' && payload.cycleDays === null) throw new Error('周期类型必须填写周期天数');
-        await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/day-records`, {
+        await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records`, {
           method: 'POST', body: JSON.stringify(payload),
         });
       }
@@ -280,7 +280,7 @@ export function DaysPage() {
     if (!window.confirm(`删除“${editing.name}”？`)) return;
     setSaving(true);
     try {
-      await apiRequest<void>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/day-records/${encodeURIComponent(editing.id)}`, {
+      await apiRequest<void>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(editing.id)}`, {
         method: 'DELETE', body: JSON.stringify({ version: editing.version }),
       });
       setEditing(null);
@@ -298,7 +298,7 @@ export function DaysPage() {
     setActingId(record.id);
     setError(null);
     try {
-      await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/day-records/${encodeURIComponent(record.id)}/actions/${actionKey}`, {
+      await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(record.id)}/actions/${actionKey}`, {
         method: 'POST', body: JSON.stringify({ version: record.version }),
       });
       setRefreshToken((value) => value + 1);
@@ -316,7 +316,7 @@ export function DaysPage() {
     setActingId(record.id);
     setError(null);
     try {
-      await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/day-records/${encodeURIComponent(record.id)}/actions/record-occurrence`, {
+      await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(record.id)}/actions/record-occurrence`, {
         method: 'POST',
         body: JSON.stringify({ version: record.version, occurredOn: occurrence.occurredOn, note: occurrence.note.trim() || null }),
       });

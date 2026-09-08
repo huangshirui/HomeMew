@@ -76,7 +76,7 @@ export function WishesPage() {
           limit: '200',
         });
         if (cursor) params.set('cursor', cursor);
-        const page = await apiRequest<WishList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/wishes?${params}`);
+        const page = await apiRequest<WishList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/wish/records?${params}`);
         items.push(...page.items);
         cursor = page.nextCursor;
       } while (cursor);
@@ -132,11 +132,11 @@ export function WishesPage() {
     try {
       const fields = payload(draft);
       if (editing) {
-        await apiRequest<WishRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/wishes/${encodeURIComponent(editing.id)}`, {
+        await apiRequest<WishRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/wish/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH', body: JSON.stringify({ ...fields, version: editing.version }),
         });
       } else {
-        await apiRequest<WishRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/wishes`, {
+        await apiRequest<WishRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/wish/records`, {
           method: 'POST', body: JSON.stringify({ ...fields, ownerPersonId: currentPersonId }),
         });
       }
@@ -155,7 +155,7 @@ export function WishesPage() {
     if (!window.confirm(`删除“${editing.title}”？`)) return;
     setSaving(true);
     try {
-      await apiRequest<void>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/wishes/${encodeURIComponent(editing.id)}`, {
+      await apiRequest<void>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/wish/records/${encodeURIComponent(editing.id)}`, {
         method: 'DELETE', body: JSON.stringify({ version: editing.version }),
       });
       setEditing(null);
@@ -173,7 +173,7 @@ export function WishesPage() {
     setActingId(wish.id);
     setError(null);
     try {
-      await apiRequest<WishRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/wishes/${encodeURIComponent(wish.id)}/actions/${actionKey}`, {
+      await apiRequest<WishRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/wish/records/${encodeURIComponent(wish.id)}/actions/${actionKey}`, {
         method: 'POST', body: JSON.stringify({ version: wish.version }),
       });
       setRefreshToken((value) => value + 1);

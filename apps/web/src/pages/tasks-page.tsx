@@ -103,7 +103,7 @@ export function TasksPage() {
         });
         if (query) params.set('q', query);
         if (cursor) params.set('cursor', cursor);
-        const page = await apiRequest<TaskList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/tasks?${params}`);
+        const page = await apiRequest<TaskList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records?${params}`);
         items.push(...page.items);
         cursor = page.nextCursor;
       } while (cursor);
@@ -174,12 +174,12 @@ export function TasksPage() {
     try {
       const payload = taskPayload(draft);
       if (editing) {
-        await apiRequest<TaskRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/tasks/${encodeURIComponent(editing.id)}`, {
+        await apiRequest<TaskRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
           body: JSON.stringify({ ...payload, version: editing.version }),
         });
       } else {
-        await apiRequest<TaskRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/tasks`, {
+        await apiRequest<TaskRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records`, {
           method: 'POST',
           body: JSON.stringify({ ...payload, status: 'pending' }),
         });
@@ -200,7 +200,7 @@ export function TasksPage() {
     setSaving(true);
     setError(null);
     try {
-      await apiRequest<void>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/tasks/${encodeURIComponent(editing.id)}`, {
+      await apiRequest<void>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records/${encodeURIComponent(editing.id)}`, {
         method: 'DELETE',
         body: JSON.stringify({ version: editing.version }),
       });
@@ -219,7 +219,7 @@ export function TasksPage() {
     setActingId(task.id);
     setError(null);
     try {
-      await apiRequest<TaskRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/tasks/${encodeURIComponent(task.id)}/actions/${action}`, {
+      await apiRequest<TaskRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records/${encodeURIComponent(task.id)}/actions/${action}`, {
         method: 'POST',
         body: JSON.stringify({ version: task.version }),
       });

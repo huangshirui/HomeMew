@@ -288,7 +288,7 @@ export function CalendarPage() {
           limit: '200',
         });
         if (cursor) params.set('cursor', cursor);
-        const page = await apiRequest<EventList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/events?${params}`);
+        const page = await apiRequest<EventList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/event/records?${params}`);
         collected.push(...page.items);
         cursor = page.nextCursor;
       } while (cursor);
@@ -359,12 +359,12 @@ export function CalendarPage() {
     try {
       const payload = eventPayload(draft);
       if (editing) {
-        await apiRequest<EventRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/events/${encodeURIComponent(editing.id)}`, {
+        await apiRequest<EventRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/event/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
           body: JSON.stringify({ ...payload, version: editing.version }),
         });
       } else {
-        await apiRequest<EventRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/events`, {
+        await apiRequest<EventRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/event/records`, {
           method: 'POST',
           body: JSON.stringify(payload),
         });
@@ -385,7 +385,7 @@ export function CalendarPage() {
     setSaving(true);
     setError(null);
     try {
-      await apiRequest<void>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/events/${encodeURIComponent(editing.id)}`, {
+      await apiRequest<void>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/event/records/${encodeURIComponent(editing.id)}`, {
         method: 'DELETE',
         body: JSON.stringify({ version: editing.version }),
       });
