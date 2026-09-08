@@ -41,6 +41,12 @@ import { loadTasksScope, assigneeParamOf } from '../../stores/tasks-scope';
 import { listEvents } from '../../services/events';
 import { listTasks, completeTask } from '../../services/tasks';
 import { listAttentionDayRecords } from '../../services/day-records';
+import {
+  readHomeStartupCache,
+  cacheHomeEvents,
+  cacheHomeTasks,
+  cacheHomeAttentionDays,
+} from '../../services/home-cache';
 import { mapDayRecordView, DayRecordView } from '../../utils/day-record-view';
 import { DayRecordKind } from '../../types/index';
 import { Event, Task, FamilyRole } from '../../types/index';
@@ -172,6 +178,8 @@ Page({
   _todayEvents: [] as Event[],
   _pendingTasks: [] as Task[],
   _completingIds: new Set<string>(),
+  /** 本页已尝试恢复启动缓存的家庭；避免同一次页面生命周期反复读取 Storage。 */
+  _homeCacheHydratedFamilyId: '' as string,
 
   _userUnsubscribe: null as (() => void) | null,
   _familyUnsubscribe: null as (() => void) | null,
@@ -212,6 +220,7 @@ Page({
         // 家庭切换：先清空旧家庭的所有缓存与派生展示数据，避免「需要关注」、
         // 今天安排、待办提醒等仍短暂显示上一个家庭的内容；随后再以新家庭重新拉取。
         this._resetFamilyData();
+        this._hydrateHomeStartupCache(newId);
         // 重置轮询节流窗口，避免下一轮轮询紧接着又对新家庭重复请求一次
         this._markFetched();
         this.loadTodayEvents(newId);
@@ -305,6 +314,32 @@ Page({
   },
 
   /**
+   * 在远端已经验证过当前 user + family 后，先恢复上一次首页数据用于首屏展示。
+   * 缓存只改善渲染速度；本方法之后仍会立即并发请求 LifeSpace，实时结果覆盖缓存。
+   */
+  _hydrateHomeStartupCache(familyId: string): void {
+    if (this._homeCacheHydratedFamilyId === familyId) return;
+    this._homeCacheHydratedFamilyId = familyId;
+
+    const userId = userStore.value?.id || '';
+    const family = currentFamilyStore.value;
+    if (!userId || !family || family.id !== familyId) return;
+
+    const viewingTimezone = getViewingTimeZone(family.timezone);
+    const viewDate = formatInstantInTimeZone(new Date().toISOString(), viewingTimezone).date;
+    const cached = readHomeStartupCache(userId, familyId, viewDate);
+    if (!cached) return;
+
+    if (cached.events) this._todayEvents = cached.events;
+    if (cached.tasks) this._pendingTasks = cached.tasks;
+    if (cached.attentionDays) {
+      this.setData({ attentionDays: cached.attentionDays.map(mapDayRecordView) });
+    }
+    this._statusFingerprint = '';
+    this.recompute();
+  },
+
+  /**
    * 清空当前家庭的全部缓存与派生展示数据，并重置展示态指纹。
    * 用于家庭切换或重新加载开始：保证旧家庭的「需要关注」日子 / 今天安排 /
    * 待办提醒不会在新家庭数据返回前继续显示，避免串数据。
@@ -317,6 +352,7 @@ Page({
     this._pendingTasks = [];
     this._completingIds.clear();
     this._statusFingerprint = '';
+    this._homeCacheHydratedFamilyId = '';
     this.setData({
       todayEvents: [],
       todayEventCount: 0,
@@ -385,6 +421,7 @@ Page({
         if (prevId && prevId !== current.id) {
           this._resetFamilyData();
         }
+        this._hydrateHomeStartupCache(current.id);
         this.loadTodayEvents(current.id);
         this.loadTasks(current.id);
         this.loadAttentionDays(current.id);
@@ -457,6 +494,8 @@ Page({
           (instant, tz) => formatInstantInTimeZone(instant, tz).date,
         ).length > 0,
       );
+      const userId = userStore.value?.id;
+      if (userId) cacheHomeEvents(userId, familyId, start, this._todayEvents);
       this.setData({ eventsLoading: false, eventsRefreshing: false });
       this.recompute();
     } catch (e) {
@@ -496,6 +535,8 @@ Page({
       if (this.data.currentFamily?.id !== familyId) return;
 
       this._pendingTasks = tasks;
+      const userId = userStore.value?.id;
+      if (userId) cacheHomeTasks(userId, familyId, tasks);
       this.setData({ tasksLoading: false, tasksRefreshing: false });
       this.recompute();
     } catch (e) {
@@ -522,6 +563,8 @@ Page({
     try {
       const records = await listAttentionDayRecords(familyId);
       if (this.data.currentFamily?.id !== familyId) return;
+      const userId = userStore.value?.id;
+      if (userId) cacheHomeAttentionDays(userId, familyId, records);
       this.setData({
         attentionDays: records.map(mapDayRecordView),
         daysLoading: false,
@@ -673,6 +716,8 @@ Page({
       if (familyId !== this.data.currentFamily?.id) return;
       this._pendingTasks = this._pendingTasks.filter((t) => t.id !== id);
       this._completingIds.delete(id);
+      const userId = userStore.value?.id;
+      if (userId) cacheHomeTasks(userId, familyId, this._pendingTasks);
       this.recompute();
       markDirty('tasks');
       showSuccess('已完成');

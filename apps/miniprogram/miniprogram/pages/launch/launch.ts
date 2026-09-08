@@ -3,10 +3,10 @@
  *
  * 职责：
  * 1. 检查/执行登录
- * 2. 加载用户信息
+ * 2. 并行加载用户信息与家庭列表
  * 3. 处理禁用用户
  * 4. 判断是否进入首次资料设置（displayName 为空或仅空白）
- * 5. 加载家庭列表并恢复当前家庭
+ * 5. 恢复当前家庭
  * 6. 进入首页
  *
  * 要求：
@@ -72,9 +72,13 @@ Page({
         await loginAndSaveToken();
       }
 
-      // Step 2: 加载用户信息
-      this.setData({ statusText: '正在加载用户信息...' });
-      const user = await loadCurrentUser();
+      // Step 2: 用户资料与家庭权限彼此独立，并行读取，避免两次约 400~500ms RTT 串行叠加。
+      // 家庭列表在每次启动都 force 远端刷新，仍然满足“启动时重新校验家庭权限”的安全要求。
+      this.setData({ statusText: '正在加载家庭数据...' });
+      const [user, families] = await Promise.all([
+        loadCurrentUser(),
+        loadFamilies({ force: true }),
+      ]);
 
       // Step 3: 检查用户是否被禁用
       if (user.status === 'disabled') {
@@ -90,9 +94,7 @@ Page({
         return;
       }
 
-      // Step 5: 加载家庭列表并恢复当前家庭
-      this.setData({ statusText: '正在加载家庭数据...' });
-      const families = await loadFamilies();
+      // Step 5: 用刚刚远端校验过的家庭列表恢复当前家庭
       refreshFamilyState(families);
 
       // Step 6: 进入首页（TabBar 页面）
