@@ -70,6 +70,7 @@ export function clearAuth(): void {
   wx.removeStorageSync(STORAGE_KEYS.coreApiUrl);
   wx.removeStorageSync(STORAGE_KEYS.identityApiUrl);
   wx.removeStorageSync(STORAGE_KEYS.loginBackendUrl);
+  wx.removeStorageSync(STORAGE_KEYS.homeCache);
 }
 
 export function hasValidToken(): boolean {
