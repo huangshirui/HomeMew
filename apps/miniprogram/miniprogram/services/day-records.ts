@@ -15,10 +15,10 @@ import {
   LifeSpacePage,
   auditActor,
   getSpaceMembers,
+  modelCollectionPath,
   modelRecordPath,
   personRef,
   queryString,
-  spacePath,
   userIdToPersonId,
 } from './lifespace';
 
@@ -137,7 +137,7 @@ export async function listDayRecords(
     updated_desc: 'updatedAt:desc',
   } as const;
   const raw = await request<LifeSpacePage<DayRecordResource>>(
-    `${spacePath(familyId, 'day-records')}${queryString({
+    `${modelCollectionPath(familyId, 'day_record')}${queryString({
       kind: params.kind,
       status: params.status,
       subjectPersonId: subjectPersonId ?? undefined,
@@ -171,7 +171,7 @@ export async function listAttentionDayRecords(familyId: string, maxItems = 100):
 }
 
 export async function getDayRecord(familyId: string, dayRecordId: string): Promise<DayRecord> {
-  return toDayRecord(familyId, await request<DayRecordResource>(modelRecordPath(familyId, 'day-records', dayRecordId)));
+  return toDayRecord(familyId, await request<DayRecordResource>(modelRecordPath(familyId, 'day_record', dayRecordId)));
 }
 
 async function writePayload(
@@ -186,7 +186,7 @@ async function writePayload(
 }
 
 export async function createDayRecord(familyId: string, data: CreateDayRecordRequest): Promise<DayRecord> {
-  const raw = await request<DayRecordResource>(spacePath(familyId, 'day-records'), {
+  const raw = await request<DayRecordResource>(modelCollectionPath(familyId, 'day_record'), {
     method: 'POST', data: await writePayload(familyId, data), skipRetry: true,
   });
   return toDayRecord(familyId, raw);
@@ -197,14 +197,14 @@ export async function updateDayRecord(
   dayRecordId: string,
   data: UpdateDayRecordRequest,
 ): Promise<DayRecord> {
-  const raw = await request<DayRecordResource>(modelRecordPath(familyId, 'day-records', dayRecordId), {
+  const raw = await request<DayRecordResource>(modelRecordPath(familyId, 'day_record', dayRecordId), {
     method: 'PATCH', data: await writePayload(familyId, data), skipRetry: true,
   });
   return toDayRecord(familyId, raw);
 }
 
 export function deleteDayRecord(familyId: string, dayRecordId: string, version: number): Promise<void> {
-  return request<void>(modelRecordPath(familyId, 'day-records', dayRecordId), {
+  return request<void>(modelRecordPath(familyId, 'day_record', dayRecordId), {
     method: 'DELETE', data: { version }, skipRetry: true,
   });
 }
@@ -215,7 +215,7 @@ export async function listDayRecordOccurrences(
   params: { limit?: number; cursor?: string | null } = {},
 ): Promise<Page<DayRecordOccurrence>> {
   const raw = await request<LifeSpacePage<OccurrenceResource>>(
-    `${modelRecordPath(familyId, 'day-records', dayRecordId)}/occurrences${queryString(params)}`,
+    `${modelRecordPath(familyId, 'day_record', dayRecordId)}/occurrences${queryString(params)}`,
   );
   return {
     items: raw.items.map(item => ({
@@ -244,7 +244,7 @@ export async function createDayRecordOccurrence(
 ): Promise<CreateDayRecordOccurrenceResult> {
   const previous = await getDayRecord(familyId, dayRecordId);
   const raw = await request<DayRecordResource>(
-    `${modelRecordPath(familyId, 'day-records', dayRecordId)}/actions/record-occurrence`,
+    `${modelRecordPath(familyId, 'day_record', dayRecordId)}/actions/record-occurrence`,
     { method: 'POST', data: data as unknown as Record<string, unknown>, skipRetry: true },
   );
   return {
@@ -261,7 +261,7 @@ async function stateAction(
   version: number,
 ): Promise<DayRecord> {
   const raw = await request<DayRecordResource>(
-    `${modelRecordPath(familyId, 'day-records', dayRecordId)}/actions/${action}`,
+    `${modelRecordPath(familyId, 'day_record', dayRecordId)}/actions/${action}`,
     { method: 'POST', data: { version }, skipRetry: true },
   );
   return toDayRecord(familyId, raw);
