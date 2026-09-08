@@ -8,10 +8,10 @@ import {
   auditActor,
   currentPersonId,
   getSpaceMembers,
+  modelCollectionPath,
   modelRecordPath,
   personRef,
   queryString,
-  spacePath,
   userIdToPersonId,
 } from './lifespace';
 
@@ -73,7 +73,7 @@ export async function listWishes(
     updated_desc: 'updatedAt:desc',
   } as const;
   const raw = await request<LifeSpacePage<WishResource>>(
-    `${spacePath(familyId, 'wishes')}${queryString({
+    `${modelCollectionPath(familyId, 'wish')}${queryString({
       status: params.status,
       ownerPersonId: ownerPersonId ?? undefined,
       desiredDateFrom: params.desiredFrom,
@@ -90,11 +90,11 @@ export async function listWishes(
 }
 
 export async function getWish(familyId: string, wishId: string): Promise<Wish> {
-  return toWish(familyId, await request<WishResource>(modelRecordPath(familyId, 'wishes', wishId)));
+  return toWish(familyId, await request<WishResource>(modelRecordPath(familyId, 'wish', wishId)));
 }
 
 export async function createWish(familyId: string, data: CreateWishRequest): Promise<Wish> {
-  const raw = await request<WishResource>(spacePath(familyId, 'wishes'), {
+  const raw = await request<WishResource>(modelCollectionPath(familyId, 'wish'), {
     method: 'POST',
     data: {
       title: data.title,
@@ -112,7 +112,7 @@ export async function updateWish(
   wishId: string,
   data: UpdateWishRequest,
 ): Promise<Wish> {
-  const raw = await request<WishResource>(modelRecordPath(familyId, 'wishes', wishId), {
+  const raw = await request<WishResource>(modelRecordPath(familyId, 'wish', wishId), {
     method: 'PATCH',
     data: data as unknown as Record<string, unknown>,
     skipRetry: true,
@@ -121,7 +121,7 @@ export async function updateWish(
 }
 
 export function deleteWish(familyId: string, wishId: string, version: number): Promise<void> {
-  return request<void>(modelRecordPath(familyId, 'wishes', wishId), {
+  return request<void>(modelRecordPath(familyId, 'wish', wishId), {
     method: 'DELETE',
     data: { version },
     skipRetry: true,
@@ -135,7 +135,7 @@ async function wishAction(
   version: number,
 ): Promise<Wish> {
   const raw = await request<WishResource>(
-    `${modelRecordPath(familyId, 'wishes', wishId)}/actions/${action}`,
+    `${modelRecordPath(familyId, 'wish', wishId)}/actions/${action}`,
     { method: 'POST', data: { version }, skipRetry: true },
   );
   return toWish(familyId, raw);

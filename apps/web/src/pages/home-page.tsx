@@ -59,9 +59,9 @@ export function HomePage() {
       const taskParams = new URLSearchParams({ status: 'pending', dueDateTo: today, sort: 'dueDate:asc', limit: '20' });
       const dayParams = new URLSearchParams({ status: 'active', attentionOnly: 'true', sort: 'attention:desc', limit: '6' });
       const [eventResult, taskResult, dayResult] = await Promise.all([
-        apiRequest<List<EventRecord>>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/events?${eventParams}`),
-        apiRequest<List<TaskRecord>>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/tasks?${taskParams}`),
-        apiRequest<List<DayRecord>>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/day-records?${dayParams}`),
+        apiRequest<List<EventRecord>>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/event/records?${eventParams}`),
+        apiRequest<List<TaskRecord>>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records?${taskParams}`),
+        apiRequest<List<DayRecord>>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records?${dayParams}`),
       ]);
       setEvents(eventResult.items); setTasks(taskResult.items); setDays(dayResult.items);
     } catch (cause) { setError(message(cause)); }
@@ -73,7 +73,7 @@ export function HomePage() {
     if (!currentFamily || !canWrite) return;
     setActingTask(task.id); setError(null);
     try {
-      await apiRequest(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/tasks/${encodeURIComponent(task.id)}/actions/complete`, { method: 'POST', body: JSON.stringify({ version: task.version }) });
+      await apiRequest(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records/${encodeURIComponent(task.id)}/actions/complete`, { method: 'POST', body: JSON.stringify({ version: task.version }) });
       setRefresh((value) => value + 1);
     } catch (cause) { setError(message(cause)); }
     finally { setActingTask(null); }

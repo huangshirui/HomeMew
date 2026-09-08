@@ -38,12 +38,16 @@ export type ResourceBase = {
 const SPACE_MEMBERS_CACHE_TTL_MS = 30_000;
 const spaceMembersCache = new AsyncKeyedTtlCache<SpaceMember[]>(SPACE_MEMBERS_CACHE_TTL_MS);
 
-export function spacePath(spaceId: string, route: string): string {
-  return `/api/v1/spaces/${encodeURIComponent(spaceId)}/${route}`;
+export function spacePath(spaceId: string, segment: string): string {
+  return `/api/v1/spaces/${encodeURIComponent(spaceId)}/${segment}`;
 }
 
-export function modelRecordPath(spaceId: string, route: string, recordId: string): string {
-  return `${spacePath(spaceId, route)}/${encodeURIComponent(recordId)}`;
+export function modelCollectionPath(spaceId: string, modelKey: string): string {
+  return `/api/v1/spaces/${encodeURIComponent(spaceId)}/models/${encodeURIComponent(modelKey)}/records`;
+}
+
+export function modelRecordPath(spaceId: string, modelKey: string, recordId: string): string {
+  return `${modelCollectionPath(spaceId, modelKey)}/${encodeURIComponent(recordId)}`;
 }
 
 /**
