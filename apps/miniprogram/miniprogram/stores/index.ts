@@ -80,19 +80,58 @@ export const familiesStore = new Store<FamilyListItem[]>([]);
 export const currentFamilyStore = new Store<FamilyListItem | null>(null);
 
 /**
+ * Launch 刚完成家庭权限刷新后，首页会立刻进入并再次调用 loadFamilies()。
+ * 5 秒复用窗口只复用本次小程序进程里刚刚成功从远端拿到的结果，用来消除这次重复网络请求；
+ * 它不是持久化权限缓存，也不会替代下一次启动的远端权限校验。
+ */
+const FAMILY_LIST_REUSE_WINDOW_MS = 5 * 1000;
+let familiesLoadedAt = 0;
+let familiesLoadInFlight: Promise<FamilyListItem[]> | null = null;
+
+export type LoadFamiliesOptions = {
+  /** 明确要求重新访问 LifeSpace；用于启动权限校验或用户主动刷新。 */
+  force?: boolean;
+};
+
+/**
  * 从远程加载家庭列表并更新 store。
+ *
+ * - 并发调用 single-flight，避免同时发出重复请求；
+ * - 刚刚成功加载后的短窗口内允许复用内存结果，消除 Launch -> Home 的重复 Families 请求；
+ * - force=true 始终要求新的远端结果（如果已有同一轮 in-flight，则共享该请求）。
+ *
  * 失败时抛出原始错误（不吞掉网络 / 401 / 403 / 500）。
  */
-export async function loadFamilies(): Promise<FamilyListItem[]> {
-  const { listMyFamilies } = require('../services/families');
-  const families = await listMyFamilies();
-  familiesStore.value = families;
-  // 同步到 globalData
-  const app = getApp<IAppOption>();
-  if (app) {
-    app.globalData.families = families;
+export async function loadFamilies(options: LoadFamiliesOptions = {}): Promise<FamilyListItem[]> {
+  if (
+    !options.force &&
+    familiesLoadedAt > 0 &&
+    Date.now() - familiesLoadedAt <= FAMILY_LIST_REUSE_WINDOW_MS
+  ) {
+    return familiesStore.value;
   }
-  return families;
+
+  if (familiesLoadInFlight) return familiesLoadInFlight;
+
+  const request = (async () => {
+    const { listMyFamilies } = require('../services/families');
+    const families = await listMyFamilies();
+    familiesStore.value = families;
+    familiesLoadedAt = Date.now();
+    // 同步到 globalData
+    const app = getApp<IAppOption>();
+    if (app) {
+      app.globalData.families = families;
+    }
+    return families;
+  })();
+
+  familiesLoadInFlight = request;
+  try {
+    return await request;
+  } finally {
+    if (familiesLoadInFlight === request) familiesLoadInFlight = null;
+  }
 }
 
 /** 设置当前家庭 */
@@ -172,6 +211,7 @@ export function clearUserState(): void {
   userStore.value = null;
   familiesStore.value = [];
   currentFamilyStore.value = null;
+  familiesLoadedAt = 0;
 
   const app = getApp<IAppOption>();
   if (app) {
