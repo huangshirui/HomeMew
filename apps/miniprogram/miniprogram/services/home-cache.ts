@@ -5,9 +5,10 @@
  * 已经由本次启动远端校验过的 userId + familyId；页面进入后仍立即并发刷新远端数据。
  */
 
-import { DayRecord, Event, Task } from '../types/index';
-import { STORAGE_KEYS } from './config';
+import type { DayRecord, Event, Task } from '../types/index';
 
+/** 与 config.ts 的 STORAGE_KEYS.homeCache 保持一致；这里避免引入运行时依赖，便于纯单测。 */
+const HOME_CACHE_STORAGE_KEY = 'homeCacheV1';
 const CACHE_VERSION = 1;
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -44,7 +45,7 @@ function emptyEnvelope(userId: string): HomeCacheEnvelope {
 
 function readEnvelope(userId: string): HomeCacheEnvelope {
   try {
-    const raw = wx.getStorageSync(STORAGE_KEYS.homeCache) as Partial<HomeCacheEnvelope> | null | undefined;
+    const raw = wx.getStorageSync(HOME_CACHE_STORAGE_KEY) as Partial<HomeCacheEnvelope> | null | undefined;
     if (
       !raw ||
       raw.version !== CACHE_VERSION ||
@@ -63,7 +64,7 @@ function readEnvelope(userId: string): HomeCacheEnvelope {
 
 function writeEnvelope(envelope: HomeCacheEnvelope): void {
   try {
-    wx.setStorageSync(STORAGE_KEYS.homeCache, envelope);
+    wx.setStorageSync(HOME_CACHE_STORAGE_KEY, envelope);
   } catch (error) {
     // 缓存写失败不应影响真实业务请求与页面可用性。
     console.warn('[HomeCache] Write failed:', error);
@@ -71,7 +72,12 @@ function writeEnvelope(envelope: HomeCacheEnvelope): void {
 }
 
 function isFresh(savedAt: unknown, now: number): savedAt is number {
-  return typeof savedAt === 'number' && savedAt > 0 && now - savedAt <= CACHE_MAX_AGE_MS;
+  return (
+    typeof savedAt === 'number' &&
+    savedAt > 0 &&
+    savedAt <= now &&
+    now - savedAt <= CACHE_MAX_AGE_MS
+  );
 }
 
 function updateFamily(
@@ -161,7 +167,7 @@ export function cacheHomeAttentionDays(
 
 export function clearHomeStartupCache(): void {
   try {
-    wx.removeStorageSync(STORAGE_KEYS.homeCache);
+    wx.removeStorageSync(HOME_CACHE_STORAGE_KEY);
   } catch (error) {
     console.warn('[HomeCache] Clear failed:', error);
   }
