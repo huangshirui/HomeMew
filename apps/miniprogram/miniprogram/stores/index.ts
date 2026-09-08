@@ -136,7 +136,11 @@ export async function loadFamilies(options: LoadFamiliesOptions = {}): Promise<F
 
 /** 设置当前家庭 */
 export function setCurrentFamily(family: FamilyListItem | null): void {
-  currentFamilyStore.value = family;
+  // restoreCurrentFamily() 在 Launch -> Home 紧接着会拿到同一个对象；
+  // 相同引用不再次通知订阅者，避免首页订阅回调把 Events/Tasks/Days 再请求一遍。
+  if (currentFamilyStore.value !== family) {
+    currentFamilyStore.value = family;
+  }
   if (family) {
     wx.setStorageSync(STORAGE_KEYS.currentFamilyId, family.id);
   } else {
