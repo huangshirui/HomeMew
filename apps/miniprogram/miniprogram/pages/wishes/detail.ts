@@ -7,6 +7,7 @@
 
 import { getWish, fulfillWish, reopenWish, deleteWish } from '../../services/wishes';
 import { currentFamilyStore, userStore, loadCurrentUser } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { markDirty } from '../../stores/dirty';
 import {
   showError,
@@ -44,7 +45,13 @@ Page({
   _wish: null as Wish | null,
   _celebrationTimer: null as ReturnType<typeof setTimeout> | null,
 
-  onLoad(options: { id?: string; familyId?: string }): void {
+  async onLoad(options: { id?: string; familyId?: string }): Promise<void> {
+    // 补全运行时上下文（用户/家庭/时区），失败也不阻塞详情加载（请求层会自动登录）
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[WishDetail] Runtime bootstrap failed:', error);
+    }
     const familyId = options?.familyId || currentFamilyStore.value?.id || '';
     const wishId = options?.id || '';
     if (!familyId || !wishId) {

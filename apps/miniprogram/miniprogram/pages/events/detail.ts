@@ -26,6 +26,7 @@ import { getViewingTimeZone } from '../../services/settings';
 import { Event } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 import { currentFamilyStore, familiesStore } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { setCloneSource } from '../../stores/clone-buffer';
 
 Page({
@@ -52,13 +53,19 @@ Page({
     deleting: false,
   },
 
-  onLoad(options: { id?: string; familyId?: string }): void {
+  async onLoad(options: { id?: string; familyId?: string }): Promise<void> {
     const eventId = options?.id;
     const familyId = options?.familyId;
     if (!eventId || !familyId) {
       showError('缺少日程参数');
       setTimeout(() => wx.navigateBack(), 1200);
       return;
+    }
+    // 补全运行时上下文（用户/家庭/时区），失败也不阻塞详情加载（请求层会自动登录）
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[EventDetail] Runtime bootstrap failed:', error);
     }
     this.setData({ eventId, familyId });
     this.loadEvent();

@@ -11,6 +11,7 @@
 import { listTasks, reopenTask } from '../../services/tasks';
 import { listFamilyMembers } from '../../services/families';
 import { currentFamilyStore, userStore } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { consumeDirty, markDirty, subscribe } from '../../stores/dirty';
 import { loadTasksScope, assigneeParamOf, TasksScope } from '../../stores/tasks-scope';
 import {
@@ -44,10 +45,20 @@ Page({
 
   /** 请求序号：用于丢弃过期返回结果 */
   _reqSeq: 0,
+  /** 缓存 onLoad 入参，供初始化失败后重试复用 */
+  _initOptions: null as { familyId?: string } | null,
   _members: [] as FamilyMember[],
   _dirtyUnsubscribe: null as (() => void) | null,
 
-  onLoad(options: { familyId?: string }): void {
+  async onLoad(options: { familyId?: string }): Promise<void> {
+    this._initOptions = options;
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[CompletedTasks] Runtime bootstrap failed:', error);
+      this.setData({ loaded: true, listError: true });
+      return;
+    }
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
     if (!familyId) {
       this.setData({ loaded: true, listError: true });
@@ -141,7 +152,8 @@ Page({
   },
 
   onRetry(): void {
-    this.loadTasks();
+    // 既覆盖首屏数据加载失败，也覆盖运行时初始化失败：重新走完整 onLoad
+    this.onLoad(this._initOptions || {});
   },
 
   async onPullDownRefresh(): Promise<void> {

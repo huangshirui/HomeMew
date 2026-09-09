@@ -13,6 +13,7 @@
 
 import { listDayRecords, ListDayRecordsParams } from '../../services/day-records';
 import { currentFamilyStore } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { consumeDirty, subscribe } from '../../stores/dirty';
 import { showError, getErrorMessage } from '../../utils/index';
 import { mapDayRecordView, DayRecordView } from '../../utils/day-record-view';
@@ -79,9 +80,19 @@ Page({
   _cursor: null as string | null,
   /** 请求序号：丢弃家庭切换 / 筛选切换造成的过期响应 */
   _reqSeq: 0,
+  /** 缓存 onLoad 入参，供初始化失败后重试复用 */
+  _initOptions: null as { familyId?: string } | null,
   _dirtyUnsubscribe: null as (() => void) | null,
 
-  onLoad(options: { familyId?: string }): void {
+  async onLoad(options: { familyId?: string }): Promise<void> {
+    this._initOptions = options;
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[Days] Runtime bootstrap failed:', error);
+      this.setData({ noFamily: false, loaded: true, loadError: true });
+      return;
+    }
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
     if (!familyId) {
       this.setData({ noFamily: true, loaded: true });
@@ -278,7 +289,8 @@ Page({
   },
 
   onRetry(): void {
-    this.loadFirstPage();
+    // 既覆盖首屏数据加载失败，也覆盖运行时初始化失败：重新走完整 onLoad
+    this.onLoad(this._initOptions || {});
   },
 
   onRecordTap(e: WechatMiniprogram.TouchEvent): void {

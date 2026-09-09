@@ -7,6 +7,7 @@
 
 import { listWishes, ListWishesParams } from '../../services/wishes';
 import { currentFamilyStore, userStore, loadCurrentUser } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { consumeDirty, subscribe } from '../../stores/dirty';
 import { showError, getErrorMessage } from '../../utils/index';
 import { mapWishView, WishView } from '../../utils/wish-view';
@@ -52,9 +53,19 @@ Page({
   _wishes: [] as Wish[],
   _cursor: null as string | null,
   _reqSeq: 0,
+  /** 缓存 onLoad 入参，供初始化失败后重试复用 */
+  _initOptions: null as { familyId?: string } | null,
   _dirtyUnsubscribe: null as (() => void) | null,
 
   async onLoad(options: { familyId?: string }): Promise<void> {
+    this._initOptions = options;
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[Wishes] Runtime bootstrap failed:', error);
+      this.setData({ noFamily: false, loaded: true, loadError: true });
+      return;
+    }
     const familyId = currentFamilyStore.value?.id || options?.familyId || '';
     if (!familyId) {
       this.setData({ noFamily: true, loaded: true });
@@ -195,7 +206,10 @@ Page({
     this.loadFirstPage();
   },
 
-  onRetry(): void { this.loadFirstPage(); },
+  onRetry(): void {
+    // 既覆盖首屏数据加载失败，也覆盖运行时初始化失败：重新走完整 onLoad
+    this.onLoad(this._initOptions || {});
+  },
 
   onWishTap(e: WechatMiniprogram.TouchEvent): void {
     const id = e.currentTarget.dataset.id as string;

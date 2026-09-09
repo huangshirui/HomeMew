@@ -17,6 +17,7 @@ import { getEvent, createEvent, updateEvent, createEventsBatch } from '../../ser
 import type { BatchCreateItemResult } from '../../services/events';
 import { listFamilyMembers } from '../../services/families';
 import { currentFamilyStore, familiesStore } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import {
   showError,
   showSuccess,
@@ -103,12 +104,18 @@ Page({
     showEndCalendar: false,
   },
 
-  onLoad(options: { familyId?: string; id?: string; date?: string; clone?: string }): void {
+  async onLoad(options: { familyId?: string; id?: string; date?: string; clone?: string }): Promise<void> {
     const familyId = options?.familyId;
     if (!familyId) {
       showError('缺少家庭参数');
       setTimeout(() => wx.navigateBack(), 1200);
       return;
+    }
+    // 补全运行时上下文（用户/家庭/时区），失败也不阻塞编辑页加载（请求层会自动登录）
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[EventEdit] Runtime bootstrap failed:', error);
     }
     const today = formatYmd(new Date());
     const initialDate = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date)

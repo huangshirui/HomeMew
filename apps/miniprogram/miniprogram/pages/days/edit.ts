@@ -20,6 +20,7 @@ import {
 } from '../../services/day-records';
 import { listFamilyMembers } from '../../services/families';
 import { currentFamilyStore } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { markDirty } from '../../stores/dirty';
 import {
   showError,
@@ -116,7 +117,13 @@ Page({
     anchorMaxDate: '',
   },
 
-  onLoad(options: { familyId?: string; id?: string }): void {
+  async onLoad(options: { familyId?: string; id?: string }): Promise<void> {
+    // 补全运行时上下文（用户/家庭/时区），失败也不阻塞编辑页加载（请求层会自动登录）
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[DayEdit] Runtime bootstrap failed:', error);
+    }
     const familyId = options?.familyId || currentFamilyStore.value?.id || '';
     if (!familyId) {
       showError('缺少家庭参数');

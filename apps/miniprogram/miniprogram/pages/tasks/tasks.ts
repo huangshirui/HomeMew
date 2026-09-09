@@ -14,6 +14,7 @@
 import { listTasks, completeTask } from '../../services/tasks';
 import { listFamilyMembers } from '../../services/families';
 import { currentFamilyStore, userStore } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { consumeDirty, markDirty, subscribe } from '../../stores/dirty';
 import {
   loadTasksScope,
@@ -77,6 +78,8 @@ Page({
 
   /** 请求序号：用于丢弃过期（家庭切换 / 范围切换 / 慢网络）返回结果 */
   _reqSeq: 0,
+  /** 缓存 onLoad 入参，供初始化失败后重试复用 */
+  _initOptions: null as { familyId?: string } | null,
 
   /** 家庭成员（用于范围选择器） */
   _members: [] as FamilyMember[],
@@ -89,7 +92,15 @@ Page({
   /** 上次真正发起后台拉取的时间戳，用于轮询节流 */
   _lastFetchAt: 0,
 
-  onLoad(options: { familyId?: string }): void {
+  async onLoad(options: { familyId?: string }): Promise<void> {
+    this._initOptions = options;
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[Tasks] Runtime bootstrap failed:', error);
+      this.setData({ loaded: true, listError: true });
+      return;
+    }
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
     if (!familyId) {
       this.setData({ loaded: true, noFamily: true });
@@ -340,7 +351,8 @@ Page({
   },
 
   onRetry(): void {
-    this.loadTasks();
+    // 既覆盖首屏数据加载失败，也覆盖运行时初始化失败：重新走完整 onLoad
+    this.onLoad(this._initOptions || {});
   },
 
   async onPullDownRefresh(): Promise<void> {

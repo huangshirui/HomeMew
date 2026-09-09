@@ -22,6 +22,7 @@
 import { fetchEventsPage } from '../../services/events';
 import { listFamilyMembers } from '../../services/families';
 import { currentFamilyStore, userStore } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { consumeDirty, markDirty, subscribe } from '../../stores/dirty';
 import {
   loadEventsScope,
@@ -162,6 +163,8 @@ Page({
 
   /** 请求序号：用于丢弃过期（家庭切换 / 范围切换 / 重新锚定）返回结果 */
   _reqSeq: 0,
+  /** 缓存 onLoad 入参，供初始化失败后重试复用 */
+  _initOptions: null as { date?: string; familyId?: string; attendee?: string } | null,
   /** 去重后的全部已加载事件：id -> Event */
   _events: {} as Record<string, Event>,
   /** 已加载范围 [start, end)，YYYY-MM-DD */
@@ -203,7 +206,15 @@ Page({
   /** 查看时区：请求参数与列表归组共用同一个值 */
   _viewingTimezone: 'Asia/Shanghai',
 
-  onLoad(options: { date?: string; familyId?: string; attendee?: string }): void {
+  async onLoad(options: { date?: string; familyId?: string; attendee?: string }): Promise<void> {
+    this._initOptions = options;
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[Events] Runtime bootstrap failed:', error);
+      this.setData({ loaded: true, initError: true });
+      return;
+    }
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
     if (!familyId) {
       this.setData({ loaded: true, noFamily: true });
@@ -570,7 +581,8 @@ Page({
   },
 
   onRetryInit(): void {
-    this.initialLoad(this._visibleDate || todayYmd());
+    // 既覆盖首屏数据加载失败，也覆盖运行时初始化失败：重新走完整 onLoad
+    this.onLoad(this._initOptions || {});
   },
 
   /** 向上扩展一个 30 天窗口，并保持视口内容不跳动 */

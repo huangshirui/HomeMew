@@ -19,6 +19,7 @@ import {
 } from '../../utils/index';
 import { Task } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 
 Page({
   data: {
@@ -47,13 +48,19 @@ Page({
     toggling: false,
   },
 
-  onLoad(options: { id?: string; familyId?: string }): void {
+  async onLoad(options: { id?: string; familyId?: string }): Promise<void> {
     const taskId = options?.id;
     const familyId = options?.familyId;
     if (!taskId || !familyId) {
       showError('缺少任务参数');
       setTimeout(() => wx.navigateBack(), 1200);
       return;
+    }
+    // 补全运行时上下文（用户/家庭/时区），失败也不阻塞详情加载（请求层会自动登录）
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[TaskDetail] Runtime bootstrap failed:', error);
     }
     this.setData({ taskId, familyId });
     this.loadTask();

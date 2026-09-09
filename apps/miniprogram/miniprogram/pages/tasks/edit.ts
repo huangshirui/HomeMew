@@ -23,6 +23,7 @@ import {
 } from '../../utils/index';
 import { Task, FamilyMember, CreateTaskRequest, UpdateTaskRequest, TaskCreationDraft } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { consumePendingDraft } from '../../stores/draft-buffer';
 
 type MemberOption = {
@@ -55,12 +56,18 @@ Page({
     showCalendar: false,
   },
 
-  onLoad(options: { familyId?: string; id?: string }): void {
+  async onLoad(options: { familyId?: string; id?: string }): Promise<void> {
     const familyId = options?.familyId;
     if (!familyId) {
       showError('缺少家庭参数');
       setTimeout(() => wx.navigateBack(), 1200);
       return;
+    }
+    // 补全运行时上下文（用户/家庭/时区），失败也不阻塞编辑页加载（请求层会自动登录）
+    try {
+      await ensureRuntimeReady();
+    } catch (error) {
+      console.error('[TaskEdit] Runtime bootstrap failed:', error);
     }
     const today = formatYmd(new Date());
     this.setData({
