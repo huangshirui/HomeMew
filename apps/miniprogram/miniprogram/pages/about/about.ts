@@ -40,13 +40,17 @@ function formatLocalTime(iso: string): string {
 
 Page({
   data: {
-    version: '1.5.1',
+    version: '1.6.2',
     testing: false,
     errorText: '',
     latency: null as LatencyView | null,
   },
 
   onLoad(): void {
+    // 响应时间测试改为手动点击开始，不再在页面加载时自动触发。
+  },
+
+  onStartLatency(): void {
     this.runLatencyTest();
   },
 

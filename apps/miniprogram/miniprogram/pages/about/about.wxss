@@ -98,6 +98,16 @@
   text-align: center;
 }
 
+.idle-state {
+  padding: 52rpx 0;
+  text-align: center;
+}
+
+.idle-text {
+  font-size: 25rpx;
+  color: var(--color-text-secondary);
+}
+
 .testing-text,
 .refreshing-line {
   font-size: 25rpx;

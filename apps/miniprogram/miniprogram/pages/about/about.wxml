@@ -14,9 +14,13 @@
         <text class="section-title">响应时间测试</text>
         <text class="section-subtitle">Core production · 每项 3 次取中位数</text>
       </view>
-      <button class="retry-btn" bindtap="onRetryLatency" disabled="{{testing}}">
-        {{testing ? '测试中…' : '重新测试'}}
+      <button class="retry-btn" bindtap="onStartLatency" disabled="{{testing}}">
+        {{testing ? '测试中…' : (latency ? '重新测试' : '开始测试')}}
       </button>
+    </view>
+
+    <view wx:if="{{!testing && !latency}}" class="idle-state">
+      <text class="idle-text">点击下方「开始测试」测量当前网络到 Core 的响应时间</text>
     </view>
 
     <view wx:if="{{testing && !latency}}" class="testing-state">
