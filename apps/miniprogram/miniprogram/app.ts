@@ -20,6 +20,7 @@ App<IAppOption>({
   },
 
   onShow() {
-    // 应用从后台显示时检查 token 状态
+    // 应用从后台显示时检查 token 状态。
+    // 业务页面通过 ensureRuntimeReady() 确保身份和家庭上下文可用。
   },
 });
