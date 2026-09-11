@@ -5,6 +5,15 @@ const USER_SCOPES = [
   'resources:read', 'resources:write', 'creation-drafts:read', 'creation-drafts:write',
 ];
 
+const ACTIVITY_CHANNEL_FIELDS = {
+  miniprogram: 'miniProgramLastSeenAt',
+  web: 'webLastSeenAt',
+  wecom: 'wecomLastSeenAt',
+};
+const FIRST_PARTY_ACTIVITY_CHANNELS = new Set(['miniprogram', 'web']);
+const MAX_ACTIVITY_QUERY_USERS = 50;
+const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
 class HttpError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }
@@ -29,6 +38,14 @@ function isLoginReady(env) {
       && env.LIFESPACE_CORE_URL
       && env.WECHAT_IDENTITIES,
   );
+}
+function isActivityReady(env) {
+  return Boolean(env.MEMBER_ACTIVITIES && typeof env.MEMBER_ACTIVITIES.getByName === 'function');
+}
+function isExternalActivityReady(env) {
+  return isActivityReady(env)
+    && typeof env.ACTIVITY_API_SECRET === 'string'
+    && env.ACTIVITY_API_SECRET.trim().length >= 32;
 }
 async function readJson(request) {
   const value = await request.json().catch(() => null);
@@ -133,9 +150,6 @@ export class WechatIdentity extends DurableObject {
       return { userId: migratedUserId, isNewUser: false };
     }
 
-    // The object is keyed by WeChat appid + openid. A shared in-memory promise
-    // collapses concurrent first-login requests while the external LifeSpace call
-    // is in flight. Persistent storage remains authoritative after completion.
     if (!this.pendingResolution) {
       this.pendingResolution = this.createAndPersist(openid).finally(() => {
         this.pendingResolution = null;
@@ -152,6 +166,31 @@ export class WechatIdentity extends DurableObject {
       createdAt: now,
     });
     return { userId, isNewUser: true };
+  }
+}
+
+export class MemberActivity extends DurableObject {
+  async report(channel, occurredAt) {
+    const field = ACTIVITY_CHANNEL_FIELDS[channel];
+    if (!field) throw new Error(`Unsupported activity channel: ${channel}`);
+
+    const existing = await this.ctx.storage.get('activity');
+    const state = existing && typeof existing === 'object' ? existing : {};
+    const previous = typeof state[field] === 'string' ? state[field] : null;
+    const previousMs = previous ? Date.parse(previous) : Number.NaN;
+    const candidateMs = Date.parse(occurredAt);
+
+    if (!previous || Number.isNaN(previousMs) || candidateMs > previousMs) {
+      state[field] = occurredAt;
+      await this.ctx.storage.put('activity', state);
+    }
+
+    return activityDto(null, state);
+  }
+
+  async getActivity() {
+    const existing = await this.ctx.storage.get('activity');
+    return activityDto(null, existing && typeof existing === 'object' ? existing : {});
   }
 }
 
@@ -186,6 +225,146 @@ async function login(request, env) {
   });
 }
 
+function validateUserId(value) {
+  const userId = typeof value === 'string' ? value.trim() : '';
+  if (!userId.startsWith('usr_') || userId.length <= 4 || userId.length > 100) {
+    throw new HttpError(422, 'INVALID_ACTIVITY_USER', 'userId must be a LifeSpace usr_* ID');
+  }
+  return userId;
+}
+
+function validateActivityChannel(value, allowed = null) {
+  const channel = typeof value === 'string' ? value.trim() : '';
+  if (!ACTIVITY_CHANNEL_FIELDS[channel] || (allowed && !allowed.has(channel))) {
+    throw new HttpError(422, 'INVALID_ACTIVITY_CHANNEL', 'Unsupported activity channel');
+  }
+  return channel;
+}
+
+function normalizeOccurredAt(value, nowMs = Date.now()) {
+  if (value === undefined || value === null || value === '') return new Date(nowMs).toISOString();
+  if (typeof value !== 'string') {
+    throw new HttpError(422, 'INVALID_ACTIVITY_TIME', 'occurredAt must be an RFC 3339 timestamp');
+  }
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed) || parsed > nowMs + MAX_FUTURE_SKEW_MS) {
+    throw new HttpError(422, 'INVALID_ACTIVITY_TIME', 'occurredAt must be a valid timestamp not materially in the future');
+  }
+  return new Date(parsed).toISOString();
+}
+
+function activityDto(userId, state) {
+  const miniProgramLastSeenAt = typeof state?.miniProgramLastSeenAt === 'string' ? state.miniProgramLastSeenAt : null;
+  const webLastSeenAt = typeof state?.webLastSeenAt === 'string' ? state.webLastSeenAt : null;
+  const wecomLastSeenAt = typeof state?.wecomLastSeenAt === 'string' ? state.wecomLastSeenAt : null;
+  const candidates = [miniProgramLastSeenAt, webLastSeenAt, wecomLastSeenAt].filter(Boolean);
+  const lastSeenAt = candidates.length
+    ? candidates.reduce((latest, value) => Date.parse(value) > Date.parse(latest) ? value : latest)
+    : null;
+  return {
+    ...(userId ? { userId } : {}),
+    miniProgramLastSeenAt,
+    webLastSeenAt,
+    wecomLastSeenAt,
+    lastSeenAt,
+  };
+}
+
+function activityStub(env, userId) {
+  if (!isActivityReady(env)) {
+    throw new HttpError(503, 'ACTIVITY_NOT_CONFIGURED', 'Activity storage is not configured');
+  }
+  return env.MEMBER_ACTIVITIES.getByName(`activity:${userId}`);
+}
+
+async function reportActivity(env, userId, channel, occurredAt) {
+  const result = await activityStub(env, userId).report(channel, occurredAt);
+  return activityDto(userId, result);
+}
+
+async function resolveCurrentLifeSpaceUser(request, env) {
+  const authorization = request.headers.get('authorization')?.trim();
+  if (!authorization?.startsWith('Bearer ') || authorization.slice(7).trim().length < 10) {
+    throw new HttpError(401, 'UNAUTHORIZED', 'LifeSpace user bearer is required');
+  }
+  const response = await fetch(`${baseUrl(env.LIFESPACE_IDENTITY_URL, 'LIFESPACE_IDENTITY_URL')}/api/v1/me`, {
+    headers: {
+      accept: 'application/json',
+      authorization,
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (response.status !== 200) {
+    if (response.status === 401 || response.status === 403) {
+      throw new HttpError(response.status, payload?.error?.code || 'UNAUTHORIZED', payload?.error?.message || 'LifeSpace user bearer is not accepted');
+    }
+    throw new HttpError(502, 'LIFESPACE_PROFILE_FAILED', 'LifeSpace 身份服务暂时不可用');
+  }
+  return validateUserId(payload?.data?.id);
+}
+
+async function sha256(value) {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+}
+
+async function constantTimeSecretEqual(left, right) {
+  const [a, b] = await Promise.all([sha256(left), sha256(right)]);
+  let difference = 0;
+  for (let index = 0; index < a.length; index += 1) difference |= a[index] ^ b[index];
+  return difference === 0;
+}
+
+async function requireActivitySecret(request, env) {
+  const expected = typeof env.ACTIVITY_API_SECRET === 'string' ? env.ACTIVITY_API_SECRET.trim() : '';
+  if (expected.length < 32) {
+    throw new HttpError(503, 'ACTIVITY_API_NOT_CONFIGURED', 'External Activity API is not configured');
+  }
+  const authorization = request.headers.get('authorization')?.trim() || '';
+  const supplied = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+  if (!supplied || !(await constantTimeSecretEqual(supplied, expected))) {
+    throw new HttpError(401, 'UNAUTHORIZED', 'Activity API bearer is required');
+  }
+}
+
+async function reportOwnActivity(request, env) {
+  const input = await readJson(request);
+  if (Object.keys(input).some(key => key !== 'channel')) {
+    throw new HttpError(400, 'INVALID_REQUEST', 'Request must contain only channel');
+  }
+  const channel = validateActivityChannel(input.channel, FIRST_PARTY_ACTIVITY_CHANNELS);
+  const userId = await resolveCurrentLifeSpaceUser(request, env);
+  await reportActivity(env, userId, channel, new Date().toISOString());
+  return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+}
+
+async function reportExternalActivity(request, env) {
+  await requireActivitySecret(request, env);
+  const input = await readJson(request);
+  if (Object.keys(input).some(key => !['userId', 'channel', 'occurredAt'].includes(key))) {
+    throw new HttpError(400, 'INVALID_REQUEST', 'Request contains unsupported fields');
+  }
+  const userId = validateUserId(input.userId);
+  const channel = validateActivityChannel(input.channel);
+  const occurredAt = normalizeOccurredAt(input.occurredAt);
+  const activity = await reportActivity(env, userId, channel, occurredAt);
+  return json({ data: activity });
+}
+
+async function queryActivity(request, env, url) {
+  await requireActivitySecret(request, env);
+  const raw = url.searchParams.get('userIds') || '';
+  const requested = raw.split(',').map(value => value.trim()).filter(Boolean);
+  if (requested.length === 0 || requested.length > MAX_ACTIVITY_QUERY_USERS) {
+    throw new HttpError(400, 'INVALID_REQUEST', `userIds must contain 1-${MAX_ACTIVITY_QUERY_USERS} user IDs`);
+  }
+  const userIds = [...new Set(requested.map(validateUserId))];
+  const activities = await Promise.all(userIds.map(async (userId) => {
+    const state = await activityStub(env, userId).getActivity();
+    return activityDto(userId, state);
+  }));
+  return json({ data: { activities } });
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -196,10 +375,15 @@ export default {
           service: 'homemew-backend',
           environment: env.ENVIRONMENT ?? 'unknown',
           loginReady: isLoginReady(env),
+          activityReady: isActivityReady(env),
+          externalActivityReady: isExternalActivityReady(env),
           identityBootstrapConfigured: Boolean(env.WECHAT_IDENTITY_BOOTSTRAP_MAP),
         });
       }
       if (request.method === 'POST' && url.pathname === '/api/v1/login/wechat') return await login(request, env);
+      if (request.method === 'POST' && url.pathname === '/api/v1/activity/me') return await reportOwnActivity(request, env);
+      if (request.method === 'POST' && url.pathname === '/api/v1/activity/report') return await reportExternalActivity(request, env);
+      if (request.method === 'GET' && url.pathname === '/api/v1/activity') return await queryActivity(request, env, url);
       return json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
     } catch (error) {
       if (error instanceof HttpError) return json({ error: { code: error.code, message: error.message } }, error.status);

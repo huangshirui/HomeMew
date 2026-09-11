@@ -88,6 +88,17 @@ function isReady(env) {
   );
 }
 
+function activityReady(env) {
+  return Boolean(env.HOMEMEW_BACKEND && typeof env.HOMEMEW_BACKEND.fetch === 'function');
+}
+
+function activityBackend(env) {
+  if (!activityReady(env)) {
+    throw new HttpError(503, 'ACTIVITY_BACKEND_NOT_CONFIGURED', 'HomeMew Activity 服务暂时不可用');
+  }
+  return env.HOMEMEW_BACKEND;
+}
+
 function accessAssertion(request) {
   const assertion = request.headers.get(ACCESS_ASSERTION_HEADER)?.trim();
   if (!assertion) {
@@ -308,6 +319,27 @@ function responseHeaders(response, id, sessionCookie) {
   return headers;
 }
 
+async function reportWebActivity(request, env, fetcher, assertion, id, nowMs) {
+  requireSameOrigin(request);
+  const session = await ensureSession(request, env, fetcher, assertion, id, nowMs);
+  const response = await activityBackend(env).fetch(new Request('https://homemew-backend.internal/api/v1/activity/me', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${session.accessToken}`,
+      'content-type': 'application/json',
+      'x-request-id': id,
+    },
+    body: JSON.stringify({ channel: 'web' }),
+  }));
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: responseHeaders(response, id, session.cookie),
+  });
+}
+
 async function proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, service) {
   requireSameOrigin(request);
   const prefix = `/api/lifespace/${service}`;
@@ -353,6 +385,7 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
               environment: env.ENVIRONMENT ?? 'unknown',
               ready: isReady(env),
               integrationsReady: integrationsReady(env),
+              activityReady: activityReady(env),
               accessMode: 'cloudflare-access',
             },
           }, 200, {}, id);
@@ -374,6 +407,9 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         }
         if (request.method === 'POST' && url.pathname === '/api/access/link-challenge') {
           return await createLinkChallenge(request, env, fetcher, assertion, id);
+        }
+        if (request.method === 'POST' && url.pathname === '/api/activity/me') {
+          return await reportWebActivity(request, env, fetcher, assertion, id, nowMs);
         }
         if (url.pathname === '/api/integrations' || url.pathname.startsWith('/api/integrations/')) {
           return await handleIntegrationRequest(request, env, { fetcher, assertion, id });

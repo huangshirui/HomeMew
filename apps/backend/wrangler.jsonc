@@ -6,13 +6,18 @@
   "workers_dev": false,
   "durable_objects": {
     "bindings": [
-      { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
+      { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" },
+      { "name": "MEMBER_ACTIVITIES", "class_name": "MemberActivity" }
     ]
   },
   "migrations": [
     {
       "tag": "v1",
       "new_sqlite_classes": ["WechatIdentity"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["MemberActivity"]
     }
   ],
   "env": {
@@ -29,7 +34,8 @@
       },
       "durable_objects": {
         "bindings": [
-          { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
+          { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" },
+          { "name": "MEMBER_ACTIVITIES", "class_name": "MemberActivity" }
         ]
       }
     },
@@ -43,7 +49,8 @@
       },
       "durable_objects": {
         "bindings": [
-          { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" }
+          { "name": "WECHAT_IDENTITIES", "class_name": "WechatIdentity" },
+          { "name": "MEMBER_ACTIVITIES", "class_name": "MemberActivity" }
         ]
       }
     }

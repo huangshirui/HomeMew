@@ -42,8 +42,10 @@ jobs:
           test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN is not configured" >&2; exit 1; }
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID is not configured" >&2; exit 1; }
 
-      - name: Validate backend syntax
-        run: node --check apps/backend/worker.mjs
+      - name: Validate backend syntax and contracts
+        run: |
+          node --check apps/backend/worker.mjs
+          node --test apps/backend/*.test.mjs
 
       - name: Verify LifeSpace staging is reachable
         shell: bash
@@ -76,6 +78,16 @@ jobs:
             const data = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/homemew-staging-health.json", "utf8"));
             process.stdout.write(data.loginReady === true ? "true" : "false");
           ')"
+          ACTIVITY_READY="$(node --input-type=module -e '
+            import fs from "node:fs";
+            const data = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/homemew-staging-health.json", "utf8"));
+            process.stdout.write(data.activityReady === true ? "true" : "false");
+          ')"
+          EXTERNAL_ACTIVITY_READY="$(node --input-type=module -e '
+            import fs from "node:fs";
+            const data = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/homemew-staging-health.json", "utf8"));
+            process.stdout.write(data.externalActivityReady === true ? "true" : "false");
+          ')"
           {
             echo "## HomeMew backend staging"
             echo
@@ -83,8 +95,11 @@ jobs:
             echo "- LifeSpace Identity: https://auth-staging.aisr.online"
             echo "- LifeSpace Core: https://core-staging.aisr.online"
             echo "- Identity mapping: SQLite-backed Durable Object"
+            echo "- Member activity: SQLite-backed Durable Object"
             echo "- Wrangler: pinned standalone 4.49.1 (no legacy Core dependency)"
             echo "- Runtime secrets: Cloudflare Worker Secrets (not duplicated in GitHub Actions)"
             echo "- Login ready: ${LOGIN_READY}"
+            echo "- Activity ready: ${ACTIVITY_READY}"
+            echo "- External Activity API ready: ${EXTERNAL_ACTIVITY_READY}"
             echo "- Production traffic/configuration: untouched"
           } >> "$GITHUB_STEP_SUMMARY"

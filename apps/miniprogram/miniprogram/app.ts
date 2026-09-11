@@ -3,6 +3,7 @@ import {
   ensureRuntimeEnvironmentStorage,
   getRuntimeServiceUrls,
 } from './services/config';
+import { reportMiniProgramActivityOncePerDay } from './services/activity';
 
 App<IAppOption>({
   globalData: {
@@ -20,7 +21,10 @@ App<IAppOption>({
   },
 
   onShow() {
-    // 应用从后台显示时检查 token 状态。
-    // 业务页面通过 ensureRuntimeReady() 确保身份和家庭上下文可用。
+    // 任意可直达页面都会经过 App.onShow。Activity 在进程内按本地自然日去重，
+    // 上报失败不记成功，后续 onShow 仍可重试；跨日后下一次 onShow 会再次上报。
+    void reportMiniProgramActivityOncePerDay().catch((error) => {
+      console.warn('[HomeMew Activity] miniprogram report failed', error instanceof Error ? error.message : 'unknown');
+    });
   },
 });
