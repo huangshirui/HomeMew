@@ -25,7 +25,10 @@
         "ENVIRONMENT": "staging",
         "LIFESPACE_IDENTITY_URL": "https://auth-staging.aisr.online",
         "LIFESPACE_CORE_URL": "https://core-staging.aisr.online"
-      }
+      },
+      "services": [
+        { "binding": "HOMEMEW_BACKEND", "service": "homemew-backend-staging" }
+      ]
     },
     "production": {
       "name": "homemew-web-production",
@@ -34,7 +37,10 @@
         "ENVIRONMENT": "production",
         "LIFESPACE_IDENTITY_URL": "https://auth.aisr.online",
         "LIFESPACE_CORE_URL": "https://core.aisr.online"
-      }
+      },
+      "services": [
+        { "binding": "HOMEMEW_BACKEND", "service": "homemew-backend-production" }
+      ]
     }
   }
 }

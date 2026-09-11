@@ -1,0 +1,34 @@
+name: HomeMew Backend Check
+
+on:
+  pull_request:
+    paths:
+      - apps/backend/**
+      - .github/workflows/backend-check.yml
+  push:
+    branches:
+      - main
+    paths:
+      - apps/backend/**
+      - .github/workflows/backend-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Validate backend
+        run: |
+          node --check apps/backend/worker.mjs
+          node --test apps/backend/*.test.mjs

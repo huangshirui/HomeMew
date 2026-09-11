@@ -51,6 +51,7 @@ test('health reports Access BFF readiness without exposing secrets', async () =>
     environment: 'test',
     ready: true,
     integrationsReady: false,
+    activityReady: false,
     accessMode: 'cloudflare-access',
   });
 });
@@ -168,6 +169,48 @@ test('link challenge is created from the verified Access assertion only', async 
   const response = await handler.fetch(request('/api/access/link-challenge', { method: 'POST' }), ENV);
   assert.equal(response.status, 201);
   assert.equal((await payload(response)).data.challengeId, 'alc_123');
+});
+
+test('Web activity reporting uses the verified LifeSpace session and backend binding', async () => {
+  const fetcher = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/internal/v1/access/tokens')) return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+    assert.fail(`unexpected upstream ${url}`);
+  };
+  let backendCalls = 0;
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: {
+      async fetch(activityRequest) {
+        backendCalls += 1;
+        assert.equal(new URL(activityRequest.url).pathname, '/api/v1/activity/me');
+        assert.equal(activityRequest.headers.get('authorization'), 'Bearer life-token-a');
+        assert.deepEqual(await activityRequest.json(), { channel: 'web' });
+        return new Response(null, { status: 204 });
+      },
+    },
+  };
+  const handler = createWebHandler({ fetcher, now: () => NOW });
+  const response = await handler.fetch(request('/api/activity/me', { method: 'POST' }), env);
+  assert.equal(response.status, 204);
+  assert.equal(backendCalls, 1);
+  assert.ok(response.headers.get('set-cookie'), 'new Web session must still be returned to the browser');
+});
+
+test('Web activity reporting rejects cross-origin requests before backend write', async () => {
+  let backendCalls = 0;
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: { async fetch() { backendCalls += 1; return new Response(null, { status: 204 }); } },
+  };
+  const handler = createWebHandler({ fetcher: async () => assert.fail('cross-origin activity must fail before session exchange'), now: () => NOW });
+  const response = await handler.fetch(request('/api/activity/me', {
+    method: 'POST',
+    origin: 'https://evil.example.test',
+  }), env);
+  assert.equal(response.status, 403);
+  assert.equal((await payload(response)).error.code, 'INVALID_ORIGIN');
+  assert.equal(backendCalls, 0);
 });
 
 test('Core proxy obtains a LifeSpace session and forwards only the user bearer', async () => {

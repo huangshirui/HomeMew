@@ -49,6 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check apps/backend/worker.mjs
+          node --test apps/backend/*.test.mjs
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const config = JSON.parse(fs.readFileSync('apps/backend/wrangler.jsonc', 'utf8'));
@@ -60,6 +61,8 @@ jobs:
           if (production.vars?.ENVIRONMENT !== 'production') throw new Error('Backend production ENVIRONMENT mismatch');
           if (production.vars?.LIFESPACE_IDENTITY_URL !== 'https://auth.aisr.online') throw new Error('Unexpected production Identity URL');
           if (production.vars?.LIFESPACE_CORE_URL !== 'https://core.aisr.online') throw new Error('Unexpected production Core URL');
+          const activity = production.durable_objects?.bindings?.find((entry) => entry.name === 'MEMBER_ACTIVITIES');
+          if (activity?.class_name !== 'MemberActivity') throw new Error('Production MEMBER_ACTIVITIES binding is missing');
           NODE
 
       - name: Verify LifeSpace production is reachable
@@ -101,5 +104,6 @@ jobs:
             echo "- Worker: homemew-backend-production"
             echo "- Public front door ownership: unchanged (homemew-web-production)"
             echo "- Mini Program provider route: verified through the Web front door"
+            echo "- Member activity: SQLite-backed Durable Object"
             echo "- Custom Domain and Cloudflare Access configuration: untouched"
           } >> "$GITHUB_STEP_SUMMARY"

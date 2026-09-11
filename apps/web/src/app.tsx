@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { ActivityReporter } from './components/activity-reporter';
 import { AppShell } from './components/app-shell';
 import { HouseholdProvider } from './components/household-provider';
 import { SessionGate } from './components/session-gate';
@@ -15,6 +16,7 @@ import { WishesPage } from './pages/wishes-page';
 export function App() {
   return (
     <SessionGate>
+      <ActivityReporter />
       <HouseholdProvider>
         <Routes>
           <Route element={<AppShell />}>
