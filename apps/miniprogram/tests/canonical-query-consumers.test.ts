@@ -26,3 +26,15 @@ test('Task and Wish lists use the LifeSpace structured Canonical Query endpoint'
   assert.match(wishes, /field: 'desiredDate', op: 'gte'/);
   assert.match(wishes, /field: 'desiredDate', op: 'lte'/);
 });
+
+test('Event traffic is isolated behind the HomeMew Mini Program BFF boundary', () => {
+  const api = read('miniprogram/services/api.ts');
+  const events = read('miniprogram/services/events.ts');
+
+  assert.match(api, /target\?: 'core' \| 'identity' \| 'backend'/);
+  assert.match(api, /target === 'backend'/);
+  assert.match(events, /\/api\/v1\/miniprogram\/spaces\/\$\{encodeURIComponent\(spaceId\)\}\/events/);
+  assert.match(events, /target: 'backend'/);
+  assert.doesNotMatch(events, /modelCollectionPath\(familyId, 'event'\)/);
+  assert.doesNotMatch(events, /modelRecordPath\(familyId, 'event'/);
+});
