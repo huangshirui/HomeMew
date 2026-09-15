@@ -1,4 +1,5 @@
 import webHandler from './worker.mjs';
+import { handleMiniProgramEventBff } from './miniprogram-event-bff.mjs';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -29,6 +30,9 @@ async function proxyBackend(request, env) {
 export function createFrontDoorHandler({ app = webHandler } = {}) {
   return {
     async fetch(request, env, context) {
+      const eventBffResponse = await handleMiniProgramEventBff(request, env);
+      if (eventBffResponse) return eventBffResponse;
+
       const url = new URL(request.url);
       if (isBackendPublicRoute(request, url)) {
         return proxyBackend(request, env);
