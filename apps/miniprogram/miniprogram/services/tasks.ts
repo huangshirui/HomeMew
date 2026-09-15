@@ -4,6 +4,7 @@ import { request } from './api';
 import { andFilters, orFilters, queryModelRecords, type CanonicalQueryFilter } from './canonical-query';
 import { Actor, Task, CreateTaskRequest, UpdateTaskRequest } from '../types/index';
 import {
+  LifeSpacePage,
   ResourceBase,
   SpaceMember,
   auditActor,
@@ -109,7 +110,7 @@ export async function listTasks(
   let cursor: string | null = null;
 
   for (let page = 0; page < 50; page++) {
-    const data = await queryModelRecords<TaskResource>(familyId, 'task', {
+    const data: LifeSpacePage<TaskResource> = await queryModelRecords<TaskResource>(familyId, 'task', {
       ...(params?.q ? { search: { text: params.q } } : {}),
       ...(filter ? { filter } : {}),
       sort: [sortMap[params?.sort ?? 'due_asc']],
