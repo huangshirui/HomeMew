@@ -1,17 +1,16 @@
 /** HomeMew 许愿池 -> LifeSpace wish model。 */
 
 import { request } from './api';
+import { andFilters, queryModelRecords, type CanonicalQueryFilter } from './canonical-query';
 import { Wish, CreateWishRequest, UpdateWishRequest, PersonRef } from '../types/index';
 import {
   ResourceBase,
-  LifeSpacePage,
   auditActor,
   currentPersonId,
   getSpaceMembers,
   modelCollectionPath,
   modelRecordPath,
   personRef,
-  queryString,
   userIdToPersonId,
 } from './lifespace';
 
@@ -72,17 +71,20 @@ export async function listWishes(
     created_desc: 'createdAt:desc',
     updated_desc: 'updatedAt:desc',
   } as const;
-  const raw = await request<LifeSpacePage<WishResource>>(
-    `${modelCollectionPath(familyId, 'wish')}${queryString({
-      status: params.status,
-      ownerPersonId: ownerPersonId ?? undefined,
-      desiredDateFrom: params.desiredFrom,
-      desiredDateTo: params.desiredTo,
-      sort: params.sort ? sortMap[params.sort] : 'desiredDate:asc',
-      limit: params.limit,
-      cursor: params.cursor,
-    })}`,
-  );
+  const filters: CanonicalQueryFilter[] = [];
+  if (params.status) filters.push({ field: 'status', op: 'eq', value: params.status });
+  if (ownerPersonId) filters.push({ field: 'ownerPersonId', op: 'contains', value: ownerPersonId });
+  if (params.desiredFrom) filters.push({ field: 'desiredDate', op: 'gte', value: params.desiredFrom });
+  if (params.desiredTo) filters.push({ field: 'desiredDate', op: 'lte', value: params.desiredTo });
+  const [sortField, sortDirection] = (params.sort ? sortMap[params.sort] : 'desiredDate:asc').split(':') as [
+    string,
+    'asc' | 'desc',
+  ];
+  const raw = await queryModelRecords<WishResource>(familyId, 'wish', {
+    ...(andFilters(filters) ? { filter: andFilters(filters) } : {}),
+    sort: [{ field: sortField, direction: sortDirection }],
+    page: { limit: params.limit, cursor: params.cursor },
+  });
   return {
     items: await Promise.all(raw.items.map(item => toWish(familyId, item))),
     nextCursor: raw.nextCursor,

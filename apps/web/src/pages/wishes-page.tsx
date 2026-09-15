@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
+import { queryModelRecords } from '../lib/canonical-query';
 
 type WishStatus = 'open' | 'fulfilled';
 type WishRecord = {
@@ -23,7 +24,6 @@ type WishRecord = {
   updatedAt: string;
 };
 
-type WishList = { items: WishRecord[]; nextCursor: string | null };
 type WishDraft = { title: string; description: string; desiredDate: string };
 type Tab = 'open' | 'fulfilled';
 
@@ -70,13 +70,14 @@ export function WishesPage() {
       const items: WishRecord[] = [];
       let cursor: string | null = null;
       do {
-        const params = new URLSearchParams({
-          status: tab,
-          sort: tab === 'fulfilled' ? 'updatedAt:desc' : 'desiredDate:asc',
-          limit: '200',
+        const page = await queryModelRecords<WishRecord>(currentFamily.id, 'wish', {
+          filter: { field: 'status', op: 'eq', value: tab },
+          sort: [{
+            field: tab === 'fulfilled' ? 'updatedAt' : 'desiredDate',
+            direction: tab === 'fulfilled' ? 'desc' : 'asc',
+          }],
+          page: { limit: 200, cursor },
         });
-        if (cursor) params.set('cursor', cursor);
-        const page = await apiRequest<WishList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/wish/records?${params}`);
         items.push(...page.items);
         cursor = page.nextCursor;
       } while (cursor);
