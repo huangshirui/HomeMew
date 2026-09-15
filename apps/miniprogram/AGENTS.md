@@ -1,6 +1,6 @@
 # HomeMew Mini Program Agent Instructions
 
-This file applies to `apps/miniprogram/`. Read `/AGENTS.md`, `/docs/architecture.md`, `/docs/product-rules.md`, this application's README, and the current LifeSpace contract relevant to the task before making changes.
+This file applies to `apps/miniprogram/`. Read `/AGENTS.md`, `/docs/architecture.md`, `/docs/product-rules.md`, accepted decisions under `/docs/decisions/`, this application's README, and the current LifeSpace contract relevant to the task before making changes.
 
 ## Architecture
 
@@ -25,13 +25,26 @@ Do not use `wx.cloud.init`, `wx.cloud.callFunction`, WeChat Cloud Database, or W
 
 ### Normal requests
 
+The accepted `2026-09-15-miniprogram-bff-contract-boundary` decision supersedes the previous rule that every normal business request must call LifeSpace Core directly.
+
+Use two explicit request paths:
+
 ```text
+Platform/identity/stable model requests
 Mini Program
 -> Authorization: Bearer <short-lived LifeSpace user token>
--> LifeSpace Identity or Core
+-> LifeSpace Identity/Core
+
+HomeMew business surfaces that require release-lag isolation
+Mini Program
+-> Authorization: Bearer <short-lived LifeSpace user token>
+-> bounded HomeMew Mini BFF route
+-> fixed LifeSpace Core operation
 ```
 
-Do not add a transparent HomeMew `/families/...` proxy/BFF. HomeMew product terms are adapted explicitly in `miniprogram/services/` to LifeSpace APIs.
+The BFF is an application contract/anti-corruption boundary, not a second business Core. It must not persist household business data, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, or become a generic `/api/v1/*` proxy.
+
+Event is the first BFF-protected surface because LifeSpace Event will migrate to first-class TemporalRange semantics. Add another model behind the BFF only for a concrete compatibility/product-boundary need.
 
 ## Product surface boundary
 
@@ -44,9 +57,9 @@ The Mini Program may display audit actors that happen to be external systems whe
 ## Source of truth
 
 - Platform API/auth/model behavior: `huangshirui/LifeSpace`.
-- HomeMew product/UX behavior: this repository.
+- HomeMew product/UX and Mini BFF contract behavior: this repository.
 - Legacy `apps/core/openapi.yaml` is not the current Mini Program platform contract after the LifeSpace cutover.
-- If LifeSpace lacks a required capability, identify the exact gap and obtain explicit approval before modifying LifeSpace. Do not invent a permanent client or BFF workaround.
+- If LifeSpace lacks a required durable platform capability, identify the exact gap and obtain explicit approval before modifying LifeSpace. Do not hide a missing platform capability inside BFF persistence or authorization logic.
 
 ## Product mapping
 
@@ -54,21 +67,21 @@ The Mini Program may display audit actors that happen to be external systems whe
 - HomeMew admin -> Space `owner`/`admin`
 - ordinary writable member -> Space `editor`
 - member references used by models -> Space Person IDs
-- event -> `event` + Calendar capability
+- event -> HomeMew Mini Event BFF -> LifeSpace `event` + Calendar/Temporal semantics
 - task -> `task` + Actions
 - day -> `day_record` + Temporal capability
 - wish -> `wish` + Actions
 - 喵一下 -> Registry Creation Drafts
 
-The UI may keep names such as `familyId`, `attendeeIds` and `assigneeIds`; service adapters must translate them to platform fields such as Space IDs and Person IDs.
+The UI may keep names such as `familyId`, `attendeeIds` and `assigneeIds`; service adapters/BFF mappings must translate them explicitly to current LifeSpace semantics where needed.
 
 ## Shared request client
 
 All authenticated requests must use the shared request layer. It must:
 
 - attach the Bearer token;
-- choose LifeSpace Identity/Core explicitly;
-- parse standard success/error envelopes;
+- choose HomeMew BFF, LifeSpace Identity or LifeSpace Core explicitly;
+- parse standard `{ data }` / `{ error }` envelopes;
 - retain request IDs for diagnostics;
 - handle timeouts;
 - serialize token refresh so concurrent requests do not trigger multiple refreshes;
@@ -77,13 +90,13 @@ All authenticated requests must use the shared request layer. It must:
 
 ## State and authorization
 
-`currentFamilyId` is UI state only. LifeSpace authorization is authoritative. Client role checks only control presentation.
+`currentFamilyId` is UI state only. LifeSpace authorization is authoritative. Client and BFF role checks may control presentation/validation convenience only and must not become authority.
 
 At startup, refresh authentication, load the current user and accessible family Spaces, validate the cached family, then select/restore an accessible family.
 
 ## Time and concurrency
 
-Follow LifeSpace contract semantics:
+Follow the active HomeMew BFF contract and underlying LifeSpace semantics:
 
 - timed event instants use RFC 3339 UTC;
 - all-day ranges are half-open date ranges;
@@ -91,6 +104,8 @@ Follow LifeSpace contract semantics:
 - use the appropriate IANA timezone for household/viewing calculations;
 - pass current resource `version` for operations that require optimistic concurrency;
 - on version conflict, reload and ask the user to review rather than silently overwrite.
+
+The BFF may translate between the stable Mini Program Event DTO and a newer LifeSpace temporal representation, but it must preserve these observable semantics.
 
 ## Local storage
 
@@ -115,4 +130,4 @@ npm run watch
 
 ## Definition of done
 
-A Mini Program change is complete only when it follows the LifeSpace contract, uses the shared auth/request path, contains no backend secrets, handles expiry/errors/concurrency, updates affected HomeMew docs/tests, and does not silently reintroduce a second business backend.
+A Mini Program change is complete only when it follows the accepted HomeMew application boundary and current LifeSpace semantics, uses the shared auth/request path, contains no backend secrets, handles expiry/errors/concurrency, updates affected HomeMew docs/tests, and does not silently reintroduce a second business backend.
