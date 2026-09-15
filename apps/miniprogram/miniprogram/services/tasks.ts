@@ -1,6 +1,7 @@
 /** HomeMew 待办 -> LifeSpace task 模型与 Actions。 */
 
 import { request } from './api';
+import { andFilters, orFilters, queryModelRecords, type CanonicalQueryFilter } from './canonical-query';
 import { Actor, Task, CreateTaskRequest, UpdateTaskRequest } from '../types/index';
 import {
   LifeSpacePage,
@@ -11,7 +12,6 @@ import {
   modelCollectionPath,
   modelRecordPath,
   personRefs,
-  queryString,
   userIdToPersonId,
   userIdsToPersonIds,
 } from './lifespace';
@@ -66,36 +66,10 @@ async function toTask(spaceId: string, raw: TaskResource): Promise<Task> {
   };
 }
 
-function platformSort(sort: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc' | undefined): string | undefined {
-  if (sort === 'due_desc') return 'dueDate:desc';
-  if (sort === 'due_asc' || sort === undefined) return 'dueDate:asc';
-  return undefined;
-}
-
-function clientSort(
-  items: TaskResource[],
-  sort: 'due_asc' | 'due_desc' | 'created_desc' | 'updated_desc' | undefined,
-): TaskResource[] {
-  if (sort !== 'created_desc' && sort !== 'updated_desc') return items;
-  const field = sort === 'created_desc' ? 'createdAt' : 'updatedAt';
-  return [...items].sort((a, b) => b[field].localeCompare(a[field]));
-}
-
-function inDueRange(
-  task: TaskResource,
-  params: { dueDateFrom?: string; dueDateTo?: string; includeNoDue?: boolean } | undefined,
-): boolean {
-  if (!params?.dueDateFrom && !params?.dueDateTo) return true;
-  if (!task.dueDate) return params?.includeNoDue === true;
-  if (params.dueDateFrom && task.dueDate < params.dueDateFrom) return false;
-  if (params.dueDateTo && task.dueDate > params.dueDateTo) return false;
-  return true;
-}
-
 /**
  * 保持 HomeMew 页面侧契约：参数名与返回值仍为 Task[]。
- * LifeSpace task 已原生使用 pending/completed/cancelled 与 name；日期窗口以及
- * created/updated 排序在 HomeMew service 层适配。
+ * LifeSpace task 已原生使用 pending/completed/cancelled 与 name；查询统一降低为
+ * LifeSpace Canonical Query，不在客户端二次筛选或排序。
  */
 export async function listTasks(
   familyId: string,
@@ -112,30 +86,42 @@ export async function listTasks(
   const assigneePersonId = params?.assigneeId
     ? await userIdToPersonId(familyId, params.assigneeId)
     : null;
+  const dueBounds: CanonicalQueryFilter[] = [];
+  if (params?.dueDateFrom) dueBounds.push({ field: 'dueDate', op: 'gte', value: params.dueDateFrom });
+  if (params?.dueDateTo) dueBounds.push({ field: 'dueDate', op: 'lte', value: params.dueDateTo });
+  const dueRange = andFilters(dueBounds);
+  const dueFilter = params?.includeNoDue && dueRange
+    ? orFilters([dueRange, { field: 'dueDate', op: 'isNull' }])
+    : dueRange;
+  const filter = andFilters([
+    params?.status ? { field: 'status', op: 'eq', value: params.status } : undefined,
+    assigneePersonId
+      ? { field: 'assigneePersonIds', op: 'contains', value: assigneePersonId }
+      : undefined,
+    dueFilter,
+  ]);
+  const sortMap = {
+    due_asc: { field: 'dueDate', direction: 'asc' },
+    due_desc: { field: 'dueDate', direction: 'desc' },
+    created_desc: { field: 'createdAt', direction: 'desc' },
+    updated_desc: { field: 'updatedAt', direction: 'desc' },
+  } as const;
   const items: TaskResource[] = [];
   let cursor: string | null = null;
 
   for (let page = 0; page < 50; page++) {
-    const data: LifeSpacePage<TaskResource> = await request<LifeSpacePage<TaskResource>>(
-      `${modelCollectionPath(familyId, 'task')}${queryString({
-        status: params?.status,
-        assigneePersonIds: assigneePersonId ?? undefined,
-        q: params?.q,
-        sort: platformSort(params?.sort),
-        cursor,
-        limit: 100,
-      })}`,
-    );
+    const data: LifeSpacePage<TaskResource> = await queryModelRecords<TaskResource>(familyId, 'task', {
+      ...(params?.q ? { search: { text: params.q } } : {}),
+      ...(filter ? { filter } : {}),
+      sort: [sortMap[params?.sort ?? 'due_asc']],
+      page: { cursor, limit: 100 },
+    });
     items.push(...(data.items ?? []));
     cursor = data.nextCursor;
     if (!cursor) break;
   }
 
-  const filtered = clientSort(
-    items.filter(item => inDueRange(item, params)),
-    params?.sort,
-  );
-  return Promise.all(filtered.map(item => toTask(familyId, item)));
+  return Promise.all(items.map(item => toTask(familyId, item)));
 }
 
 export async function getTask(familyId: string, taskId: string): Promise<Task> {

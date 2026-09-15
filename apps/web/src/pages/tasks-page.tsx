@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
+import { queryModelRecords, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type TaskRecord = {
   id: string;
@@ -24,7 +25,6 @@ type TaskRecord = {
   updatedAt: string;
 };
 
-type TaskList = { items: TaskRecord[]; nextCursor: string | null };
 type TaskDraft = { name: string; description: string; dueDate: string; assigneePersonIds: string[] };
 type Tab = 'pending' | 'completed';
 
@@ -96,14 +96,15 @@ export function TasksPage() {
       const items: TaskRecord[] = [];
       let cursor: string | null = null;
       do {
-        const params = new URLSearchParams({
-          status: tab,
-          sort: tab === 'pending' ? 'dueDate:asc' : 'updatedAt:desc',
-          limit: '200',
+        const page: CanonicalQueryPage<TaskRecord> = await queryModelRecords<TaskRecord>(currentFamily.id, 'task', {
+          ...(query ? { search: { text: query } } : {}),
+          filter: { field: 'status', op: 'eq', value: tab },
+          sort: [{
+            field: tab === 'pending' ? 'dueDate' : 'updatedAt',
+            direction: tab === 'pending' ? 'asc' : 'desc',
+          }],
+          page: { limit: 200, cursor },
         });
-        if (query) params.set('q', query);
-        if (cursor) params.set('cursor', cursor);
-        const page = await apiRequest<TaskList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records?${params}`);
         items.push(...page.items);
         cursor = page.nextCursor;
       } while (cursor);

@@ -17,6 +17,7 @@ test('household pages keep their canonical LifeSpace modelKey and Action routes'
   const days = source('./src/pages/days-page.tsx');
   const wishes = source('./src/pages/wishes-page.tsx');
   const home = source('./src/pages/home-page.tsx');
+  const canonicalQuery = source('./src/lib/canonical-query.ts');
 
   requireAll(calendar, [
     /\/models\/event\/records\?\$\{params\}/u,
@@ -28,7 +29,7 @@ test('household pages keep their canonical LifeSpace modelKey and Action routes'
   ], 'Calendar');
 
   requireAll(tasks, [
-    /\/models\/task\/records\?\$\{params\}/u,
+    /queryModelRecords<TaskRecord>\(currentFamily\.id, 'task'/u,
     /\/models\/task\/records`/u,
     /\/models\/task\/records\/\$\{encodeURIComponent\(editing\.id\)\}/u,
     /action: 'complete' \| 'reopen'/u,
@@ -44,10 +45,16 @@ test('household pages keep their canonical LifeSpace modelKey and Action routes'
   ], 'Days');
 
   requireAll(wishes, [
+    /queryModelRecords<WishRecord>\(currentFamily\.id, 'wish'/u,
     /\/models\/wish\/records`/u,
     /actionKey: 'fulfill' \| 'reopen'/u,
     /\/actions\/\$\{actionKey\}/u,
   ], 'Wishes');
+
+  requireAll(canonicalQuery, [
+    /\/models\/\$\{encodeURIComponent\(modelKey\)\}\/records\/query/u,
+    /method: 'POST'/u,
+  ], 'Canonical Query transport');
 
   requireAll(home, [
     /\/models\/event\/records\?\$\{eventParams\}/u,
