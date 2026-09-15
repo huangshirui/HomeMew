@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
-import { queryModelRecords } from '../lib/canonical-query';
+import { queryModelRecords, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type TaskRecord = {
   id: string;
@@ -96,7 +96,7 @@ export function TasksPage() {
       const items: TaskRecord[] = [];
       let cursor: string | null = null;
       do {
-        const page = await queryModelRecords<TaskRecord>(currentFamily.id, 'task', {
+        const page: CanonicalQueryPage<TaskRecord> = await queryModelRecords<TaskRecord>(currentFamily.id, 'task', {
           ...(query ? { search: { text: query } } : {}),
           filter: { field: 'status', op: 'eq', value: tab },
           sort: [{
