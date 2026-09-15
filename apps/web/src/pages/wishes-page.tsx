@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
-import { queryModelRecords } from '../lib/canonical-query';
+import { queryModelRecords, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type WishStatus = 'open' | 'fulfilled';
 type WishRecord = {
@@ -70,7 +70,7 @@ export function WishesPage() {
       const items: WishRecord[] = [];
       let cursor: string | null = null;
       do {
-        const page = await queryModelRecords<WishRecord>(currentFamily.id, 'wish', {
+        const page: CanonicalQueryPage<WishRecord> = await queryModelRecords<WishRecord>(currentFamily.id, 'wish', {
           filter: { field: 'status', op: 'eq', value: tab },
           sort: [{
             field: tab === 'fulfilled' ? 'updatedAt' : 'desiredDate',
