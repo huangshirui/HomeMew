@@ -1,12 +1,14 @@
 /**
- * LifeSpace 统一请求封装。
- * 默认请求 Core；用户资料/头像等 Identity 资源可通过 target: 'identity' 调用。
+ * HomeMew / LifeSpace 统一请求封装。
+ * 默认请求 LifeSpace Core；Identity 资源使用 target: 'identity'；
+ * 需要应用契约隔离的 Mini Program BFF 资源使用 target: 'backend'。
  */
 
 import { ErrorResponse } from '../types/index';
 import {
   getCoreBaseUrl,
   getIdentityBaseUrl,
+  getLoginBackendUrl,
   generateRequestId,
   REQUEST_TIMEOUT,
   isTokenValid,
@@ -30,7 +32,7 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   skipRetry?: boolean;
   timeout?: number;
-  target?: 'core' | 'identity';
+  target?: 'core' | 'identity' | 'backend';
 }
 
 function getValidToken(): string | null {
@@ -109,7 +111,11 @@ export function request<T>(path: string, options: RequestOptions = {}): Promise<
     timeout = REQUEST_TIMEOUT,
     target = 'core',
   } = options;
-  const base = target === 'identity' ? getIdentityBaseUrl() : getCoreBaseUrl();
+  const base = target === 'identity'
+    ? getIdentityBaseUrl()
+    : target === 'backend'
+      ? getLoginBackendUrl()
+      : getCoreBaseUrl();
   const url = `${base}${path}`;
 
   return (async (): Promise<T> => {
