@@ -208,7 +208,8 @@ Last verified: 2026-09-16
 | HomeMew normative documentation alignment | ✅ Phase 0 complete | root/nested AGENTS, architecture/product rules, READMEs and historical decisions aligned in PR #82 |
 | Full Mini -> LifeSpace runtime call inventory | ✅ Complete | Source-derived inventory at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md` |
 | Final cross-surface Mini BFF route/DTO map | ✅ Design baseline complete | Every observed runtime dependency has a bounded product route/DTO and current/Phase-4 adapter note |
-| BFF -> LifeSpace Service Bindings | 🟡 Foundation in PR #84 | production bindings and fixed adapter implemented for Event/profile/access-link/avatar slice; remaining routes pending |
+| BFF -> LifeSpace Service Bindings | 🟡 Foundation merged | PR #84 merged at `53a04ce`; fixed Core/Identity adapter is used by Event/profile/access-link/avatar and the Family slice |
+| Family / Member / Invitation BFF slice | 🟡 PR #85 open | Fixed product routes/DTOs implemented against current Core/Identity; Mini callers remain unchanged |
 | HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
 | One-time Mini migration | ⬜ Not done | Phase 2 |
 | WeChat review | ⬜ Not done | Phase 3 |
@@ -367,7 +368,8 @@ local tests/typecheck/build
 - [x] fixed-router/binding contract tests and shared implementation for Core/Identity;
 - [x] current-user profile, access-link, user/family avatar read/upload adapter slice;
 - [x] existing Event precursor moved from public Core fetch to the shared Core binding;
-- [ ] current-LifeSpace adapters for remaining final routes;
+- [x] family/member/invitation adapter slice against current Core/Identity bindings (PR #85);
+- [ ] current-LifeSpace adapters for Task/Wish/Day/Creation Draft/diagnostic and remaining final routes;
 - [ ] one production-compatible Event old/new adapter seam;
 - [ ] HomeMew Web staging workflow/config retirement;
 - [ ] BFF/Web checks and production smoke evidence.
@@ -529,23 +531,23 @@ No external blocker prevents Phase 1.
 
 Phase 0 documentation drift is resolved in merged PR #82. The Phase-1 source-derived inventory and final route/DTO design baseline now exist at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md`.
 
-No external blocker prevents the first implementation slice. The main correctness risks are accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must land before broad route implementation.
+No external blocker prevents the remaining Phase-1 implementation slices. PR #84 is merged; PR #85 contains the Family / Member / Invitation slice and is awaiting repository CI/review. The main correctness risks remain accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must accompany each bounded route slice.
 
 The existing HomeMew Web staging workflow/config remains a known Phase-1 retirement item. Its presence is implementation evidence to remove, not current release authority.
 
 ## 14. Exact next action / 下一步动作
 
-**Finish review/CI for PR #84, then implement the family/member/invitation vertical adapter slice; do not change Mini runtime calls yet.**
+**Finish CI/review for PR #85, then implement the bounded Task + Wish adapter slice; do not change Mini runtime calls yet.**
 
-After PR #84 is merged:
+After PR #85 is merged:
 
 1. re-read current `main`, this plan, and the inventory baseline;
-2. add contract tests for family list/create/detail/update/close/leave, member list/role/remove, and invitation create/list/revoke/preview/join;
-3. implement only the fixed `/api/v1/miniprogram/families/**` and `/api/v1/miniprogram/family-invites/**` routes against current LifeSpace Core/Identity bindings;
-4. keep `familyId` and HomeMew admin/member DTOs stable while translating Space roles, current-user identity, member counts, Person IDs, and avatar URLs inside the BFF;
-5. preserve LifeSpace bearer authority, optimistic versions, error envelopes, and request IDs; do not add BFF role authorization or persistence;
+2. verify the current production-compatible Task and Wish paths, field mappings, lifecycle actions, query parameters, pagination, and optimistic-version behavior against LifeSpace Runtime/contracts/tests;
+3. add Mini-facing contract and deny tests before implementation, including explicit ordering/query lowering and upstream error propagation;
+4. implement only the fixed Task and Wish product routes from the inventory using the shared Core Service Binding adapter;
+5. keep LifeSpace authorization and storage truth authoritative; do not expose a generic model proxy, Canonical Query AST, arbitrary upstream fields, or client-selected upstream paths;
 6. run the full Web/BFF suite and update this plan plus #79 with exact evidence;
-7. only after the family slice is green, proceed to Task/Wish/Day/Creation Draft adapters and then retire HomeMew Web staging.
+7. only after that slice is green, proceed to Day / Creation Draft / diagnostic adapters, the Event final-contract seam, and HomeMew Web staging retirement.
 
 Do not merge PR #77, start LifeSpace #234's breaking Event migration, remove LifeSpace compatibility, or alter Mini runtime addressing in this slice.
 
@@ -587,8 +589,20 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Branch / PR: `codex/phase-1-bff-binding-profile-slice` / #84
 - Base: merged inventory PR #83 at `804b704`
 - Completed: fixed Core/Identity binding adapter; fail-closed Mini route handling; profile update/read; access-link confirmation; user/family avatar read/upload; avatar URL rewriting; Event precursor moved to Core binding; production bindings documented/configured.
-- Evidence: focused Node tests 13/13 passed locally; full repository CI pending on #84.
+- Evidence: focused Node tests 13/13 passed locally; GitHub Web check passed; PR #84 merged as `53a04ce2699e1e30e3333ced7185d3b1af4471c7`.
 - Authority checked: HomeMew root AGENTS, architecture/product rules, accepted final-BFF decision, Web README/config/tests, inventory/plan; current LifeSpace Identity/Core paths and production Worker names from the prior verified inventory.
 - Changed assumptions/decisions: none. Public LifeSpace URL variables remain only for the server-controlled Web session BFF; Mini adapters have no public-URL fallback.
 - Remaining: family/member/invitation adapters; Task/Wish/Day/Creation Draft/diagnostic adapters; Event final route/DTO adapter seam; Web staging retirement; Phase-2 Mini cutover.
-- Blockers: no external blocker; #84 CI/review must pass before the next slice is based on main.
+- Blockers: none; #84 is merged.
+
+
+### 2026-09-16 — Phase 1 Family / Member / Invitation slice
+
+- Branch / PR: `codex/phase-1-bff-family-invite-slice` / #85
+- Base: merged binding/profile PR #84 at `53a04ce`
+- Completed: bounded Family CRUD/lifecycle routes; member list/role/remove; invitation create/list/revoke/preview/join; Core/Identity composition; product role/DTO mapping; avatar URL rewriting; front-door ordering before the generic fail-closed Mini handler.
+- Evidence: focused Node tests 27/27 passed locally, including fixed-route/field/query deny coverage, leave/removal forwarding, LifeSpace authorization error propagation, and front-door integration; repository CI pending on #85.
+- Authority checked: current merged plan/inventory and accepted boundary; HomeMew root AGENTS and Web constraints; current LifeSpace Space/member/invitation Runtime paths and version/role behavior.
+- Changed assumptions/decisions: none. The slice applies the accepted boundary; LifeSpace remains authorization and domain authority, so no Notion decision-log append is required.
+- Remaining: Task/Wish adapters; Day/Creation Draft/diagnostic adapters; Event final route/DTO adapter seam; Web staging retirement; Phase-2 Mini cutover.
+- Blockers: no external blocker; #85 CI/review must pass before the next slice is based on main.

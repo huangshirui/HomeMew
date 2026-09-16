@@ -47,6 +47,45 @@ test('Mini Program Event BFF is handled through the Core binding before the Acce
   assert.equal(appCalled, false);
 });
 
+test('Mini Program Family BFF is handled before the generic Mini catch-all and Web app', async () => {
+  let appCalled = false;
+  let upstreamCalled = false;
+  const handler = createFrontDoorHandler({
+    app: {
+      async fetch() {
+        appCalled = true;
+        return new Response('web');
+      },
+    },
+  });
+  const response = await handler.fetch(
+    request('/api/v1/miniprogram/family-invites/preview', { method: 'POST', body: { code: 'LS-CODE' } }),
+    {
+      LIFESPACE_CORE: {
+        async fetch(incoming) {
+          upstreamCalled = true;
+          assert.equal(new URL(incoming.url).pathname, '/api/v1/space-invites/preview');
+          assert.deepEqual(await incoming.json(), { token: 'LS-CODE' });
+          return new Response(JSON.stringify({
+            data: {
+              space: { id: 'spc_home', name: 'Home', memberCount: 2 },
+              expiresAt: '2026-09-17T00:00:00Z',
+              canJoin: true,
+            },
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        },
+      },
+    },
+  );
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.family.id, 'spc_home');
+  assert.equal(upstreamCalled, true);
+  assert.equal(appCalled, false);
+});
+
 test('unknown Mini BFF routes fail closed before the Access-protected Web app', async () => {
   let appCalled = false;
   const handler = createFrontDoorHandler({
