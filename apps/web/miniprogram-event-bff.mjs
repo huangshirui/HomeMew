@@ -6,6 +6,7 @@ const LIST_QUERY_KEYS = new Set([
   'rangeEnd',
   'dateStart',
   'dateEndExclusive',
+  'timezone',
   'attendeePersonIds',
   'status',
   'q',
@@ -67,6 +68,7 @@ function copyListQuery(input, output) {
     if (!LIST_QUERY_KEYS.has(key)) {
       throw new Error(`unsupported-query:${key}`);
     }
+    if (key === 'timezone') continue;
     if (output.has(key)) {
       throw new Error(`duplicate-query:${key}`);
     }
