@@ -3,7 +3,7 @@
 Status: Active / Living Plan  
 Started: 2026-09-16  
 Tracking issue: HomeMew #79  
-Current phase: Phase 1 — source-derived inventory and final Mini BFF contract design  
+Current phase: Phase 1 — final BFF implementation against current LifeSpace  
 Related platform work: LifeSpace #234  
 Accepted architecture decision: `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
 
@@ -208,7 +208,7 @@ Last verified: 2026-09-16
 | HomeMew normative documentation alignment | ✅ Phase 0 complete | root/nested AGENTS, architecture/product rules, READMEs and historical decisions aligned in PR #82 |
 | Full Mini -> LifeSpace runtime call inventory | ✅ Complete | Source-derived inventory at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md` |
 | Final cross-surface Mini BFF route/DTO map | ✅ Design baseline complete | Every observed runtime dependency has a bounded product route/DTO and current/Phase-4 adapter note |
-| BFF -> LifeSpace Service Bindings | 🟡 Targets verified | production services are `lifespace-core` and `lifespace-identity`; implementation not started |
+| BFF -> LifeSpace Service Bindings | 🟡 Foundation in PR #84 | production bindings and fixed adapter implemented for Event/profile/access-link/avatar slice; remaining routes pending |
 | HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
 | One-time Mini migration | ⬜ Not done | Phase 2 |
 | WeChat review | ⬜ Not done | Phase 3 |
@@ -364,8 +364,10 @@ local tests/typecheck/build
 - [x] current and known Phase-4 LifeSpace adapter targets verified against Runtime/contracts;
 - [x] production Worker service names verified: `lifespace-core`, `lifespace-identity`;
 - [x] contract-test matrix and Web staging retirement plan recorded;
-- [ ] fixed-router/binding contract tests and implementation;
-- [ ] current-LifeSpace adapters for all final routes;
+- [x] fixed-router/binding contract tests and shared implementation for Core/Identity;
+- [x] current-user profile, access-link, user/family avatar read/upload adapter slice;
+- [x] existing Event precursor moved from public Core fetch to the shared Core binding;
+- [ ] current-LifeSpace adapters for remaining final routes;
 - [ ] one production-compatible Event old/new adapter seam;
 - [ ] HomeMew Web staging workflow/config retirement;
 - [ ] BFF/Web checks and production smoke evidence.
@@ -533,17 +535,17 @@ The existing HomeMew Web staging workflow/config remains a known Phase-1 retirem
 
 ## 14. Exact next action / 下一步动作
 
-**Implement the first test-first BFF foundation slice against the completed inventory; do not change Mini runtime calls yet.**
+**Finish review/CI for PR #84, then implement the family/member/invitation vertical adapter slice; do not change Mini runtime calls yet.**
 
-On branch `codex/phase-1-mini-bff-contract-inventory` (or a successor based on its merged result):
+After PR #84 is merged:
 
-1. review `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md` against the current branch diff and keep it as the route/DTO baseline;
-2. add fixed-router contract and deny tests covering unknown routes, arbitrary upstream URL/path/model selection, bearer/request-ID propagation, upstream error preservation, and avatar URL rewriting;
-3. introduce a shared Core/Identity Service-Binding adapter with explicit targets only, using HomeMew binding names `LIFESPACE_CORE` and `LIFESPACE_IDENTITY`;
-4. add those bindings in the production Wrangler config to `lifespace-core` and `lifespace-identity`;
-5. implement the first vertical route slice for current-user profile, access-link confirmation, user/family avatar read/upload, and the required URL rewriting, preserving existing Mini DTOs;
-6. keep the existing Event-only route working during this server-side slice; do not migrate Mini callers yet;
-7. run Web/BFF tests and update this plan plus HomeMew #79 with exact evidence and the next adapter slice.
+1. re-read current `main`, this plan, and the inventory baseline;
+2. add contract tests for family list/create/detail/update/close/leave, member list/role/remove, and invitation create/list/revoke/preview/join;
+3. implement only the fixed `/api/v1/miniprogram/families/**` and `/api/v1/miniprogram/family-invites/**` routes against current LifeSpace Core/Identity bindings;
+4. keep `familyId` and HomeMew admin/member DTOs stable while translating Space roles, current-user identity, member counts, Person IDs, and avatar URLs inside the BFF;
+5. preserve LifeSpace bearer authority, optimistic versions, error envelopes, and request IDs; do not add BFF role authorization or persistence;
+6. run the full Web/BFF suite and update this plan plus #79 with exact evidence;
+7. only after the family slice is green, proceed to Task/Wish/Day/Creation Draft adapters and then retire HomeMew Web staging.
 
 Do not merge PR #77, start LifeSpace #234's breaking Event migration, remove LifeSpace compatibility, or alter Mini runtime addressing in this slice.
 
@@ -579,3 +581,14 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Authority checked: HomeMew root and Mini AGENTS, architecture/product rules, accepted decision/plan; LifeSpace root/apps/Core/Identity constraints, Canonical Query/time specs, OpenAPI/Runtime/model definitions/tests, #234.
 - Changed assumptions: avatar asset URLs and the About-page Core latency probe are runtime dependencies and must cross the final BFF; they are not exceptions.
 - New architecture/product decision: none; this applies the accepted 2026-09-16 boundary, so no Notion decision-log append is required.
+
+### 2026-09-16 — Phase 1 binding foundation and profile/media slice
+
+- Branch / PR: `codex/phase-1-bff-binding-profile-slice` / #84
+- Base: merged inventory PR #83 at `804b704`
+- Completed: fixed Core/Identity binding adapter; fail-closed Mini route handling; profile update/read; access-link confirmation; user/family avatar read/upload; avatar URL rewriting; Event precursor moved to Core binding; production bindings documented/configured.
+- Evidence: focused Node tests 13/13 passed locally; full repository CI pending on #84.
+- Authority checked: HomeMew root AGENTS, architecture/product rules, accepted final-BFF decision, Web README/config/tests, inventory/plan; current LifeSpace Identity/Core paths and production Worker names from the prior verified inventory.
+- Changed assumptions/decisions: none. Public LifeSpace URL variables remain only for the server-controlled Web session BFF; Mini adapters have no public-URL fallback.
+- Remaining: family/member/invitation adapters; Task/Wish/Day/Creation Draft/diagnostic adapters; Event final route/DTO adapter seam; Web staging retirement; Phase-2 Mini cutover.
+- Blockers: no external blocker; #84 CI/review must pass before the next slice is based on main.

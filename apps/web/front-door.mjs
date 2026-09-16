@@ -1,4 +1,5 @@
 import webHandler from './worker.mjs';
+import { handleMiniProgramBff } from './miniprogram-bff.mjs';
 import { handleMiniProgramEventBff } from './miniprogram-event-bff.mjs';
 
 function json(data, status = 200) {
@@ -32,6 +33,9 @@ export function createFrontDoorHandler({ app = webHandler } = {}) {
     async fetch(request, env, context) {
       const eventBffResponse = await handleMiniProgramEventBff(request, env);
       if (eventBffResponse) return eventBffResponse;
+
+      const miniBffResponse = await handleMiniProgramBff(request, env);
+      if (miniBffResponse) return miniBffResponse;
 
       const url = new URL(request.url);
       if (isBackendPublicRoute(request, url)) {

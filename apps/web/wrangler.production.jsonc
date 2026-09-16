@@ -21,6 +21,8 @@
     "LIFESPACE_CORE_URL": "https://core.aisr.online"
   },
   "services": [
-    { "binding": "HOMEMEW_BACKEND", "service": "homemew-backend-production" }
+    { "binding": "HOMEMEW_BACKEND", "service": "homemew-backend-production" },
+    { "binding": "LIFESPACE_CORE", "service": "lifespace-core" },
+    { "binding": "LIFESPACE_IDENTITY", "service": "lifespace-identity" }
   ]
 }
