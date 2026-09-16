@@ -139,8 +139,7 @@ n8n 服务 Token
 `404/USER_NOT_FOUND` 时才重建 Core 用户并原位更新映射；401、403、超时和 5xx 均作为登录
 错误返回，避免因临时故障创建重复用户。
 
-定时日程统一提交规范 UTC `startAt/endAt`，`startTimezone/endTimezone` 仅作为端点显示元数据；
-全天日程只提交 `startDate/endDateExclusive`。待办截止日期使用纯日期 `dueDate`。
+日程通过 LifeSpace canonical `when: temporal_range` 读写：定时日程使用绝对 RFC 3339 `instant` 区间，全天日程使用纯日期 `date` 区间；两者均采用半开区间 `[start, endExclusive)`。待办截止日期使用纯日期 `dueDate`。
 
 ## 4.2 获取用户信息
 
@@ -634,206 +633,84 @@ POST /api/v1/families/{familyId}/invites/{inviteId}/revoke
 
 ## 9.1 日程列表
 
-调用：
+小程序通过 LifeSpace 单模型 Canonical Query 查询 Event：
 
 ```http
-GET /api/v1/families/{familyId}/events?startDate=2026-07-01&endDateExclusive=2026-08-01&timezone=Asia%2FShanghai
+POST /api/v1/spaces/{spaceId}/models/event/records/query
 ```
 
-`timezone` 是「查看时区」：Core 用它把 `startDate/endDateExclusive` 换算成 UTC 查询窗口。
-客户端必须使用同一个查看时区决定「日程属于哪一天」——包括列表分组、月历圆点和首页
-「今天」判断。日程自身的 `startTimezone/endTimezone` 只是端点地点时区元数据
-（例如航班出发地 / 到达地），只能作为详情与卡片上的时间标签，绝不能参与归组，
-否则同一条日程会被分到 Core 查询窗口以外的另一天。
+请求使用 `when overlaps local_date_window`，并在 operand 和 `context.viewingTimezone` 中携带同一个明确 IANA 查看时区。按 `when` 排序时，该上下文也是 cursor 语义的一部分。
 
-由于查询窗口与归组窗口语义一致，请求不得再前后额外扩几天；
-「当前范围无日程」的判断也只统计真正落在范围内、能被展示的日程。
+客户端必须使用同一个查看时区决定定时日程属于哪一天，包括列表分组、月历圆点和首页“今天”判断。Event 保存的是绝对 Instant 或纯 Date，不保存另一份端点时区真值。
 
-第一版建议提供两种展示：
-
-```text
-日期列表
-月历 + 当日列表
-```
-
-默认进入时展示：
-
-* 今天；
-* 未来近期日程；
-* 全天日程；
-* 普通时间日程。
-
-可筛选：
-
-* 时间范围；
-* 全部参与人；
-* 只看我的日程；
-* 指定家庭成员。
-
-只看我的日程：
-
-```http
-GET /api/v1/families/{familyId}/events?startDate=2026-07-01&endDateExclusive=2026-08-01&timezone=Asia%2FShanghai&attendeeId=me
-```
+查询窗口与归组窗口都使用半开区间，不额外前后扩日。支持 status、参与人和关键词与时间窗口共同过滤，并通过 `nextCursor` 翻页。
 
 ## 9.2 日程卡片
 
-日程列表项展示：
-
-* 标题；
-* 日期；
-* 开始和结束时间；
-* 全天标识；
-* 地点；
-* 参与人头像；
-* 已取消状态，可选。
+日程列表项展示标题、日期/时间、全天标识、地点、参与人和状态。全天标识由 `when.kind === "date"` 派生。
 
 ## 9.3 日程详情
 
-调用：
-
 ```http
-GET /api/v1/families/{familyId}/events/{eventId}
+GET /api/v1/spaces/{spaceId}/models/event/records/{eventId}
 ```
 
-展示：
-
-* 标题；
-* 描述；
-* 开始时间；
-* 结束时间；
-* 是否全天；
-* 地点；
-* 参与人；
-* 创建人；
-* 最后修改人；
-* 创建和修改时间。
-
-提供：
-
-* 编辑；
-* 删除。
-
-第一版家庭所有有效成员均可编辑和删除日程。
+页面 DTO 可以继续使用 `isAllDay` 等便于渲染的字段，但它们必须由 service 边界从 canonical `when` 确定性派生，不形成第二份后端合同。
 
 ## 9.4 创建日程
 
-表单字段：
-
-```text
-标题：必填
-描述：可选
-全天：开关
-开始日期/时间：必填
-结束日期/时间：必填
-参与人：可多选
-地点：可选文本
-```
-
-普通时间日程示例：
+定时日程：
 
 ```json
 {
   "summary": "足球训练",
-  "description": "携带水杯和训练服",
-  "startAt": "2026-07-25T08:00:00.000Z",
-  "endAt": "2026-07-25T10:00:00.000Z",
-  "isAllDay": false,
-  "startTimezone": "Asia/Shanghai",
-  "endTimezone": "Asia/Shanghai",
-  "attendeeIds": [
-    "usr_KK",
-    "usr_DAD"
-  ],
+  "when": {
+    "kind": "instant",
+    "start": "2026-07-25T08:00:00.000Z",
+    "endExclusive": "2026-07-25T10:00:00.000Z"
+  },
+  "attendeePersonIds": ["per_KK", "per_DAD"],
   "location": "浦东足球公园"
 }
 ```
 
-调用：
-
 ```http
-POST /api/v1/families/{familyId}/events
+POST /api/v1/spaces/{spaceId}/models/event/records
 ```
 
 ## 9.5 全天日程
 
-全天日程只选择日期，不选择具体时间。
-
-前端应清楚表达结束日期规则。
-
-建议用户界面显示为包含式日期，例如：
-
-```text
-7 月 25 日至 7 月 27 日
-```
-
-提交给 Core 时转换成结束日期不包含的形式：
+全天日程只选择日期。界面可以显示包含式结束日期，提交时转换为 exclusive boundary：
 
 ```json
 {
-  "isAllDay": true,
-  "startDate": "2026-07-25",
-  "endDateExclusive": "2026-07-28"
+  "when": {
+    "kind": "date",
+    "start": "2026-07-25",
+    "endExclusive": "2026-07-28"
+  }
 }
 ```
 
 ## 9.6 参与人选择
 
-参与人从当前家庭成员列表中选择。
-
-支持：
-
-* 不选择任何人；
-* 选择自己；
-* 选择多个家庭成员；
-* 全选家庭成员。
-
-前端提交 `userId`，不提交昵称作为身份。
+参与人从当前家庭成员列表中选择；service 边界把 HomeMew 用户选择映射为当前 Space Person IDs。
 
 ## 9.7 编辑日程
 
-调用：
-
 ```http
-PATCH /api/v1/families/{familyId}/events/{eventId}
+PATCH /api/v1/spaces/{spaceId}/models/event/records/{eventId}
 ```
 
-修改时携带当前版本号：
-
-```json
-{
-  "summary": "足球比赛",
-  "version": 2
-}
-```
-
-如果返回版本冲突：
-
-```text
-该日程已被其他成员修改
-```
-
-提供：
-
-* 重新加载；
-* 查看最新内容；
-* 用户重新编辑。
-
-不要自动覆盖其他成员的修改。
+`when` 作为一个值原子替换，并携带当前 `version`。版本冲突时重新加载并让用户确认，不自动覆盖。
 
 ## 9.8 删除日程
 
-调用：
-
 ```http
-DELETE /api/v1/families/{familyId}/events/{eventId}?version=2
+DELETE /api/v1/spaces/{spaceId}/models/event/records/{eventId}
 ```
 
-要求：
-
-* 二次确认；
-* 删除成功后返回日程列表；
-* 刷新首页近期日程。
+请求体携带当前 `version`；删除前二次确认，成功后刷新首页与日程列表。
 
 ## 9.9 第一版暂不支持
 
