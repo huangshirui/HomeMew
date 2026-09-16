@@ -1,4 +1,4 @@
-/** HomeMew 日程 -> LifeSpace event Calendar capability。 */
+/** HomeMew 日程 -> HomeMew Mini BFF -> LifeSpace event。 */
 
 import { request } from './api';
 import { Event, CreateEventRequest, UpdateEventRequest } from '../types/index';
@@ -8,8 +8,6 @@ import {
   auditActor,
   calendarUtcRange,
   getSpaceMembers,
-  modelCollectionPath,
-  modelRecordPath,
   personRefs,
   queryString,
   userIdToPersonId,
@@ -46,6 +44,14 @@ type EventResource = ResourceBase & {
   startDate: string | null;
   endDateExclusive: string | null;
 };
+
+function eventBffCollectionPath(spaceId: string): string {
+  return `/api/v1/miniprogram/spaces/${encodeURIComponent(spaceId)}/events`;
+}
+
+function eventBffRecordPath(spaceId: string, recordId: string): string {
+  return `${eventBffCollectionPath(spaceId)}/${encodeURIComponent(recordId)}`;
+}
 
 async function toEvent(spaceId: string, raw: EventResource): Promise<Event> {
   const members = await getSpaceMembers(spaceId);
@@ -90,11 +96,12 @@ export async function fetchEventsPage(
     ? await userIdToPersonId(familyId, params.attendeeId)
     : null;
   const raw = await request<LifeSpacePage<EventResource>>(
-    `${modelCollectionPath(familyId, 'event')}${queryString({
+    `${eventBffCollectionPath(familyId)}${queryString({
       rangeStart: range.rangeStart,
       rangeEnd: range.rangeEnd,
       dateStart: params.startDate,
       dateEndExclusive: params.endDateExclusive,
+      timezone: params.timezone,
       attendeePersonIds: attendeePersonId ?? undefined,
       status: params.status,
       q: params.q,
@@ -102,6 +109,7 @@ export async function fetchEventsPage(
       cursor: params.cursor,
       limit: params.limit ?? 100,
     })}`,
+    { target: 'backend' },
   );
   return {
     items: await Promise.all((raw.items ?? []).map(item => toEvent(familyId, item))),
@@ -125,7 +133,10 @@ export async function listEvents(
 }
 
 export async function getEvent(familyId: string, eventId: string): Promise<Event> {
-  return toEvent(familyId, await request<EventResource>(modelRecordPath(familyId, 'event', eventId)));
+  return toEvent(
+    familyId,
+    await request<EventResource>(eventBffRecordPath(familyId, eventId), { target: 'backend' }),
+  );
 }
 
 function eventPayload(data: CreateEventRequest | UpdateEventRequest, attendeePersonIds?: string[]): Record<string, unknown> {
@@ -138,10 +149,11 @@ function eventPayload(data: CreateEventRequest | UpdateEventRequest, attendeePer
 
 export async function createEvent(familyId: string, data: CreateEventRequest): Promise<Event> {
   const attendeePersonIds = await userIdsToPersonIds(familyId, data.attendeeIds);
-  const raw = await request<EventResource>(modelCollectionPath(familyId, 'event'), {
+  const raw = await request<EventResource>(eventBffCollectionPath(familyId), {
     method: 'POST',
     data: eventPayload(data, attendeePersonIds),
     skipRetry: true,
+    target: 'backend',
   });
   return toEvent(familyId, raw);
 }
@@ -154,19 +166,21 @@ export async function updateEvent(
   const attendeePersonIds = data.attendeeIds === undefined
     ? undefined
     : await userIdsToPersonIds(familyId, data.attendeeIds);
-  const raw = await request<EventResource>(modelRecordPath(familyId, 'event', eventId), {
+  const raw = await request<EventResource>(eventBffRecordPath(familyId, eventId), {
     method: 'PATCH',
     data: eventPayload(data, attendeePersonIds),
     skipRetry: true,
+    target: 'backend',
   });
   return toEvent(familyId, raw);
 }
 
 export function deleteEvent(familyId: string, eventId: string, version: number): Promise<void> {
-  return request<void>(modelRecordPath(familyId, 'event', eventId), {
+  return request<void>(eventBffRecordPath(familyId, eventId), {
     method: 'DELETE',
     data: { version },
     skipRetry: true,
+    target: 'backend',
   });
 }
 
