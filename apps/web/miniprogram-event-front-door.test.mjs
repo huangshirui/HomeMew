@@ -86,6 +86,52 @@ test('Mini Program Family BFF is handled before the generic Mini catch-all and W
   assert.equal(appCalled, false);
 });
 
+test('Mini Program Task/Wish BFF is handled before the generic Mini catch-all and Web app', async () => {
+  let appCalled = false;
+  const calls = [];
+  const handler = createFrontDoorHandler({
+    app: {
+      async fetch() {
+        appCalled = true;
+        return new Response('web');
+      },
+    },
+  });
+  const response = await handler.fetch(
+    request('/api/v1/miniprogram/families/spc_home/tasks?status=pending'),
+    {
+      LIFESPACE_CORE: {
+        async fetch(incoming) {
+          const path = new URL(incoming.url).pathname;
+          calls.push(path);
+          if (path.endsWith('/members')) {
+            return new Response(JSON.stringify({ data: [] }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+          assert.equal(path, '/api/v1/spaces/spc_home/models/task/records/query');
+          assert.deepEqual(await incoming.json(), {
+            filter: { field: 'status', op: 'eq', value: 'pending' },
+            sort: [{ field: 'dueDate', direction: 'asc' }],
+            page: { limit: 100, cursor: null },
+          });
+          return new Response(JSON.stringify({ data: { items: [], nextCursor: null } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        },
+      },
+    },
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, [
+    '/api/v1/spaces/spc_home/members',
+    '/api/v1/spaces/spc_home/models/task/records/query',
+  ]);
+  assert.equal(appCalled, false);
+});
+
 test('unknown Mini BFF routes fail closed before the Access-protected Web app', async () => {
   let appCalled = false;
   const handler = createFrontDoorHandler({

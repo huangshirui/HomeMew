@@ -2,6 +2,7 @@ import webHandler from './worker.mjs';
 import { handleMiniProgramBff } from './miniprogram-bff.mjs';
 import { handleMiniProgramEventBff } from './miniprogram-event-bff.mjs';
 import { handleMiniProgramFamilyBff } from './miniprogram-family-bff.mjs';
+import { handleMiniProgramTaskWishBff } from './miniprogram-task-wish-bff.mjs';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -37,6 +38,9 @@ export function createFrontDoorHandler({ app = webHandler } = {}) {
 
       const familyBffResponse = await handleMiniProgramFamilyBff(request, env);
       if (familyBffResponse) return familyBffResponse;
+
+      const taskWishBffResponse = await handleMiniProgramTaskWishBff(request, env);
+      if (taskWishBffResponse) return taskWishBffResponse;
 
       const miniBffResponse = await handleMiniProgramBff(request, env);
       if (miniBffResponse) return miniBffResponse;
