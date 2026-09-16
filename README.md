@@ -6,18 +6,20 @@ HomeMew 是构建在 LifeSpace 平台之上的家庭事务应用。LifeSpace 是
 
 ```text
 WeChat Mini Program
-  -> HomeMew Web front door
-       -> /api/v1/login/wechat -> HomeMew Cloudflare backend
+  -> homemew.aisr.online
+       -> /api/v1/login/wechat -> HomeMew provider backend
             -> WeChat jscode2session
             -> Durable Object: openid -> LifeSpace usr_*
             -> LifeSpace Identity trusted application exchange
-  -> LifeSpace Identity / Core
+       -> stable HomeMew Mini BFF contract
+            -> fixed adapters
+            -> LifeSpace Identity / Core Service Bindings
 
 HomeMew Web
   -> Cloudflare Access
-  -> HomeMew Web Worker / same-origin BFF
+  -> HomeMew Web Worker / same-origin Web session BFF
        -> LifeSpace Identity Access principal exchange/linking
-       -> LifeSpace Identity / Core
+       -> current LifeSpace Identity / Core contract
 ```
 
 HomeMew 不再拥有独立的家庭业务 Core。旧 HomeMew Core 已在 2026-08-26 从 active tree 退休；需要追溯旧实现、OpenAPI 或 migration 时使用 Git 历史，不再把历史 Core 作为当前工作区的一部分。
@@ -111,9 +113,9 @@ homemew.aisr.online
   + /api/v1/login/wechat provider pass-through
 ```
 
-BFF 只负责 Access assertion、App Session、HttpOnly Cookie、Origin/CSRF 防护、凭据隔离和 LifeSpace 请求转发；不建立 `/families/...` 兼容 API，不保存家庭业务数据，也不复制 LifeSpace 授权逻辑。
+同一生产 Worker 承载两类边界：Web same-origin BFF 负责 Access assertion、App Session、HttpOnly Cookie、Origin/CSRF 与浏览器凭据隔离；Mini BFF 提供稳定、显式的 HomeMew 产品路由并在内部适配当前 LifeSpace 契约。两者都不保存家庭业务数据、不复制 LifeSpace 授权逻辑，也不接受任意上游 URL/路径或提供通用模型代理。
 
-生产已实现并验证 Access session exchange、existing-user link challenge、same-origin Core/Identity proxy、外部系统管理编排与微信登录 provider pass-through；HomeMew Web 不暴露 LifeSpace Access registration。
+当前过渡态已实现 Access session exchange、existing-user link challenge、same-origin Core/Identity proxy、外部系统管理编排、微信登录 provider pass-through 和 Event Mini BFF 先导路由。最终 Mini BFF 全量迁移由 `docs/plans/2026-09-16-miniprogram-final-bff-rollout.md` 跟踪；HomeMew Web 不暴露 LifeSpace Access registration。
 
 ## LifeSpace 模型映射
 

@@ -1,6 +1,10 @@
 # HomeMew Web staging acceptance
 
-This checklist is the final browser-level acceptance layer for the household Web application. LifeSpace Core semantics are verified in the LifeSpace staging gate; HomeMew CI additionally guards the page-to-model/Action route contract. The checks below prove the remaining real browser, Cloudflare Access and cross-client behavior.
+Status: Historical acceptance record / retirement target
+
+> This checklist records the completed pre-production staging acceptance approach. It is not the current HomeMew Web release procedure after the accepted 2026-09-16 final-BFF decision. HomeMew Web no longer maintains a dedicated staging environment; current releases use repository gates, explicit production deployment and production smoke verification. LifeSpace staging is unaffected.
+
+Historically, this checklist was the final browser-level acceptance layer for the household Web application. LifeSpace Core semantics are verified in the LifeSpace staging gate; HomeMew CI additionally guards the page-to-model/Action route contract. The checks below prove the remaining real browser, Cloudflare Access and cross-client behavior.
 
 ## Preconditions
 
@@ -39,4 +43,4 @@ This is intentionally not a substitute for the browser matrix. Cloudflare Access
 
 ## Exit criteria
 
-W6 household-domain staging acceptance is complete when every row above has been exercised on staging without an unresolved correctness, authorization, timezone, concurrency or cross-client issue. Record any defects as normal repository work; do not encode staging-only business behavior to make the checklist pass.
+The historical W6 household-domain staging acceptance was complete when every row above has been exercised on staging without an unresolved correctness, authorization, timezone, concurrency or cross-client issue. Record any defects as normal repository work; do not encode staging-only business behavior to make the checklist pass.

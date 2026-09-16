@@ -10,22 +10,24 @@ The legacy HomeMew business Core was retired from the active repository on 2026-
 
 ```text
 WeChat Mini Program
-  ├─ wx.login code ───────────────> HomeMew Cloudflare application backend
-  │                                  ├─ WeChat jscode2session
-  │                                  ├─ Durable Object: openid -> LifeSpace usr_*
-  │                                  └─ LifeSpace Identity trusted application exchange
-  │
-  ├─ profile/avatar + user token ─> LifeSpace Identity
-  └─ household business + token ──> LifeSpace Core
+  ├─ wx.login code ───────────────> HomeMew production front door
+  │                                  └─ /api/v1/login/wechat
+  │                                       -> HOMEMEW_BACKEND Service Binding
+  │                                       -> WeChat jscode2session
+  │                                       -> Durable Object: openid -> LifeSpace usr_*
+  │                                       -> LifeSpace Identity token exchange
+  └─ all normal runtime + bearer ─> stable HomeMew Mini BFF contract
+                                     -> fixed HomeMew adapter
+                                     -> LifeSpace Identity/Core Service Bindings
 
 HomeMew Web browser
   -> Cloudflare Access
-  -> HomeMew Web Worker / same-origin BFF
+  -> HomeMew Web Worker / same-origin Web session BFF
       ├─ original Cf-Access-Jwt-Assertion
       ├─ dedicated HomeMew-Web lsa_* credential
       ├─ LifeSpace Identity Access principal exchange/linking
-      └─ signed host-only HttpOnly application session
-  -> LifeSpace Identity/Core
+      ├─ signed host-only HttpOnly application session
+      └─ current LifeSpace Identity/Core contract
 
 HomeMew-managed n8n / Agents / scripts
   -> dedicated LifeSpace Service Principal
@@ -35,7 +37,9 @@ HomeMew-managed n8n / Agents / scripts
   -> LifeSpace Core
 ```
 
-There is no WeChat Cloud Development dependency and no permanent HomeMew compatibility BFF for normal business APIs. The HomeMew Web BFF is an application/browser trust and orchestration boundary only; it does not persist household business data or implement a second authorization model.
+The Mini BFF and Web same-origin BFF are distinct contracts even when hosted by the same production Worker. The Mini BFF is a stable HomeMew product/anti-corruption boundary for a review-constrained downloadable client; the Web BFF is a browser trust/session boundary whose server-controlled application follows the current LifeSpace contract. Neither persists household business truth or duplicates LifeSpace authorization.
+
+After Phase 2, Mini runtime code does not address public LifeSpace Core/Identity URLs or wire routes. BFF-to-LifeSpace calls use Cloudflare Service Bindings where supported while preserving the LifeSpace user bearer, request IDs, errors, timeouts and authoritative checks. There is no WeChat Cloud Development dependency and no second HomeMew business Core.
 
 External-system administration is an advanced HomeMew Web capability. The Mini Program remains a lightweight household client and does not create, configure, rotate, revoke or display service credentials or Data Grants. This product boundary is fixed by `docs/decisions/2026-08-24-external-integrations-web-only.md`.
 
@@ -137,7 +141,7 @@ unlinked Access principal
 
 The target user ID for account linking is never supplied by Web. Identity owns the Access-principal -> `usr_*` relationship. This HomeMew product policy is fixed by `docs/decisions/2026-08-25-web-existing-user-link-only.md`.
 
-The final Web domain is `homemew.aisr.online`. Since the accepted production cutover on 2026-08-24, that hostname is owned by `homemew-web-production`: browser Web traffic and the same-origin BFF remain behind Cloudflare Access, while the exact `POST /api/v1/login/wechat` provider route uses an Access bypass and the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. Normal Web deployments do not implicitly move Custom Domain ownership; domain transfer/rollback remains a separately confirmed release operation. `homemew-web-staging.aisr.online` remains the isolated staging hostname. See `docs/decisions/2026-08-24-web-production-cutover.md`.
+The final Web domain is `homemew.aisr.online`. Since the accepted production cutover on 2026-08-24, that hostname is owned by `homemew-web-production`: browser Web traffic and the same-origin BFF remain behind Cloudflare Access, while the exact `POST /api/v1/login/wechat` provider route uses an Access bypass and the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. Normal Web deployments do not implicitly move Custom Domain ownership; domain transfer/rollback remains a separately confirmed release operation. The dedicated HomeMew Web staging environment is retired by the 2026-09-16 final-BFF decision; production release now uses repository gates plus explicit production smoke verification. See `docs/decisions/2026-08-24-web-production-cutover.md`.
 
 ## 6. Household model mapping
 
@@ -162,10 +166,11 @@ HomeMew services may expose `familyId`, `attendeeIds`, `assigneeIds` and similar
 ```text
 Mini Program
 -> Authorization: Bearer <short-lived LifeSpace user token>
--> LifeSpace Identity/Core
+-> stable HomeMew Mini BFF route
+-> fixed LifeSpace Identity/Core operation through an internal adapter
 ```
 
-The shared request client selects Identity or Core explicitly, parses standard LifeSpace envelopes, propagates request IDs, serializes token refresh and does not blindly retry non-idempotent writes.
+The shared Mini request client selects explicit HomeMew product routes only. The BFF adapter selects the current LifeSpace operation, parses/preserves standard LifeSpace envelopes and request IDs, enforces timeouts, and does not blindly retry non-idempotent writes.
 
 `currentFamilyId` remains UI state only. LifeSpace Space membership and grant checks are authoritative.
 
@@ -284,9 +289,9 @@ The code may be deployed before the integrations application credential is insta
 ## 12. Migration/cutover rules
 
 - Do not dual-write HomeMew Core and LifeSpace.
-- Do not keep a permanent `/api/v1/families/...` facade in front of LifeSpace.
+- Do not recreate the retired broad legacy `/api/v1/families/...` facade. The final Mini BFF may expose explicit HomeMew product routes, but never an arbitrary generic proxy or second business model.
 - HomeMew production business data is authoritative in LifeSpace after the completed production cutover.
-- Staging and production HomeMew Workers use separate Durable Object namespaces, application credentials, Access applications/audiences and session secrets.
+- HomeMew Web has no active dedicated staging release environment. LifeSpace staging and any independently approved test resources remain separate concerns.
 - `apps/backend/` keeps the application-owned WeChat identity mapping; `apps/web/` never duplicates it.
 - Production Web activation must not break the existing Mini Program `/api/v1/login/wechat` application-provider endpoint.
 - The legacy HomeMew Core source is retired from the active repository. Any still-existing old HomeMew Worker/D1 resources remain frozen/read-only only for the explicit stabilization/rollback-evidence window and require a separate operations decision before physical deletion.

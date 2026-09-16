@@ -3,6 +3,7 @@
 Status: Active / Living Plan  
 Started: 2026-09-16  
 Tracking issue: HomeMew #79  
+Current phase: Phase 1 — source-derived inventory and final Mini BFF contract design  
 Related platform work: LifeSpace #234  
 Accepted architecture decision: `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
 
@@ -204,11 +205,11 @@ Last verified: 2026-09-16
 | Final HomeMew BFF architecture decision | ✅ Accepted | `2026-09-16-miniprogram-final-bff-boundary.md` |
 | Durable rollout tracking | ✅ | HomeMew #79 + this plan |
 | Event-only BFF precursor | ✅ Merged | HomeMew #74 |
-| HomeMew normative documentation alignment | 🔴 Incomplete | direct-LifeSpace / Event-only / staging wording remains in required docs |
-| Full Mini -> LifeSpace runtime call inventory | ⬜ Not done | must come from current source, not docs or guesses |
+| HomeMew normative documentation alignment | ✅ Phase 0 complete | root/nested AGENTS, architecture/product rules, READMEs and historical decisions aligned in PR #82 |
+| Full Mini -> LifeSpace runtime call inventory | ⏭ Next | Phase 1 must derive it from current source, not docs or guesses |
 | Final cross-surface Mini BFF route/DTO map | 🟡 Partial | Event precursor only |
 | BFF -> LifeSpace Service Bindings | ⬜ Not done | current Event BFF uses public Core URL fetch |
-| HomeMew Web staging retirement | ⬜ Not done | workflow/config/docs remain |
+| HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
 | One-time Mini migration | ⬜ Not done | Phase 2 |
 | WeChat review | ⬜ Not done | Phase 3 |
 | Event new-contract cutover | ⏸ Gated | HomeMew #77 is Draft/Phase 4 only |
@@ -253,14 +254,15 @@ If a concrete drift is found, fix the owning LifeSpace spec/runtime/tests togeth
 
 ### Phase-0 completion gate
 
-All must be true:
+Completed on branch `codex/phase-0-final-bff-doc-alignment`:
 
-- required HomeMew docs describe one consistent target architecture;
-- old 2026-09-15 Event-only rollout is visibly historical/superseded where conflicting;
-- current docs clearly distinguish transition state from final state;
-- LifeSpace Canonical Query/Time specs are linked as upstream authority;
-- HomeMew #79 points to this plan;
-- a fresh session reading only repository docs cannot reasonably conclude that normal Mini business traffic should continue direct to LifeSpace.
+- [x] required HomeMew docs describe one consistent target architecture;
+- [x] old 2026-09-15 Event-only rollout is visibly historical/superseded where conflicting;
+- [x] current docs clearly distinguish transition state from final state;
+- [x] LifeSpace Canonical Query/Time specs are linked as upstream authority;
+- [x] HomeMew #79 points to this plan;
+- [x] repository scan covered all Markdown/YAML files and found no unmarked current guidance that normal Mini business traffic should continue direct to LifeSpace;
+- [x] active HomeMew Web staging wording in normative docs was removed or marked historical; workflow/config retirement remains explicitly assigned to Phase 1.
 
 ## 7. Phase 1 — Final BFF contract + current-LifeSpace compatibility
 
@@ -508,33 +510,30 @@ Do not:
 
 ## 13. Current blockers / 当前阻塞
 
-No external blocker prevents Phase 0.
+No external blocker prevents Phase 1.
 
-The immediate correctness blocker is **documentation drift**: required HomeMew architecture/product/client instructions still describe the superseded direct-LifeSpace/Event-only/staging topology.
+Phase 0 documentation drift is resolved in PR #82 on `codex/phase-0-final-bff-doc-alignment`. The next correctness risk is an incomplete or documentation-derived Mini call inventory. Phase 1 must therefore inspect current Mini source and shared request helpers before defining routes; it must not infer the final contract from this README or PR #77.
 
-After Phase 0, the next correctness risk is incomplete Mini call inventory. Therefore inventory/contract design remains a hard gate before broad implementation.
+The existing HomeMew Web staging workflow/config remains a known Phase-1 retirement item. Its presence is implementation evidence to remove, not current release authority.
 
 ## 14. Exact next action / 下一步动作
 
-**Complete Phase 0 before any broad BFF implementation.**
+**Start Phase 1 with a source-derived inventory; do not begin broad route implementation first.**
 
-Next session/work branch must:
+The next session/work branch must:
 
-1. update HomeMew root `AGENTS.md`;
-2. update `apps/miniprogram/AGENTS.md`;
-3. update `docs/architecture.md`;
-4. update `docs/product-rules.md`;
-5. update root `README.md`;
-6. update `apps/miniprogram/README.md`;
-7. update `apps/web/README.md`;
-8. mark `2026-09-15-miniprogram-bff-contract-boundary.md` as partially superseded;
-9. identify `docs/web-staging-acceptance.md` as historical/retirement-target documentation rather than current release authority;
-10. run a repository text search for contradictory `Mini -> LifeSpace direct`, `Event-only BFF`, and active Web staging statements;
-11. update this plan's Current state/Evidence/Next action and comment on HomeMew #79.
+1. read current `main` after the Phase-0 documentation PR is merged;
+2. read root and nearest nested `AGENTS.md` for every source/config directory inspected or changed;
+3. enumerate every current Mini runtime call from source, including shared request helpers and indirect/deep-link/startup paths;
+4. record, for each call, source file/function, current target/method/path/DTO/auth, product semantics, proposed final HomeMew route/DTO, current LifeSpace adapter target, and known Phase-4 target;
+5. inspect the actual LifeSpace contracts/runtime/tests for each adapter target—do not infer them from HomeMew historical docs;
+6. verify actual production LifeSpace Core/Identity Worker service names/config before designing Service Bindings;
+7. design the complete final Mini-facing contract and contract tests only after the inventory is complete;
+8. plan the HomeMew Web staging workflow/config/resource retirement within Phase 1;
+9. update this plan and HomeMew #79 with inventory evidence and the next implementation slice.
 
-Only after the Phase-0 gate is green should a fresh implementation branch start the source-derived Mini call inventory.
+Do not merge PR #77, start LifeSpace #234's breaking Event migration, or change Mini runtime calls during the inventory/design slice.
 
-Do not merge PR #77 and do not start LifeSpace Event's breaking migration during Phase 0/1/2/3.
 
 ## 15. Session handoff template / 每轮交接模板
 

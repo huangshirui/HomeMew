@@ -1,7 +1,9 @@
 # Decision: Mini Program BFF Contract Boundary
 
 Date: 2026-09-15
-Status: Accepted
+Status: Partially superseded by `2026-09-16-miniprogram-final-bff-boundary.md`
+
+> Historical decision notice: the anti-corruption boundary, statelessness, bearer-forwarding, fixed-route and no-second-Core rules below remain accepted. The **Initial scope: Event**, “additional models only as needed” rule, and the original release sequence are superseded. The current target moves every existing Mini runtime LifeSpace dependency behind one final HomeMew BFF contract before the next review; see HomeMew #79 and the living rollout plan.
 
 ## Context
 
@@ -25,7 +27,7 @@ LifeSpace remains the only source of truth for Spaces, authorization and househo
 
 The BFF forwards the current short-lived LifeSpace user bearer to Core. Core continues to perform the authoritative Application × Model Access, Space/Data Grant, Model and Policy checks. The BFF never accepts a client-controlled upstream URL, Core path or replacement Authorization value.
 
-## Initial scope: Event
+## Historical initial scope: Event (superseded)
 
 The first protected business surface is Event because Event will move from the current Calendar compatibility fields to first-class TemporalRange semantics.
 
@@ -33,7 +35,7 @@ The Mini Program calls a HomeMew-owned Event BFF route. During the first release
 
 This is not a generic arbitrary-model proxy. Additional HomeMew model routes are added only when there is a concrete reason to place that application contract behind the BFF.
 
-## Release sequence
+## Historical release sequence (superseded)
 
 1. Ship the Event BFF route while LifeSpace still supports the current Event contract.
 2. Release a Mini Program version that routes Event reads/writes through the HomeMew BFF.
