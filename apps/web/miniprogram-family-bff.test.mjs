@@ -139,6 +139,26 @@ test('member list and role update map product roles and hide Person/version fiel
   assert.equal(calls.at(-1).path, '/api/v1/spaces/spc_home/members/usr_mew');
 });
 
+test('leave and member removal forward only their fixed Core operations', async () => {
+  const calls = [];
+  const core = async incoming => {
+    calls.push({ method: incoming.method, path: new URL(incoming.url).pathname });
+    return new Response(null, { status: 204 });
+  };
+  const left = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/families/spc_home/leave', { method: 'POST' }), env(core),
+  );
+  const removed = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/families/spc_home/members/usr_mew', { method: 'DELETE' }), env(core),
+  );
+  assert.equal(left.status, 204);
+  assert.equal(removed.status, 204);
+  assert.deepEqual(calls, [
+    { method: 'POST', path: '/api/v1/spaces/spc_home/leave' },
+    { method: 'DELETE', path: '/api/v1/spaces/spc_home/members/usr_mew' },
+  ]);
+});
+
 test('invitation create/list/revoke use fixed editor invites and product DTOs', async () => {
   const core = async incoming => {
     const path = new URL(incoming.url).pathname;
@@ -198,4 +218,21 @@ test('family routes reject arbitrary fields, query parameters and invalid produc
   assert.equal(arbitrary.status, 400);
   assert.equal(query.status, 400);
   assert.equal(role.status, 422);
+});
+
+test('LifeSpace authorization errors are preserved without remapping', async () => {
+  const response = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/families/spc_home/members'),
+    env(async () => new Response(JSON.stringify({
+      error: { code: 'FORBIDDEN', message: 'Insufficient Space role' },
+    }), {
+      status: 403,
+      headers: { 'content-type': 'application/json', 'x-request-id': 'req_forbidden' },
+    })),
+  );
+  assert.equal(response.status, 403);
+  assert.equal(response.headers.get('x-request-id'), 'req_forbidden');
+  assert.deepEqual(await response.json(), {
+    error: { code: 'FORBIDDEN', message: 'Insufficient Space role' },
+  });
 });
