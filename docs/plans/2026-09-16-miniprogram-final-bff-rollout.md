@@ -5,7 +5,9 @@ Started: 2026-09-16
 Tracking issue: HomeMew #79  
 Current phase: Phase 1 — final BFF implementation against current LifeSpace  
 Related platform work: LifeSpace #234  
-Accepted architecture decision: `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
+Accepted architecture decisions:
+- `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
+- `docs/decisions/2026-09-16-meow-bff-ownership-and-temporary-offline.md`
 
 > This file is the single cross-session execution plan for the current LifeSpace Query/Sort/TemporalRange -> HomeMew migration. The historical filename is retained because existing issues/PRs already link to it. Chat history is not required to continue the work.
 
@@ -192,6 +194,7 @@ The Mini-facing DTO may be simpler than Canonical Query, but BFF lowering must p
 - PR #77 is not the current implementation branch; it is Phase-4 source material only.
 - LifeSpace #234 Event breaking migration stays gated until the final-BFF Mini review candidate is approved and production-active.
 - No broad runtime implementation begins while normative HomeMew docs contradict this target.
+- “喵一下” is offline and excluded from the current final Mini contract. Its future interpretation/draft-job lifecycle is HomeMew BFF-owned application orchestration and requires a separate re-enable decision; confirmed domain records remain LifeSpace truth.
 
 ## 5. Current state / 当前状态
 
@@ -211,6 +214,7 @@ Last verified: 2026-09-16
 | BFF -> LifeSpace Service Bindings | 🟡 Foundation merged | PR #84 merged at `53a04ce`; fixed Core/Identity adapter is used by Event/profile/access-link/avatar, Family, and Task/Wish slices |
 | Family / Member / Invitation BFF slice | ✅ Merged | PR #85 merged at `9229ee3`; fixed product routes/DTOs run against current Core/Identity; Mini callers remain unchanged |
 | Task / Wish BFF slice | ✅ Merged | PR #87 merged at `81d4b6e`; Canonical Query lowering, Person translation, CRUD/Actions and stable DTOs are in main; Mini callers remain unchanged |
+| Meow / Creation Draft scope | 🟡 Offline change in review | Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed; accepted decision added on `codex/disable-meow-bff-owned` |
 | HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
 | One-time Mini migration | ⬜ Not done | Phase 2 |
 | WeChat review | ⬜ Not done | Phase 3 |
@@ -283,7 +287,7 @@ Cover at least:
 - Task list/get/create/update/complete/reopen/delete;
 - Day Record operations;
 - Wish operations;
-- Creation Draft / `喵一下`;
+- dormant Creation Draft / `喵一下` calls (inventory evidence only; the offline surface has no final route and is excluded from migration);
 - Access-link challenge confirmation;
 - media upload/read paths;
 - deep-link/notification detail loads;
@@ -371,7 +375,7 @@ local tests/typecheck/build
 - [x] existing Event precursor moved from public Core fetch to the shared Core binding;
 - [x] family/member/invitation adapter slice against current Core/Identity bindings (PR #85);
 - [x] Task/Wish Canonical Query, Person mapping, CRUD and Action adapter slice (PR #87);
-- [ ] current-LifeSpace adapters for Day/Creation Draft/diagnostic and remaining final routes;
+- [ ] current-LifeSpace adapters for Day/diagnostic and remaining final routes; Creation Draft is explicitly excluded while Meow is offline;
 - [ ] one production-compatible Event old/new adapter seam;
 - [ ] HomeMew Web staging workflow/config retirement;
 - [ ] BFF/Web checks and production smoke evidence.
@@ -418,7 +422,7 @@ events
 tasks
 day records
 wishes
-Creation Draft / 喵一下
+Meow offline regression (no registered page, entry, or active runtime calls)
 Web-link challenge confirmation
 avatar/media paths
 notification/deep-link entries
@@ -533,25 +537,26 @@ No external blocker prevents Phase 1.
 
 Phase 0 documentation drift is resolved in merged PR #82. The Phase-1 source-derived inventory and final route/DTO design baseline now exist at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md`.
 
-No external blocker prevents the remaining Phase-1 implementation slices. PR #84, the Family / Member / Invitation slice in PR #85, and the Task / Wish slice in PR #87 are merged. The main correctness risks remain accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must accompany each bounded route slice.
+No external blocker prevents the remaining Phase-1 implementation slices. PR #84, the Family / Member / Invitation slice in PR #85, and the Task / Wish slice in PR #87 are merged. Meow is now intentionally offline and its former LifeSpace Creation Draft calls are removed from active migration scope. The main correctness risks remain accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must accompany each bounded route slice.
 
 The existing HomeMew Web staging workflow/config remains a known Phase-1 retirement item. Its presence is implementation evidence to remove, not current release authority.
 
 ## 14. Exact next action / 下一步动作
 
-**Implement the bounded Day / Creation Draft / diagnostic adapter slice; do not change Mini runtime calls yet.**
+**Merge the bounded Meow-offline scope correction, then implement the Day / diagnostic adapter slice; do not migrate dormant Creation Draft calls.**
 
-From current `main` at merged PR #87 (`81d4b6e`):
+From current `main` after the Meow-offline PR:
 
-1. re-read current `main`, this plan, and the inventory baseline;
-2. verify Day Record CRUD/Actions/occurrence/Temporal projection and Creation Draft/diagnostic paths against current LifeSpace Runtime/contracts/tests;
-3. add Mini-facing contract and deny tests before implementation, including subject user→Person mapping, date-only/computed-state preservation, Creation Draft member projection, and fixed diagnostic behavior;
-4. implement only the fixed Day / Creation Draft / diagnostic product routes from the inventory using the shared Core Service Binding adapter;
-5. keep LifeSpace computed fields, Creation Draft interpretation, authorization, and storage truth authoritative; do not reproduce Temporal calculations or AI interpretation in the BFF;
-6. run the full Web/BFF suite and update this plan plus #79 with exact evidence;
-7. only after that slice is green, implement the Event final-contract old/new adapter seam and retire HomeMew Web staging.
+1. re-read current `main`, both accepted 2026-09-16 decisions, this plan, and the inventory baseline;
+2. verify Day Record CRUD/Actions/occurrence/Temporal projection and the bounded diagnostic paths against current LifeSpace Runtime/contracts/tests;
+3. add Mini-facing contract and deny tests before implementation, including subject user→Person mapping, date-only/computed-state preservation, and fixed diagnostic behavior;
+4. implement only the fixed Day / diagnostic product routes from the inventory using the shared Core Service Binding adapter;
+5. keep LifeSpace computed fields, authorization, and storage truth authoritative; do not reproduce Temporal calculations in the BFF;
+6. keep Meow unregistered/unreachable and do not add Creation Draft routes or LifeSpace adapter code;
+7. run the full Web/BFF suite and update this plan plus #79 with exact evidence;
+8. only after that slice is green, implement the Event final-contract old/new adapter seam and retire HomeMew Web staging.
 
-Do not merge PR #77, start LifeSpace #234's breaking Event migration, remove LifeSpace compatibility, or alter Mini runtime addressing in this slice.
+Do not merge PR #77, start LifeSpace #234's breaking Event migration, remove LifeSpace compatibility, re-enable Meow, or alter Mini runtime addressing in the Day/diagnostic slice.
 
 ## 15. Session handoff template / 每轮交接模板
 
@@ -594,7 +599,7 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Evidence: focused Node tests 13/13 passed locally; GitHub Web check passed; PR #84 merged as `53a04ce2699e1e30e3333ced7185d3b1af4471c7`.
 - Authority checked: HomeMew root AGENTS, architecture/product rules, accepted final-BFF decision, Web README/config/tests, inventory/plan; current LifeSpace Identity/Core paths and production Worker names from the prior verified inventory.
 - Changed assumptions/decisions: none. Public LifeSpace URL variables remain only for the server-controlled Web session BFF; Mini adapters have no public-URL fallback.
-- Remaining: family/member/invitation adapters; Task/Wish/Day/Creation Draft/diagnostic adapters; Event final route/DTO adapter seam; Web staging retirement; Phase-2 Mini cutover.
+- Remaining: family/member/invitation adapters; Task/Wish/Day/diagnostic adapters; Event final route/DTO adapter seam; Web staging retirement; Phase-2 Mini cutover.
 - Blockers: none; #84 is merged.
 
 
@@ -606,7 +611,7 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Evidence: focused Node tests 27/27 passed locally, including fixed-route/field/query deny coverage, leave/removal forwarding, LifeSpace authorization error propagation, and front-door integration; GitHub Web check run `35117715454` passed; PR #85 merged as `9229ee301956df300634688e55c95156ab003cb0`.
 - Authority checked: current merged plan/inventory and accepted boundary; HomeMew root AGENTS and Web constraints; current LifeSpace Space/member/invitation Runtime paths and version/role behavior.
 - Changed assumptions/decisions: none. The slice applies the accepted boundary; LifeSpace remains authorization and domain authority, so no Notion decision-log append is required.
-- Remaining: Task/Wish adapters; Day/Creation Draft/diagnostic adapters; Event final route/DTO adapter seam; Web staging retirement; Phase-2 Mini cutover.
+- Remaining: Task/Wish adapters; Day/diagnostic adapters; Event final route/DTO adapter seam; Web staging retirement; Phase-2 Mini cutover.
 - Blockers: none; #85 is merged.
 
 
@@ -618,5 +623,16 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Evidence: focused Node tests 38/38 passed locally, including exact nested Query AST/sort/page assertions, fixed route/action/field/query denials, optimistic-version/error propagation, Person mapping, and front-door ordering; GitHub Web check run `35161055829` passed; PR #87 merged as `81d4b6e198a25cd161abfd133d99701982df234c`.
 - Authority checked: HomeMew root AGENTS, accepted decision, current Living Plan/inventory, Mini Task/Wish services and DTOs; LifeSpace root/Core constraints, `docs/canonical-query.md`, current Task/Wish Model Definitions, Canonical Runtime/parser/operators, generic routes/Actions and integration-test evidence.
 - Changed assumptions/decisions: none. The implementation applies the accepted final-BFF route/DTO baseline and LifeSpace Canonical Query semantics; no Notion decision-log append is required.
-- Remaining: Day/Creation Draft/diagnostic adapters; Event final route/DTO old/new adapter seam; HomeMew Web staging retirement; Phase-2 Mini cutover.
+- Remaining: Day/diagnostic adapters; Event final route/DTO old/new adapter seam; HomeMew Web staging retirement; Phase-2 Mini cutover.
 - Blockers: none; #87 is merged.
+
+### 2026-09-16 — Meow offline and future BFF ownership
+
+- Branch: `codex/disable-meow-bff-owned`
+- Base: merged Task/Wish plan handoff at `743a08d`
+- Decision: “喵一下” is offline now. Its future interpretation/provider/draft-job lifecycle is a bounded HomeMew BFF application capability, not a LifeSpace Registry Creation Draft contract. Confirmed Event/Task/Day/Wish records remain LifeSpace-authoritative.
+- Implementation: removed the Meow page registration and create-sheet entry; retained the page/service implementation as explicitly dormant historical source; added an offline regression test.
+- Scope correction: removed Creation Draft from active Phase 1/2 route migration; the next adapter slice is Day / diagnostic only.
+- Authority updates: root and Mini AGENTS, architecture, product rules, README, Mini README/SPEC, inventory, dormant adapter documentation, and this Living Plan.
+- External repositories: no LifeSpace code or issue state changed; #234 remains gated and PR #77 remains frozen for Phase 4.
+- Decision log: append required to the HomeMew Notion `99 · 架构演进与决策日志`.
