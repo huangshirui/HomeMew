@@ -14,7 +14,7 @@ The inventory was generated from the current Mini source, not from historical do
 
 - every TypeScript source under `apps/miniprogram/miniprogram` was checked for service imports and direct network primitives;
 - every file under `services/` was checked for `request`, `wx.request`, upload, target selection, and URL construction;
-- startup (`app.ts`, launch page, stores, runtime bootstrap), invitation deep links, account linking, Creation Draft polling, avatar display/upload, and the About-page latency diagnostic were inspected explicitly;
+- startup (`app.ts`, launch page, stores, runtime bootstrap), invitation deep links, account linking, now-dormant Creation Draft polling, avatar display/upload, and the About-page latency diagnostic were inspected explicitly;
 - no page or store performs an unlisted network call; runtime calls are centralized in services, except that `activity.ts`, `auth.ts`, `media.ts`, and `core-latency.ts` intentionally use `wx.request` directly today.
 
 Shared current behavior:
