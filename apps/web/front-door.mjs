@@ -42,7 +42,9 @@ export function createFrontDoorHandler({ app = webHandler } = {}) {
       if (miniBffResponse) return miniBffResponse;
 
       const url = new URL(request.url);
-      if (isBackendPublicRoute(request, url)) return proxyBackend(request, env);
+      if (isBackendPublicRoute(request, url)) {
+        return proxyBackend(request, env);
+      }
       return app.fetch(request, env, context);
     },
   };
