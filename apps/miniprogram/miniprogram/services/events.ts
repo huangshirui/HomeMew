@@ -1,6 +1,7 @@
 /** HomeMew 日程 -> LifeSpace event Calendar capability。 */
 
 import { request } from './api';
+import { andFilters, queryModelRecords, type CanonicalQueryFilter } from './canonical-query';
 import { Event, CreateEventRequest, UpdateEventRequest } from '../types/index';
 import {
   ResourceBase,
@@ -84,7 +85,7 @@ export async function fetchEventsPage(
   const attendeePersonId = params.attendeeId
     ? await userIdToPersonId(familyId, params.attendeeId)
     : null;
-  const filters: Array<Record<string, unknown>> = [{
+  const filters: CanonicalQueryFilter[] = [{
     field: 'when',
     op: 'overlaps',
     value: {
@@ -96,19 +97,13 @@ export async function fetchEventsPage(
   }];
   if (attendeePersonId) filters.push({ field: 'attendeePersonIds', op: 'contains', value: attendeePersonId });
   if (params.status) filters.push({ field: 'status', op: 'eq', value: params.status });
-  const raw = await request<LifeSpacePage<EventResource>>(
-    `${modelCollectionPath(familyId, 'event')}/query`,
-    {
-      method: 'POST',
-      data: {
-        ...(params.q ? { search: { text: params.q } } : {}),
-        filter: { and: filters },
-        sort: [{ field: 'when', direction: 'asc' }],
-        page: { limit: params.limit ?? 100, ...(params.cursor ? { cursor: params.cursor } : {}) },
-        context: { viewingTimezone: params.timezone },
-      },
-    },
-  );
+  const raw = await queryModelRecords<EventResource>(familyId, 'event', {
+    ...(params.q ? { search: { text: params.q } } : {}),
+    filter: andFilters(filters),
+    sort: [{ field: 'when', direction: 'asc' }],
+    page: { limit: params.limit ?? 100, ...(params.cursor ? { cursor: params.cursor } : {}) },
+    context: { viewingTimezone: params.timezone },
+  });
   return {
     items: await Promise.all((raw.items ?? []).map(item => toEvent(familyId, item))),
     nextCursor: raw.nextCursor,
