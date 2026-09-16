@@ -115,8 +115,10 @@ export function FamilyPage() {
     setJoinFamilyBusy(true);
     setActionError(null);
     try {
-      const pathToken = encodeURIComponent(token);
-      const preview = await apiRequest<InvitePreview>(`/api/lifespace/core/v1/space-invites/${pathToken}`);
+      const preview = await apiRequest<InvitePreview>('/api/lifespace/core/v1/space-invites/preview', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      });
       if (preview.space.kind !== 'family') {
         setActionError('这个邀请码不是 HomeMew 家庭邀请');
         return;
@@ -125,9 +127,9 @@ export function FamilyPage() {
         setActionError('这个家庭邀请码当前不可加入');
         return;
       }
-      await apiRequest(`/api/lifespace/core/v1/space-invites/${pathToken}/join`, {
+      await apiRequest('/api/lifespace/core/v1/space-invites/join', {
         method: 'POST',
-        body: JSON.stringify({ displayName }),
+        body: JSON.stringify({ token, displayName }),
       });
       setJoinToken('');
       await refresh();
