@@ -101,6 +101,7 @@ export async function fetchEventsPage(
       rangeEnd: range.rangeEnd,
       dateStart: params.startDate,
       dateEndExclusive: params.endDateExclusive,
+      timezone: params.timezone,
       attendeePersonIds: attendeePersonId ?? undefined,
       status: params.status,
       q: params.q,
