@@ -25,7 +25,7 @@ test('matches only bounded Mini Program Event routes', () => {
   assert.equal(matchMiniProgramEventRoute('/api/v1/miniprogram/spaces/spc_family/tasks'), null);
 });
 
-test('forwards collection query to the fixed LifeSpace event model path', async () => {
+test('accepts Mini viewing timezone while forwarding the current legacy Event query unchanged otherwise', async () => {
   const originalFetch = globalThis.fetch;
   let captured;
   globalThis.fetch = async (url, init) => {
@@ -37,7 +37,7 @@ test('forwards collection query to the fixed LifeSpace event model path', async 
   };
   try {
     const response = await handleMiniProgramEventBff(
-      request('/api/v1/miniprogram/spaces/spc_family/events?dateStart=2026-09-15&dateEndExclusive=2026-09-16&sort=calendarStart%3Aasc'),
+      request('/api/v1/miniprogram/spaces/spc_family/events?dateStart=2026-09-15&dateEndExclusive=2026-09-16&timezone=Asia%2FShanghai&sort=calendarStart%3Aasc'),
       { LIFESPACE_CORE_URL: 'https://core.example.test' },
     );
     assert.equal(response.status, 200);
