@@ -222,6 +222,14 @@ Non-secret configuration:
 - `LIFESPACE_IDENTITY_URL`
 - `LIFESPACE_CORE_URL`
 
+Production Service Bindings:
+
+- `HOMEMEW_BACKEND` -> `homemew-backend-production` for Mini login/activity provider routes;
+- `LIFESPACE_CORE` -> `lifespace-core` for fixed Mini domain/media adapters;
+- `LIFESPACE_IDENTITY` -> `lifespace-identity` for fixed Mini profile/avatar/access-link adapters.
+
+The public LifeSpace URL variables remain for the server-controlled Web session BFF. Mini BFF adapters must use the fixed Service Bindings and must not fall back to those public URLs.
+
 The Worker must sit behind the intended Cloudflare Access application. The original assertion comes from `Cf-Access-Jwt-Assertion`; browser JSON must never be accepted as an assertion source.
 
 `/health` reports base `ready` and separate `integrationsReady`; production smoke verification expects both to be ready.
