@@ -23,7 +23,7 @@ The foundation already includes the responsive App Shell, Today and the real hou
 Keep dependencies demand-driven:
 
 - add TanStack Query only when current React context/local-state patterns stop being sufficient;
-- add Schedule-X only after staging acceptance if a richer Calendar renderer materially improves the product;
+- add Schedule-X only when a richer Calendar renderer materially improves the product;
 - prefer URL state, React Context and local browser/UI state before adding Redux/Zustand or another global state library.
 
 ## Product routes
@@ -57,7 +57,12 @@ Browser
        -> /api/* and /health -> Worker BFF
 ```
 
-The Worker BFF is an authentication/session/application-orchestration boundary only. It must not:
+The Worker hosts two deliberately separate application boundaries:
+
+- the Web same-origin BFF, an authentication/session/application-orchestration boundary whose server-controlled Web client follows the current LifeSpace contract;
+- explicit public Mini BFF product routes, a stable anti-corruption/release-lag contract for the reviewed Mini Program.
+
+Both boundaries must not:
 
 - create a HomeMew `/families/...` business contract;
 - persist Spaces, events, tasks, day records, wishes or other household data;
@@ -106,7 +111,7 @@ Identity derives the target `usr_*`; Web never submits a target user ID. LifeSpa
 
 ### Existing-account linking UX
 
-The staging/MVP UX intentionally keeps the security contract visible and simple:
+The initial production UX intentionally keeps the security contract visible and simple:
 
 ```text
 HomeMew Web
@@ -126,7 +131,7 @@ HomeMew Web
 
 The challenge is high-entropy, short-lived and single-use. The Mini Program never accepts or sends a target `userId`; the authenticated bearer is the only proof of which LifeSpace user is confirming the link.
 
-Manual copy/paste is the staging/MVP confirmation UX. A later QR code or Mini Program deep-link may carry the same `challengeId`, but it must not weaken or replace the Identity challenge/confirmation contract.
+Manual copy/paste is the initial confirmation UX. A later QR code or Mini Program deep-link may carry the same `challengeId`, but it must not weaken or replace the Identity challenge/confirmation contract.
 
 If a person has never used HomeMew, the Web UI directs them to complete first use in the Mini Program and return to link the Web login. This avoids creating a second global LifeSpace user as a normal HomeMew onboarding outcome. Future LifeSpace user-merge capability remains a platform concern rather than a prerequisite for normal HomeMew Web onboarding.
 
@@ -209,7 +214,7 @@ The HomeMew Web LifeSpace application must allow `grants:manage` so the BFF can 
 
 The integrations LifeSpace application has only the stable service scope ceiling needed by the product (`resources:read` / `resources:write`) and Core Application × Model Access for the explicitly supported HomeMew models.
 
-After the real W4 staging E2E passed, all three Worker secrets above became required staging runtime prerequisites. The staging deployment inspects Cloudflare Worker secret binding names after deployment and fails if any required binding is missing; it never prints secret values.
+All three Worker secrets above are required production runtime prerequisites. Deployment checks binding names without printing secret values.
 
 Non-secret configuration:
 
@@ -219,25 +224,30 @@ Non-secret configuration:
 
 The Worker must sit behind the intended Cloudflare Access application. The original assertion comes from `Cf-Access-Jwt-Assertion`; browser JSON must never be accepted as an assertion source.
 
-`/health` reports base `ready` and separate `integrationsReady`; healthy staging is expected to have both ready.
+`/health` reports base `ready` and separate `integrationsReady`; production smoke verification expects both to be ready.
 
-## Staging and production
+## Production release
 
-The isolated Web staging environment is:
+HomeMew Web has no dedicated staging environment after the accepted 2026-09-16 final-BFF decision. This does not remove LifeSpace staging or unrelated test environments.
 
-```text
-homemew-web-staging.aisr.online
-```
-
-The final user-facing domain remains:
+The user-facing domain is:
 
 ```text
 homemew.aisr.online
 ```
 
-Since the accepted production cutover on 2026-08-24, `homemew.aisr.online` is owned by `homemew-web-production`. Browser Web traffic remains behind Cloudflare Access, while the exact Mini Program provider route `POST /api/v1/login/wechat` uses the Access bypass and `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`.
+Since the accepted production cutover on 2026-08-24, it is owned by `homemew-web-production`. Browser Web traffic remains behind Cloudflare Access. Explicit Mini application routes—including `POST /api/v1/login/wechat` and the stable Mini BFF surface—use narrowly scoped Access bypass rules, still require their own LifeSpace user bearer where applicable, and delegate only to fixed internal operations.
 
-Normal `homemew-web-production` deployment configuration intentionally does not claim or move the Custom Domain. Domain ownership transfer or rollback remains a separate confirmation-gated release operation and must preserve the Mini Program login pass-through.
+Release path:
+
+```text
+local tests / typecheck / build
+-> CI
+-> explicit production deployment
+-> production smoke verification
+```
+
+Normal production deployment configuration intentionally does not claim or move the Custom Domain. Domain ownership transfer or rollback remains a separate confirmation-gated operation and must preserve all Mini routes.
 
 ## Tests and builds
 

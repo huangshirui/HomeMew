@@ -25,26 +25,21 @@ Do not use `wx.cloud.init`, `wx.cloud.callFunction`, WeChat Cloud Database, or W
 
 ### Normal requests
 
-The accepted `2026-09-15-miniprogram-bff-contract-boundary` decision supersedes the previous rule that every normal business request must call LifeSpace Core directly.
+The accepted `2026-09-16-miniprogram-final-bff-boundary` decision supersedes the Event-only/two-path target from 2026-09-15.
 
-Use two explicit request paths:
+After the one-time migration, all normal Mini runtime dependencies use the stable HomeMew application contract:
 
 ```text
-Platform/identity/stable model requests
 Mini Program
 -> Authorization: Bearer <short-lived LifeSpace user token>
--> LifeSpace Identity/Core
-
-HomeMew business surfaces that require release-lag isolation
-Mini Program
--> Authorization: Bearer <short-lived LifeSpace user token>
--> bounded HomeMew Mini BFF route
--> fixed LifeSpace Core operation
+-> explicit HomeMew Mini BFF product route
+-> fixed current LifeSpace Identity/Core operation through Cloudflare Service Binding
 ```
 
-The BFF is an application contract/anti-corruption boundary, not a second business Core. It must not persist household business data, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, or become a generic `/api/v1/*` proxy.
+Mini code must not select public LifeSpace base URLs, Identity/Core wire paths, Canonical Query AST, generic `modelKey` routes, or the old/new Event representation. Those details belong to BFF adapters. The login route remains a HomeMew provider route and may delegate to `apps/backend`.
 
-Event is the first BFF-protected surface because LifeSpace Event will migrate to first-class TemporalRange semantics. Add another model behind the BFF only for a concrete compatibility/product-boundary need.
+The BFF is an application contract/anti-corruption boundary, not a second business Core. It must not persist household business data, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, expose a generic model proxy, or become a generic `/api/v1/*` proxy.
+
 
 ## Product surface boundary
 
@@ -67,11 +62,12 @@ The Mini Program may display audit actors that happen to be external systems whe
 - HomeMew admin -> Space `owner`/`admin`
 - ordinary writable member -> Space `editor`
 - member references used by models -> Space Person IDs
-- event -> HomeMew Mini Event BFF -> LifeSpace `event` + Calendar/Temporal semantics
-- task -> `task` + Actions
-- day -> `day_record` + Temporal capability
-- wish -> `wish` + Actions
-- 喵一下 -> Registry Creation Drafts
+- profile/family/member/invitation/business operations -> explicit HomeMew Mini BFF routes -> current LifeSpace contracts
+- event -> stable HomeMew Event DTO -> BFF adapter -> LifeSpace `event` + Calendar/Temporal semantics
+- task -> stable HomeMew Task DTO -> BFF adapter -> LifeSpace `task` + Actions
+- day -> stable HomeMew Day DTO -> BFF adapter -> LifeSpace `day_record` + Temporal capability
+- wish -> stable HomeMew Wish DTO -> BFF adapter -> LifeSpace `wish` + Actions
+- 喵一下 -> stable HomeMew draft route -> BFF adapter -> Registry Creation Drafts
 
 The UI may keep names such as `familyId`, `attendeeIds` and `assigneeIds`; service adapters/BFF mappings must translate them explicitly to current LifeSpace semantics where needed.
 
@@ -80,7 +76,7 @@ The UI may keep names such as `familyId`, `attendeeIds` and `assigneeIds`; servi
 All authenticated requests must use the shared request layer. It must:
 
 - attach the Bearer token;
-- choose HomeMew BFF, LifeSpace Identity or LifeSpace Core explicitly;
+- call only explicit HomeMew application routes for normal runtime behavior; never accept or select a LifeSpace base URL/path;
 - parse standard `{ data }` / `{ error }` envelopes;
 - retain request IDs for diagnostics;
 - handle timeouts;
@@ -105,7 +101,7 @@ Follow the active HomeMew BFF contract and underlying LifeSpace semantics:
 - pass current resource `version` for operations that require optimistic concurrency;
 - on version conflict, reload and ask the user to review rather than silently overwrite.
 
-The BFF may translate between the stable Mini Program Event DTO and a newer LifeSpace temporal representation, but it must preserve these observable semantics.
+The BFF may translate any stable Mini product DTO to the active LifeSpace representation. In particular, Event may move between split Calendar fields and TemporalRange internally, but observable Mini semantics must not change.
 
 ## Local storage
 

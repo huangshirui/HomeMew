@@ -44,7 +44,7 @@ HomeMew 客户端都必须在高风险关闭写入前取得当前 Space `version
 3. LifeSpace 使用 Optimistic Concurrency Control（乐观并发控制）执行关闭；
 4. 成功后 HomeMew 刷新可访问家庭列表并重新选择当前家庭，然后返回家庭首页。
 
-Mini Program 通过现有共享 LifeSpace 请求层直接调用 LifeSpace；Web 通过现有 same-origin BFF（同源 BFF）`/api/lifespace/core/v1/*` 代理调用 LifeSpace。Web BFF 只提供浏览器认证/传输边界，不增加家庭生命周期业务逻辑。
+调用路径更新（2026-09-16 最终 BFF 边界）：Mini Program 通过稳定的 HomeMew Mini BFF 产品路由触发此动作，由 BFF 映射到上述 LifeSpace Space Close 契约；不再直接选择 LifeSpace 公网地址或 wire path。Web 继续通过 same-origin BFF 调用当前 LifeSpace 契约。此更新只 supersede 旧传输路径，不改变本决策的 Space Close 语义、权限和并发规则。
 
 `SPACE_OWNER_REQUIRED` 和 `SPACE_VERSION_CONFLICT` 必须在产品层给出明确提示，不得静默重试高风险写操作。
 

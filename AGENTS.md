@@ -26,9 +26,9 @@ When HomeMew needs a durable platform capability LifeSpace does not provide, do 
 - HomeMew household business data lives in LifeSpace, not in a HomeMew database or WeChat Cloud Database.
 - HomeMew “family” maps to LifeSpace `Space(kind=family)`.
 - HomeMew users map to LifeSpace Identity users; member-facing domain references map through Space Person IDs where the LifeSpace contract requires them.
-- The Mini Program may call LifeSpace Identity/Core directly for stable platform surfaces, or a **bounded HomeMew Mini BFF** for business surfaces that require application-contract/release-lag isolation. Follow `docs/decisions/2026-09-15-miniprogram-bff-contract-boundary.md`.
-- A Mini BFF is stateless application adaptation only: fixed HomeMew routes may translate request/response DTOs and forward the current LifeSpace user bearer, but must not persist household business data, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, or become a generic `/api/v1/*` proxy.
-- Event is the first BFF-protected Mini Program business surface because LifeSpace Event is migrating toward first-class TemporalRange semantics. Additional models require a concrete accepted need; do not proxy every model pre-emptively.
+- The Mini Program's normal runtime contract is the **final bounded HomeMew Mini BFF** defined by `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md` and tracked by `docs/plans/2026-09-16-miniprogram-final-bff-rollout.md`. After the one-time migration it must not address public LifeSpace Identity/Core URLs or wire paths directly.
+- A Mini BFF is stateless application adaptation only: explicit HomeMew product routes may translate request/response DTOs, deterministically lower product filters/sorts to the active LifeSpace Canonical Query contract, and forward the current LifeSpace user bearer. It must not persist household business data, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, expose a generic model proxy, or become a generic `/api/v1/*` proxy.
+- The 2026-09-15 Event-only BFF decision is historical where it conflicts with the final boundary. Event remains the first compatibility-sensitive model, but the next reviewed Mini release moves every current direct LifeSpace runtime dependency behind the final HomeMew contract.
 - A small HomeMew Cloudflare application backend handles WeChat provider trust: `wx.login` code exchange, `openid -> LifeSpace user_id` mapping, and exchange of the server-only LifeSpace application credential for a short-lived user token. It remains separate from household business-data ownership.
 - The WeChat identity mapping is stored in a SQLite-backed Durable Object keyed per WeChat application identity; do not provision a dedicated HomeMew D1 merely for this mapping.
 - Never expose WeChat `appsecret`, LifeSpace `lsa_*` application credentials, service credentials, signing keys, or other backend secrets to Mini Program code.
@@ -72,11 +72,12 @@ Use explicit product-to-platform mappings:
 - family -> Space (`kind=family`)
 - family admin -> Space `owner`/`admin`
 - ordinary writable HomeMew member -> Space `editor`
-- event -> HomeMew Mini Event BFF (for Mini Program) -> LifeSpace `event`; HomeMew Web may consume the current LifeSpace Event contract directly
-- task -> LifeSpace `task` model + Actions
-- day -> LifeSpace `day_record` model + Temporal capability
-- wish -> LifeSpace `wish` model + Actions
-- 喵一下 -> LifeSpace Registry Creation Draft capability
+- Mini family/member/profile/business operations -> explicit HomeMew Mini BFF product routes -> current LifeSpace Identity/Core contracts
+- event -> stable HomeMew Mini Event DTO -> BFF adapter -> LifeSpace `event`; HomeMew Web tracks the current LifeSpace Event contract through its Web boundary
+- task -> HomeMew Mini Task DTO -> BFF adapter -> LifeSpace `task` model + Actions
+- day -> HomeMew Mini Day DTO -> BFF adapter -> LifeSpace `day_record` model + Temporal capability
+- wish -> HomeMew Mini Wish DTO -> BFF adapter -> LifeSpace `wish` model + Actions
+- 喵一下 -> HomeMew Mini draft route -> BFF adapter -> LifeSpace Registry Creation Draft capability
 
 HomeMew page DTOs may preserve product-friendly names such as `familyId`, but platform IDs and fields must be translated explicitly at the client/BFF service boundary rather than represented as another authoritative backend model.
 
@@ -84,26 +85,20 @@ HomeMew page DTOs may preserve product-friendly names such as `familyId`, but pl
 
 The Mini Program stores only the short-lived user token, expiry and non-secret service base URLs. Token refresh uses a fresh `wx.login()` code and the HomeMew Cloudflare application backend.
 
-Authenticated requests use one of two explicit paths:
+After the one-time migration, authenticated normal runtime requests use one explicit application path:
 
 ```text
 Mini Program
   -> Authorization: Bearer <LifeSpace user token>
-  -> LifeSpace Identity/Core
+  -> stable HomeMew Mini BFF route
+  -> fixed current LifeSpace Identity/Core operation through Cloudflare Service Binding
 ```
 
-or, for a BFF-protected HomeMew surface:
-
-```text
-Mini Program
-  -> Authorization: Bearer <LifeSpace user token>
-  -> bounded HomeMew Mini BFF route
-  -> fixed LifeSpace Core operation
-```
+The separate HomeMew login route performs WeChat provider trust and LifeSpace token exchange. It is part of the application boundary, not permission to expose LifeSpace wire addressing to Mini code.
 
 The BFF forwards rather than replaces user authority. LifeSpace performs the authoritative model/Space/policy checks.
 
-The shared request layer must parse standard `{ "data": ... }` / `{ "error": ... }` envelopes, preserve request IDs, handle timeouts, serialize token refresh, and never blindly retry non-idempotent writes.
+The Mini shared request layer targets only the stable HomeMew routes for normal runtime behavior. The BFF must parse and preserve standard `{ "data": ... }` / `{ "error": ... }` envelopes, preserve request IDs, handle timeouts, serialize token refresh, and never blindly retry non-idempotent writes.
 
 ## Data and time rules
 

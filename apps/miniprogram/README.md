@@ -2,6 +2,8 @@
 
 # HomeMew 家事喵微信小程序需求
 
+> 当前架构权威：`/docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md` 与 `/docs/plans/2026-09-16-miniprogram-final-bff-rollout.md`。本 README 保留产品需求与交互细节；其中尚未由 Phase 1 固化的具体 path/DTO 仅是历史需求示例，不是最终 wire contract。所有运行时 API 均指稳定的 HomeMew Mini BFF 产品契约；小程序不得直接选择或调用 LifeSpace Core/Identity 公网地址与 wire path。LifeSpace 仍是 Identity、Space/Grant、领域数据和授权的唯一权威来源。
+
 ## 本地开发与构建
 
 本项目用本地 `tsc` 将 TypeScript 预编译为 `miniprogram/**/*.js`，微信开发者工具直接加载 `.js`（不依赖工具内置 SWC 编译器，避免其缺失 `@swc/runtime` 辅助模块导致的白屏问题）。在 `apps/miniprogram/` 目录下：
@@ -31,7 +33,7 @@ npm run watch      # 监听改动并自动重新编译
 
 小程序不是独立业务系统。
 
-家庭、成员、日程、待办等业务数据统一存储在 HomeMew Core 中，小程序通过 Core API 读写数据。
+家庭、成员、日程、待办等业务数据统一存储在 LifeSpace 中；小程序只调用稳定的 HomeMew Mini BFF 产品 API，由 BFF 通过固定 Adapter 映射到当前 LifeSpace 契约。
 
 ---
 
@@ -63,11 +65,11 @@ npm run watch      # 监听改动并自动重新编译
 
 ```text
 微信小程序
-→ 微信云函数
+→ HomeMew Cloudflare 应用后端
 → 获取可信 openid
-→ 查询微信身份与 HomeMew user_id 的映射
-→ 必要时调用 Core 创建用户
-→ 签发短期 HomeMew JWT
+→ 查询微信身份与 LifeSpace user_id 的映射
+→ 必要时调用 LifeSpace Identity 创建 LifeSpace 用户
+→ 签发短期 LifeSpace user bearer
 → 返回小程序
 ```
 
@@ -75,15 +77,16 @@ npm run watch      # 监听改动并自动重新编译
 
 ```text
 微信小程序
-→ 携带 HomeMew JWT
-→ 直接调用 Cloudflare Worker Core API
+→ 携带 LifeSpace user bearer
+→ 调用 HomeMew 生产前门的稳定 Mini BFF API
+→ BFF 通过固定 Adapter 和 Cloudflare Service Binding 调用 LifeSpace
 ```
 
 ### 微信平台专属能力
 
 ```text
 微信小程序
-→ 微信云函数
+→ HomeMew Cloudflare 应用后端
 → 微信服务端 API
 ```
 
@@ -99,8 +102,8 @@ npm run watch      # 监听改动并自动重新编译
 ## 3.2 小程序不应保存
 
 ```text
-JWT_SECRET
-Core 服务 Token
+LifeSpace 签名密钥
+LifeSpace application credential
 n8n 服务 Token
 微信 appsecret
 企业微信 secret
@@ -114,15 +117,15 @@ n8n 服务 Token
 
 ## 4.1 首次进入
 
-用户第一次打开小程序时，小程序自动调用登录云函数。
+用户第一次打开小程序时，小程序自动调用 HomeMew 登录接口。
 
-登录云函数：
+HomeMew 登录接口：
 
 1. 从微信运行环境取得 `openid`；
 2. 查询身份映射；
-3. 如果不存在映射，调用 Core 创建 HomeMew 用户；
-4. 保存 `openid → HomeMew user_id` 映射；
-5. 签发短期用户 JWT；
+3. 如果不存在映射，调用 LifeSpace Identity 创建 LifeSpace 用户；
+4. 保存 `openid → LifeSpace user_id` 映射；
+5. 签发短期LifeSpace user bearer；
 6. 返回登录结果。
 
 返回建议：
@@ -135,8 +138,8 @@ n8n 服务 Token
 }
 ```
 
-已有身份映射登录时，云函数会先使用用户 JWT 请求 `GET /api/v1/me`。只有 Core 明确返回
-`404/USER_NOT_FOUND` 时才重建 Core 用户并原位更新映射；401、403、超时和 5xx 均作为登录
+已有身份映射登录时，HomeMew 应用后端会先使用 LifeSpace user bearer 请求 `GET /api/v1/me`。只有 LifeSpace Core 明确返回
+`404/USER_NOT_FOUND` 时才重建 LifeSpace Identity 用户并原位更新映射；401、403、超时和 5xx 均作为登录
 错误返回，避免因临时故障创建重复用户。
 
 定时日程统一提交规范 UTC `startAt/endAt`，`startTimezone/endTimezone` 仅作为端点显示元数据；
@@ -152,7 +155,7 @@ GET /api/v1/me
 
 用于获取：
 
-* HomeMew 用户 ID；
+* LifeSpace 用户 ID；
 * 昵称；
 * 头像；
 * 用户状态。
@@ -183,10 +186,10 @@ PATCH /api/v1/me
 
 ## 4.4 Token 过期
 
-Core 返回 `401` 时：
+LifeSpace Core 返回 `401` 时：
 
 ```text
-小程序重新调用登录云函数
+小程序重新调用HomeMew 登录接口
 → 获取新 Token
 → 原请求自动重试一次
 ```
@@ -195,7 +198,7 @@ Core 返回 `401` 时：
 
 ## 4.5 用户被禁用
 
-如果 Core 返回用户已被禁用：
+如果 LifeSpace Core 返回用户已被禁用：
 
 * 清除本地 Token；
 * 停止访问业务页面；
@@ -278,7 +281,7 @@ Core 返回 `401` 时：
 ```text
 启动小程序
 → 恢复本地 Token
-→ Token 不存在或即将过期则调用登录云函数
+→ Token 不存在或即将过期则调用HomeMew 登录接口
 → GET /api/v1/me
 → GET /api/v1/me/families
 ```
@@ -346,7 +349,7 @@ pages/tasks/detail?id=tsk_123&familyId=fam_123
 ```text
 完成登录
 → 调用对应详情 API
-→ Core 校验家庭权限
+→ LifeSpace Core 校验家庭权限
 → 展示详情
 ```
 
@@ -454,7 +457,7 @@ PATCH /api/v1/families/{familyId}
 
 普通成员不显示编辑入口。
 
-即使前端错误展示，Core 仍必须返回 `403`。
+即使前端错误展示，LifeSpace Core 仍必须返回 `403`。
 
 ---
 
@@ -626,7 +629,7 @@ GET /api/v1/families/{familyId}/invites
 POST /api/v1/families/{familyId}/invites/{inviteId}/revoke
 ```
 
-列表中不展示邀请码原文，因为 Core 不保存邀请码明文。
+列表中不展示邀请码原文，因为 LifeSpace Core 不保存邀请码明文。
 
 ---
 
@@ -640,11 +643,11 @@ POST /api/v1/families/{familyId}/invites/{inviteId}/revoke
 GET /api/v1/families/{familyId}/events?startDate=2026-07-01&endDateExclusive=2026-08-01&timezone=Asia%2FShanghai
 ```
 
-`timezone` 是「查看时区」：Core 用它把 `startDate/endDateExclusive` 换算成 UTC 查询窗口。
+`timezone` 是「查看时区」：LifeSpace Core 用它把 `startDate/endDateExclusive` 换算成 UTC 查询窗口。
 客户端必须使用同一个查看时区决定「日程属于哪一天」——包括列表分组、月历圆点和首页
 「今天」判断。日程自身的 `startTimezone/endTimezone` 只是端点地点时区元数据
 （例如航班出发地 / 到达地），只能作为详情与卡片上的时间标签，绝不能参与归组，
-否则同一条日程会被分到 Core 查询窗口以外的另一天。
+否则同一条日程会被分到 LifeSpace Core 查询窗口以外的另一天。
 
 由于查询窗口与归组窗口语义一致，请求不得再前后额外扩几天；
 「当前范围无日程」的判断也只统计真正落在范围内、能被展示的日程。
@@ -767,7 +770,7 @@ POST /api/v1/families/{familyId}/events
 7 月 25 日至 7 月 27 日
 ```
 
-提交给 Core 时转换成结束日期不包含的形式：
+提交给 LifeSpace Core 时转换成结束日期不包含的形式：
 
 ```json
 {
@@ -1202,7 +1205,7 @@ GET /api/v1/me/families
 
 ## 14.1 统一请求封装
 
-小程序应有统一 Core API 请求层，负责：
+小程序应有统一 HomeMew Mini BFF API 请求层，负责：
 
 * 添加 `Authorization`；
 * 添加 `x-request-id`，可选；
@@ -1229,7 +1232,7 @@ GET /api/v1/me/families
 
 否则可能导致重复创建。
 
-后续建议 Core 支持：
+后续建议 LifeSpace Core 支持：
 
 ```http
 Idempotency-Key: <随机值>
@@ -1326,7 +1329,7 @@ currentUserRole
 
 控制按钮显示。
 
-但前端权限控制只用于交互优化，Core 必须再次校验权限。
+但前端权限控制只用于交互优化，LifeSpace Core 必须再次校验权限。
 
 ---
 
@@ -1352,7 +1355,7 @@ currentUserRole
 
 第一版暂不建议通过公开链接分享日程。
 
-通知中可以跳转到小程序内部日程详情页，但仍必须登录并经过 Core 权限校验。
+通知中可以跳转到小程序内部日程详情页，但仍必须登录并经过 LifeSpace Core 权限校验。
 
 ## 16.3 待办分享
 
@@ -1417,7 +1420,7 @@ currentUserRole
 日程和待办页中的自然语言输入框
 ```
 
-助手执行日程或待办操作时，最终仍调用同一套 Core API。
+助手执行日程或待办操作时，最终仍调用同一套 HomeMew Mini BFF API。
 
 例如：
 
@@ -1445,7 +1448,7 @@ POST /api/v1/families/{familyId}/events
 微信小程序原生
 TypeScript
 微信云开发
-云函数
+HomeMew 应用后端
 ```
 
 暂时没有明显必要引入 uni-app、Taro 或复杂跨端框架。
@@ -1456,7 +1459,7 @@ TypeScript
 * 微信登录、分享、小程序码等能力较多；
 * 原生方案兼容性和问题定位最直接；
 * 项目结构和构建链路更简单；
-* 后续其他端可以独立调用 Core API，不要求共享同一套 UI 代码。
+* 各客户端按自己的发布约束选择明确的应用边界；Mini 使用稳定 BFF，Web 通过 Web session BFF 跟随当前 LifeSpace 契约，不要求共享同一套 UI 代码。
 
 ## 19.2 目录建议
 
@@ -1487,7 +1490,7 @@ apps/miniprogram/
 
 ## 19.3 API 类型
 
-小程序可以在本地维护 Core API 类型，后续如果 Core 增加 OpenAPI 定义，可以自动生成 TypeScript SDK 和类型。
+小程序只维护最终 HomeMew Mini BFF 契约类型；LifeSpace OpenAPI / Model Contract 仅供 BFF Adapter 使用，不能直接生成 Mini 的运行时 wire contract。
 
 ---
 
@@ -1505,12 +1508,12 @@ apps/miniprogram/
 
 ## 20.2 安全
 
-* 所有家庭数据访问必须经过 Core；
+* 所有家庭数据访问必须经过 LifeSpace Core；
 * 小程序前端不能直接访问 D1；
 * 小程序前端不能持有服务密钥；
 * 不信任客户端传入的当前用户 ID；
 * `userId` 从 JWT 中取得；
-* 家庭权限由 Core 的成员关系判断；
+* 家庭权限由 LifeSpace Core 的成员关系判断；
 * 分享链接不能绕过权限。
 
 ## 20.3 可用性
@@ -1620,9 +1623,9 @@ Token 自动刷新
 ```text
 初始化原生小程序工程
 微信云开发环境
-登录云函数
+HomeMew 登录接口
 身份映射表
-创建 Core 用户
+创建 LifeSpace Core 用户
 JWT 签发
 统一请求封装
 ```

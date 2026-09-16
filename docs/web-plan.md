@@ -1,5 +1,7 @@
 # HomeMew Web Plan
 
+Current release status: production-only for HomeMew Web. The W1-W6 staging text below is retained as completed historical rollout evidence; it is not current release authority. The accepted 2026-09-16 final-BFF decision retires the dedicated HomeMew Web staging environment. Current releases use repository gates, explicit production deployment and production smoke verification; LifeSpace staging is unaffected.
+
 ## 1. Goal
 
 Build the primary HomeMew Web application at `homemew.aisr.online` as a household product surface, not an enterprise admin dashboard.
@@ -61,7 +63,7 @@ Use a deliberately small SPA stack:
 
 Do not use Next.js / SSR / RSC for this signed-in household app. Add TanStack Query only when current React context/local-state patterns stop being sufficient.
 
-Schedule-X remains the intended richer Calendar renderer, but it is not a correctness prerequisite. The current Calendar surface first proves and converges LifeSpace range/CRUD/time semantics with the existing UI primitives; the richer renderer belongs after staging acceptance.
+Schedule-X remains the intended richer Calendar renderer, but it is not a correctness prerequisite. The current Calendar surface first proves and converges LifeSpace range/CRUD/time semantics with the existing UI primitives; the richer renderer is optional product polish independent of the retired staging gate.
 
 ## 6. Cloudflare runtime and same-origin BFF boundary
 
@@ -180,7 +182,7 @@ A migrated Principal without the HomeMew Space ownership binding is also read-on
 
 React/Vite/Cloudflare SPA, responsive shell, routes, repository scripts and CI.
 
-### W2 — Access identity and staging runtime — complete
+### W2 — Access identity and staging runtime — historical, complete
 
 - LifeSpace Identity Access principal exchange and proof-backed link challenge;
 - HomeMew same-origin Worker BFF;
@@ -199,7 +201,7 @@ React/Vite/Cloudflare SPA, responsive shell, routes, repository scripts and CI.
 - invite, role update and removal;
 - enough household administration to select the target family for integrations.
 
-### W4 — external integrations — complete and staging accepted
+### W4 — external integrations — historical staging acceptance complete
 
 Completed and verified through the real staging chain:
 
@@ -228,13 +230,13 @@ Implemented directly against LifeSpace through the same-origin BFF:
 - Wishes: open/claimed/fulfilled/archived views, owner edit/delete and lifecycle Actions;
 - Home/Today: real family-local events, due/overdue tasks, Temporal attention and quick task completion; all preview/fake household data removed.
 
-Remaining product polish is primarily richer Calendar presentation (Schedule-X after staging acceptance) plus general responsive/empty/error-state refinement.
+Remaining product polish is primarily richer Calendar presentation plus general responsive/empty/error-state refinement.
 
-### W6 — staging acceptance and product convergence — acceptance complete, polish ongoing
+### W6 — historical staging acceptance and product convergence — complete
 
 Completed during W6 so far:
 
-- keep `main` continuously deployable to `homemew-web-staging.aisr.online`;
+- historically kept `main` continuously deployable to the former `homemew-web-staging.aisr.online`;
 - make deployment output report runtime readiness without exposing secret values;
 - complete W4 real service-credential E2E and promote integrations runtime to a required staging prerequisite;
 - fix first-family onboarding so a linked existing HomeMew user with no accessible family can create/join a family;
@@ -257,13 +259,13 @@ The final Web domain `homemew.aisr.online` is currently owned by `homemew-web-pr
 
 Normal `homemew-web-production` deployments intentionally do not claim or move the Custom Domain. Any future ownership transfer or rollback remains a manual, confirmation-gated release operation and must re-verify Access protection, Mini Program login pass-through, LifeSpace production runtime and required Worker bindings.
 
-The isolated staging hostname remains `homemew-web-staging.aisr.online`. See `docs/decisions/2026-08-24-web-production-cutover.md`.
+The former `homemew-web-staging.aisr.online` environment and its deployment workflow are retirement targets under Phase 1 of the final Mini BFF rollout. They are not a current release path. See `docs/decisions/2026-08-24-web-production-cutover.md` for the historical cutover.
 
 ## 12. Non-goals
 
 - SSR/SEO framework complexity for the signed-in household app.
 - A second HomeMew business database.
-- A permanent compatibility/business BFF.
+- A second business Core, arbitrary upstream proxy, or BFF-owned household truth. The explicit stable Mini product BFF remains required.
 - A HomeMew-owned credential authority.
 - Separate desktop/mobile Web codebases.
 - Broad Space-wide external-system access as a shortcut around model-grant authorization.

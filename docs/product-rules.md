@@ -224,7 +224,7 @@ The first version has one task-level completion state. It does not track complet
 ## 10. Mini Program behavior
 
 - Login and external identity mapping occur through trusted WeChat Cloud Functions.
-- After login, normal business API calls go directly from the Mini Program to Core with a short-lived user token.
+- After login, every normal Mini Program runtime call uses the stable HomeMew Mini BFF contract with the short-lived LifeSpace user bearer. The BFF maps product DTOs deterministically to the active LifeSpace contract; LifeSpace remains authoritative for identity, model, Space/Grant and policy checks.
 - On a `401`, the client refreshes through the login Cloud Function and retries once.
 - Writes are not blindly retried until idempotency support exists.
 - The Mini Program stores `currentFamilyId` only as UI context; it is not an authorization credential.

@@ -33,7 +33,7 @@ LifeSpace remains authoritative for time semantics:
 
 These split Event time fields and Calendar GET parameters are the current compatibility transport. They remain in use until LifeSpace completes the `temporal_range` platform layers and explicitly migrates the Event model to `when`; HomeMew must not invent that migration locally.
 
-The current W6 slice intentionally keeps the existing lightweight HomeMew UI primitives while correctness and staging behavior converge. Schedule-X remains the intended richer renderer after the staging acceptance pass; it is not required for LifeSpace range/CRUD/time correctness.
+The current Calendar keeps the existing lightweight HomeMew UI primitives. A richer renderer such as Schedule-X remains optional product polish and is not required for LifeSpace range/CRUD/time correctness.
 
 ## API
 
