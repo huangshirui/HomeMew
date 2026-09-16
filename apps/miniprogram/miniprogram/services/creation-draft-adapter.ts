@@ -1,3 +1,5 @@
+// Historical inactive adapter for the offline “喵一下” surface. Do not extend this
+// LifeSpace mapping; a future implementation belongs to the HomeMew BFF contract.
 import type { EventFormDraft } from '../types/index';
 import { addDaysToDateOnly, formatInstantInTimeZone } from '../utils/datetime';
 
