@@ -6,19 +6,34 @@ Tracking: HomeMew #79; LifeSpace #234
 
 ## Context / 背景
 
-HomeMew Mini Program is subject to WeChat review and release lag. The 2026-09-15 decision introduced a bounded HomeMew Mini BFF, initially only for Event, so the Mini Program would not have to move in lockstep with LifeSpace Event's TemporalRange migration.
+The **primary trigger** for this boundary change is the LifeSpace Query / Sort / Time semantics convergence, not WeChat review by itself.
 
-That decision correctly established the anti-corruption boundary, but its **initial Event-only scope and rollout sequence are no longer sufficient**. The next Mini Program review candidate should finish the application boundary once, not migrate one model now and require another Mini Program contract migration later.
+LifeSpace is moving ordinary-model consumption toward one Canonical Query model built from Search / Filter / Sort / Cursor Pagination, typed operators, explicit `local_date_window`, stable multi-sort/cursor behavior, and first-class `TemporalRange`. Event is the first concrete HomeMew model whose published resource truth will move from the current Calendar split fields to a canonical `when: temporal_range` value.
 
-The accepted target is therefore:
+Platform authority for that work lives in the LifeSpace repository, especially:
+
+- `docs/canonical-query.md`;
+- `docs/time-space-semantics.md`;
+- current Model Definition / generated contracts / Runtime / tests;
+- LifeSpace issue #234 for the compatibility-classified Event migration.
+
+The corresponding LifeSpace Notion pages `09 · Query 语义与能力设计` and `10 · 时间与空间语义设计` record the confirmed design and rationale, but repository Specification / Contract / Runtime remain the implementation source of truth.
+
+HomeMew Web can move with the current LifeSpace contract because it is server-controlled and can be released together with platform changes. The Mini Program cannot safely share that coupling: a published client can remain in circulation while LifeSpace changes, and WeChat review adds an unavoidable release lag.
+
+The 2026-09-15 decision therefore introduced a bounded HomeMew Mini BFF, initially only for Event. That decision correctly established the anti-corruption boundary, but its **initial Event-only scope and rollout sequence are no longer sufficient**. If the Mini Program remains directly coupled to other LifeSpace wire surfaces, the same class of platform evolution can force another reviewed client migration later.
+
+The next Mini Program review candidate should therefore finish the application boundary once, not migrate one model now and require another Mini Program contract migration later.
+
+The accepted target is:
 
 ```text
 Mini Program
   -> stable HomeMew-owned Mini BFF contract
-       -> current LifeSpace contract through application adapters
+       -> active LifeSpace Core / Identity contract through application adapters
 ```
 
-The Mini-facing contract is designed as a HomeMew application contract from the start. LifeSpace wire details such as model-specific query syntax, Canonical Query AST, TemporalRange storage shape, compatibility GET parameters, or future platform contract revisions remain behind the BFF.
+The Mini-facing contract is designed as a HomeMew application contract from the start. LifeSpace wire details such as Canonical Query AST, generic `modelKey` addressing, TemporalRange canonical representation, compatibility GET parameters, sort/cursor mechanics, or later compatible platform revisions remain behind the BFF.
 
 This decision supersedes the **"Initial scope: Event"** and **release sequence** sections of `2026-09-15-miniprogram-bff-contract-boundary.md`. The earlier decision's security, authority, statelessness and no-second-Core rules remain binding.
 
@@ -71,7 +86,21 @@ The dedicated HomeMew Web staging deployment is retired. Future HomeMew Web/BFF 
 
 This decision applies to HomeMew Web staging only. It does not imply removing LifeSpace staging or unrelated backend/test environments.
 
+### 6. Documentation alignment is a hard prerequisite
+
+Because `AGENTS.md` requires architecture/product/decision documents to be read before code changes, conflicting normative documents are themselves a migration risk.
+
+Before broad BFF implementation continues, HomeMew must synchronize the documents that still describe direct Mini -> LifeSpace business calls, Event-only BFF scope, or active Web staging. Until that synchronization is merged, this decision and the active rollout plan supersede conflicting wording.
+
+The execution plan must keep an explicit document-alignment checklist and may not mark implementation phases complete while normative HomeMew docs contradict the target architecture.
+
 ## Final release sequence / 最终发布顺序
+
+### Phase 0 — Documentation and authority alignment
+
+Synchronize HomeMew `AGENTS.md`, nested Mini instructions, architecture/product rules and client READMEs with the accepted target. Verify the LifeSpace repository specifications that drive this migration and link them explicitly from the rollout plan.
+
+No broad BFF business implementation should proceed from stale architectural wording.
 
 ### Phase 1 — Final BFF contract + current-LifeSpace compatibility
 
@@ -113,14 +142,17 @@ After production stabilization, remove obsolete old-LifeSpace mapping, fallback,
 - Do not create a generic arbitrary upstream proxy.
 - Do not expose arbitrary LifeSpace Core/Identity path selection to Mini Program input.
 - Do not make the Mini Program adopt Canonical Query or TemporalRange merely to simplify BFF implementation.
+- Do not invent a second HomeMew query language that competes with LifeSpace Canonical Query; HomeMew product DTOs must lower deterministically to the active platform contract.
 - Do not merge HomeMew PR #77 as the immediate next step; its Event/TemporalRange work belongs to Phase 4 and must be re-evaluated against the final Mini BFF contract first.
 
 ## Consequences / 结果
 
 - The Mini Program performs one contract migration before review instead of repeated application migrations as LifeSpace evolves.
-- WeChat review lag becomes an application-boundary problem rather than a reason for LifeSpace to retain product-specific compatibility indefinitely.
+- Query/Sort/TemporalRange platform evolution is isolated behind a stable application boundary for the review-constrained client.
+- WeChat review lag becomes a release constraint handled by the application boundary rather than a reason for LifeSpace to retain product-specific compatibility indefinitely.
 - Temporary compatibility becomes easier to delete because it exists only inside the BFF.
 - HomeMew Web remains free to track the current LifeSpace contract directly.
 - LifeSpace remains the sole source of truth and authorization authority.
+- Future sessions have an explicit authority chain and cannot treat outdated HomeMew architecture prose as equal to the accepted decision.
 
 Execution details and continuously updated progress are normative in `docs/plans/2026-09-16-miniprogram-final-bff-rollout.md`.
