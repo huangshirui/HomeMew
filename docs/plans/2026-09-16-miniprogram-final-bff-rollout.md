@@ -1,4 +1,4 @@
-# HomeMew Mini Program Final BFF Rollout Plan
+# LifeSpace Query/Temporal -> HomeMew Final Mini BFF Rollout Plan
 
 Status: Active / Living Plan  
 Started: 2026-09-16  
@@ -6,321 +6,539 @@ Tracking issue: HomeMew #79
 Related platform work: LifeSpace #234  
 Accepted architecture decision: `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
 
-> This file is the cross-session execution source of truth for the current HomeMew Mini Program BFF rollout. Chat history is not required to continue the work.
+> This file is the single cross-session execution plan for the current LifeSpace Query/Sort/TemporalRange -> HomeMew migration. The historical filename is retained because existing issues/PRs already link to it. Chat history is not required to continue the work.
 
-## 0. How a new session must resume / 新会话接力方法
+## 0. Why this migration exists / 为什么要做
 
-Before changing code, a new session must:
+The primary change is upstream in **LifeSpace**, not in the Mini Program.
 
-1. Read repository `AGENTS.md` and the nearest nested `AGENTS.md` for every surface that will change.
-2. Read `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md` and this plan.
-3. Read HomeMew issue #79, HomeMew PR #77, and LifeSpace issue #234 for current execution/dependency state.
-4. Re-check `main` rather than trusting this file blindly if code or PR state has moved since the last update.
-5. Work only on the **Next action** section unless a newly discovered blocker requires the plan to be amended first.
-6. Before ending a significant work session, update this file's **Current state**, **Evidence**, **Next action**, and any affected phase checklist; then leave a short progress comment on HomeMew #79.
-7. If the work changes an important architecture/product/engineering decision, append that decision to the project's Notion `99 · 架构演进与决策日志` as required by project instructions.
+LifeSpace Query and time semantics are converging on:
 
-Do not use old chat conclusions as implementation authority when repository evidence disagrees.
+```text
+Canonical Query
+= Search
++ Filter
++ Sort
++ Cursor Pagination
+```
 
-## 1. Final target / 最终目标
+with typed operators, nested Boolean filters, explicit `local_date_window`, stable effective sort/cursor behavior, and first-class `TemporalRange`.
 
-The next Mini Program review candidate must already use the final HomeMew-owned BFF contract for all of its runtime LifeSpace dependencies.
+For HomeMew Event specifically, the long-term LifeSpace resource truth changes from the current Calendar split representation:
+
+```text
+isAllDay
+startAt / endAt
+startTimezone / endTimezone
+startDate / endDateExclusive
+```
+
+to one canonical temporal value:
+
+```text
+when: TemporalRange
+  -> kind=date    + [start, endExclusive)
+  -> kind=instant + [start, endExclusive)
+```
+
+This platform evolution is desirable, but it exposes a release-coupling problem:
+
+- HomeMew Web is server-controlled and can track the current LifeSpace contract directly.
+- Mini Program releases are review-constrained and old versions can remain active while LifeSpace evolves.
+- Therefore the Mini Program must stop depending directly on LifeSpace wire details before the breaking Event migration.
+
+The BFF is an **application anti-corruption / release-lag boundary**. It is not introduced to replace LifeSpace, duplicate authorization, or create another business Core.
+
+## 1. Authority chain / 权威链
+
+Future sessions must use the following precedence when documents disagree.
+
+### 1.1 LifeSpace platform semantics — authoritative
+
+Repository source of truth:
+
+1. `huangshirui/LifeSpace/docs/canonical-query.md`
+2. `huangshirui/LifeSpace/docs/time-space-semantics.md`
+3. `docs/model-definition-spec.md` and generated Model Contract behavior where relevant
+4. current Runtime implementation and automated tests
+5. LifeSpace issue #234 for the compatibility-classified Event resource/storage migration
+
+Confirmed upstream state as of 2026-09-16:
+
+- Canonical Query composition is Search / Filter / Sort / Cursor Pagination.
+- Query is single-model; adapters do not expose Standard Query vs Capability Query as competing public concepts.
+- typed scalar/range/list predicates and nested AND/OR are implemented.
+- direct `temporal_range` CRUD is implemented.
+- TemporalRange filter/local-date-window is implemented.
+- TemporalRange sort/cursor with explicit `context.viewingTimezone` is implemented.
+- Calendar-backed Event still uses a compatibility `when` projection; Event resource/storage migration remains open in #234.
+
+### 1.2 LifeSpace Notion — confirmed design/rationale, not implementation source
+
+Relevant pages:
+
+- `09 · Query 语义与能力设计`
+- `10 · 时间与空间语义设计`
+
+These pages explain the confirmed design and seven-layer reasoning. If they diverge from current repository Specification / Contract / Runtime, investigate and synchronize rather than silently choosing one.
+
+### 1.3 HomeMew application architecture — authoritative for product boundary
+
+Use:
+
+- `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
+- `docs/architecture.md`
+- `docs/product-rules.md`
+- root and nested `AGENTS.md`
+- current client/BFF tests and implementation
+
+HomeMew may define stable product DTOs and routes, but it must not redefine LifeSpace query/time semantics.
+
+### 1.4 This plan — execution state only
+
+This file owns:
+
+- phase order;
+- current progress;
+- gates;
+- exact next action;
+- evidence and blockers.
+
+It does not override platform or accepted architecture semantics.
+
+## 2. Cross-repo target architecture / 目标架构
+
+### 2.1 Mini Program
 
 ```text
 WeChat Mini Program
-  -> HomeMew front door / final Mini BFF contract
-       -> HomeMew provider backend where needed for WeChat trust
-       -> LifeSpace Core / Identity through Cloudflare Service Bindings
+  -> HomeMew production front door
+       -> final stable Mini-facing HomeMew BFF contract
+            -> LifeSpace Core Service Binding
+            -> LifeSpace Identity Service Binding
+       -> /api/v1/login/wechat
+            -> HOMEMEW_BACKEND Service Binding
+            -> WeChat provider trust + LifeSpace token exchange
 ```
 
-The Mini-facing contract remains stable while the LifeSpace-side contract evolves.
+The Mini Program may still hold the short-lived LifeSpace user bearer, but normal runtime code must not address public LifeSpace Core/Identity URLs or wire paths after the one-time migration.
 
-After the Mini version is approved, LifeSpace Event/Query/TemporalRange can cut over and the BFF changes only its internal adapter. Final cleanup removes old-LifeSpace compatibility code from the BFF without another Mini Program migration.
+### 2.2 BFF
 
-## 2. Non-negotiable invariants / 不可破坏的边界
+The BFF owns only application adaptation:
 
-- LifeSpace remains the sole source of truth for Identity, Spaces/Grants, business models and authorization.
-- The Mini Program is a client only; the BFF is a stateless application anti-corruption layer only.
-- The final Mini contract is a HomeMew product contract, not a mirror of LifeSpace REST or Canonical Query wire shape.
-- After Phase 2, Mini runtime code must not address public LifeSpace Core/Identity base URLs or LifeSpace API paths directly.
-- The short-lived LifeSpace user bearer may still be held by the Mini Program and forwarded through the HomeMew BFF; this does not make the BFF the authorization authority.
-- BFF -> LifeSpace transport uses Cloudflare Service Bindings where supported, while preserving bearer, request/error semantics and LifeSpace authorization behavior.
-- The BFF must not persist household business truth, duplicate Space/model authorization, accept arbitrary upstream URLs/paths, or become a generic proxy.
-- HomeMew Web has no dedicated staging environment after Phase 1. This does not affect LifeSpace staging or unrelated environments.
-- Compatibility required by review/release lag lives inside the BFF only.
-- Phase 5 must not require a Mini Program code change or another WeChat review.
-- HomeMew PR #77 is not the next merge target; it belongs to Phase 4 and must be re-evaluated/rebased before use.
-- LifeSpace #234 Event breaking migration is gated until the submitted final-BFF Mini version is approved and production-active.
+```text
+HomeMew Mini DTO / route
+  -> fixed route handler
+  -> HomeMew <-> LifeSpace mapping
+  -> current LifeSpace contract
+```
 
-## 3. Current state / 当前状态
+It may temporarily map the same final Mini contract to old/new LifeSpace upstream contracts during rollout.
+
+It must never own:
+
+- household business persistence;
+- Space/model authorization truth;
+- a second user/role permission table;
+- arbitrary upstream URLs/paths;
+- a generic unrestricted proxy.
+
+### 2.3 Web
+
+HomeMew Web remains a direct consumer of the **current LifeSpace application contract** through its own same-origin session/BFF boundary. It does not consume the Mini compatibility DTO merely for consistency.
+
+HomeMew Web has no dedicated staging environment going forward. This rule applies only to HomeMew Web, not LifeSpace staging or unrelated test environments.
+
+## 3. Query/Sort/Time semantics HomeMew must preserve / 不得在 BFF 中改写的平台语义
+
+The Mini-facing DTO may be simpler than Canonical Query, but BFF lowering must preserve observable semantics.
+
+### Query
+
+- Search / Filter / Sort / Pagination are orthogonal and may coexist.
+- Search is retrieval, not a synthetic filter predicate.
+- nested Boolean Filter exists at the platform layer even if common Mini routes expose only product-friendly filters.
+- `containsAny` / `containsAll`, if exposed by HomeMew, are conveniences that lower deterministically to Canonical `contains` Boolean expressions.
+
+### Sort
+
+- platform fallback without caller sort is `createdAt DESC`.
+- business ordering must be explicit, e.g. Event `when ASC` or Task `dueDate ASC`.
+- multi-sort order is significant.
+- NULL sorts last in either direction.
+- LifeSpace appends stable record `id` as final continuation tie-breaker.
+- Mini APIs must not promise ordering that the BFF does not request explicitly upstream.
+
+### Time
+
+- Date is not Instant.
+- stored Instant remains absolute; viewing timezone is context.
+- ranges are half-open `[start, endExclusive)`.
+- local-day intent becomes explicit date bounds + IANA timezone before Canonical execution.
+- TemporalRange Date/Instant mixed sorting requires explicit viewing timezone.
+- Event's eventual `when` TemporalRange is the single truth; `isAllDay` must not survive as independent platform truth after cutover.
+
+## 4. Non-negotiable rollout invariants / 不可破坏的边界
+
+- LifeSpace remains sole source of truth for Identity, Spaces/Grants, models and authorization.
+- The final Mini-facing API is a HomeMew product contract, not a mirror of LifeSpace REST/Model Contract internals.
+- The Mini Program migrates to that final BFF contract **once before review**.
+- After review, platform migration changes only HomeMew BFF internal adapters and HomeMew Web's direct platform consumption.
+- Phase 5 changes BFF compatibility code only; it does not change Mini Program code.
+- BFF -> LifeSpace uses Cloudflare Service Bindings where supported.
+- LifeSpace user bearer/authority semantics remain unchanged by Service Binding transport.
+- PR #77 is not the current implementation branch; it is Phase-4 source material only.
+- LifeSpace #234 Event breaking migration stays gated until the final-BFF Mini review candidate is approved and production-active.
+- No broad runtime implementation begins while normative HomeMew docs contradict this target.
+
+## 5. Current state / 当前状态
 
 Last verified: 2026-09-16
 
 | Area | State | Evidence / Note |
 | --- | --- | --- |
-| Final architecture decision | ✅ Defined | `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md` |
-| Durable execution tracking | ✅ Defined | HomeMew #79 + this living plan |
-| Event-only Mini BFF precursor | ✅ Merged | HomeMew PR #74, merge commit `6225c3959d1765eedb5b2690c64b20a7f2c87c1f` |
-| Full Mini -> LifeSpace call inventory | ⬜ Not done | Must be generated from current `apps/miniprogram` code, not guessed |
-| Final Mini BFF route/DTO contract | 🟡 Partial | Event precursor exists; complete cross-surface contract not yet designed |
-| All Mini runtime LifeSpace dependencies behind BFF | ⬜ Not done | Current repo still contains direct LifeSpace paths outside Event |
-| BFF -> LifeSpace Core/Identity Service Bindings | ⬜ Not done | Current Event BFF uses configured public Core URL/fetch path |
-| HomeMew Web staging retirement | ⬜ Not done | staging workflow/config/docs still exist |
-| Mini one-time migration to final BFF | ⬜ Not done | Phase 2 |
-| WeChat review submission | ⬜ Not done | Phase 3 |
-| LifeSpace TemporalRange platform foundation | ✅ Complete | LifeSpace #247/#248/#249: CRUD + filters/local-date-window + sort/cursor |
-| LifeSpace Event model/storage migration | ⏸ Gated | LifeSpace #234 remains open; do not cut over yet |
-| HomeMew Event new-contract cutover | ⏸ Gated | PR #77 Draft; Phase 4 only |
-| BFF old-LifeSpace compatibility cleanup | ⬜ Not started | Phase 5 |
+| LifeSpace Canonical Query semantics | ✅ Platform foundation complete | `docs/canonical-query.md`; Query composition/filter/sort/cursor implemented |
+| LifeSpace TemporalRange CRUD/filter/sort | ✅ Complete | LifeSpace #247/#248/#249; summarized in #234 |
+| LifeSpace Event resource/storage migration | ⏸ Gated | #234 open; current Event still Calendar split truth |
+| Final HomeMew BFF architecture decision | ✅ Accepted | `2026-09-16-miniprogram-final-bff-boundary.md` |
+| Durable rollout tracking | ✅ | HomeMew #79 + this plan |
+| Event-only BFF precursor | ✅ Merged | HomeMew #74 |
+| HomeMew normative documentation alignment | 🔴 Incomplete | direct-LifeSpace / Event-only / staging wording remains in required docs |
+| Full Mini -> LifeSpace runtime call inventory | ⬜ Not done | must come from current source, not docs or guesses |
+| Final cross-surface Mini BFF route/DTO map | 🟡 Partial | Event precursor only |
+| BFF -> LifeSpace Service Bindings | ⬜ Not done | current Event BFF uses public Core URL fetch |
+| HomeMew Web staging retirement | ⬜ Not done | workflow/config/docs remain |
+| One-time Mini migration | ⬜ Not done | Phase 2 |
+| WeChat review | ⬜ Not done | Phase 3 |
+| Event new-contract cutover | ⏸ Gated | HomeMew #77 is Draft/Phase 4 only |
+| Compatibility cleanup | ⬜ Not started | Phase 5 |
 
-## 4. Phase 1 — Final BFF contract + compatibility against current LifeSpace
+## 6. Phase 0 — Documentation and architecture alignment / 文档先收口
 
 ### Objective
 
-Create the **final Mini-facing HomeMew contract now**, while the BFF still adapts that contract to the current production LifeSpace APIs.
+Remove contradictory normative guidance before implementation continues.
 
-### 4.1 Inventory every current Mini runtime dependency
+This is a **Hard Gate** because repository `AGENTS.md` explicitly requires these documents to be read before code changes. A new session must not be forced to guess which conflicting instruction is newer.
 
-Do not infer the list from documentation. Search current Mini Program source and produce an explicit route/call inventory covering at least:
+### 6.1 HomeMew document synchronization matrix
+
+| Document | Required correction |
+| --- | --- |
+| `AGENTS.md` | Replace Event-only/direct-LifeSpace Mini rule with final all-runtime Mini BFF boundary; reference active 2026-09-16 decision/plan; preserve LifeSpace authority/no-second-Core rules |
+| `apps/miniprogram/AGENTS.md` | Remove two-normal-request-path design as target; normal Mini runtime goes through final HomeMew BFF; login remains HomeMew provider route; prohibit public LifeSpace base/path dependencies after migration |
+| `docs/architecture.md` | Update target topology; distinguish Web same-origin session BFF from Mini application-contract BFF; document transition state vs final state; document Service Binding transport; remove active Web staging as target |
+| `docs/product-rules.md` | Update Mini behavior section from direct Core calls to stable BFF; retain token refresh, authorization, time/date/concurrency semantics |
+| `README.md` | Update current architecture diagram and production topology so first repository entry does not describe direct Mini -> LifeSpace business calls |
+| `apps/miniprogram/README.md` | Replace retired HomeMew Core/cloud-function/direct-Core architecture wording with current LifeSpace + HomeMew BFF/provider flow |
+| `apps/web/README.md` | Separate browser Web BFF restrictions from bounded Mini BFF routes hosted by the same Worker; remove staging as active target; keep production gates |
+| `docs/decisions/2026-09-15-miniprogram-bff-contract-boundary.md` | Add explicit superseded banner for Event-only scope/release sequence; retain historical rationale/security invariants |
+| `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md` | State Query/Sort/TemporalRange convergence as primary trigger and review lag as rollout constraint |
+| `docs/web-staging-acceptance.md` | Mark historical/retired once staging removal is executed; do not leave it looking like current release procedure |
+| this living plan | Maintain current phase/evidence/next action after every significant session |
+
+### 6.2 LifeSpace documentation verification
+
+Do **not** rewrite already-correct LifeSpace semantics merely to mention HomeMew.
+
+Verify instead:
+
+- `docs/canonical-query.md` remains aligned with Notion 09 and current Runtime/tests;
+- `docs/time-space-semantics.md` remains aligned with Notion 10 and current Runtime/tests;
+- #234 remains the explicit Event resource/storage migration tracker;
+- future Query/Time work sessions read those two documents before changing query/time behavior.
+
+If a concrete drift is found, fix the owning LifeSpace spec/runtime/tests together under LifeSpace's own `AGENTS.md`; do not patch around it in HomeMew.
+
+### Phase-0 completion gate
+
+All must be true:
+
+- required HomeMew docs describe one consistent target architecture;
+- old 2026-09-15 Event-only rollout is visibly historical/superseded where conflicting;
+- current docs clearly distinguish transition state from final state;
+- LifeSpace Canonical Query/Time specs are linked as upstream authority;
+- HomeMew #79 points to this plan;
+- a fresh session reading only repository docs cannot reasonably conclude that normal Mini business traffic should continue direct to LifeSpace.
+
+## 7. Phase 1 — Final BFF contract + current-LifeSpace compatibility
+
+### 7.1 Inventory every Mini runtime dependency
+
+Generate the list from **current source**, not documentation.
+
+Cover at least:
 
 - WeChat login / token acquisition;
-- current-user profile/avatar and any Identity operations;
-- family/Space list, create, detail, update, close/leave as actually used;
-- members and role management;
-- invitations / join flows;
+- current-user profile/avatar and Identity operations;
+- family/Space list/create/detail/update/close/leave;
+- members and roles;
+- invitation preview/create/join/revoke flows actually present;
 - Event list/get/create/update/delete;
-- Task list/get/create/update/Actions/delete;
+- Task list/get/create/update/complete/reopen/delete;
 - Day Record operations;
 - Wish operations;
 - Creation Draft / `喵一下`;
-- Access-link challenge confirmation used for Web account linking;
-- media upload/download calls actually used by Mini;
-- notification/deep-link detail reads if they introduce separate routes;
-- any hidden/shared request helper that can still choose LifeSpace directly.
+- Access-link challenge confirmation;
+- media upload/read paths;
+- deep-link/notification detail loads;
+- shared request helpers capable of selecting LifeSpace directly.
 
-Output of this step must be written back into this plan or a linked contract document with exact current source files and intended final HomeMew route for each call.
+The output must record for every call:
 
-### 4.2 Design the final Mini-facing contract
+```text
+Current Mini source file/function
+Current target: HomeMew / LifeSpace Core / LifeSpace Identity
+Current method/path
+Current request/response DTO
+Auth requirement
+Product semantics
+Final HomeMew BFF route
+Final Mini DTO
+Current LifeSpace adapter target
+Phase-4 new LifeSpace adapter target if known
+```
 
-For each inventoried dependency, decide one explicit HomeMew route and DTO.
+### 7.2 Design the final Mini-facing contract
 
 Rules:
 
-- Prefer HomeMew semantic routes over leaking generic LifeSpace model/query mechanics.
-- Preserve stable HomeMew terms such as `familyId`, attendee/assignee/member concepts where appropriate.
-- Keep LifeSpace IDs opaque; translate only where the HomeMew product contract intentionally differs.
-- Keep date/time semantics exact: UTC Instant vs date-only vs half-open all-day ranges.
-- Preserve optimistic concurrency/version behavior where required.
-- Define list/filter/sort DTOs from the Mini product need, then map them internally to the active LifeSpace query contract.
-- Do not make the Mini Program understand Canonical Query AST, TemporalRange physical representation, capability internals, or future platform revisioning.
-- Route allowlists must be fixed; no client-controlled upstream path.
+- route and DTO are HomeMew product semantics;
+- do not leak Canonical AST merely because Core supports it;
+- expose only filters/sorts actually needed by Mini product flows, but define their semantics precisely;
+- lower them deterministically to the active LifeSpace Query contract;
+- preserve `familyId`, member/attendee/assignee product terminology where useful;
+- keep LifeSpace IDs opaque;
+- preserve optimistic concurrency/version rules;
+- preserve Date/Instant/half-open-range/timezone semantics;
+- no client-controlled upstream URL/path;
+- no arbitrary generic model proxy.
 
-Before broad implementation, add contract tests that make this route surface explicit.
+Add contract tests before broad route implementation.
 
-### 4.3 Implement current-LifeSpace adapters
+### 7.3 Implement current-LifeSpace adapters
 
-Implement the final routes at the HomeMew front-door/BFF and translate them to the **current production LifeSpace contract**.
+The BFF must initially implement the final Mini contract against **current production-compatible LifeSpace**.
 
-Temporary compatibility may exist here, including Event legacy-time mapping or current query parameter mapping, but it must be isolated from Mini-facing DTOs.
+Temporary internal mappings may include:
 
-LifeSpace bearer forwarding remains mandatory for user authority. HomeMew role checks are validation/UX only.
+- Event split Calendar fields;
+- current compatibility GET parameters;
+- old upstream DTO shapes.
 
-### 4.4 Switch BFF -> LifeSpace to Service Bindings
+These mappings are temporary upstream adapters, not Mini API semantics.
 
-Inspect LifeSpace production Worker service names and current HomeMew wrangler config; do not guess them.
+### 7.4 Switch Core/Identity transport to Service Bindings
 
-Add explicit Core and Identity Service Bindings where the LifeSpace Workers support service-to-service `fetch`.
+Read actual LifeSpace production Worker service names/config before editing HomeMew wrangler files; do not guess.
 
 Requirements:
 
-- preserve `Authorization: Bearer <LifeSpace user token>` for user operations;
-- preserve request method/body/content type/multipart behavior;
+- preserve user bearer;
+- preserve method/body/multipart semantics;
 - preserve/propagate request IDs;
-- retain timeout/error-envelope behavior;
-- no fallback to a client-controlled URL;
-- any temporary public-URL fallback must be explicit, bounded and scheduled for deletion, not silent permanent behavior.
+- preserve error envelopes/statuses/timeouts;
+- no arbitrary fallback target;
+- any temporary public-URL fallback must be explicit and scheduled for removal.
 
-### 4.5 Retire HomeMew Web staging
+### 7.5 Retire HomeMew Web staging
 
-Remove only the dedicated **HomeMew Web** staging deployment path and stale documentation/configuration that claims it is an active release environment.
+Remove only HomeMew Web staging deployment/config/workflow and current-procedure documentation.
 
-Do not remove LifeSpace staging or other unrelated environments.
-
-Production release safety becomes:
+New Web/BFF release path:
 
 ```text
 local tests/typecheck/build
--> CI gates
--> explicit production deploy
+-> CI
+-> explicit production deployment
 -> production smoke verification
 ```
 
-### 4.6 Phase-1 tests / gate
+### Phase-1 gate
 
-Phase 1 is complete only when all of the following are true:
+- full call inventory exists;
+- every used Mini dependency has a final HomeMew route/DTO;
+- final routes work against current LifeSpace contract;
+- Core/Identity Service Bindings are wired where supported;
+- arbitrary-proxy/authority deny tests pass;
+- HomeMew Web staging is retired;
+- BFF/Web checks pass.
 
-- every currently used Mini LifeSpace dependency has a final HomeMew route and DTO;
-- BFF routes run successfully against the current production-compatible LifeSpace contract;
-- Core/Identity internal Service Bindings are wired and tested where supported;
-- route tests prove the BFF cannot become an arbitrary proxy;
-- bearer forwarding and deny-path tests prove LifeSpace remains authority;
-- HomeMew Web staging workflow/config is retired;
-- documentation reflects that the Mini-facing contract is final before review.
-
-## 5. Phase 2 — One-time Mini Program migration
+## 8. Phase 2 — One-time Mini Program migration
 
 ### Objective
 
-Change the Mini Program exactly once so all normal runtime LifeSpace dependencies use the final HomeMew BFF contract.
+Change Mini exactly once to consume the final HomeMew BFF contract.
 
 ### Work
 
-- migrate shared request/service layers to HomeMew routes;
-- remove direct LifeSpace Core/Identity route selection from Mini runtime code;
-- remove stored/returned public LifeSpace service URLs if no longer required by any supported Mini flow;
-- preserve the short-lived user bearer and refresh behavior through the HomeMew login flow;
-- keep page-friendly DTOs and UI behavior stable unless the final contract deliberately improves them;
-- ensure deep-link startup flows go through the same BFF boundary.
+- migrate shared request/service layers;
+- remove direct public LifeSpace Core/Identity route selection;
+- remove stored/returned LifeSpace public service URLs if no supported Mini flow still needs them;
+- preserve short-lived LifeSpace user bearer and refresh flow;
+- migrate all deep-link/startup flows to the same boundary;
+- keep UI/page DTO behavior stable except deliberate final-contract changes.
 
-### Automated review gate
+### Architectural regression gate
 
-Add a durable test/check that fails when Mini production source reintroduces direct LifeSpace API addressing. The check should be architectural rather than only a brittle hostname grep when possible; hostname/path scans can supplement it.
+Add a durable check that fails when production Mini source reintroduces direct LifeSpace addressing. Prefer dependency/boundary assertions; supplement with hostname/path scans.
 
 ### Manual smoke coverage
 
-At minimum verify in WeChat Developer Tools and, before review, on a real device:
+At minimum:
 
 ```text
-login / token refresh
+login / refresh
 first-use profile
 family create/join/switch/detail/manage
-members / invitation flows
-event list/detail/create/edit/delete
-task list/detail/create/edit/complete/reopen/delete
+members / invitations
+events
+tasks
 day records
 wishes
-喵一下 / Creation Draft
+Creation Draft / 喵一下
 Web-link challenge confirmation
-avatar/media flows actually present in current Mini
-notification/deep-link entry paths
-startup directly into a business page
+avatar/media paths
+notification/deep-link entries
+direct startup into business page
 ```
 
 ### Phase-2 gate
 
-The review candidate must satisfy:
+- no normal Mini runtime call addresses public LifeSpace Core/Identity directly;
+- all supported flows use final BFF routes;
+- Mini tests/typecheck/build pass;
+- Web/BFF tests pass;
+- WeChat Developer Tools smoke passes;
+- real-device smoke passes;
+- review candidate contains no temporary upstream compatibility semantics.
 
-- Mini runtime does not call public LifeSpace Core/Identity APIs directly;
-- all supported product flows pass through final HomeMew routes;
-- Mini typecheck/build/tests pass;
-- BFF/Web tests pass;
-- smoke coverage passes;
-- no server secret or service credential reaches Mini code;
-- no temporary compatibility detail is encoded into the Mini contract.
+## 9. Phase 3 — WeChat review / 契约冻结
 
-## 6. Phase 3 — WeChat review and contract freeze
-
-Submit the Phase-2 build for WeChat review.
+Submit the Phase-2 build.
 
 During review:
 
-- freeze the Mini-facing API shape;
-- allow only backward-compatible server fixes unless WeChat review itself requires a client change;
-- do not start the LifeSpace Event breaking cutover;
-- prepare Phase-4 BFF/LifeSpace/Web changes behind the frozen contract.
+- freeze Mini-facing route/DTO contract;
+- allow only backward-compatible server fixes unless review itself requires a client change;
+- do not perform LifeSpace Event breaking resource migration;
+- prepare Phase-4 upstream cutover behind the frozen contract.
 
-Phase 3 completes only when the submitted build is approved and production-active.
+Gate: submitted build is approved and production-active.
 
-## 7. Phase 4 — Coordinated LifeSpace + BFF cutover
+## 10. Phase 4 — LifeSpace + BFF + Web coordinated cutover
 
 ### Preconditions
 
-- Phase 3 is complete;
-- LifeSpace #234 migration plan/data backfill/contract tests are ready;
-- PR #77 is re-evaluated against current `main` and the final Mini BFF contract; reuse code only where still correct.
+- Phase 3 complete;
+- LifeSpace #234 migration/backfill/contract verification ready;
+- #77 re-evaluated/rebased against current main and final BFF contract; reuse only still-correct work.
 
 ### Target
 
 ```text
 Approved Mini
   -> unchanged final HomeMew BFF contract
-       -> new LifeSpace Event/Query/TemporalRange contract
+       -> new LifeSpace Query/Event/TemporalRange contract
 
 HomeMew Web
-  -> new LifeSpace contract directly through its Web BFF/session boundary
+  -> current LifeSpace contract directly through Web session/BFF boundary
 ```
 
-### Rolling release safety
+### Required LifeSpace outcomes
 
-There is no assumption of a physically atomic multi-repository deploy.
+- Event published resource truth becomes canonical `when: temporal_range` according to #234.
+- Event data migration/backfill is explicit and verified.
+- Canonical Query over direct TemporalRange becomes the normal Event query path.
+- compatibility Calendar planners/routes are not retired until traffic/consumer evidence says they are unused.
+
+### Rolling deployment safety
+
+Do not assume physical atomicity across Workers/repos.
 
 Preferred sequence:
 
-1. Deploy BFF logic that can safely tolerate the old/new upstream contract for the cutover window if required.
-2. Deploy the LifeSpace Event/model/storage migration and activate the new contract according to LifeSpace #234's compatibility plan.
-3. Switch/verify BFF new-adapter behavior while the Mini-facing contract stays unchanged.
-4. Deploy/verify HomeMew Web against the new LifeSpace contract.
-5. Observe production evidence before declaring the old adapter removable.
+1. deploy BFF capable of safely tolerating required old/new upstream window;
+2. deploy LifeSpace migration/new contract according to #234;
+3. verify BFF switches to new upstream adapter while Mini contract remains identical;
+4. deploy/verify HomeMew Web against current platform contract;
+5. inspect production evidence before cleanup.
 
-Temporary dual compatibility is permitted only inside the BFF and only for the cutover window.
+## 11. Phase 5 — Remove BFF compatibility redundancy only
 
-## 8. Phase 5 — Remove BFF compatibility redundancy only
+Remove only compatibility that exists for the old LifeSpace upstream contract, e.g.:
 
-Delete obsolete compatibility that exists solely for the pre-migration LifeSpace contract, for example:
-
-- old Event split-time conversion branches;
-- old query parameter translators/fallbacks;
+- Event split-time mapping;
+- old query parameter translators;
 - legacy upstream DTO mapping;
-- temporary old/new upstream detection;
-- old compatibility-only tests and metrics.
+- temporary old/new detection or fallback;
+- compatibility-only tests/metrics.
 
-Keep tests that assert the stable Mini-facing contract.
+Retain tests for the stable Mini-facing contract.
 
-**No Mini Program code change is part of Phase 5.**
+**No Mini Program code change belongs to Phase 5.**
 
-Final gate:
+Final state:
 
 ```text
 Mini contract unchanged since review candidate
 BFF has one current LifeSpace adapter path
-LifeSpace new Event/Query/TemporalRange contract is authoritative
-HomeMew Web uses current platform contract
-old compatibility code removed
+LifeSpace Canonical Query + direct Event TemporalRange are authoritative
+HomeMew Web consumes current LifeSpace contract
+old upstream compatibility removed
 ```
 
-## 9. Evidence / 已确认依据
+## 12. Explicit do-not-do list / 防走偏清单
 
-As of 2026-09-16:
+Do not:
 
-- HomeMew PR #74 is merged and provides an Event-only BFF precursor.
-- HomeMew PR #77 is open Draft for Event -> TemporalRange cutover and must stay out of the immediate path.
-- `AGENTS.md`, `apps/miniprogram/AGENTS.md`, `docs/architecture.md`, `docs/product-rules.md`, `README.md`, and `apps/web/README.md` still contain older direct-LifeSpace/Event-only/staging wording; the 2026-09-16 accepted decision supersedes those conflicting statements until they are synchronized during implementation.
-- LifeSpace #234 records that TemporalRange CRUD, typed filters/local-date-window, and sort/cursor foundation are complete via #247/#248/#249; Event model/storage migration is still open.
+- continue broad BFF implementation before Phase 0 doc alignment;
+- infer Mini dependencies from old README/product docs instead of source;
+- treat PR #77 as current architecture authority;
+- change Mini to canonical `when`/Query AST because LifeSpace uses them;
+- invent a HomeMew platform query language parallel to Canonical Query;
+- put product-specific compatibility into LifeSpace merely for WeChat release lag;
+- keep both public-URL and Service-Binding upstream paths permanently without an explicit need;
+- remove LifeSpace compatibility before active-consumer evidence allows it;
+- remove HomeMew Web staging rules from unrelated LifeSpace staging;
+- encode authorization in BFF role checks instead of LifeSpace;
+- persist household truth in HomeMew BFF/backend;
+- change the Mini again during Phase 5 cleanup.
 
-## 10. Current blockers / 当前阻塞
+## 13. Current blockers / 当前阻塞
 
-No external blocker prevents starting Phase 1.
+No external blocker prevents Phase 0.
 
-The main correctness risk is beginning implementation before producing the complete Mini call inventory and final HomeMew route/DTO map. Therefore contract inventory/design is a hard gate before broad proxy migration.
+The immediate correctness blocker is **documentation drift**: required HomeMew architecture/product/client instructions still describe the superseded direct-LifeSpace/Event-only/staging topology.
 
-## 11. Next action / 下一步动作
+After Phase 0, the next correctness risk is incomplete Mini call inventory. Therefore inventory/contract design remains a hard gate before broad implementation.
 
-**Start Phase 1 on a fresh implementation branch from current `main`; do not build on PR #77.**
+## 14. Exact next action / 下一步动作
 
-The first implementation session must:
+**Complete Phase 0 before any broad BFF implementation.**
 
-1. read `AGENTS.md`, `apps/miniprogram/AGENTS.md`, and relevant current LifeSpace contracts;
-2. enumerate every direct/indirect Mini -> LifeSpace call from current source;
-3. add the exact inventory and proposed final BFF route/DTO mapping to this plan (or a linked contract doc);
-4. identify which calls target Core, Identity, or the HomeMew provider backend;
-5. verify actual LifeSpace Worker service names/bindings from the LifeSpace repository;
-6. only after that inventory is reviewed internally against the accepted decision, begin implementing the complete final BFF surface.
+Next session/work branch must:
 
-Do not merge PR #77 and do not start LifeSpace Event's breaking migration during this step.
+1. update HomeMew root `AGENTS.md`;
+2. update `apps/miniprogram/AGENTS.md`;
+3. update `docs/architecture.md`;
+4. update `docs/product-rules.md`;
+5. update root `README.md`;
+6. update `apps/miniprogram/README.md`;
+7. update `apps/web/README.md`;
+8. mark `2026-09-15-miniprogram-bff-contract-boundary.md` as partially superseded;
+9. identify `docs/web-staging-acceptance.md` as historical/retirement-target documentation rather than current release authority;
+10. run a repository text search for contradictory `Mini -> LifeSpace direct`, `Event-only BFF`, and active Web staging statements;
+11. update this plan's Current state/Evidence/Next action and comment on HomeMew #79.
 
-## 12. Session handoff template / 每轮交接模板
+Only after the Phase-0 gate is green should a fresh implementation branch start the source-derived Mini call inventory.
 
-At the end of each significant work session, append/update the following information in this file and mirror a concise version to HomeMew #79:
+Do not merge PR #77 and do not start LifeSpace Event's breaking migration during Phase 0/1/2/3.
+
+## 15. Session handoff template / 每轮交接模板
+
+At the end of every significant work session, update this file and mirror a concise version to HomeMew #79:
 
 ```text
 Date:
@@ -328,6 +546,7 @@ Branch / PR:
 Phase:
 Completed:
 Evidence (tests/commits/PRs):
+Authority docs checked:
 Changed assumptions/decisions:
 Remaining:
 Blockers:
@@ -335,4 +554,4 @@ Exact next action:
 Do not do yet:
 ```
 
-The **Exact next action** must be specific enough that a fresh session can continue without asking what happened in chat.
+The **Exact next action** must be specific enough that a new conversation can continue from repository state without asking for chat history.
