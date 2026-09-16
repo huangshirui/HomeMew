@@ -268,45 +268,12 @@ The first version has one task-level completion state. It does not track complet
 - An Event Subscription filter grants no data authority; the Service Principal must retain the corresponding current model Data Grant and LifeSpace re-checks current authority before delivery.
 - Disabling or deleting an integration does not delete historical events, tasks, or day records it created. Audit fields preserve the true service principal as actor where the LifeSpace model supports actor audit.
 
-## 14. AI creation drafts
+## 14. 喵一下 / AI creation drafts
 
-- Interpretation classifies text as `event`, `task`, `day_record`, or `wish`.
-  When the kind is genuinely ambiguous and the request has no `targetKind`, the
-  response is exactly `choose_kind` with two to four unique `candidateKinds`.
-  It contains no confidence score. After the user chooses, the client repeats
-  the request with the original text and that `targetKind`; a ready result must
-  use the requested kind.
-- A ready result contains the complete draft shape for exactly one kind,
-  `missingFields`, and `warnings`. `missingFields` names values that the client
-  must ask the user to supply or confirm. A nullable scalar set to `null` means
-  unknown, invalid, ambiguous, or inapplicable; Core and clients must not turn
-  it into an invented default. Arrays are always present and may be empty.
-- Member names are resolved only against active members of the requested
-  family. The provider sees display names with temporary request-scoped
-  references, not HomeMew user IDs. Duplicate display names must not be guessed:
-  even a unique temporary reference for a member whose display name is shared
-  is treated as ambiguous and omitted from the ID array. Each ambiguous or
-  unresolved reference produces `AMBIGUOUS_MEMBER` or `UNRESOLVED_MEMBER`, and
-  leaves the corresponding field missing for user review. Unambiguous resolved
-  IDs are de-duplicated.
-- Event draft dates and `HH:mm` times are local calendar values interpreted
-  in the request's `viewingTimezone`. Timed drafts keep start and end date/time
-  fields; all-day drafts use the half-open `startDate`/`endDateExclusive` range
-  and clear timed fields. Relative task due dates, day-record anchors, and wish
-  desired dates are interpreted in the family timezone and remain date-only.
-  Family-local today governs day-record rules. Invalid or impossible inferred
-  values become `null` with a warning; they are not silently shifted.
-- A local event wall time in a nonexistent spring-forward gap or ambiguous
-  fall-back fold cannot be represented unambiguously. Core clears the affected
-  `startTime` or `endTime`, adds that field to `missingFields`, and emits
-  `INVALID_INFERRED_VALUE`; it never shifts the time or chooses a fold
-  arbitrarily.
-- Interpretation is ephemeral and never creates, updates, or reserves a Core
-  record. The user must review the result and submit it through the existing
-  create endpoint, whose normal authorization and validation remain decisive.
-- The route is limited per authenticated user to 10 requests per 60 seconds.
-  Clients should correct `INVALID_REQUEST`; wait before
-  retrying `AI_RATE_LIMITED`; and present an explicit retry for provider
-  unavailable, invalid-response, or timeout errors. `AI_NOT_CONFIGURED` is an
-  operator condition. Core does not retry the provider automatically, and a
-  client must not turn an interpretation retry into a blind create retry.
+- “喵一下”当前下线：Mini 不注册该页面，也不展示任何入口；现存页面与 LifeSpace Creation Draft 客户端代码是不可达的历史实现，不是当前运行契约。
+- 未来若重新启用，文本解释、模型/provider 编排、限流与临时 draft-job 生命周期由有界 HomeMew BFF 能力负责，不再使用或扩展 LifeSpace Registry Creation Draft capability。
+- 重新启用前必须有独立的 Accepted Decision 和 Mini-facing contract，明确稳定 DTO、任务生命周期/存储、provider trust、滥用防护、可观测性、成员解析、时间语义和失败处理；不得从休眠代码反推新契约。
+- AI 草稿只属于应用编排，不是家庭业务事实。用户必须先审阅；确认后的 Event、Task、Day Record 或 Wish 仍通过各自的 HomeMew Mini BFF 产品路由写入 LifeSpace，并由 LifeSpace 执行最终授权、校验与持久化。
+- 该边界不得演变为通用 AI proxy、任意上游代理或第二个 HomeMew business Core。
+
+详细决定见 `docs/decisions/2026-09-16-meow-bff-ownership-and-temporary-offline.md`。
