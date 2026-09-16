@@ -1,4 +1,7 @@
 /**
+ * @deprecated Historical inactive adapter. “喵一下” is offline and future draft-job
+ * orchestration belongs to HomeMew BFF, not LifeSpace Registry Creation Drafts.
+ *
  * 喵一下（Creation Drafts）-> LifeSpace Registry Creation Drafts。
  * HomeMew 页面仍使用 kind 术语；平台侧使用 modelKey，在适配层做一一映射。
  */

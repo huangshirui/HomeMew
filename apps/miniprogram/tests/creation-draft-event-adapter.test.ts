@@ -1,3 +1,5 @@
+// Historical inactive contract tests retained as design evidence only. They are intentionally
+// absent from npm test while “喵一下” is offline; future behavior is defined by HomeMew BFF.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

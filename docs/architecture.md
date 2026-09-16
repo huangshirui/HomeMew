@@ -157,7 +157,7 @@ HomeMew keeps product-friendly terms in the UI but maps them explicitly at the c
 | task | `task` model + Actions |
 | day | `day_record` model + Temporal capability |
 | wish | `wish` model + Actions |
-| 喵一下 | Registry Creation Draft capability |
+| 喵一下 | Currently offline; future bounded HomeMew BFF-owned draft orchestration, while confirmed domain records still write to LifeSpace |
 
 HomeMew services may expose `familyId`, `attendeeIds`, `assigneeIds` and similar product DTOs to pages, but translate them to Space IDs/Person IDs before calling LifeSpace.
 

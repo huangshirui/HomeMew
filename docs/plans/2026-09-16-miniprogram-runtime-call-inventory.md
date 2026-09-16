@@ -14,7 +14,7 @@ The inventory was generated from the current Mini source, not from historical do
 
 - every TypeScript source under `apps/miniprogram/miniprogram` was checked for service imports and direct network primitives;
 - every file under `services/` was checked for `request`, `wx.request`, upload, target selection, and URL construction;
-- startup (`app.ts`, launch page, stores, runtime bootstrap), invitation deep links, account linking, Creation Draft polling, avatar display/upload, and the About-page latency diagnostic were inspected explicitly;
+- startup (`app.ts`, launch page, stores, runtime bootstrap), invitation deep links, account linking, now-dormant Creation Draft polling, avatar display/upload, and the About-page latency diagnostic were inspected explicitly;
 - no page or store performs an unlisted network call; runtime calls are centralized in services, except that `activity.ts`, `auth.ts`, `media.ts`, and `core-latency.ts` intentionally use `wx.request` directly today.
 
 Shared current behavior:
@@ -132,13 +132,13 @@ All Event routes return the existing `Event` product union. The Mini contract ke
 | `updateWish/deleteWish` | Core record PATCH / DELETE with version; bearer | PATCH / DELETE final record route | Unchanged |
 | `fulfillWish/reopenWish` | Core POST fixed actions with version; `Wish`; bearer | POST `.../fulfill|reopen`; same DTO | Unchanged |
 
-### 3.7 Creation Drafts and diagnostics
+### 3.7 Dormant Meow history and active diagnostics
 
 | Source / product operation | Current target, method, path, DTO/auth | Final HomeMew route and Mini DTO | Adapter now / Phase 4 |
 | --- | --- | --- | --- |
-| `createCreationDraftJob`; Meow page | Core `POST /api/v1/spaces/{id}/creation-drafts`; product request -> processing job; bearer | `POST /api/v1/miniprogram/families/{familyId}/creation-drafts`; existing product job DTO | Map kind <-> modelKey and Event draft adapter in BFF; unchanged unless current LifeSpace contract evolves |
-| `getCreationDraftJob`; polling | Core GET draft; processing/choose/ready/failed job; bearer | GET `.../creation-drafts/{draftId}?viewingTimezone=`; same product job union | Same mapping; Event draft mapping follows active upstream |
-| `chooseCreationDraftKind` | Core POST `.../choose-model` with targetModelKey; processing job; bearer | POST `.../creation-drafts/{draftId}/choose-kind`; `{targetKind,viewingTimezone}` | kind -> modelKey | Event ready draft maps new temporal contract while Mini draft stays stable |
+| `createCreationDraftJob`; dormant Meow page | Historical Core `POST /api/v1/spaces/{id}/creation-drafts`; bearer | **No active final route.** Meow is offline and the page is not registered | Do not implement a LifeSpace adapter. Future HomeMew BFF-owned orchestration requires a separate accepted contract |
+| `getCreationDraftJob`; dormant polling | Historical Core GET draft | **No active final route** | Historical only; excluded from Phase 2 migration |
+| `chooseCreationDraftKind`; dormant selection | Historical Core POST `.../choose-model` | **No active final route** | Historical only; excluded from Phase 2 migration |
 | `core-latency.runCoreLatencyTest`; About page | Direct public Core GET `/health`, GET `/api/v1/status`, and authenticated task Canonical query, three samples; exposes `coreBaseUrl` | `POST /api/v1/miniprogram/diagnostics/lifespace-core`; bounded diagnostic DTO with target label, upstream health/status/business samples, no URL/path; bearer. Mini measures end-to-end request time and supplies local `networkType` only for display | BFF probes only fixed Core binding endpoints and one authorized limit-1 task query for the selected family | Event Phase 4 irrelevant; diagnostic remains bounded |
 
 ## 4. Query lowering matrix
@@ -158,7 +158,7 @@ Verified production Worker service names:
 
 | HomeMew binding | LifeSpace production service | Purpose |
 | --- | --- | --- |
-| `LIFESPACE_CORE` | `lifespace-core` | Space, model, Creation Draft, Core media, diagnostics |
+| `LIFESPACE_CORE` | `lifespace-core` | Space, model, Core media, diagnostics |
 | `LIFESPACE_IDENTITY` | `lifespace-identity` | user profile/avatar and access-link confirmation |
 | existing `HOMEMEW_BACKEND` | `homemew-backend-production` | login/activity provider functions |
 
@@ -193,8 +193,12 @@ The replacement gate is:
 
 ## 8. Inventory conclusions
 
-- All normal Mini network behavior is now accounted for; no page-local hidden API family was found.
-- The final boundary contains more than domain CRUD: startup refresh, activity, account linking, avatars, asset reads, Creation Draft polling, invite deep links, and diagnostics must migrate together.
+- All active normal Mini network behavior is now accounted for; no page-local hidden API family was found. The source inventory also records dormant Meow calls so they are not mistaken for active migration scope.
+- The final boundary contains more than domain CRUD: startup refresh, activity, account linking, avatars, asset reads, invite deep links, and diagnostics must migrate together. Dormant Meow/Creation Draft calls are explicitly excluded while the surface is offline.
 - Event-only BFF code is a precursor, not the final route layout.
 - No Mini-facing route needs Canonical AST, `modelKey`, Space Person IDs, public LifeSpace URLs, or TemporalRange wire shape.
 - This design introduces no new platform semantics. It applies the accepted 2026-09-16 boundary to the current source inventory.
+
+## 9. 2026-09-16 scope correction: Meow offline
+
+The accepted `2026-09-16-meow-bff-ownership-and-temporary-offline` decision supersedes the Creation Draft route rows above as active design. They remain in this source-derived inventory only as historical evidence of the calls found during inspection. The current Mini package exposes no Meow page or entry, Phase 1 implements no LifeSpace Creation Draft adapter, and Phase 2 must not migrate those dormant calls. Any future Meow contract is a separate HomeMew BFF-owned capability.

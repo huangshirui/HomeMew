@@ -1,4 +1,8 @@
 /**
+ * @deprecated Inactive since 2026-09-16. The page is intentionally absent from app.json
+ * and has no product entry. Future draft orchestration belongs to HomeMew BFF; do not
+ * reconnect this historical LifeSpace client without a new accepted decision.
+ *
  * 喵一下页
  *
  * 创建解析任务后轮询结果，避免自然语言解析需要 40–60 秒时触发微信请求超时。
