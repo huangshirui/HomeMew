@@ -1,3 +1,5 @@
+> Status: historical / inactive since 2026-09-16. “喵一下” is offline and this LifeSpace adapter is not an active runtime contract. A future implementation belongs to the HomeMew BFF and requires a new accepted contract; see `docs/decisions/2026-09-16-meow-bff-ownership-and-temporary-offline.md`.
+
 # LifeSpace Creation Draft -> HomeMew form mapping
 
 HomeMew treats LifeSpace Registry Creation Drafts as platform-native model drafts and adapts them to product form fields at the Mini Program service boundary.
