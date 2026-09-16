@@ -132,6 +132,50 @@ test('Mini Program Task/Wish BFF is handled before the generic Mini catch-all an
   assert.equal(appCalled, false);
 });
 
+test('Mini Program Day BFF is handled before the generic catch-all and Meow remains absent', async () => {
+  let appCalled = false;
+  const handler = createFrontDoorHandler({
+    app: {
+      async fetch() {
+        appCalled = true;
+        return new Response('web');
+      },
+    },
+  });
+  const dayResponse = await handler.fetch(
+    request('/api/v1/miniprogram/families/spc_home/day-records/rec_day'),
+    {
+      LIFESPACE_CORE: {
+        async fetch(incoming) {
+          const path = new URL(incoming.url).pathname;
+          if (path.endsWith('/members')) {
+            return new Response(JSON.stringify({ data: [] }), {
+              status: 200, headers: { 'content-type': 'application/json' },
+            });
+          }
+          assert.equal(path, '/api/v1/spaces/spc_home/models/day_record/records/rec_day');
+          return new Response(JSON.stringify({ data: {
+            id: 'rec_day', spaceId: 'spc_home', kind: 'elapsed', name: 'Since',
+            anchorDate: '2026-09-01', status: 'active', version: 1,
+            createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z',
+          } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        },
+      },
+    },
+  );
+  assert.equal(dayResponse.status, 200);
+  assert.equal(appCalled, false);
+
+  const meowResponse = await handler.fetch(
+    request('/api/v1/miniprogram/families/spc_home/creation-drafts', {
+      method: 'POST', body: { text: 'tomorrow', viewingTimezone: 'Asia/Shanghai' },
+    }),
+    {},
+  );
+  assert.equal(meowResponse.status, 404);
+  assert.equal((await meowResponse.json()).error.code, 'BFF_ROUTE_NOT_FOUND');
+});
+
 test('unknown Mini BFF routes fail closed before the Access-protected Web app', async () => {
   let appCalled = false;
   const handler = createFrontDoorHandler({
