@@ -236,7 +236,7 @@ The user-facing domain is:
 homemew.aisr.online
 ```
 
-Since the accepted production cutover on 2026-08-24, it is owned by `homemew-web-production`. Browser Web traffic remains behind Cloudflare Access. Explicit Mini application routes—including `POST /api/v1/login/wechat` and the stable Mini BFF surface—use narrowly scoped Access bypass rules, still require their own LifeSpace user bearer where applicable, and delegate only to fixed internal operations.
+Since the accepted production cutover on 2026-08-24, it is owned by `homemew-web-production`. Browser Web traffic remains behind Cloudflare Access. The exact Mini login route `POST /api/v1/login/wechat` uses its narrow Access bypass and delegates through the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. The stable Mini BFF surface uses only its explicit bypass/routes, requires the LifeSpace user bearer where applicable, and delegates only to fixed internal operations.
 
 Release path:
 
