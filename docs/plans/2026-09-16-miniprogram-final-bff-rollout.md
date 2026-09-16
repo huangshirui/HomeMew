@@ -215,7 +215,7 @@ Last verified: 2026-09-16
 | Family / Member / Invitation BFF slice | ✅ Merged | PR #85 merged at `9229ee3`; fixed product routes/DTOs run against current Core/Identity; Mini callers remain unchanged |
 | Task / Wish BFF slice | ✅ Merged | PR #87 merged at `81d4b6e`; Canonical Query lowering, Person translation, CRUD/Actions and stable DTOs are in main; Mini callers remain unchanged |
 | Meow / Creation Draft scope | ✅ Offline / scope corrected | PR #89 merged at `6724fc9`; Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed |
-| Day / diagnostic BFF slice | 🟡 PR #91 in review | Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
+| Day / diagnostic BFF slice | ✅ Merged | PR #91 merged at `875faeb`; Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
 | HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
 | One-time Mini migration | ⬜ Not done | Phase 2 |
 | WeChat review | ⬜ Not done | Phase 3 |
@@ -544,14 +544,12 @@ The existing HomeMew Web staging workflow/config remains a known Phase-1 retirem
 
 ## 14. Exact next action / 下一步动作
 
-**Finish CI and merge PR #91, then implement the production-compatible Event final-contract old/new adapter seam; keep Mini callers and the offline Meow surface unchanged.**
+**Implement the production-compatible Event final-contract old/new adapter seam; keep Mini callers and the offline Meow surface unchanged.**
 
-1. require the full GitHub Web Check for PR #91 and fix any failure without broadening its fixed route surface;
-2. merge #91 only when the check is green, then record the exact merge SHA/check run in this plan and #79;
-3. re-read current Event Mini DTO/service, PR #77 as Phase-4 source material only, and current/new LifeSpace Event Runtime/contracts/tests;
-4. add fixtures proving current split Calendar and future `when: temporal_range` upstream records map to the same stable Mini Event DTO and product query semantics;
-5. implement the internal old/new adapter seam without changing Mini-facing routes/DTOs or starting LifeSpace #234;
-6. after the Event seam is green, retire HomeMew Web staging workflow/config and update historical operational documentation.
+1. re-read current Event Mini DTO/service, PR #77 as Phase-4 source material only, and current/new LifeSpace Event Runtime/contracts/tests;
+2. add fixtures proving current split Calendar and future `when: temporal_range` upstream records map to the same stable Mini Event DTO and product query semantics;
+3. implement the internal old/new adapter seam without changing Mini-facing routes/DTOs or starting LifeSpace #234;
+4. after the Event seam is green, retire HomeMew Web staging workflow/config and update historical operational documentation.
 
 Do not change Mini runtime calls, re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, or remove current-LifeSpace compatibility.
 
@@ -637,11 +635,11 @@ The **Exact next action** must be specific enough that a new conversation can co
 
 ### 2026-09-16 — Phase 1 Day / diagnostic slice
 
-- Branch / PR: `codex/phase-1-bff-day-diagnostic-slice` / #91
+- Branch / PR: `codex/phase-1-bff-day-diagnostic-slice` / #91 (merged)
 - Base: merged Meow handoff at `5b240ca`
 - Completed in branch: bounded Day list/get/create/update/delete/archive/restore and occurrence routes; exact current compatibility query mapping; `me`/user→Space Person translation; Temporal `computed.temporal` preservation; fixed three-sample Core binding diagnostic; front-door integration.
 - Offline boundary: no Creation Draft matcher/handler exists; the historical Mini route fails closed with `BFF_ROUTE_NOT_FOUND`.
-- Evidence: focused and full BFF Node suite passed 48/48 locally, including fixed route/query/body denials, computed/cycle projection, occurrence composition, diagnostic call/body bounds, error propagation, and front-door ordering.
+- Evidence: focused and full BFF Node suite passed 48/48 locally; GitHub Web Check run `35164044471` passed BFF tests, Web typecheck, and Web build; PR #91 merged as `875faebef5fd89f85e52bddbbd394812850ebb9d`.
 - External repositories/clients: no Mini caller or LifeSpace change; #234 remains gated and PR #77 remains frozen for Phase 4.
 - New architecture/product decision: none; this implements the existing final-BFF decision and the merged Meow scope correction, so no additional Notion log entry is required.
 - Remaining after merge: Event final old/new adapter seam; HomeMew Web staging retirement; Phase-2 Mini cutover.
