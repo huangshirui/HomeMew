@@ -2,7 +2,7 @@
 
 # LifeSpace Creation Draft -> HomeMew form mapping
 
-HomeMew treats LifeSpace Registry Creation Drafts as platform-native model drafts and adapts them to product form fields at the Mini Program service boundary.
+The retired implementation treated LifeSpace Registry Creation Drafts as platform-native model drafts and adapted them to product form fields at the Mini Program service boundary.
 
 ## Event time mapping
 
