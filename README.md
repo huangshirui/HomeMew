@@ -129,7 +129,7 @@ homemew.aisr.online
 | task | `task` + Actions |
 | day | `day_record` + Temporal capability |
 | wish | `wish` + Actions |
-| 喵一下 | Registry Creation Draft capability |
+| 喵一下 | 当前下线；未来由 HomeMew BFF 承担有界草稿编排，确认后的领域记录仍写入 LifeSpace |
 
 ## 本地检查
 
