@@ -208,8 +208,9 @@ Last verified: 2026-09-16
 | HomeMew normative documentation alignment | ✅ Phase 0 complete | root/nested AGENTS, architecture/product rules, READMEs and historical decisions aligned in PR #82 |
 | Full Mini -> LifeSpace runtime call inventory | ✅ Complete | Source-derived inventory at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md` |
 | Final cross-surface Mini BFF route/DTO map | ✅ Design baseline complete | Every observed runtime dependency has a bounded product route/DTO and current/Phase-4 adapter note |
-| BFF -> LifeSpace Service Bindings | 🟡 Foundation merged | PR #84 merged at `53a04ce`; fixed Core/Identity adapter is used by Event/profile/access-link/avatar and the Family slice |
+| BFF -> LifeSpace Service Bindings | 🟡 Foundation merged | PR #84 merged at `53a04ce`; fixed Core/Identity adapter is used by Event/profile/access-link/avatar, Family, and Task/Wish slices |
 | Family / Member / Invitation BFF slice | ✅ Merged | PR #85 merged at `9229ee3`; fixed product routes/DTOs run against current Core/Identity; Mini callers remain unchanged |
+| Task / Wish BFF slice | 🟡 PR #87 open | Canonical Query lowering, Person translation, CRUD/Actions and stable product DTOs implemented; Mini callers remain unchanged |
 | HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
 | One-time Mini migration | ⬜ Not done | Phase 2 |
 | WeChat review | ⬜ Not done | Phase 3 |
@@ -369,7 +370,8 @@ local tests/typecheck/build
 - [x] current-user profile, access-link, user/family avatar read/upload adapter slice;
 - [x] existing Event precursor moved from public Core fetch to the shared Core binding;
 - [x] family/member/invitation adapter slice against current Core/Identity bindings (PR #85);
-- [ ] current-LifeSpace adapters for Task/Wish/Day/Creation Draft/diagnostic and remaining final routes;
+- [x] Task/Wish Canonical Query, Person mapping, CRUD and Action adapter slice (PR #87);
+- [ ] current-LifeSpace adapters for Day/Creation Draft/diagnostic and remaining final routes;
 - [ ] one production-compatible Event old/new adapter seam;
 - [ ] HomeMew Web staging workflow/config retirement;
 - [ ] BFF/Web checks and production smoke evidence.
@@ -531,23 +533,23 @@ No external blocker prevents Phase 1.
 
 Phase 0 documentation drift is resolved in merged PR #82. The Phase-1 source-derived inventory and final route/DTO design baseline now exist at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md`.
 
-No external blocker prevents the remaining Phase-1 implementation slices. PR #84 and the Family / Member / Invitation slice in PR #85 are merged. The main correctness risks remain accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must accompany each bounded route slice.
+No external blocker prevents the remaining Phase-1 implementation slices. PR #84 and the Family / Member / Invitation slice in PR #85 are merged; PR #87 contains the Task / Wish slice and is awaiting repository CI/review. The main correctness risks remain accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must accompany each bounded route slice.
 
 The existing HomeMew Web staging workflow/config remains a known Phase-1 retirement item. Its presence is implementation evidence to remove, not current release authority.
 
 ## 14. Exact next action / 下一步动作
 
-**Implement the bounded Task + Wish adapter slice against current production-compatible LifeSpace; do not change Mini runtime calls yet.**
+**Finish CI/review for PR #87, then implement the bounded Day / Creation Draft / diagnostic adapter slice; do not change Mini runtime calls yet.**
 
-From current `main` at merged PR #85 (`9229ee3`):
+After PR #87 is merged:
 
 1. re-read current `main`, this plan, and the inventory baseline;
-2. verify the current production-compatible Task and Wish paths, field mappings, lifecycle actions, query parameters, pagination, and optimistic-version behavior against LifeSpace Runtime/contracts/tests;
-3. add Mini-facing contract and deny tests before implementation, including explicit ordering/query lowering and upstream error propagation;
-4. implement only the fixed Task and Wish product routes from the inventory using the shared Core Service Binding adapter;
-5. keep LifeSpace authorization and storage truth authoritative; do not expose a generic model proxy, Canonical Query AST, arbitrary upstream fields, or client-selected upstream paths;
+2. verify Day Record CRUD/Actions/occurrence/Temporal projection and Creation Draft/diagnostic paths against current LifeSpace Runtime/contracts/tests;
+3. add Mini-facing contract and deny tests before implementation, including subject user→Person mapping, date-only/computed-state preservation, Creation Draft member projection, and fixed diagnostic behavior;
+4. implement only the fixed Day / Creation Draft / diagnostic product routes from the inventory using the shared Core Service Binding adapter;
+5. keep LifeSpace computed fields, Creation Draft interpretation, authorization, and storage truth authoritative; do not reproduce Temporal calculations or AI interpretation in the BFF;
 6. run the full Web/BFF suite and update this plan plus #79 with exact evidence;
-7. only after that slice is green, proceed to Day / Creation Draft / diagnostic adapters, the Event final-contract seam, and HomeMew Web staging retirement.
+7. only after that slice is green, implement the Event final-contract old/new adapter seam and retire HomeMew Web staging.
 
 Do not merge PR #77, start LifeSpace #234's breaking Event migration, remove LifeSpace compatibility, or alter Mini runtime addressing in this slice.
 
@@ -606,3 +608,15 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Changed assumptions/decisions: none. The slice applies the accepted boundary; LifeSpace remains authorization and domain authority, so no Notion decision-log append is required.
 - Remaining: Task/Wish adapters; Day/Creation Draft/diagnostic adapters; Event final route/DTO adapter seam; Web staging retirement; Phase-2 Mini cutover.
 - Blockers: none; #85 is merged.
+
+
+### 2026-09-16 — Phase 1 Task / Wish slice
+
+- Branch / PR: `codex/phase-1-bff-task-wish-slice` / #87
+- Base: merged Family handoff at `da5937f`
+- Completed: bounded Task/Wish collection, record and lifecycle Action routes; exact product-filter lowering to Canonical Query; explicit stable sort/cursor pagination; `me`/user→Space Person translation; current-person Wish ownership; product DTO and avatar mapping; front-door integration.
+- Evidence: focused Node tests 38/38 passed locally, including exact nested Query AST/sort/page assertions, fixed route/action/field/query denials, optimistic-version/error propagation, Person mapping, and front-door ordering; repository CI pending on #87.
+- Authority checked: HomeMew root AGENTS, accepted decision, current Living Plan/inventory, Mini Task/Wish services and DTOs; LifeSpace root/Core constraints, `docs/canonical-query.md`, current Task/Wish Model Definitions, Canonical Runtime/parser/operators, generic routes/Actions and integration-test evidence.
+- Changed assumptions/decisions: none. The implementation applies the accepted final-BFF route/DTO baseline and LifeSpace Canonical Query semantics; no Notion decision-log append is required.
+- Remaining: Day/Creation Draft/diagnostic adapters; Event final route/DTO old/new adapter seam; HomeMew Web staging retirement; Phase-2 Mini cutover.
+- Blockers: no external blocker; #87 CI/review must pass before the next slice is based on main.
