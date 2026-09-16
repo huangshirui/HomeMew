@@ -81,6 +81,14 @@ jobs:
           test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN is not configured" >&2; exit 1; }
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID is not configured" >&2; exit 1; }
 
+      - name: Verify LifeSpace staging release baseline
+        run: |
+          echo "verify-lifespace" > "$RUNNER_TEMP/homemew-web-deploy-stage"
+          node apps/web/lifespace-release-baseline.mjs \
+            staging \
+            https://auth-staging.aisr.online \
+            https://core-staging.aisr.online
+
       - name: Validate HomeMew Web
         run: |
           echo "validate-web" > "$RUNNER_TEMP/homemew-web-deploy-stage"
@@ -190,5 +198,5 @@ jobs:
           const readinessPath = `${process.env.RUNNER_TEMP}/homemew-web-runtime-readiness.json`;
           const readiness = JSON.parse(fs.readFileSync(readinessPath, 'utf8'));
           if (!readiness.baseReady || !readiness.integrationsReady) throw new Error('Runtime readiness summary is inconsistent');
-          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## HomeMew Web staging\n\n- Worker: \`homemew-web-staging\`\n- Hostname: \`homemew-web-staging.aisr.online\`\n- Build/deploy environment: \`CLOUDFLARE_ENV=staging\`\n- Base runtime secrets: ready\n- W4 integrations runtime: ready — required staging credential binding is present\n- LifeSpace bootstrap authority is not present in this repository/workflow.\n- Production routes/configuration: untouched.\n`);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## HomeMew Web staging\n\n- Worker: \`homemew-web-staging\`\n- Hostname: \`homemew-web-staging.aisr.online\`\n- Build/deploy environment: \`CLOUDFLARE_ENV=staging\`\n- LifeSpace release baseline: verified before deploy\n- Base runtime secrets: ready\n- W4 integrations runtime: ready — required staging credential binding is present\n- LifeSpace bootstrap authority is not present in this repository/workflow.\n- Production routes/configuration: untouched.\n`);
           NODE
