@@ -27,7 +27,7 @@ When HomeMew needs a durable platform capability LifeSpace does not provide, do 
 - HomeMew “family” maps to LifeSpace `Space(kind=family)`.
 - HomeMew users map to LifeSpace Identity users; member-facing domain references map through Space Person IDs where the LifeSpace contract requires them.
 - The Mini Program's normal runtime contract is the **final bounded HomeMew Mini BFF** defined by `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md` and tracked by `docs/plans/2026-09-16-miniprogram-final-bff-rollout.md`. After the one-time migration it must not address public LifeSpace Identity/Core URLs or wire paths directly.
-- A Mini BFF is stateless application adaptation only: explicit HomeMew product routes may translate request/response DTOs, deterministically lower product filters/sorts to the active LifeSpace Canonical Query contract, and forward the current LifeSpace user bearer. It must not persist household business data, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, expose a generic model proxy, or become a generic `/api/v1/*` proxy.
+- Mini household-domain adapters are stateless application adaptation only: explicit HomeMew product routes may translate request/response DTOs, deterministically lower product filters/sorts to the active LifeSpace Canonical Query contract, and forward the current LifeSpace user bearer. A separately accepted HomeMew-owned application capability may own bounded ephemeral orchestration state, but it must not persist household business truth, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, expose a generic model proxy, or become a generic `/api/v1/*` proxy.
 - The 2026-09-15 Event-only BFF decision is historical where it conflicts with the final boundary. Event remains the first compatibility-sensitive model, but the next reviewed Mini release moves every current direct LifeSpace runtime dependency behind the final HomeMew contract.
 - A small HomeMew Cloudflare application backend handles WeChat provider trust: `wx.login` code exchange, `openid -> LifeSpace user_id` mapping, and exchange of the server-only LifeSpace application credential for a short-lived user token. It remains separate from household business-data ownership.
 - The WeChat identity mapping is stored in a SQLite-backed Durable Object keyed per WeChat application identity; do not provision a dedicated HomeMew D1 merely for this mapping.
@@ -77,7 +77,7 @@ Use explicit product-to-platform mappings:
 - task -> HomeMew Mini Task DTO -> BFF adapter -> LifeSpace `task` model + Actions
 - day -> HomeMew Mini Day DTO -> BFF adapter -> LifeSpace `day_record` model + Temporal capability
 - wish -> HomeMew Mini Wish DTO -> BFF adapter -> LifeSpace `wish` model + Actions
-- 喵一下 -> HomeMew Mini draft route -> BFF adapter -> LifeSpace Registry Creation Draft capability
+- 喵一下 -> currently offline; any future interpretation/draft-job capability is HomeMew BFF-owned application orchestration, not a LifeSpace Registry contract; durable confirmed records still use the normal LifeSpace-backed product routes
 
 HomeMew page DTOs may preserve product-friendly names such as `familyId`, but platform IDs and fields must be translated explicitly at the client/BFF service boundary rather than represented as another authoritative backend model.
 
