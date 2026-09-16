@@ -17,6 +17,7 @@ export type CanonicalQuery = {
   filter?: CanonicalQueryFilter;
   sort?: Array<{ field: string; direction: 'asc' | 'desc' }>;
   page?: { limit?: number; cursor?: string | null };
+  context?: { viewingTimezone: string };
 };
 
 export function andFilters(
