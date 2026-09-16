@@ -52,12 +52,12 @@ Rules:
 
 ### 5.1 Core fields
 
-Every event has common identity, family, content, attendee, status, audit, and
-version fields. Its time fields are one of two mutually exclusive shapes:
+Every event has common identity, family, content, attendee, status, audit, and version fields. Time has one authoritative field:
 
-- Timed: `isAllDay=false`, `startAt`, `endAt`, optional nullable
-  `startTimezone`, and optional nullable `endTimezone`.
-- All-day: `isAllDay=true`, `startDate`, and `endDateExclusive`.
+- `when.kind=date`: an all-day/date range with `start` and `endExclusive` date values.
+- `when.kind=instant`: a timed range with absolute RFC 3339 `start` and `endExclusive` instants.
+
+`isAllDay` is a UI projection of `when.kind`, not persisted Event truth.
 
 ### 5.2 Access and editing
 
@@ -69,38 +69,34 @@ version fields. Its time fields are one of two mutually exclusive shapes:
 
 ### 5.3 Timed events
 
-- `startAt` and `endAt` are RFC 3339 UTC strings ending in `Z`; Core stores and returns canonical millisecond-precision UTC.
-- `endAt` must be later than `startAt`.
-- `startTimezone` and `endTimezone` are independently nullable IANA display metadata and never participate in calculations.
-- On create, an omitted endpoint timezone defaults to the family timezone while an explicit `null` remains `null`.
-- On update, an omitted endpoint timezone is unchanged while an explicit `null` clears it.
-- Changing the family timezone does not rewrite existing event display metadata.
+- `when.start` and `when.endExclusive` are absolute RFC 3339 instants; the end must be later than the start.
+- Event instants do not persist an endpoint display timezone.
+- Viewing/editing uses the current explicit HomeMew viewing timezone; changing that context never rewrites saved instants.
 
 ### 5.4 All-day events
 
-- `startDate` and `endDateExclusive` are date-only strings in `YYYY-MM-DD` format.
-- The range is half-open: `[startDate, endDateExclusive)`.
-- A one-day event on July 25 uses `startDate=2026-07-25` and `endDateExclusive=2026-07-26`.
-- `endDateExclusive` must be later than `startDate`.
-- Time-point and timezone fields are forbidden and all-day dates are never converted to UTC.
-- Clients may show inclusive end dates in forms, but must convert to the exclusive Core representation.
+- `when.start` and `when.endExclusive` are date-only strings in `YYYY-MM-DD` format.
+- The range is half-open: `[start, endExclusive)`.
+- A one-day event on July 25 uses `start=2026-07-25` and `endExclusive=2026-07-26`.
+- All-day dates are never converted into persisted UTC instants.
+- Clients may show inclusive end dates in forms, but must convert to the exclusive canonical representation.
 
 ### 5.5 Updates and deletion
 
-- Updates require the version read by the client.
+- Updates replace `when` atomically and require the version read by the client.
 - Core increments `version` on every successful write.
 - A stale update or delete is rejected with a conflict error.
 - Deletion is soft deletion.
-- If event cancellation is implemented, cancellation is distinct from deletion: a cancelled event remains visible with cancelled status.
+- Cancellation is distinct from deletion: a cancelled event remains visible with cancelled status.
 
 ### 5.6 Event list queries
 
-- Every query supplies `startDate` and `endDateExclusive`; there is no implicit default range.
-- An optional IANA `timezone` determines the viewing-day UTC bounds for timed events and defaults to the family timezone.
-- Timed and all-day overlap checks both use half-open query ranges.
+- Lists use the structured Canonical Query endpoint.
+- The time filter is `when overlaps local_date_window`, with explicit `startDate`, `endDateExclusive`, and IANA `timezone`.
+- Sorting by `when` carries the same timezone in `context.viewingTimezone`.
+- Timed and all-day overlap checks use half-open ranges.
 - Return events that overlap the requested range, not only events whose start falls inside it.
 - Deleted events are excluded by default.
-- Default ordering is ascending by start.
 - The first version may filter by attendee and status.
 
 ### 5.7 Out of first scope
