@@ -17,3 +17,12 @@ test('Web Task and Wish lists use the LifeSpace structured Canonical Query endpo
   assert.match(wishes, /queryModelRecords<WishRecord>\(currentFamily\.id, 'wish'/);
   assert.match(wishes, /field: 'status', op: 'eq'/);
 });
+
+test('Web Space invite bearer tokens stay in request bodies instead of URL paths', () => {
+  const family = read('src/pages/family-page.tsx');
+  assert.match(family, /'\/api\/lifespace\/core\/v1\/space-invites\/preview'/);
+  assert.match(family, /JSON\.stringify\(\{ token \}\)/);
+  assert.match(family, /'\/api\/lifespace\/core\/v1\/space-invites\/join'/);
+  assert.match(family, /JSON\.stringify\(\{ token, displayName \}\)/);
+  assert.doesNotMatch(family, /space-invites\/\$\{pathToken\}/);
+});

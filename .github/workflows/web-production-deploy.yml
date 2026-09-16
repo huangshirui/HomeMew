@@ -66,6 +66,13 @@ jobs:
           if (backend?.service !== 'homemew-backend-production') throw new Error('Unexpected HOMEMEW_BACKEND service binding');
           NODE
 
+      - name: Verify LifeSpace production release baseline
+        run: >-
+          node apps/web/lifespace-release-baseline.mjs
+          production
+          https://auth.aisr.online
+          https://core.aisr.online
+
       - name: Test, typecheck and build Web
         run: |
           corepack pnpm test:web
@@ -115,6 +122,7 @@ jobs:
             echo
             echo "- Worker: homemew-web-production"
             echo "- LifeSpace: auth.aisr.online / core.aisr.online"
+            echo "- LifeSpace release baseline: verified before deploy"
             echo "- HOMEMEW_BACKEND binding: homemew-backend-production"
             echo "- Existing homemew.aisr.online ownership retained"
             echo "- Custom Domain transfer and Cloudflare Access provisioning: not performed by this workflow"

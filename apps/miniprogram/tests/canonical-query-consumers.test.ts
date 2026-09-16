@@ -27,6 +27,22 @@ test('Task and Wish lists use the LifeSpace structured Canonical Query endpoint'
   assert.match(wishes, /field: 'desiredDate', op: 'lte'/);
 });
 
+test('Core latency business probe exercises the canonical Task query route', () => {
+  const latency = read('miniprogram/services/core-latency.ts');
+  assert.match(latency, /models\/task\/records\/query/);
+  assert.match(latency, /method: 'POST'/);
+  assert.doesNotMatch(latency, /\/tasks\?status=/);
+});
+
+test('Space invite bearer tokens stay in request bodies instead of URL paths', () => {
+  const families = read('miniprogram/services/families.ts');
+  assert.match(families, /'\/api\/v1\/space-invites\/preview'/);
+  assert.match(families, /data: \{ token: code \}/);
+  assert.match(families, /'\/api\/v1\/space-invites\/join'/);
+  assert.match(families, /data: \{ token: code, displayName: me\.displayName \}/);
+  assert.doesNotMatch(families, /space-invites\/\$\{encodeURIComponent\(code\)\}/);
+});
+
 test('Event traffic is isolated behind the HomeMew Mini Program BFF boundary', () => {
   const api = read('miniprogram/services/api.ts');
   const events = read('miniprogram/services/events.ts');

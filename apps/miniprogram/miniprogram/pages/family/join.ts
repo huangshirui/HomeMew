@@ -118,8 +118,9 @@ Page({
       console.error('[Join] Join failed:', error);
       const err = error as { code?: string; message?: string };
 
-      // 已经是该家庭成员：作为可恢复导航状态，引导进入家庭
-      if (err.code === 'ALREADY_FAMILY_MEMBER') {
+      // 已经是该家庭成员：作为可恢复导航状态，引导进入家庭。
+      // ALREADY_FAMILY_MEMBER 保留为旧客户端兼容错误名，当前 LifeSpace 使用 ALREADY_SPACE_MEMBER。
+      if (err.code === 'ALREADY_SPACE_MEMBER' || err.code === 'ALREADY_FAMILY_MEMBER') {
         const families = await loadFamilies().catch(() => null);
         if (families && families.length) {
           refreshFamilyState(families);

@@ -230,7 +230,11 @@ export async function previewInvite(code: string): Promise<InvitePreview> {
     space: { id: string; name: string; avatarUrl?: string | null; memberCount: number };
     expiresAt: string;
     canJoin: boolean;
-  }>(`/api/v1/space-invites/${encodeURIComponent(code)}`);
+  }>('/api/v1/space-invites/preview', {
+    method: 'POST',
+    data: { token: code },
+    skipRetry: true,
+  });
   return {
     family: {
       id: preview.space.id,
@@ -244,23 +248,21 @@ export async function previewInvite(code: string): Promise<InvitePreview> {
 }
 
 export async function joinFamilyByCode(code: string): Promise<JoinFamilyResult> {
+  const me = await getCurrentUser();
   const joined = await request<{
     spaceId: string;
-    spaceName: string;
     role: SpaceRole;
+    personId?: string;
     joinedAt?: string;
-    membership?: { spaceId?: string; role?: SpaceRole };
-    space?: { id: string; name: string };
-  }>(`/api/v1/space-invites/${encodeURIComponent(code)}/join`, {
+  }>('/api/v1/space-invites/join', {
     method: 'POST',
-    data: {},
+    data: { token: code, displayName: me.displayName },
     skipRetry: true,
   });
-  const familyId = joined.spaceId ?? joined.membership?.spaceId ?? joined.space?.id ?? '';
-  if (familyId) invalidateSpaceMembers(familyId);
+  if (joined.spaceId) invalidateSpaceMembers(joined.spaceId);
   return {
-    familyId,
-    familyName: joined.spaceName ?? joined.space?.name ?? '',
+    familyId: joined.spaceId,
+    familyName: '',
     role: 'member',
     joinedAt: joined.joinedAt ?? new Date().toISOString(),
   };

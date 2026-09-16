@@ -61,8 +61,16 @@ function probe(path: '/health' | '/api/v1/status'): Promise<LatencySample> {
 async function businessProbe(familyId: string): Promise<number> {
   const startedAt = Date.now();
   await request<unknown>(
-    `/api/v1/spaces/${encodeURIComponent(familyId)}/tasks?status=pending&sort=dueDate%3Aasc&limit=1`,
-    { timeout: PROBE_TIMEOUT_MS },
+    `/api/v1/spaces/${encodeURIComponent(familyId)}/models/task/records/query`,
+    {
+      method: 'POST',
+      data: {
+        filter: { field: 'status', op: 'eq', value: 'pending' },
+        sort: [{ field: 'dueDate', direction: 'asc' }],
+        page: { limit: 1 },
+      },
+      timeout: PROBE_TIMEOUT_MS,
+    },
   );
   return Date.now() - startedAt;
 }
