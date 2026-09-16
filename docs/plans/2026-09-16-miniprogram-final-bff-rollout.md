@@ -214,7 +214,7 @@ Last verified: 2026-09-16
 | BFF -> LifeSpace Service Bindings | 🟡 Foundation merged | PR #84 merged at `53a04ce`; fixed Core/Identity adapter is used by Event/profile/access-link/avatar, Family, and Task/Wish slices |
 | Family / Member / Invitation BFF slice | ✅ Merged | PR #85 merged at `9229ee3`; fixed product routes/DTOs run against current Core/Identity; Mini callers remain unchanged |
 | Task / Wish BFF slice | ✅ Merged | PR #87 merged at `81d4b6e`; Canonical Query lowering, Person translation, CRUD/Actions and stable DTOs are in main; Mini callers remain unchanged |
-| Meow / Creation Draft scope | 🟡 PR #89 in review | Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed; accepted decision and regression coverage are in PR #89 |
+| Meow / Creation Draft scope | ✅ Offline / scope corrected | PR #89 merged at `6724fc9`; Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed |
 | HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
 | One-time Mini migration | ⬜ Not done | Phase 2 |
 | WeChat review | ⬜ Not done | Phase 3 |
@@ -543,9 +543,9 @@ The existing HomeMew Web staging workflow/config remains a known Phase-1 retirem
 
 ## 14. Exact next action / 下一步动作
 
-**Merge PR #89 (bounded Meow-offline scope correction), then implement the Day / diagnostic adapter slice; do not migrate dormant Creation Draft calls.**
+**Implement the bounded Day / diagnostic adapter slice; do not migrate dormant Creation Draft calls or change Mini runtime calls yet.**
 
-From current `main` after the Meow-offline PR:
+From current `main` at merged Meow-offline PR #89 (`6724fc9`):
 
 1. re-read current `main`, both accepted 2026-09-16 decisions, this plan, and the inventory baseline;
 2. verify Day Record CRUD/Actions/occurrence/Temporal projection and the bounded diagnostic paths against current LifeSpace Runtime/contracts/tests;
@@ -628,10 +628,11 @@ The **Exact next action** must be specific enough that a new conversation can co
 
 ### 2026-09-16 — Meow offline and future BFF ownership
 
-- Branch / PR: `codex/disable-meow-bff-owned` / #89
+- Branch / PR: `codex/disable-meow-bff-owned` / #89 (merged)
 - Base: merged Task/Wish plan handoff at `743a08d`
 - Decision: “喵一下” is offline now. Its future interpretation/provider/draft-job lifecycle is a bounded HomeMew BFF application capability, not a LifeSpace Registry Creation Draft contract. Confirmed Event/Task/Day/Wish records remain LifeSpace-authoritative.
-- Implementation: removed the Meow page registration and create-sheet entry; retained the page/service implementation as explicitly dormant historical source; added an offline regression test.
+- Implementation: removed the Meow page registration and create-sheet entry; retained the page/service implementation as explicitly dormant historical source; added an offline regression test. PR #89 merged as `6724fc95fb1f979df90c517c2f93fecbfcdb6f24`.
+- Evidence: focused offline regression passed 2/2 locally; Mini Program Check run `35163479458` passed.
 - Scope correction: removed Creation Draft from active Phase 1/2 route migration; the next adapter slice is Day / diagnostic only.
 - Authority updates: root and Mini AGENTS, architecture, product rules, README, Mini README/SPEC, inventory, dormant adapter documentation, and this Living Plan.
 - External repositories: no LifeSpace code or issue state changed; #234 remains gated and PR #77 remains frozen for Phase 4.
