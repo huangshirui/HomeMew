@@ -6,12 +6,10 @@ import {
   ResourceBase,
   LifeSpacePage,
   auditActor,
-  calendarUtcRange,
   getSpaceMembers,
   modelCollectionPath,
   modelRecordPath,
   personRefs,
-  queryString,
   userIdToPersonId,
   userIdsToPersonIds,
 } from './lifespace';
@@ -32,19 +30,17 @@ export interface EventsPage {
   nextCursor: string | null;
 }
 
+type TemporalRange =
+  | { kind: 'instant'; start: string; endExclusive: string }
+  | { kind: 'date'; start: string; endExclusive: string };
+
 type EventResource = ResourceBase & {
   summary: string;
   description: string | null;
   location: string | null;
   status: 'active' | 'cancelled';
   attendeePersonIds: string[];
-  isAllDay: boolean;
-  startAt: string | null;
-  endAt: string | null;
-  startTimezone: string | null;
-  endTimezone: string | null;
-  startDate: string | null;
-  endDateExclusive: string | null;
+  when: TemporalRange;
 };
 
 async function toEvent(spaceId: string, raw: EventResource): Promise<Event> {
@@ -63,21 +59,21 @@ async function toEvent(spaceId: string, raw: EventResource): Promise<Event> {
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
   };
-  if (raw.isAllDay) {
+  if (raw.when.kind === 'date') {
     return {
       ...common,
       isAllDay: true,
-      startDate: raw.startDate ?? '',
-      endDateExclusive: raw.endDateExclusive ?? '',
+      startDate: raw.when.start,
+      endDateExclusive: raw.when.endExclusive,
     };
   }
   return {
     ...common,
     isAllDay: false,
-    startAt: raw.startAt ?? '',
-    endAt: raw.endAt ?? '',
-    startTimezone: raw.startTimezone ?? null,
-    endTimezone: raw.endTimezone ?? null,
+    startAt: raw.when.start,
+    endAt: raw.when.endExclusive,
+    startTimezone: null,
+    endTimezone: null,
   };
 }
 
@@ -85,23 +81,33 @@ export async function fetchEventsPage(
   familyId: string,
   params: ListEventsParams,
 ): Promise<EventsPage> {
-  const range = calendarUtcRange(params.startDate, params.endDateExclusive, params.timezone);
   const attendeePersonId = params.attendeeId
     ? await userIdToPersonId(familyId, params.attendeeId)
     : null;
+  const filters: Array<Record<string, unknown>> = [{
+    field: 'when',
+    op: 'overlaps',
+    value: {
+      kind: 'local_date_window',
+      startDate: params.startDate,
+      endDateExclusive: params.endDateExclusive,
+      timezone: params.timezone,
+    },
+  }];
+  if (attendeePersonId) filters.push({ field: 'attendeePersonIds', op: 'contains', value: attendeePersonId });
+  if (params.status) filters.push({ field: 'status', op: 'eq', value: params.status });
   const raw = await request<LifeSpacePage<EventResource>>(
-    `${modelCollectionPath(familyId, 'event')}${queryString({
-      rangeStart: range.rangeStart,
-      rangeEnd: range.rangeEnd,
-      dateStart: params.startDate,
-      dateEndExclusive: params.endDateExclusive,
-      attendeePersonIds: attendeePersonId ?? undefined,
-      status: params.status,
-      q: params.q,
-      sort: 'calendarStart:asc',
-      cursor: params.cursor,
-      limit: params.limit ?? 100,
-    })}`,
+    `${modelCollectionPath(familyId, 'event')}/query`,
+    {
+      method: 'POST',
+      data: {
+        ...(params.q ? { search: { text: params.q } } : {}),
+        filter: { and: filters },
+        sort: [{ field: 'when', direction: 'asc' }],
+        page: { limit: params.limit ?? 100, ...(params.cursor ? { cursor: params.cursor } : {}) },
+        context: { viewingTimezone: params.timezone },
+      },
+    },
   );
   return {
     items: await Promise.all((raw.items ?? []).map(item => toEvent(familyId, item))),
@@ -129,11 +135,27 @@ export async function getEvent(familyId: string, eventId: string): Promise<Event
 }
 
 function eventPayload(data: CreateEventRequest | UpdateEventRequest, attendeePersonIds?: string[]): Record<string, unknown> {
-  const { attendeeIds, ...rest } = data;
+  const {
+    attendeeIds,
+    isAllDay,
+    startAt,
+    endAt,
+    startDate,
+    endDateExclusive,
+    startTimezone: _startTimezone,
+    endTimezone: _endTimezone,
+    ...rest
+  } = data;
+  const when = isAllDay === true
+    ? { kind: 'date', start: startDate, endExclusive: endDateExclusive }
+    : isAllDay === false
+      ? { kind: 'instant', start: startAt, endExclusive: endAt }
+      : undefined;
   return {
     ...rest,
+    ...(when ? { when } : {}),
     ...(attendeeIds !== undefined ? { attendeePersonIds: attendeePersonIds ?? [] } : {}),
-  } as unknown as Record<string, unknown>;
+  };
 }
 
 export async function createEvent(familyId: string, data: CreateEventRequest): Promise<Event> {
