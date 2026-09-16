@@ -35,6 +35,7 @@ test('Event traffic is isolated behind the HomeMew Mini Program BFF boundary', (
   assert.match(api, /target === 'backend'/);
   assert.match(events, /\/api\/v1\/miniprogram\/spaces\/\$\{encodeURIComponent\(spaceId\)\}\/events/);
   assert.match(events, /target: 'backend'/);
+  assert.match(events, /timezone: params\.timezone/);
   assert.doesNotMatch(events, /modelCollectionPath\(familyId, 'event'\)/);
   assert.doesNotMatch(events, /modelRecordPath\(familyId, 'event'/);
 });
