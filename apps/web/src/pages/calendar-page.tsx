@@ -264,7 +264,7 @@ export function CalendarPage() {
       const collected: EventRecord[] = [];
       let cursor: string | null = null;
       do {
-        const page = await queryModelRecords<EventRecord>(currentFamily.id, 'event', {
+        const page: { items: EventRecord[]; nextCursor: string | null } = await queryModelRecords<EventRecord>(currentFamily.id, 'event', {
           filter: {
             and: [
               { field: 'status', op: 'eq', value: 'active' },
