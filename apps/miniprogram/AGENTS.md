@@ -38,7 +38,7 @@ Mini Program
 
 Mini code must not select public LifeSpace base URLs, Identity/Core wire paths, Canonical Query AST, generic `modelKey` routes, or the old/new Event representation. Those details belong to BFF adapters. The login route remains a HomeMew provider route and may delegate to `apps/backend`.
 
-The BFF is an application contract/anti-corruption boundary, not a second business Core. It must not persist household business data, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, expose a generic model proxy, or become a generic `/api/v1/*` proxy.
+The BFF is an application contract/anti-corruption boundary, not a second business Core. Household-domain adapters must not persist household business data, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, expose a generic model proxy, or become a generic `/api/v1/*` proxy. Separately accepted HomeMew-owned application capabilities may use bounded ephemeral orchestration state without becoming domain truth.
 
 
 ## Product surface boundary
@@ -67,7 +67,7 @@ The Mini Program may display audit actors that happen to be external systems whe
 - task -> stable HomeMew Task DTO -> BFF adapter -> LifeSpace `task` + Actions
 - day -> stable HomeMew Day DTO -> BFF adapter -> LifeSpace `day_record` + Temporal capability
 - wish -> stable HomeMew Wish DTO -> BFF adapter -> LifeSpace `wish` + Actions
-- 喵一下 -> stable HomeMew draft route -> BFF adapter -> Registry Creation Drafts
+- 喵一下 -> currently offline and not registered as a Mini page; any future draft interpretation/job contract is owned by the HomeMew BFF and requires a separate accepted re-enable decision
 
 The UI may keep names such as `familyId`, `attendeeIds` and `assigneeIds`; service adapters/BFF mappings must translate them explicitly to current LifeSpace semantics where needed.
 
