@@ -215,6 +215,7 @@ Last verified: 2026-09-16
 | Family / Member / Invitation BFF slice | ✅ Merged | PR #85 merged at `9229ee3`; fixed product routes/DTOs run against current Core/Identity; Mini callers remain unchanged |
 | Task / Wish BFF slice | ✅ Merged | PR #87 merged at `81d4b6e`; Canonical Query lowering, Person translation, CRUD/Actions and stable DTOs are in main; Mini callers remain unchanged |
 | Meow / Creation Draft scope | ✅ Offline / scope corrected | PR #89 merged at `6724fc9`; Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed |
+| Day / diagnostic BFF slice | 🟡 PR #91 in review | Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
 | HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
 | One-time Mini migration | ⬜ Not done | Phase 2 |
 | WeChat review | ⬜ Not done | Phase 3 |
@@ -375,7 +376,7 @@ local tests/typecheck/build
 - [x] existing Event precursor moved from public Core fetch to the shared Core binding;
 - [x] family/member/invitation adapter slice against current Core/Identity bindings (PR #85);
 - [x] Task/Wish Canonical Query, Person mapping, CRUD and Action adapter slice (PR #87);
-- [ ] current-LifeSpace adapters for Day/diagnostic and remaining final routes; Creation Draft is explicitly excluded while Meow is offline;
+- [x] current-LifeSpace adapters for Day/diagnostic; Creation Draft remains explicitly excluded while Meow is offline (PR #91);
 - [ ] one production-compatible Event old/new adapter seam;
 - [ ] HomeMew Web staging workflow/config retirement;
 - [ ] BFF/Web checks and production smoke evidence.
@@ -543,20 +544,16 @@ The existing HomeMew Web staging workflow/config remains a known Phase-1 retirem
 
 ## 14. Exact next action / 下一步动作
 
-**Implement the bounded Day / diagnostic adapter slice; do not migrate dormant Creation Draft calls or change Mini runtime calls yet.**
+**Finish CI and merge PR #91, then implement the production-compatible Event final-contract old/new adapter seam; keep Mini callers and the offline Meow surface unchanged.**
 
-From current `main` at merged Meow-offline PR #89 (`6724fc9`):
+1. require the full GitHub Web Check for PR #91 and fix any failure without broadening its fixed route surface;
+2. merge #91 only when the check is green, then record the exact merge SHA/check run in this plan and #79;
+3. re-read current Event Mini DTO/service, PR #77 as Phase-4 source material only, and current/new LifeSpace Event Runtime/contracts/tests;
+4. add fixtures proving current split Calendar and future `when: temporal_range` upstream records map to the same stable Mini Event DTO and product query semantics;
+5. implement the internal old/new adapter seam without changing Mini-facing routes/DTOs or starting LifeSpace #234;
+6. after the Event seam is green, retire HomeMew Web staging workflow/config and update historical operational documentation.
 
-1. re-read current `main`, both accepted 2026-09-16 decisions, this plan, and the inventory baseline;
-2. verify Day Record CRUD/Actions/occurrence/Temporal projection and the bounded diagnostic paths against current LifeSpace Runtime/contracts/tests;
-3. add Mini-facing contract and deny tests before implementation, including subject user→Person mapping, date-only/computed-state preservation, and fixed diagnostic behavior;
-4. implement only the fixed Day / diagnostic product routes from the inventory using the shared Core Service Binding adapter;
-5. keep LifeSpace computed fields, authorization, and storage truth authoritative; do not reproduce Temporal calculations in the BFF;
-6. keep Meow unregistered/unreachable and do not add Creation Draft routes or LifeSpace adapter code;
-7. run the full Web/BFF suite and update this plan plus #79 with exact evidence;
-8. only after that slice is green, implement the Event final-contract old/new adapter seam and retire HomeMew Web staging.
-
-Do not merge PR #77, start LifeSpace #234's breaking Event migration, remove LifeSpace compatibility, re-enable Meow, or alter Mini runtime addressing in the Day/diagnostic slice.
+Do not change Mini runtime calls, re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, or remove current-LifeSpace compatibility.
 
 ## 15. Session handoff template / 每轮交接模板
 
@@ -637,3 +634,14 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Authority updates: root and Mini AGENTS, architecture, product rules, README, Mini README/SPEC, inventory, dormant adapter documentation, and this Living Plan.
 - External repositories: no LifeSpace code or issue state changed; #234 remains gated and PR #77 remains frozen for Phase 4.
 - Decision log: appended to the HomeMew Notion `99 · 架构演进与决策日志`.
+
+### 2026-09-16 — Phase 1 Day / diagnostic slice
+
+- Branch / PR: `codex/phase-1-bff-day-diagnostic-slice` / #91
+- Base: merged Meow handoff at `5b240ca`
+- Completed in branch: bounded Day list/get/create/update/delete/archive/restore and occurrence routes; exact current compatibility query mapping; `me`/user→Space Person translation; Temporal `computed.temporal` preservation; fixed three-sample Core binding diagnostic; front-door integration.
+- Offline boundary: no Creation Draft matcher/handler exists; the historical Mini route fails closed with `BFF_ROUTE_NOT_FOUND`.
+- Evidence: focused and full BFF Node suite passed 48/48 locally, including fixed route/query/body denials, computed/cycle projection, occurrence composition, diagnostic call/body bounds, error propagation, and front-door ordering.
+- External repositories/clients: no Mini caller or LifeSpace change; #234 remains gated and PR #77 remains frozen for Phase 4.
+- New architecture/product decision: none; this implements the existing final-BFF decision and the merged Meow scope correction, so no additional Notion log entry is required.
+- Remaining after merge: Event final old/new adapter seam; HomeMew Web staging retirement; Phase-2 Mini cutover.
