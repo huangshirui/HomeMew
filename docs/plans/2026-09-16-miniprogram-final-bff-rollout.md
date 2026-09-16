@@ -206,9 +206,9 @@ Last verified: 2026-09-16
 | Durable rollout tracking | ✅ | HomeMew #79 + this plan |
 | Event-only BFF precursor | ✅ Merged | HomeMew #74 |
 | HomeMew normative documentation alignment | ✅ Phase 0 complete | root/nested AGENTS, architecture/product rules, READMEs and historical decisions aligned in PR #82 |
-| Full Mini -> LifeSpace runtime call inventory | ⏭ Next | Phase 1 must derive it from current source, not docs or guesses |
-| Final cross-surface Mini BFF route/DTO map | 🟡 Partial | Event precursor only |
-| BFF -> LifeSpace Service Bindings | ⬜ Not done | current Event BFF uses public Core URL fetch |
+| Full Mini -> LifeSpace runtime call inventory | ✅ Complete | Source-derived inventory at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md` |
+| Final cross-surface Mini BFF route/DTO map | ✅ Design baseline complete | Every observed runtime dependency has a bounded product route/DTO and current/Phase-4 adapter note |
+| BFF -> LifeSpace Service Bindings | 🟡 Targets verified | production services are `lifespace-core` and `lifespace-identity`; implementation not started |
 | HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
 | One-time Mini migration | ⬜ Not done | Phase 2 |
 | WeChat review | ⬜ Not done | Phase 3 |
@@ -356,6 +356,19 @@ local tests/typecheck/build
 -> explicit production deployment
 -> production smoke verification
 ```
+
+### Phase-1 progress
+
+- [x] source-derived runtime inventory, including startup, deep links, shared helpers, assets, uploads, and diagnostics;
+- [x] final bounded route/DTO design for every observed dependency;
+- [x] current and known Phase-4 LifeSpace adapter targets verified against Runtime/contracts;
+- [x] production Worker service names verified: `lifespace-core`, `lifespace-identity`;
+- [x] contract-test matrix and Web staging retirement plan recorded;
+- [ ] fixed-router/binding contract tests and implementation;
+- [ ] current-LifeSpace adapters for all final routes;
+- [ ] one production-compatible Event old/new adapter seam;
+- [ ] HomeMew Web staging workflow/config retirement;
+- [ ] BFF/Web checks and production smoke evidence.
 
 ### Phase-1 gate
 
@@ -512,28 +525,27 @@ Do not:
 
 No external blocker prevents Phase 1.
 
-Phase 0 documentation drift is resolved in PR #82 on `codex/phase-0-final-bff-doc-alignment`. The next correctness risk is an incomplete or documentation-derived Mini call inventory. Phase 1 must therefore inspect current Mini source and shared request helpers before defining routes; it must not infer the final contract from this README or PR #77.
+Phase 0 documentation drift is resolved in merged PR #82. The Phase-1 source-derived inventory and final route/DTO design baseline now exist at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md`.
+
+No external blocker prevents the first implementation slice. The main correctness risks are accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must land before broad route implementation.
 
 The existing HomeMew Web staging workflow/config remains a known Phase-1 retirement item. Its presence is implementation evidence to remove, not current release authority.
 
 ## 14. Exact next action / 下一步动作
 
-**Start Phase 1 with a source-derived inventory; do not begin broad route implementation first.**
+**Implement the first test-first BFF foundation slice against the completed inventory; do not change Mini runtime calls yet.**
 
-The next session/work branch must:
+On branch `codex/phase-1-mini-bff-contract-inventory` (or a successor based on its merged result):
 
-1. read current `main` after the Phase-0 documentation PR is merged;
-2. read root and nearest nested `AGENTS.md` for every source/config directory inspected or changed;
-3. enumerate every current Mini runtime call from source, including shared request helpers and indirect/deep-link/startup paths;
-4. record, for each call, source file/function, current target/method/path/DTO/auth, product semantics, proposed final HomeMew route/DTO, current LifeSpace adapter target, and known Phase-4 target;
-5. inspect the actual LifeSpace contracts/runtime/tests for each adapter target—do not infer them from HomeMew historical docs;
-6. verify actual production LifeSpace Core/Identity Worker service names/config before designing Service Bindings;
-7. design the complete final Mini-facing contract and contract tests only after the inventory is complete;
-8. plan the HomeMew Web staging workflow/config/resource retirement within Phase 1;
-9. update this plan and HomeMew #79 with inventory evidence and the next implementation slice.
+1. review `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md` against the current branch diff and keep it as the route/DTO baseline;
+2. add fixed-router contract and deny tests covering unknown routes, arbitrary upstream URL/path/model selection, bearer/request-ID propagation, upstream error preservation, and avatar URL rewriting;
+3. introduce a shared Core/Identity Service-Binding adapter with explicit targets only, using HomeMew binding names `LIFESPACE_CORE` and `LIFESPACE_IDENTITY`;
+4. add those bindings in the production Wrangler config to `lifespace-core` and `lifespace-identity`;
+5. implement the first vertical route slice for current-user profile, access-link confirmation, user/family avatar read/upload, and the required URL rewriting, preserving existing Mini DTOs;
+6. keep the existing Event-only route working during this server-side slice; do not migrate Mini callers yet;
+7. run Web/BFF tests and update this plan plus HomeMew #79 with exact evidence and the next adapter slice.
 
-Do not merge PR #77, start LifeSpace #234's breaking Event migration, or change Mini runtime calls during the inventory/design slice.
-
+Do not merge PR #77, start LifeSpace #234's breaking Event migration, remove LifeSpace compatibility, or alter Mini runtime addressing in this slice.
 
 ## 15. Session handoff template / 每轮交接模板
 
@@ -554,3 +566,16 @@ Do not do yet:
 ```
 
 The **Exact next action** must be specific enough that a new conversation can continue from repository state without asking for chat history.
+
+## 16. Session log
+
+### 2026-09-16 — Phase 1 inventory and contract baseline
+
+- Branch: `codex/phase-1-mini-bff-contract-inventory`
+- HomeMew inspected at: `6106552311bbfc3d06a5f07a95b11fc0092f035c`
+- LifeSpace inspected at: `cd25c8bb0f88f503f5c7a4a48f90ffed53727c0a`
+- Completed: full Mini runtime call inventory; final route/DTO map; query lowering matrix; avatar/media and diagnostic boundary coverage; production Service Binding targets; contract-test matrix; Web staging retirement plan.
+- Evidence: `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md`
+- Authority checked: HomeMew root and Mini AGENTS, architecture/product rules, accepted decision/plan; LifeSpace root/apps/Core/Identity constraints, Canonical Query/time specs, OpenAPI/Runtime/model definitions/tests, #234.
+- Changed assumptions: avatar asset URLs and the About-page Core latency probe are runtime dependencies and must cross the final BFF; they are not exceptions.
+- New architecture/product decision: none; this applies the accepted 2026-09-16 boundary, so no Notion decision-log append is required.
