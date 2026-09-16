@@ -14,13 +14,23 @@ const LIST_QUERY_KEYS = new Set([
   'cursor',
   'limit',
 ]);
+const LEGACY_TEMPORAL_KEYS = new Set([
+  'isAllDay',
+  'startAt',
+  'endAt',
+  'startTimezone',
+  'endTimezone',
+  'startDate',
+  'endDateExclusive',
+]);
 
-function json(data, status = 200) {
+function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
+      ...headers,
     },
   });
 }
@@ -40,6 +50,14 @@ function decodeSegment(value) {
   } catch {
     return null;
   }
+}
+
+function isObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 export function matchMiniProgramEventRoute(pathname) {
@@ -63,16 +81,160 @@ function authorizationHeader(request) {
   return value;
 }
 
-function copyListQuery(input, output) {
-  for (const [key, value] of input.entries()) {
-    if (!LIST_QUERY_KEYS.has(key)) {
-      throw new Error(`unsupported-query:${key}`);
-    }
-    if (key === 'timezone') continue;
-    if (output.has(key)) {
-      throw new Error(`duplicate-query:${key}`);
-    }
-    output.set(key, value);
+function readSingleQuery(params, key) {
+  const values = params.getAll(key);
+  if (values.length > 1) throw new Error(`duplicate-query:${key}`);
+  return values.length === 1 ? values[0] : null;
+}
+
+function parseLimit(value) {
+  if (value === null || value === '') return 100;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 200) {
+    throw new Error('invalid-limit');
+  }
+  return parsed;
+}
+
+function buildCanonicalListQuery(params) {
+  for (const key of params.keys()) {
+    if (!LIST_QUERY_KEYS.has(key)) throw new Error(`unsupported-query:${key}`);
+  }
+
+  const dateStart = readSingleQuery(params, 'dateStart');
+  const dateEndExclusive = readSingleQuery(params, 'dateEndExclusive');
+  const timezone = readSingleQuery(params, 'timezone');
+  if (!dateStart || !dateEndExclusive || !timezone) throw new Error('missing-window-context');
+
+  const sort = readSingleQuery(params, 'sort');
+  if (sort && sort !== 'calendarStart:asc') throw new Error('unsupported-sort');
+
+  const filters = [{
+    field: 'when',
+    op: 'overlaps',
+    value: {
+      kind: 'local_date_window',
+      startDate: dateStart,
+      endDateExclusive: dateEndExclusive,
+      timezone,
+    },
+  }];
+  const attendeePersonId = readSingleQuery(params, 'attendeePersonIds');
+  const status = readSingleQuery(params, 'status');
+  if (attendeePersonId) filters.push({ field: 'attendeePersonIds', op: 'contains', value: attendeePersonId });
+  if (status) filters.push({ field: 'status', op: 'eq', value: status });
+
+  const q = readSingleQuery(params, 'q');
+  const cursor = readSingleQuery(params, 'cursor');
+  const limit = parseLimit(readSingleQuery(params, 'limit'));
+
+  // rangeStart/rangeEnd remain accepted in the stable Mini contract during rollout,
+  // but the canonical query deliberately derives its interval from the explicit
+  // local date window + IANA timezone instead of trusting pre-projected UTC bounds.
+  readSingleQuery(params, 'rangeStart');
+  readSingleQuery(params, 'rangeEnd');
+
+  return {
+    ...(q ? { search: { text: q } } : {}),
+    filter: filters.length === 1 ? filters[0] : { and: filters },
+    sort: [{ field: 'when', direction: 'asc' }],
+    page: { limit, ...(cursor ? { cursor } : {}) },
+    context: { viewingTimezone: timezone },
+  };
+}
+
+function temporalRangeFromLegacy(input) {
+  const touched = [...LEGACY_TEMPORAL_KEYS].some(key => hasOwn(input, key));
+  if (!touched) return undefined;
+
+  const explicitAllDay = input.isAllDay;
+  const hasDatePair = typeof input.startDate === 'string' && typeof input.endDateExclusive === 'string';
+  const hasInstantPair = typeof input.startAt === 'string' && typeof input.endAt === 'string';
+
+  if (explicitAllDay === true || (explicitAllDay === undefined && hasDatePair && !hasInstantPair)) {
+    if (!hasDatePair) throw new Error('invalid-date-range');
+    return { kind: 'date', start: input.startDate, endExclusive: input.endDateExclusive };
+  }
+  if (explicitAllDay === false || (explicitAllDay === undefined && hasInstantPair && !hasDatePair)) {
+    if (!hasInstantPair) throw new Error('invalid-instant-range');
+    return { kind: 'instant', start: input.startAt, endExclusive: input.endAt };
+  }
+  throw new Error('ambiguous-temporal-range');
+}
+
+function canonicalMutationFromLegacy(input) {
+  if (!isObject(input)) throw new Error('invalid-body');
+  const when = temporalRangeFromLegacy(input);
+  const output = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (!LEGACY_TEMPORAL_KEYS.has(key)) output[key] = value;
+  }
+  if (when) output.when = when;
+  return output;
+}
+
+function legacyEventFromCanonical(resource) {
+  if (!isObject(resource)) return resource;
+  const when = resource.when;
+  if (!isObject(when) || (when.kind !== 'date' && when.kind !== 'instant')) {
+    throw new Error('invalid-upstream-event');
+  }
+  const output = { ...resource };
+  delete output.when;
+  if (when.kind === 'date') {
+    return {
+      ...output,
+      isAllDay: true,
+      startAt: null,
+      endAt: null,
+      startTimezone: null,
+      endTimezone: null,
+      startDate: when.start,
+      endDateExclusive: when.endExclusive,
+    };
+  }
+  return {
+    ...output,
+    isAllDay: false,
+    startAt: when.start,
+    endAt: when.endExclusive,
+    startTimezone: null,
+    endTimezone: null,
+    startDate: null,
+    endDateExclusive: null,
+  };
+}
+
+function legacyDataFromCanonical(data) {
+  if (isObject(data) && Array.isArray(data.items)) {
+    return {
+      ...data,
+      items: data.items.map(legacyEventFromCanonical),
+    };
+  }
+  if (isObject(data) && hasOwn(data, 'when')) return legacyEventFromCanonical(data);
+  return data;
+}
+
+async function translatedSuccessResponse(upstream, incomingRequestId) {
+  const headers = responseHeaders(upstream, incomingRequestId);
+  if (upstream.status === 204) return new Response(null, { status: upstream.status, headers });
+  const contentType = upstream.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return new Response(upstream.body, { status: upstream.status, headers });
+  }
+  const payload = await upstream.json();
+  if (!isObject(payload) || !hasOwn(payload, 'data')) {
+    return error(502, 'UPSTREAM_RESPONSE_INVALID', 'LifeSpace Core returned an invalid Event response');
+  }
+  try {
+    return json(
+      { ...payload, data: legacyDataFromCanonical(payload.data) },
+      upstream.status,
+      Object.fromEntries(headers.entries()),
+    );
+  } catch {
+    return error(502, 'UPSTREAM_RESPONSE_INVALID', 'LifeSpace Core returned an invalid Event resource');
   }
 }
 
@@ -104,21 +266,14 @@ export async function handleMiniProgramEventBff(request, env) {
     return error(503, 'BFF_NOT_CONFIGURED', 'LifeSpace Core is not configured');
   }
 
-  const upstreamUrl = new URL(
-    `${coreBaseUrl}/api/v1/spaces/${encodeURIComponent(route.spaceId)}/models/event/records${route.recordId ? `/${encodeURIComponent(route.recordId)}` : ''}`,
-  );
+  const collectionPath = `${coreBaseUrl}/api/v1/spaces/${encodeURIComponent(route.spaceId)}/models/event/records`;
+  const upstreamUrl = new URL(route.recordId
+    ? `${collectionPath}/${encodeURIComponent(route.recordId)}`
+    : request.method === 'GET'
+      ? `${collectionPath}/query`
+      : collectionPath);
 
-  if (request.method === 'GET' && !route.recordId) {
-    try {
-      copyListQuery(incomingUrl.searchParams, upstreamUrl.searchParams);
-    } catch (queryError) {
-      const message = queryError instanceof Error ? queryError.message : '';
-      if (message.startsWith('unsupported-query:')) {
-        return error(400, 'INVALID_QUERY', `Unsupported Event query parameter: ${message.slice('unsupported-query:'.length)}`);
-      }
-      return error(400, 'INVALID_QUERY', 'Duplicate Event query parameter');
-    }
-  } else if ([...incomingUrl.searchParams.keys()].length > 0) {
+  if (!(request.method === 'GET' && !route.recordId) && [...incomingUrl.searchParams.keys()].length > 0) {
     return error(400, 'INVALID_QUERY', 'Query parameters are not supported for this Event operation');
   }
 
@@ -129,22 +284,55 @@ export async function handleMiniProgramEventBff(request, env) {
   const incomingRequestId = request.headers.get('x-request-id')?.trim() || '';
   if (incomingRequestId) headers.set('x-request-id', incomingRequestId);
 
+  let upstreamMethod = request.method;
   let body;
-  if (request.method === 'POST' || request.method === 'PATCH' || request.method === 'DELETE') {
-    body = await request.text();
-    if (body) headers.set('content-type', 'application/json');
+  try {
+    if (request.method === 'GET' && !route.recordId) {
+      upstreamMethod = 'POST';
+      body = JSON.stringify(buildCanonicalListQuery(incomingUrl.searchParams));
+      headers.set('content-type', 'application/json');
+    } else if (request.method === 'POST' || request.method === 'PATCH') {
+      const text = await request.text();
+      const parsed = text ? JSON.parse(text) : {};
+      body = JSON.stringify(canonicalMutationFromLegacy(parsed));
+      headers.set('content-type', 'application/json');
+    } else if (request.method === 'DELETE') {
+      body = await request.text();
+      if (body) headers.set('content-type', 'application/json');
+    }
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : '';
+    if (message.startsWith('unsupported-query:')) {
+      return error(400, 'INVALID_QUERY', `Unsupported Event query parameter: ${message.slice('unsupported-query:'.length)}`);
+    }
+    if (message === 'duplicate-query:dateStart' || message === 'duplicate-query:dateEndExclusive' || message === 'duplicate-query:timezone') {
+      return error(400, 'INVALID_QUERY', 'Duplicate Event query parameter');
+    }
+    if (message === 'missing-window-context') {
+      return error(400, 'INVALID_QUERY', 'dateStart, dateEndExclusive and timezone are required');
+    }
+    if (message === 'unsupported-sort') {
+      return error(400, 'INVALID_QUERY', 'Only calendarStart:asc is supported by the stable Mini Event contract');
+    }
+    if (message === 'invalid-limit') {
+      return error(400, 'INVALID_QUERY', 'Event limit must be an integer from 1 to 200');
+    }
+    return error(400, 'INVALID_EVENT', 'Event payload cannot be represented by the canonical TemporalRange contract');
   }
 
   try {
     const upstream = await fetch(upstreamUrl, {
-      method: request.method,
+      method: upstreamMethod,
       headers,
       ...(body ? { body } : {}),
     });
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: responseHeaders(upstream, incomingRequestId),
-    });
+    if (!upstream.ok) {
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: responseHeaders(upstream, incomingRequestId),
+      });
+    }
+    return translatedSuccessResponse(upstream, incomingRequestId);
   } catch {
     return error(502, 'LIFESPACE_CORE_UNAVAILABLE', 'LifeSpace Core is temporarily unavailable');
   }

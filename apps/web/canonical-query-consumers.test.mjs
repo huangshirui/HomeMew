@@ -17,3 +17,20 @@ test('Web Task and Wish lists use the LifeSpace structured Canonical Query endpo
   assert.match(wishes, /queryModelRecords<WishRecord>\(currentFamily\.id, 'wish'/);
   assert.match(wishes, /field: 'status', op: 'eq'/);
 });
+
+
+test('Web Calendar uses canonical TemporalRange resources and query', () => {
+  const helper = read('src/lib/canonical-query.ts');
+  const calendar = read('src/pages/calendar-page.tsx');
+
+  assert.match(helper, /context\?: \{ viewingTimezone: string \}/);
+  assert.match(calendar, /when:\s*[\s\S]*kind: 'instant'/);
+  assert.match(calendar, /queryModelRecords<EventRecord>\(currentFamily\.id, 'event'/);
+  assert.match(calendar, /field: 'when'/);
+  assert.match(calendar, /op: 'overlaps'/);
+  assert.match(calendar, /kind: 'local_date_window'/);
+  assert.match(calendar, /sort: \[\{ field: 'when', direction: 'asc' \}\]/);
+  assert.match(calendar, /context: \{ viewingTimezone: currentFamily\.timezone \}/);
+  assert.doesNotMatch(calendar, /calendarStart:asc/);
+  assert.doesNotMatch(calendar, /rangeStart,/);
+});

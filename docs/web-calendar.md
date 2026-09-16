@@ -1,49 +1,45 @@
 # HomeMew Web Calendar
 
-Updated: 2026-09-15
+Updated: 2026-09-16
 
 ## Scope
 
-`/calendar` is the LifeSpace-backed household Calendar surface. It uses the published LifeSpace `event` model (`modelKey=event`) and current Calendar compatibility semantics directly through the existing same-origin Web BFF.
-
-HomeMew does not introduce a calendar database or compatibility API.
+`/calendar` is the LifeSpace-backed household Calendar surface. It consumes the published LifeSpace `event` model (`modelKey=event`) through the existing same-origin Web BFF. The BFF remains an authenticated transport boundary; it does not own or translate an alternate Event contract.
 
 ## Current slice
 
-- 42-cell month grid with the selected family's IANA timezone;
-- real LifeSpace Calendar overlap query across the entire visible grid, including adjacent-month cells;
-- pagination through `nextCursor`;
+- 42-cell month grid with the selected family's IANA viewing timezone;
+- Canonical Query overlap across the entire visible grid, including adjacent-month cells;
+- cursor pagination;
 - timed and all-day events, including multi-day overlaps;
 - create, update and soft-delete;
 - optimistic concurrency through the LifeSpace `version` field;
 - attendee selection using current Space Person IDs;
-- viewer role is read-only UX; LifeSpace remains the authorization authority;
-- switching family Space closes any editor opened for the previous family.
+- viewer role is read-only UX; LifeSpace remains the authorization authority.
 
 ## Time mapping
 
-LifeSpace remains authoritative for time semantics:
+LifeSpace `when: temporal_range` is the only persisted Event time truth:
 
-- timed events persist `startAt` / `endAt` as UTC RFC 3339 instants and preserve independent IANA `startTimezone` / `endTimezone` metadata;
-- when editing an existing timed event, HomeMew reconstructs each endpoint in its own stored timezone so saving does not silently reinterpret an end instant using the start timezone;
-- all-day events persist the half-open `[startDate, endDateExclusive)` range;
-- the Web form shows an inclusive all-day end date and converts it to `endDateExclusive` on submission;
-- month display groups timed events using the selected family's timezone;
-- the Calendar query uses the visible grid's family-local midnight boundaries for timed overlap and the same grid dates for all-day overlap. This keeps the query range aligned with exactly what the month UI renders.
+- timed events use `{ kind: "instant", start, endExclusive }`;
+- all-day events use `{ kind: "date", start, endExclusive }`;
+- both variants use half-open `[start, endExclusive)` ranges;
+- `isAllDay` is derived in the editor from `when.kind`;
+- the Web form shows an inclusive all-day end date and converts it to the exclusive canonical boundary on submission;
+- month display projects Instant ranges through the selected family's viewing timezone;
+- the saved Instant value is absolute and is not rewritten when viewing timezone changes.
 
-These split Event time fields and Calendar GET parameters are the current compatibility transport. They remain in use until LifeSpace completes the `temporal_range` platform layers and explicitly migrates the Event model to `when`; HomeMew must not invent that migration locally.
-
-The current W6 slice intentionally keeps the existing lightweight HomeMew UI primitives while correctness and staging behavior converge. Schedule-X remains the intended richer renderer after the staging acceptance pass; it is not required for LifeSpace range/CRUD/time correctness.
+The list request uses `when overlaps local_date_window` and sorts by `when`. The same explicit IANA timezone is sent in the window operand and `context.viewingTimezone`, so filtering, ordering, grouping, and rendering share one projection.
 
 ## API
 
 The BFF preserves LifeSpace's canonical model-key Runtime paths:
 
 ```text
-GET    /api/lifespace/core/v1/spaces/{spaceId}/models/event/records
+POST   /api/lifespace/core/v1/spaces/{spaceId}/models/event/records/query
 POST   /api/lifespace/core/v1/spaces/{spaceId}/models/event/records
 PATCH  /api/lifespace/core/v1/spaces/{spaceId}/models/event/records/{eventId}
 DELETE /api/lifespace/core/v1/spaces/{spaceId}/models/event/records/{eventId}
 ```
 
-Calendar list queries currently use the canonical records GET route with the timed and all-day half-open overlap compatibility parameters plus `calendarStart:asc`, and follow cursors until exhausted. These parameters are a migration transport, not a second caller-visible Query language; after Event migrates to `when: temporal_range`, overlap queries converge on Canonical Query.
+Calendar no longer depends on split-field GET parameters or `calendarStart`; recurrence, display rules, and attendee semantics remain Calendar concerns above Generic Query.

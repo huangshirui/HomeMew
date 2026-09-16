@@ -4,6 +4,7 @@ import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { ApiError, apiRequest } from '../lib/api-client';
+import { queryModelRecords } from '../lib/canonical-query';
 
 type EventRecord = {
   id: string;
@@ -13,21 +14,15 @@ type EventRecord = {
   summary: string;
   description: string | null;
   location: string | null;
-  isAllDay: boolean;
-  startAt: string | null;
-  endAt: string | null;
-  startTimezone: string | null;
-  endTimezone: string | null;
-  startDate: string | null;
-  endDateExclusive: string | null;
+  when:
+    | { kind: 'instant'; start: string; endExclusive: string }
+    | { kind: 'date'; start: string; endExclusive: string };
   attendeePersonIds: string[];
   status: 'active' | 'cancelled';
   version: number;
   createdAt: string;
   updatedAt: string;
 };
-
-type EventList = { items: EventRecord[]; nextCursor: string | null };
 
 type EventDraft = {
   summary: string;
@@ -152,14 +147,14 @@ function defaultDraft(timeZone: string, date?: string): EventDraft {
 }
 
 function draftFromEvent(event: EventRecord, fallbackTimezone: string): EventDraft {
-  if (event.isAllDay && event.startDate && event.endDateExclusive) {
+  if (event.when.kind === 'date') {
     return {
       summary: event.summary,
       description: event.description ?? '',
       location: event.location ?? '',
       isAllDay: true,
-      startDate: event.startDate,
-      endDate: addDays(event.endDateExclusive, -1),
+      startDate: event.when.start,
+      endDate: addDays(event.when.endExclusive, -1),
       startTime: '09:00',
       endTime: '10:00',
       timezone: fallbackTimezone,
@@ -169,10 +164,8 @@ function draftFromEvent(event: EventRecord, fallbackTimezone: string): EventDraf
       attendeePersonIds: event.attendeePersonIds ?? [],
     };
   }
-  const timezone = event.startTimezone ?? fallbackTimezone;
-  const endTimezone = event.endTimezone ?? fallbackTimezone;
-  const start = event.startAt ? localDateParts(new Date(event.startAt), timezone) : { date: currentDateInZone(timezone), time: '09:00' };
-  const end = event.endAt ? localDateParts(new Date(event.endAt), endTimezone) : { date: start.date, time: '10:00' };
+  const start = localDateParts(new Date(event.when.start), fallbackTimezone);
+  const end = localDateParts(new Date(event.when.endExclusive), fallbackTimezone);
   return {
     summary: event.summary,
     description: event.description ?? '',
@@ -182,10 +175,10 @@ function draftFromEvent(event: EventRecord, fallbackTimezone: string): EventDraf
     endDate: end.date,
     startTime: start.time,
     endTime: end.time,
-    timezone,
-    endTimezone,
-    startTimezoneMetadata: event.startTimezone,
-    endTimezoneMetadata: event.endTimezone,
+    timezone: fallbackTimezone,
+    endTimezone: fallbackTimezone,
+    startTimezoneMetadata: fallbackTimezone,
+    endTimezoneMetadata: fallbackTimezone,
     attendeePersonIds: event.attendeePersonIds ?? [],
   };
 }
@@ -203,13 +196,11 @@ function eventPayload(draft: EventDraft) {
     if (draft.endDate < draft.startDate) throw new Error('结束日期不能早于开始日期');
     return {
       ...common,
-      isAllDay: true,
-      startDate: draft.startDate,
-      endDateExclusive: addDays(draft.endDate, 1),
-      startAt: null,
-      endAt: null,
-      startTimezone: null,
-      endTimezone: null,
+      when: {
+        kind: 'date' as const,
+        start: draft.startDate,
+        endExclusive: addDays(draft.endDate, 1),
+      },
     };
   }
   if (!draft.startTime || !draft.endTime) throw new Error('请选择开始和结束时间');
@@ -218,30 +209,27 @@ function eventPayload(draft: EventDraft) {
   if (endAt <= startAt) throw new Error('结束时间必须晚于开始时间');
   return {
     ...common,
-    isAllDay: false,
-    startAt,
-    endAt,
-    startTimezone: draft.startTimezoneMetadata,
-    endTimezone: draft.endTimezoneMetadata,
-    startDate: null,
-    endDateExclusive: null,
+    when: {
+      kind: 'instant' as const,
+      start: startAt,
+      endExclusive: endAt,
+    },
   };
 }
 
 function eventSpan(event: EventRecord, timeZone: string) {
-  if (event.isAllDay && event.startDate && event.endDateExclusive) {
-    return { start: event.startDate, endInclusive: addDays(event.endDateExclusive, -1) };
+  if (event.when.kind === 'date') {
+    return { start: event.when.start, endInclusive: addDays(event.when.endExclusive, -1) };
   }
-  if (!event.startAt || !event.endAt) return null;
   return {
-    start: localDateParts(new Date(event.startAt), timeZone).date,
-    endInclusive: localDateParts(new Date(Date.parse(event.endAt) - 1), timeZone).date,
+    start: localDateParts(new Date(event.when.start), timeZone).date,
+    endInclusive: localDateParts(new Date(Date.parse(event.when.endExclusive) - 1), timeZone).date,
   };
 }
 
 function timeLabel(event: EventRecord, timeZone: string) {
-  if (event.isAllDay || !event.startAt) return '全天';
-  return localDateParts(new Date(event.startAt), timeZone).time;
+  if (event.when.kind === 'date') return '全天';
+  return localDateParts(new Date(event.when.start), timeZone).time;
 }
 
 function messageOf(cause: unknown, fallback: string) {
@@ -273,22 +261,29 @@ export function CalendarPage() {
     setLoading(true);
     setError(null);
     try {
-      const rangeStart = localDateTimeToIso(gridStart, '00:00', currentFamily.timezone);
-      const rangeEnd = localDateTimeToIso(gridEndExclusive, '00:00', currentFamily.timezone);
       const collected: EventRecord[] = [];
       let cursor: string | null = null;
       do {
-        const params = new URLSearchParams({
-          status: 'active',
-          rangeStart,
-          rangeEnd,
-          dateStart: gridStart,
-          dateEndExclusive: gridEndExclusive,
-          sort: 'calendarStart:asc',
-          limit: '200',
+        const page: { items: EventRecord[]; nextCursor: string | null } = await queryModelRecords<EventRecord>(currentFamily.id, 'event', {
+          filter: {
+            and: [
+              { field: 'status', op: 'eq', value: 'active' },
+              {
+                field: 'when',
+                op: 'overlaps',
+                value: {
+                  kind: 'local_date_window',
+                  startDate: gridStart,
+                  endDateExclusive: gridEndExclusive,
+                  timezone: currentFamily.timezone,
+                },
+              },
+            ],
+          },
+          sort: [{ field: 'when', direction: 'asc' }],
+          page: { limit: 200, ...(cursor ? { cursor } : {}) },
+          context: { viewingTimezone: currentFamily.timezone },
         });
-        if (cursor) params.set('cursor', cursor);
-        const page = await apiRequest<EventList>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/event/records?${params}`);
         collected.push(...page.items);
         cursor = page.nextCursor;
       } while (cursor);

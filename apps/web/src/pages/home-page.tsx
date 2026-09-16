@@ -5,8 +5,9 @@ import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { ApiError, apiRequest } from '../lib/api-client';
+import { queryModelRecords } from '../lib/canonical-query';
 
-type EventRecord = { id: string; summary: string; location: string | null; isAllDay: boolean; startAt: string | null; attendeePersonIds: string[]; version: number };
+type EventRecord = { id: string; summary: string; location: string | null; when: { kind: 'instant' | 'date'; start: string; endExclusive: string }; attendeePersonIds: string[]; version: number };
 type TaskRecord = { id: string; name: string; dueDate: string | null; assigneePersonIds: string[]; version: number };
 type DayRecord = { id: string; name: string; kind: 'elapsed' | 'countdown' | 'cycle'; icon: string | null; computed?: { temporal?: { elapsedDays?: number; remainingDays?: number | null; nextDueDate?: string; isAttentionRequired: boolean } } };
 type List<T> = { items: T[]; nextCursor: string | null };
@@ -17,14 +18,6 @@ function dateParts(instant: Date, timeZone: string) {
   return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}` };
 }
 function addDay(date: string) { const value = new Date(`${date}T00:00:00.000Z`); value.setUTCDate(value.getUTCDate() + 1); return value.toISOString().slice(0, 10); }
-function localMidnight(date: string, timeZone: string) {
-  const [year, month, day] = date.split('-').map(Number); const desired = Date.UTC(year, month - 1, day); let candidate = desired;
-  for (let i = 0; i < 3; i += 1) {
-    const p = dateParts(new Date(candidate), timeZone); const [y, m, d] = p.date.split('-').map(Number); const [h, min] = p.time.split(':').map(Number);
-    candidate += desired - Date.UTC(y, m - 1, d, h, min);
-  }
-  return new Date(candidate).toISOString();
-}
 function message(cause: unknown) {
   if (cause instanceof ApiError) return `${cause.message}${cause.requestId ? ` · ${cause.requestId}` : ''}`;
   return cause instanceof Error ? cause.message : '无法加载首页';
@@ -55,11 +48,29 @@ export function HomePage() {
     try {
       const today = dateParts(new Date(), currentFamily.timezone).date;
       const tomorrow = addDay(today);
-      const eventParams = new URLSearchParams({ status: 'active', rangeStart: localMidnight(today, currentFamily.timezone), rangeEnd: localMidnight(tomorrow, currentFamily.timezone), dateStart: today, dateEndExclusive: tomorrow, sort: 'calendarStart:asc', limit: '50' });
       const taskParams = new URLSearchParams({ status: 'pending', dueDateTo: today, sort: 'dueDate:asc', limit: '20' });
       const dayParams = new URLSearchParams({ status: 'active', attentionOnly: 'true', sort: 'attention:desc', limit: '6' });
       const [eventResult, taskResult, dayResult] = await Promise.all([
-        apiRequest<List<EventRecord>>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/event/records?${eventParams}`),
+        queryModelRecords<EventRecord>(currentFamily.id, 'event', {
+          filter: {
+            and: [
+              { field: 'status', op: 'eq', value: 'active' },
+              {
+                field: 'when',
+                op: 'overlaps',
+                value: {
+                  kind: 'local_date_window',
+                  startDate: today,
+                  endDateExclusive: tomorrow,
+                  timezone: currentFamily.timezone,
+                },
+              },
+            ],
+          },
+          sort: [{ field: 'when', direction: 'asc' }],
+          page: { limit: 50 },
+          context: { viewingTimezone: currentFamily.timezone },
+        }),
         apiRequest<List<TaskRecord>>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records?${taskParams}`),
         apiRequest<List<DayRecord>>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records?${dayParams}`),
       ]);
@@ -99,7 +110,7 @@ export function HomePage() {
     <section className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
       <Card className="overflow-hidden"><CardHeader><div><p className="text-sm font-semibold text-stone-900">今天的日程</p><p className="mt-1 text-xs text-stone-400">{currentFamily.timezone}</p></div><Link to="/calendar"><Button variant="ghost" className="h-9 px-3">全部日程 <ArrowRight className="size-4" /></Button></Link></CardHeader><CardContent className="space-y-1 pt-3">
         {events.length ? events.slice(0, 8).map((event) => {
-          const time = event.isAllDay || !event.startAt ? '全天' : dateParts(new Date(event.startAt), currentFamily.timezone).time;
+          const time = event.when.kind === 'date' ? '全天' : dateParts(new Date(event.when.start), currentFamily.timezone).time;
           const people = event.attendeePersonIds.map(memberName).filter(Boolean).join('、');
           const meta = [event.location, people].filter(Boolean).join(' · ');
           return <div key={event.id} className="grid grid-cols-[54px_10px_1fr] items-start gap-3 rounded-2xl px-2 py-3"><span className="pt-0.5 text-sm font-semibold tabular-nums text-stone-500">{time}</span><span className="mt-1.5 size-2.5 rounded-full bg-emerald-500" /><div><p className="text-sm font-semibold text-stone-900">{event.summary}</p>{meta ? <p className="mt-1 text-xs text-stone-400">{meta}</p> : null}</div></div>;
