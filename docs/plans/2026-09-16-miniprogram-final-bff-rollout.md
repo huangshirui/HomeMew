@@ -377,7 +377,7 @@ local tests/typecheck/build
 - [x] family/member/invitation adapter slice against current Core/Identity bindings (PR #85);
 - [x] Task/Wish Canonical Query, Person mapping, CRUD and Action adapter slice (PR #87);
 - [x] current-LifeSpace adapters for Day/diagnostic; Creation Draft remains explicitly excluded while Meow is offline (PR #91);
-- [ ] one production-compatible Event old/new adapter seam;
+- [x] one production-compatible Event old/new adapter seam;
 - [ ] HomeMew Web staging workflow/config retirement;
 - [ ] BFF/Web checks and production smoke evidence.
 
@@ -544,14 +544,14 @@ The existing HomeMew Web staging workflow/config remains a known Phase-1 retirem
 
 ## 14. Exact next action / 下一步动作
 
-**Implement the production-compatible Event final-contract old/new adapter seam; keep Mini callers and the offline Meow surface unchanged.**
+**Retire HomeMew Web staging without changing the active production deployment path.**
 
-1. re-read current Event Mini DTO/service, PR #77 as Phase-4 source material only, and current/new LifeSpace Event Runtime/contracts/tests;
-2. add fixtures proving current split Calendar and future `when: temporal_range` upstream records map to the same stable Mini Event DTO and product query semantics;
-3. implement the internal old/new adapter seam without changing Mini-facing routes/DTOs or starting LifeSpace #234;
-4. after the Event seam is green, retire HomeMew Web staging workflow/config and update historical operational documentation.
+1. re-read the Web staging workflow, deployment script/config, Web README and operational references under their nearest AGENTS constraints;
+2. remove only the HomeMew Web staging workflow/config/script and active staging instructions, preserving historical records as clearly historical;
+3. verify the remaining release path is local test/typecheck/build -> CI -> explicit production deployment -> production smoke;
+4. run the full Web/BFF checks and record CI plus production-smoke evidence before closing Phase 1.
 
-Do not change Mini runtime calls, re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, or remove current-LifeSpace compatibility.
+Do not change Mini runtime calls, re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove LifeSpace staging, or remove the current Event compatibility adapter.
 
 ## 15. Session handoff template / 每轮交接模板
 
@@ -643,3 +643,15 @@ The **Exact next action** must be specific enough that a new conversation can co
 - External repositories/clients: no Mini caller or LifeSpace change; #234 remains gated and PR #77 remains frozen for Phase 4.
 - New architecture/product decision: none; this implements the existing final-BFF decision and the merged Meow scope correction, so no additional Notion log entry is required.
 - Remaining after merge: Event final old/new adapter seam; HomeMew Web staging retirement; Phase-2 Mini cutover.
+
+
+### 2026-09-17 — Phase 1 Event old/new adapter seam
+
+- Branch: `codex/phase-1-event-adapter-seam`
+- Base: merged Day/diagnostic handoff at `a77fa67bdb23095bdb8b2179237b1b359e3db760`.
+- Completed in branch: preserved the published Mini `/spaces/.../events` precursor route unchanged; added final bounded `/families/{familyId}/events` CRUD/list contract; current split Calendar and future `when: temporal_range` response mapping; current Calendar UTC-window lowering; future Canonical Query `local_date_window` lowering; user/`me` to Person mapping; atomic partial TemporalRange updates; fixed field/query/route denials.
+- Evidence: dual-representation fixtures produce the same stable Mini Event page; focused Event tests passed 11/11 and the full local Web BFF suite passed 55/55.
+- Authority checked: current Mini Event service/DTO, frozen PR #77 as Phase-4 source only, LifeSpace Canonical Query/time/model specifications, current Calendar compatibility tests, TemporalRange Runtime, and LifeSpace #234. No LifeSpace or Mini caller change was made.
+- Changed assumptions/decisions: none. `LIFESPACE_EVENT_CONTRACT=temporal_range` is a server-only Phase-4 adapter selector; absence continues to target production-compatible split Calendar. No Notion decision-log append is required.
+- Remaining: merge after Web CI; retire HomeMew Web staging; record Phase-1 BFF/Web and production-smoke evidence; then begin the one-time Phase-2 Mini cutover.
+- Blockers: none. PR #77 remains frozen and #234 remains gated.
