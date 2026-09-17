@@ -8,7 +8,6 @@ on:
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - .github/workflows/web-check.yml
-      - .github/workflows/web-staging-deploy.yml
       - .github/workflows/web-production-deploy.yml
 
 permissions:
