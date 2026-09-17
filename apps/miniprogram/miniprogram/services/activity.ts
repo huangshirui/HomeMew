@@ -1,5 +1,5 @@
 import { getStoredToken, hasValidToken, loginAndSaveToken } from './auth';
-import { getLoginBackendUrl, REQUEST_TIMEOUT } from './config';
+import { getApplicationBaseUrl, REQUEST_TIMEOUT } from './config';
 import { ensureRuntimeReady } from './runtime-bootstrap';
 
 let reportedLocalDay: string | null = null;
@@ -22,50 +22,37 @@ async function ensureActivityToken(): Promise<string> {
 
 async function sendMiniProgramActivity(): Promise<void> {
   const token = await ensureActivityToken();
-  await new Promise<void>((resolve, reject) => {
-    wx.request({
-      url: `${getLoginBackendUrl()}/api/v1/activity/me`,
-      method: 'POST',
-      data: { channel: 'miniprogram' },
-      header: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      timeout: REQUEST_TIMEOUT,
-      success(response) {
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          resolve();
-          return;
-        }
+  await new Promise<void>((resolve, reject) => wx.request({
+    url: `${getApplicationBaseUrl()}/api/v1/activity/me`,
+    method: 'POST',
+    data: { channel: 'miniprogram' },
+    header: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    timeout: REQUEST_TIMEOUT,
+    success(response) {
+      if (response.statusCode >= 200 && response.statusCode < 300) resolve();
+      else {
         const payload = response.data as { error?: { message?: string } } | undefined;
         reject(new Error(payload?.error?.message || `Activity 上报失败 (${response.statusCode})`));
-      },
-      fail(error) {
-        reject(new Error(`Activity 上报失败: ${error.errMsg}`));
-      },
-    });
-  });
+      }
+    },
+    fail: error => reject(new Error(`Activity 上报失败: ${error.errMsg}`)),
+  }));
 }
 
 export async function reportMiniProgramActivityOncePerDay(): Promise<void> {
   const day = localDayKey();
   if (reportedLocalDay === day) return;
-
   if (reportPromise) {
     await reportPromise;
     if (reportedLocalDay === day) return;
   }
-
   reportPromiseDay = day;
   reportPromise = (async () => {
     await ensureRuntimeReady();
     await sendMiniProgramActivity();
     reportedLocalDay = day;
   })();
-
-  try {
-    await reportPromise;
-  } finally {
+  try { await reportPromise; } finally {
     if (reportPromiseDay === day) {
       reportPromise = null;
       reportPromiseDay = null;
