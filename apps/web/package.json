@@ -7,8 +7,7 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "vite build",
-    "preview": "vite preview",
-    "deploy:staging": "node scripts/deploy-staging.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "lucide-react": "^1.33.0",
