@@ -13,7 +13,7 @@ export async function listMyFamilies(): Promise<FamilyListItem[]> {
   return (await request<{ items: FamilyListItem[] }>('/api/v1/miniprogram/families')).items;
 }
 export function createFamily(data: CreateFamilyRequest): Promise<CreateFamilyResult> {
-  return request('/api/v1/miniprogram/families', { method: 'POST', data: data as Record<string, unknown>, skipRetry: true });
+  return request('/api/v1/miniprogram/families', { method: 'POST', data: data as unknown as Record<string, unknown>, skipRetry: true });
 }
 export function getFamily(familyId: string): Promise<FamilyDetail> { return request(base(familyId)); }
 export async function isFamilyOwner(familyId: string): Promise<boolean> { return (await getFamily(familyId)).isOwner; }

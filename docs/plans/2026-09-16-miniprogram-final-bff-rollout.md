@@ -217,7 +217,7 @@ Last verified: 2026-09-17
 | Meow / Creation Draft scope | ✅ Offline / scope corrected | PR #89 merged at `6724fc9`; Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed |
 | Day / diagnostic BFF slice | ✅ Merged | PR #91 merged at `875faeb`; Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
 | HomeMew Web staging retirement | ✅ Complete | PR #94 merged; production workflow run `35169452659` passed deploy and smoke |
-| One-time Mini migration | 🟡 In progress | Phase-2 branch has migrated the shared request/login/profile/account-link/family/media/activity/diagnostic boundary; Event/Task/Day/Wish callers and final regression remain |
+| One-time Mini migration | 🟡 Caller cutover complete in Phase-2 branch; PR/CI/manual smoke pending | Shared request/login/profile/account-link/family/media/activity/diagnostic plus Event/Task/Day/Wish now use final product routes; active-source regression protects the boundary. Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build pass locally. |
 | WeChat review | ⬜ Not done | Phase 3 |
 | Event new-contract cutover | ⏸ Gated | HomeMew #77 is Draft/Phase 4 only |
 | Compatibility cleanup | ⬜ Not started | Phase 5 |
@@ -410,6 +410,16 @@ Change Mini exactly once to consume the final HomeMew BFF contract.
 
 Add a durable check that fails when production Mini source reintroduces direct LifeSpace addressing. Prefer dependency/boundary assertions; supplement with hostname/path scans.
 
+### Phase-2 execution checklist
+
+- [x] migrate active profile, family, Event, Task, Day, Wish, media, activity and diagnostic callers to the HomeMew origin and fixed Mini product routes;
+- [x] remove active Mini Person-ID, Canonical Query, Calendar/TemporalRange and raw Space/model route construction;
+- [x] keep Meow offline, with only its exact dormant source files allowlisted by the architecture regression;
+- [x] replace direct-LifeSpace/Event-only tests and add the active-production-source regression;
+- [x] run local Mini tests/typecheck/build and full Web/BFF tests/typecheck/build;
+- [ ] open the Phase-2 PR and pass CI;
+- [ ] complete WeChat Developer Tools and real-device smoke before closing the Phase-2 gate.
+
 ### Manual smoke coverage
 
 At minimum:
@@ -544,12 +554,12 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Finish the in-progress one-time Mini caller cutover on `codex/phase-2-mini-final-bff-cutover`.**
+**Finish the Phase-2 PR and manual smoke for `codex/phase-2-mini-final-bff-cutover`.**
 
-1. migrate the active Event, Task, Day and Wish services to their final `/api/v1/miniprogram/families/*` product routes without client-side Person/Canonical Query/time lowering;
-2. update the affected Mini source-contract tests and add a durable active-source regression against public LifeSpace hosts, raw Space/model paths, target selection and Canonical Query imports (explicitly allow only the dormant offline Meow source);
-3. run Mini tests/typecheck/build and the full Web/BFF suite, fixing any compile or DTO drift before opening a Phase-2 PR;
-4. update this plan and #79 with CI evidence, then perform WeChat Developer Tools and real-device smoke before the Phase-2 gate can close.
+1. review the complete PR diff and CI for the one-time caller cutover; fix any CI or contract drift while keeping the final Mini-facing DTOs stable;
+2. run the WeChat Developer Tools and real-device smoke matrix below against the resulting review candidate, recording actual outcomes rather than inferring them from CLI checks;
+3. after required CI and smoke gates pass, merge the Phase-2 PR and update #79/this plan with the merge and smoke evidence;
+4. only then prepare Phase 3 review submission; keep LifeSpace #234 and PR #77 gated.
 
 Do not re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove the current Event compatibility adapter, or change the frozen Mini-facing DTO/query semantics.
 
@@ -688,3 +698,13 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Current state: work is deliberately unmerged. Event, Task, Day and Wish active callers plus boundary regressions and full checks remain; Meow stays offline.
 - Changed assumptions/decisions: none. The Family fields complete an already-designed stable product DTO requirement; LifeSpace remains authorization/version authority. No Notion decision-log append is required.
 - Do not do yet: do not open/merge an incomplete Phase-2 PR, submit WeChat review, start LifeSpace #234, merge #77, remove Event compatibility, or re-enable Meow.
+
+### 2026-09-17 — Phase 2 local caller cutover and verification
+
+- Branch: `codex/phase-2-mini-final-bff-cutover`; LifeSpace read-only `origin/main@cd25c8b` refreshed without changing its checkout.
+- Completed: active Event, Task, Day and Wish services now call the final HomeMew product routes. Person/Canonical Query/Calendar wire mapping remains in the BFF. The shared request layer rejects paths outside `/api/v1/miniprogram/*`; Meow remains offline.
+- Regression: replaced stale direct-LifeSpace/Event-only Mini assertions and added an active production-source scan for public LifeSpace hosts, raw Space/model paths, target selectors and active imports of dormant wire helpers. The allowlist contains exact Meow history files only.
+- Local evidence: Mini 27 tests passed; Mini typecheck/build passed; Web/BFF 103 tests passed; Web typecheck/build passed; `git diff --check` passed. CI and WeChat Developer Tools/real-device smoke are still pending.
+- Authority checked: HomeMew root/Mini AGENTS, plan/inventory/accepted decision/architecture/product rules; LifeSpace root/docs AGENTS, current `docs/canonical-query.md`, `docs/time-space-semantics.md`, and open #234. HomeMew #79 remains open; #77 remains Draft/FROZEN for Phase 4.
+- Changed assumptions/decisions: none. No Notion decision-log append needed.
+- Exact next action: open the Phase-2 PR, wait for CI and repair failures, then run and record the manual smoke matrix before closing the gate.

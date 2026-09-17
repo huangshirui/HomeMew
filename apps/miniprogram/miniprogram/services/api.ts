@@ -76,6 +76,9 @@ function doRequest(
 }
 
 export function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  if (!path.startsWith('/api/v1/miniprogram/') || path.includes('://') || path.includes('..')) {
+    return Promise.reject(new AppError('INVALID_ROUTE', '仅允许 HomeMew Mini BFF 请求'));
+  }
   const { method = 'GET', data, headers = {}, skipRetry = false, timeout = REQUEST_TIMEOUT } = options;
   const url = `${getApplicationBaseUrl()}${path}`;
 
