@@ -198,7 +198,7 @@ The Mini-facing DTO may be simpler than Canonical Query, but BFF lowering must p
 
 ## 5. Current state / 当前状态
 
-Last verified: 2026-09-16
+Last verified: 2026-09-17
 
 | Area | State | Evidence / Note |
 | --- | --- | --- |
@@ -216,8 +216,8 @@ Last verified: 2026-09-16
 | Task / Wish BFF slice | ✅ Merged | PR #87 merged at `81d4b6e`; Canonical Query lowering, Person translation, CRUD/Actions and stable DTOs are in main; Mini callers remain unchanged |
 | Meow / Creation Draft scope | ✅ Offline / scope corrected | PR #89 merged at `6724fc9`; Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed |
 | Day / diagnostic BFF slice | ✅ Merged | PR #91 merged at `875faeb`; Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
-| HomeMew Web staging retirement | ⬜ Phase 1 | normative docs now mark production-only target; workflow/config/runtime cleanup remains |
-| One-time Mini migration | ⬜ Not done | Phase 2 |
+| HomeMew Web staging retirement | ✅ Complete | PR #94 merged; production workflow run `35169452659` passed deploy and smoke |
+| One-time Mini migration | 🟡 Caller cutover complete in PR #97; CI/manual smoke pending | Shared request/login/profile/account-link/family/media/activity/diagnostic plus Event/Task/Day/Wish now use final product routes; active-source regression protects the boundary. Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build pass locally. |
 | WeChat review | ⬜ Not done | Phase 3 |
 | Event new-contract cutover | ⏸ Gated | HomeMew #77 is Draft/Phase 4 only |
 | Compatibility cleanup | ⬜ Not started | Phase 5 |
@@ -410,6 +410,17 @@ Change Mini exactly once to consume the final HomeMew BFF contract.
 
 Add a durable check that fails when production Mini source reintroduces direct LifeSpace addressing. Prefer dependency/boundary assertions; supplement with hostname/path scans.
 
+### Phase-2 execution checklist
+
+- [x] migrate active profile, family, Event, Task, Day, Wish, media, activity and diagnostic callers to the HomeMew origin and fixed Mini product routes;
+- [x] remove active Mini Person-ID, Canonical Query, Calendar/TemporalRange and raw Space/model route construction;
+- [x] keep Meow offline, with only its exact dormant source files allowlisted by the architecture regression;
+- [x] replace direct-LifeSpace/Event-only tests and add the active-production-source regression;
+- [x] run local Mini tests/typecheck/build and full Web/BFF tests/typecheck/build;
+- [x] open the Phase-2 PR (#97);
+- [ ] pass PR #97 CI;
+- [ ] complete WeChat Developer Tools and real-device smoke before closing the Phase-2 gate.
+
 ### Manual smoke coverage
 
 At minimum:
@@ -544,12 +555,12 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Migrate all active Mini runtime callers once to the final HomeMew BFF contract.**
+**Finish PR #97 CI and manual smoke for `codex/phase-2-mini-final-bff-cutover`.**
 
-1. re-read the merged runtime inventory and current Mini request/config/service/startup/deep-link code from `main`;
-2. change the shared Mini runtime boundary and every active service caller to the final `/api/v1/miniprogram/*` product routes, preserving the LifeSpace user bearer and stable page DTOs;
-3. remove stored/returned public LifeSpace Core/Identity runtime addressing where no supported Mini flow still requires it, while leaving the separate WeChat login/provider route intact;
-4. add a durable architecture regression that fails if production Mini source reintroduces direct LifeSpace host/wire addressing, then run Mini and Web/BFF checks before manual WeChat smoke.
+1. review the complete PR diff and CI for the one-time caller cutover; fix any CI or contract drift while keeping the final Mini-facing DTOs stable;
+2. run the WeChat Developer Tools and real-device smoke matrix below against the resulting review candidate, recording actual outcomes rather than inferring them from CLI checks;
+3. after required CI and smoke gates pass, merge the Phase-2 PR and update #79/this plan with the merge and smoke evidence;
+4. only then prepare Phase 3 review submission; keep LifeSpace #234 and PR #77 gated.
 
 Do not re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove the current Event compatibility adapter, or change the frozen Mini-facing DTO/query semantics.
 
@@ -677,3 +688,24 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Phase result: Phase 1 gate complete. The final bounded BFF works against current production-compatible LifeSpace, Service Bindings are wired, HomeMew Web staging is retired, and production smoke is green.
 - Phase 2 entry state: Mini callers are still unchanged and Meow remains offline. Begin the one-time caller cutover from this deployed main; keep PR #77 frozen and LifeSpace #234 gated.
 - New architecture/product decision: none; no Notion decision-log append is required.
+
+
+### 2026-09-17 — Phase 2 caller cutover started
+
+- Branch: `codex/phase-2-mini-final-bff-cutover`
+- Base: Phase-1 closeout on `main@27754fe6ec1345f8de9b06fe4fe440047aed5a62`.
+- Completed in branch: replaced the shared Mini request target selector with one HomeMew application origin; removed runtime storage/acceptance of Core and Identity service URLs; kept WeChat login and activity as HomeMew provider routes; migrated profile, access-link, Family/Member/Invitation and avatar upload callers to final Mini BFF routes; moved Core latency diagnostics behind the fixed BFF diagnostic route.
+- Contract completion: Family detail now exposes product fields `isOwner` and `version`, preserving owner-only close UI and multipart avatar optimistic concurrency without leaking raw Space fetches.
+- Current state: work is deliberately unmerged. Event, Task, Day and Wish active callers plus boundary regressions and full checks remain; Meow stays offline.
+- Changed assumptions/decisions: none. The Family fields complete an already-designed stable product DTO requirement; LifeSpace remains authorization/version authority. No Notion decision-log append is required.
+- Do not do yet: do not open/merge an incomplete Phase-2 PR, submit WeChat review, start LifeSpace #234, merge #77, remove Event compatibility, or re-enable Meow.
+
+### 2026-09-17 — Phase 2 local caller cutover and verification
+
+- Branch: `codex/phase-2-mini-final-bff-cutover`; PR #97 opened with caller cutover commit `baaae33`. LifeSpace read-only `origin/main@cd25c8b` refreshed without changing its checkout.
+- Completed: active Event, Task, Day and Wish services now call the final HomeMew product routes. Person/Canonical Query/Calendar wire mapping remains in the BFF. The shared request layer rejects paths outside `/api/v1/miniprogram/*`; Meow remains offline.
+- Regression: replaced stale direct-LifeSpace/Event-only Mini assertions and added an active production-source scan for public LifeSpace hosts, raw Space/model paths, target selectors and active imports of dormant wire helpers. The allowlist contains exact Meow history files only.
+- Local evidence: Mini 27 tests passed; Mini typecheck/build passed; Web/BFF 103 tests passed; Web typecheck/build passed; `git diff --check` passed. CI and WeChat Developer Tools/real-device smoke are still pending.
+- Authority checked: HomeMew root/Mini AGENTS, plan/inventory/accepted decision/architecture/product rules; LifeSpace root/docs AGENTS, current `docs/canonical-query.md`, `docs/time-space-semantics.md`, and open #234. HomeMew #79 remains open; #77 remains Draft/FROZEN for Phase 4.
+- Changed assumptions/decisions: none. No Notion decision-log append needed.
+- Exact next action: wait for PR #97 CI and repair failures, then run and record the manual smoke matrix before closing the gate.

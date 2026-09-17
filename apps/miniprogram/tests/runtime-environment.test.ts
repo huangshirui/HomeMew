@@ -9,9 +9,9 @@ test('main Mini Program runtime is pinned to production for all WeChat env versi
   }
 });
 
-test('buildUserAvatarUrl uses the stable LifeSpace Identity asset route', () => {
+test('buildUserAvatarUrl uses the stable HomeMew media route', () => {
   assert.equal(
-    buildUserAvatarUrl('https://auth.aisr.online/', 'usr_example'),
-    'https://auth.aisr.online/assets/users/usr_example/avatar',
+    buildUserAvatarUrl('https://homemew.aisr.online/', 'usr_example'),
+    'https://homemew.aisr.online/api/v1/miniprogram/media/users/usr_example/avatar',
   );
 });

@@ -10,12 +10,11 @@ function page(relative: string): string {
   return readFileSync(new URL(`../miniprogram/pages/${relative}`, import.meta.url), 'utf8');
 }
 
-test('family close is a direct LifeSpace Space lifecycle adapter with optimistic concurrency', () => {
+test('family close uses the fixed HomeMew route', () => {
   const families = service('families.ts');
-  assert.match(families, /export async function closeFamily/);
-  assert.match(families, /request<Space>\(`\/api\/v1\/spaces\/\$\{familyId\}`\)/);
-  assert.match(families, /`\/api\/v1\/spaces\/\$\{familyId\}\/close`/);
-  assert.match(families, /data:\s*\{ version: current\.version \}/);
+  assert.match(families, /export function closeFamily/);
+  assert.match(families, /\$\{base\(familyId\)\}\/close/);
+  assert.doesNotMatch(families, /\/api\/v1\/spaces/);
   assert.match(families, /skipRetry:\s*true/);
 });
 

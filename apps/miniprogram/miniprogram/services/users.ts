@@ -1,17 +1,16 @@
-/** LifeSpace 全局用户资料。 */
+/** Current-user profile through the stable HomeMew Mini BFF. */
 
 import { request } from './api';
 import { UserProfile, UpdateCurrentUserRequest } from '../types/index';
 
 export function getCurrentUser(): Promise<UserProfile> {
-  return request<UserProfile>('/api/v1/me', { target: 'identity' });
+  return request<UserProfile>('/api/v1/miniprogram/me');
 }
 
 export function updateCurrentUser(data: UpdateCurrentUserRequest): Promise<UserProfile> {
-  return request<UserProfile>('/api/v1/me', {
+  return request<UserProfile>('/api/v1/miniprogram/me', {
     method: 'PATCH',
     data: data as unknown as Record<string, unknown>,
     skipRetry: true,
-    target: 'identity',
   });
 }

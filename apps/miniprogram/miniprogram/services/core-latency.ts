@@ -1,15 +1,14 @@
 import { request } from './api';
-import { getCoreBaseUrl, generateRequestId, STORAGE_KEYS } from './config';
+import { getApplicationBaseUrl, STORAGE_KEYS } from './config';
 import { LatencySample, LatencySummary, median, summarizeLatency } from './latency-metrics';
 
-const SAMPLE_COUNT = 3;
-const PROBE_TIMEOUT_MS = 10_000;
-
-type ProbeResponse = {
-  statusCode: number;
-  profile?: {
-    rtt?: number;
-  };
+type DiagnosticResponse = {
+  target: string;
+  sampleCount: number;
+  healthSamples: number[];
+  statusSamples: number[];
+  businessSamples: number[];
+  testedAt: string;
 };
 
 export type CoreLatencyReport = LatencySummary & {
@@ -22,70 +21,11 @@ export type CoreLatencyReport = LatencySummary & {
   testedAt: string;
 };
 
-function probe(path: '/health' | '/api/v1/status'): Promise<LatencySample> {
-  const baseUrl = getCoreBaseUrl();
-  const requestId = generateRequestId();
-  const separator = path.includes('?') ? '&' : '?';
-  const url = `${baseUrl}${path}${separator}latencyProbe=${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const startedAt = Date.now();
-
-  return new Promise((resolve, reject) => {
-    wx.request({
-      url,
-      method: 'GET',
-      timeout: PROBE_TIMEOUT_MS,
-      header: {
-        'Cache-Control': 'no-cache',
-        'x-request-id': requestId,
-      },
-      success(result) {
-        const response = result as unknown as ProbeResponse;
-        const elapsedMs = Date.now() - startedAt;
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-          reject(new Error(`Core probe failed: HTTP ${response.statusCode}`));
-          return;
-        }
-        const rtt = response.profile?.rtt;
-        resolve({
-          elapsedMs,
-          rttMs: typeof rtt === 'number' && rtt > 0 ? Math.round(rtt) : null,
-        });
-      },
-      fail(error) {
-        reject(new Error(error.errMsg || 'Core latency probe failed'));
-      },
-    });
-  });
-}
-
-async function businessProbe(familyId: string): Promise<number> {
-  const startedAt = Date.now();
-  await request<unknown>(
-    `/api/v1/spaces/${encodeURIComponent(familyId)}/models/task/records/query`,
-    {
-      method: 'POST',
-      data: {
-        filter: { field: 'status', op: 'eq', value: 'pending' },
-        sort: [{ field: 'dueDate', direction: 'asc' }],
-        page: { limit: 1 },
-      },
-      timeout: PROBE_TIMEOUT_MS,
-    },
-  );
-  return Date.now() - startedAt;
-}
-
 function currentNetworkType(): Promise<string> {
-  return new Promise(resolve => {
-    wx.getNetworkType({
-      success(result) {
-        resolve(result.networkType || 'unknown');
-      },
-      fail() {
-        resolve('unknown');
-      },
-    });
-  });
+  return new Promise(resolve => wx.getNetworkType({
+    success: result => resolve(result.networkType || 'unknown'),
+    fail: () => resolve('unknown'),
+  }));
 }
 
 function currentFamilyId(): string | null {
@@ -93,38 +33,30 @@ function currentFamilyId(): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function samples(values: number[]): LatencySample[] {
+  return values.map(elapsedMs => ({ elapsedMs, rttMs: null }));
+}
+
 export async function runCoreLatencyTest(): Promise<CoreLatencyReport> {
-  const networkType = await currentNetworkType();
   const familyId = currentFamilyId();
-  const healthSamples: LatencySample[] = [];
-  const statusSamples: LatencySample[] = [];
-  const businessSamples: number[] = [];
-
-  // 三种探针轮换顺序，避免某一接口总是固定落在冷连接或热连接阶段。
-  for (let index = 0; index < SAMPLE_COUNT; index += 1) {
-    if (index === 0) {
-      healthSamples.push(await probe('/health'));
-      statusSamples.push(await probe('/api/v1/status'));
-      if (familyId) businessSamples.push(await businessProbe(familyId));
-    } else if (index === 1) {
-      statusSamples.push(await probe('/api/v1/status'));
-      if (familyId) businessSamples.push(await businessProbe(familyId));
-      healthSamples.push(await probe('/health'));
-    } else {
-      if (familyId) businessSamples.push(await businessProbe(familyId));
-      healthSamples.push(await probe('/health'));
-      statusSamples.push(await probe('/api/v1/status'));
-    }
-  }
-
+  if (!familyId) throw new Error('请先选择家庭后再测试');
+  const [networkType, result] = await Promise.all([
+    currentNetworkType(),
+    request<DiagnosticResponse>('/api/v1/miniprogram/diagnostics/lifespace-core', {
+      method: 'POST',
+      data: { familyId },
+      skipRetry: true,
+      timeout: 40_000,
+    }),
+  ]);
   return {
-    coreBaseUrl: getCoreBaseUrl(),
+    coreBaseUrl: getApplicationBaseUrl(),
     networkType,
-    healthSamples: healthSamples.map(sample => sample.elapsedMs),
-    statusSamples: statusSamples.map(sample => sample.elapsedMs),
-    businessSamples,
-    businessMedianMs: businessSamples.length ? median(businessSamples) : null,
-    testedAt: new Date().toISOString(),
-    ...summarizeLatency(healthSamples, statusSamples),
+    healthSamples: result.healthSamples,
+    statusSamples: result.statusSamples,
+    businessSamples: result.businessSamples,
+    businessMedianMs: result.businessSamples.length ? median(result.businessSamples) : null,
+    testedAt: result.testedAt,
+    ...summarizeLatency(samples(result.healthSamples), samples(result.statusSamples)),
   };
 }

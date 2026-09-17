@@ -91,6 +91,8 @@ export interface FamilyDetail {
   status: FamilyStatus;
   createdBy: string;
   currentUserRole: FamilyRole;
+  isOwner: boolean;
+  version: number;
   memberCount: number;
   createdAt: string;
 }
@@ -677,8 +679,6 @@ export interface LoginResponse {
   expiresAt: string;
   /** 是否为新用户（首次登录） */
   isNewUser: boolean;
-  /** Core API 基础地址（由云函数回传，避免客户端硬编码） */
-  coreApiUrl: string;
 }
 
 // ==================== 喵一下（Creation Drafts） ====================
