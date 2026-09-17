@@ -217,7 +217,7 @@ Last verified: 2026-09-17
 | Meow / Creation Draft scope | ✅ Offline / scope corrected | PR #89 merged at `6724fc9`; Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed |
 | Day / diagnostic BFF slice | ✅ Merged | PR #91 merged at `875faeb`; Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
 | HomeMew Web staging retirement | ✅ Complete | PR #94 merged; production workflow run `35169452659` passed deploy and smoke |
-| One-time Mini migration | 🟡 Caller cutover complete in PR #97; CI/manual smoke pending | Shared request/login/profile/account-link/family/media/activity/diagnostic plus Event/Task/Day/Wish now use final product routes; active-source regression protects the boundary. Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build pass locally. |
+| One-time Mini migration | 🟡 Caller cutover complete in PR #97 merged; Developer Tools/real-device smoke pending | Shared request/login/profile/account-link/family/media/activity/diagnostic plus Event/Task/Day/Wish now use final product routes; active-source regression protects the boundary. Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build pass locally. |
 | WeChat review | ⬜ Not done | Phase 3 |
 | Event new-contract cutover | ⏸ Gated | HomeMew #77 is Draft/Phase 4 only |
 | Compatibility cleanup | ⬜ Not started | Phase 5 |
@@ -418,7 +418,7 @@ Add a durable check that fails when production Mini source reintroduces direct L
 - [x] replace direct-LifeSpace/Event-only tests and add the active-production-source regression;
 - [x] run local Mini tests/typecheck/build and full Web/BFF tests/typecheck/build;
 - [x] open the Phase-2 PR (#97);
-- [ ] pass PR #97 CI;
+- [x] pass PR #97 CI (Mini Program Check `35185237716` and Web check `35185237679`);
 - [ ] complete WeChat Developer Tools and real-device smoke before closing the Phase-2 gate.
 
 ### Manual smoke coverage
@@ -555,11 +555,11 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Finish PR #97 CI and manual smoke for `codex/phase-2-mini-final-bff-cutover`.**
+**Complete Phase-2 Developer Tools and real-device smoke against merged PR #97.**
 
-1. review the complete PR diff and CI for the one-time caller cutover; fix any CI or contract drift while keeping the final Mini-facing DTOs stable;
+1. verify the merge on `main` and record the already-passing PR #97 CI evidence; keep the Mini-facing DTOs stable;
 2. run the WeChat Developer Tools and real-device smoke matrix below against the resulting review candidate, recording actual outcomes rather than inferring them from CLI checks;
-3. after required CI and smoke gates pass, merge the Phase-2 PR and update #79/this plan with the merge and smoke evidence;
+3. after required smoke gates pass, update #79/this plan with actual results and close the Phase-2 gate;
 4. only then prepare Phase 3 review submission; keep LifeSpace #234 and PR #77 gated.
 
 Do not re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove the current Event compatibility adapter, or change the frozen Mini-facing DTO/query semantics.
@@ -708,4 +708,10 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Local evidence: Mini 27 tests passed; Mini typecheck/build passed; Web/BFF 103 tests passed; Web typecheck/build passed; `git diff --check` passed. CI and WeChat Developer Tools/real-device smoke are still pending.
 - Authority checked: HomeMew root/Mini AGENTS, plan/inventory/accepted decision/architecture/product rules; LifeSpace root/docs AGENTS, current `docs/canonical-query.md`, `docs/time-space-semantics.md`, and open #234. HomeMew #79 remains open; #77 remains Draft/FROZEN for Phase 4.
 - Changed assumptions/decisions: none. No Notion decision-log append needed.
-- Exact next action: wait for PR #97 CI and repair failures, then run and record the manual smoke matrix before closing the gate.
+- Exact next action: run and record WeChat Developer Tools and real-device smoke for merged PR #97 before closing the Phase-2 gate.
+
+### 2026-09-17 — Phase 2 PR merge and CI
+
+- PR #97 merged to `main` as `f7eb838100fe8581668f0f8e3ec851d66201a8da` after both required checks passed: Mini Program Check `35185237716` and Web check `35185237679`.
+- HomeMew #79 was updated with the caller-cutover progress. Phase 2 remains open pending actual WeChat Developer Tools and real-device smoke; no WeChat review submission was made.
+- Exact next action: run the Phase-2 manual smoke matrix against the merged review candidate, record outcomes in this plan and #79, then close Phase 2 only if all required scenarios pass.
