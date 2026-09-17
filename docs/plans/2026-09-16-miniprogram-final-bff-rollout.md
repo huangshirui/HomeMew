@@ -3,7 +3,7 @@
 Status: Active / Living Plan  
 Started: 2026-09-16  
 Tracking issue: HomeMew #79  
-Current phase: Phase 2 — one-time Mini Program migration to the final BFF  
+Current phase: Phase 3 — WeChat review preparation; not submitted
 Related platform work: LifeSpace #234  
 Accepted architecture decisions:
 - `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
@@ -217,8 +217,8 @@ Last verified: 2026-09-17
 | Meow / Creation Draft scope | ✅ Offline / scope corrected | PR #89 merged at `6724fc9`; Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed |
 | Day / diagnostic BFF slice | ✅ Merged | PR #91 merged at `875faeb`; Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
 | HomeMew Web staging retirement | ✅ Complete | PR #94 merged; production workflow run `35169452659` passed deploy and smoke |
-| One-time Mini migration | 🟡 Caller cutover complete in PR #97 merged; Developer Tools/real-device smoke pending | Shared request/login/profile/account-link/family/media/activity/diagnostic plus Event/Task/Day/Wish now use final product routes; active-source regression protects the boundary. Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build pass locally. |
-| WeChat review | ⬜ Not done | Phase 3 |
+| One-time Mini migration | ✅ Phase 2 gate complete | PR #97 merged; Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build passed locally; both PR checks passed. User reported manual testing complete on 2026-09-17 and found no Mini requests to LifeSpace; individual device/test logs were not supplied. |
+| WeChat review | ⬜ Not submitted | Phase 3; Mini-facing contract is frozen for review preparation |
 | Event new-contract cutover | ⏸ Gated | HomeMew #77 is Draft/Phase 4 only |
 | Compatibility cleanup | ⬜ Not started | Phase 5 |
 
@@ -419,7 +419,7 @@ Add a durable check that fails when production Mini source reintroduces direct L
 - [x] run local Mini tests/typecheck/build and full Web/BFF tests/typecheck/build;
 - [x] open the Phase-2 PR (#97);
 - [x] pass PR #97 CI (Mini Program Check `35185237716` and Web check `35185237679`);
-- [ ] complete WeChat Developer Tools and real-device smoke before closing the Phase-2 gate.
+- [x] complete WeChat Developer Tools and real-device smoke before closing the Phase-2 gate (user-reported completion on 2026-09-17; no Mini requests to LifeSpace observed; per-scenario logs not supplied).
 
 ### Manual smoke coverage
 
@@ -545,7 +545,9 @@ Do not:
 
 ## 13. Current blockers / 当前阻塞
 
-No external blocker prevents Phase 1.
+Phase 2 is complete based on merged PR #97, passing local/CI checks, and the user's 2026-09-17 report that manual testing was finished with no Mini requests to LifeSpace. This is user-reported manual evidence; device/version details and per-scenario logs were not supplied. Phase 3 has not been submitted for WeChat review. The earlier instruction not to submit review remains in force until the user directs that step; LifeSpace #234 and PR #77 remain gated until the reviewed Mini version is approved and production-active.
+
+Historical Phase-0/1 evidence follows.
 
 Phase 0 documentation drift is resolved in merged PR #82. The Phase-1 source-derived inventory and final route/DTO design baseline now exist at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md`.
 
@@ -555,12 +557,12 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Complete Phase-2 Developer Tools and real-device smoke against merged PR #97.**
+**Prepare Phase 3 WeChat review using the merged Phase-2 Mini build; do not submit until the user directs submission.**
 
-1. verify the merge on `main` and record the already-passing PR #97 CI evidence; keep the Mini-facing DTOs stable;
-2. run the WeChat Developer Tools and real-device smoke matrix below against the resulting review candidate, recording actual outcomes rather than inferring them from CLI checks;
-3. after required smoke gates pass, update #79/this plan with actual results and close the Phase-2 gate;
-4. only then prepare Phase 3 review submission; keep LifeSpace #234 and PR #77 gated.
+1. Keep the Mini-facing route/DTO/query/time contract frozen, allowing only strictly backward-compatible review fixes;
+2. when the user directs review submission, build from current `main`, submit through WeChat Developer Tools, and record the submitted version/build and review status in this plan and #79;
+3. after approval, verify that the reviewed Mini version is production-active before opening the LifeSpace #234 / HomeMew Phase-4 Event cutover;
+4. re-evaluate frozen PR #77 against then-current `main` and LifeSpace contracts; do not merge it as-is.
 
 Do not re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove the current Event compatibility adapter, or change the frozen Mini-facing DTO/query semantics.
 
@@ -715,3 +717,10 @@ The **Exact next action** must be specific enough that a new conversation can co
 - PR #97 merged to `main` as `f7eb838100fe8581668f0f8e3ec851d66201a8da` after both required checks passed: Mini Program Check `35185237716` and Web check `35185237679`.
 - HomeMew #79 was updated with the caller-cutover progress. Phase 2 remains open pending actual WeChat Developer Tools and real-device smoke; no WeChat review submission was made.
 - Exact next action: run the Phase-2 manual smoke matrix against the merged review candidate, record outcomes in this plan and #79, then close Phase 2 only if all required scenarios pass.
+
+### 2026-09-17 — Phase 2 manual testing reported complete
+
+- User reported that manual testing was completed and no Mini requests to LifeSpace were observed. This is user-provided evidence; per-device details, screenshots, and individual scenario results were not supplied and are not represented as independently verified.
+- Together with the merged PR #97 and passing local/CI gates recorded above, Phase 2 is marked complete. The final Mini-facing contract is now frozen for Phase 3 review preparation.
+- WeChat review has not been submitted. The user's earlier instruction not to submit remains binding until they direct submission. LifeSpace #234 and PR #77 remain gated.
+- Exact next action: prepare the merged Mini build for WeChat review, then submit only on user instruction and record the review/build evidence in this plan and #79.
