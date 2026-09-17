@@ -8,7 +8,7 @@ export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
   }),
   core: Object.freeze({
     contractVersion: '0.35.0',
-    minimumSchemaVersion: 40,
+    minimumSchemaVersion: 41,
   }),
 });
 
