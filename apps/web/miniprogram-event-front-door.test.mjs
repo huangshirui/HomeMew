@@ -47,6 +47,37 @@ test('Mini Program Event BFF is handled through the Core binding before the Acce
   assert.equal(appCalled, false);
 });
 
+test('final Mini Program Event route is handled before the generic catch-all', async () => {
+  let appCalled = false;
+  const calls = [];
+  const handler = createFrontDoorHandler({
+    app: { async fetch() { appCalled = true; return new Response('web'); } },
+  });
+  const response = await handler.fetch(
+    request('/api/v1/miniprogram/families/spc_family/events?startDate=2026-09-15&endDateExclusive=2026-09-16&timezone=Asia%2FShanghai'),
+    {
+      LIFESPACE_CORE: { async fetch(incoming) {
+        const path = new URL(incoming.url).pathname;
+        calls.push(path);
+        if (path.endsWith('/members')) {
+          return new Response(JSON.stringify({ data: [] }), {
+            status: 200, headers: { 'content-type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ data: { items: [], nextCursor: null } }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      } },
+    },
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, [
+    '/api/v1/spaces/spc_family/members',
+    '/api/v1/spaces/spc_family/models/event/records',
+  ]);
+  assert.equal(appCalled, false);
+});
+
 test('Mini Program Family BFF is handled before the generic Mini catch-all and Web app', async () => {
   let appCalled = false;
   let upstreamCalled = false;
