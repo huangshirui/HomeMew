@@ -183,6 +183,8 @@ async function getFamily(request, env, familyId) {
     status: 'active',
     createdBy: owner?.userId ?? '',
     currentUserRole: familyRole(mine?.role ?? space.data.access?.role),
+    isOwner: mine?.role === 'owner',
+    version: space.data.version,
     memberCount: list.length,
     createdAt: owner?.createdAt ?? '',
   } }, 200, space.requestId);
