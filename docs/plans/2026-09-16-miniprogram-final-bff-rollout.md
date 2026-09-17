@@ -3,7 +3,7 @@
 Status: Active / Living Plan  
 Started: 2026-09-16  
 Tracking issue: HomeMew #79  
-Current phase: Phase 1 — final BFF implementation against current LifeSpace  
+Current phase: Phase 2 — one-time Mini Program migration to the final BFF  
 Related platform work: LifeSpace #234  
 Accepted architecture decisions:
 - `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
@@ -379,7 +379,7 @@ local tests/typecheck/build
 - [x] current-LifeSpace adapters for Day/diagnostic; Creation Draft remains explicitly excluded while Meow is offline (PR #91);
 - [x] one production-compatible Event old/new adapter seam;
 - [x] HomeMew Web staging workflow/config retirement;
-- [ ] BFF/Web checks and production smoke evidence.
+- [x] BFF/Web checks and production smoke evidence.
 
 ### Phase-1 gate
 
@@ -538,20 +538,20 @@ No external blocker prevents Phase 1.
 
 Phase 0 documentation drift is resolved in merged PR #82. The Phase-1 source-derived inventory and final route/DTO design baseline now exist at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md`.
 
-All Phase-1 implementation slices are merged. The remaining Phase-1 gate is an explicitly confirmed production deployment from current `main` followed by the workflow's production smoke checks; the available GitHub integration cannot dispatch that manual workflow. PR #84, the Family / Member / Invitation slice in PR #85, and the Task / Wish slice in PR #87 are merged. Meow is now intentionally offline and its former LifeSpace Creation Draft calls are removed from active migration scope. The main correctness risks remain accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must accompany each bounded route slice.
+Phase 1 is complete. Production workflow run `35169452659` deployed `main@835ee8037176cecbc227e463d20f63af947dc4be` and passed the Web checks, LifeSpace production baseline, production reachability, Worker deployment, Access front-door smoke and Mini provider-route smoke. No external blocker prevents Phase 2. PR #84, the Family / Member / Invitation slice in PR #85, and the Task / Wish slice in PR #87 are merged. Meow is now intentionally offline and its former LifeSpace Creation Draft calls are removed from active migration scope. The main correctness risks remain accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must accompany each bounded route slice.
 
 The HomeMew Web staging workflow, deployment command/script and staging Worker environment have been removed in the Phase-1 retirement slice. Historical staging acceptance records remain explicitly historical; LifeSpace and backend staging are unaffected.
 
 ## 14. Exact next action / 下一步动作
 
-**Run the explicit HomeMew Web production workflow from current `main`, record its smoke evidence, then close Phase 1.**
+**Migrate all active Mini runtime callers once to the final HomeMew BFF contract.**
 
-1. manually dispatch `Deploy HomeMew Web production` on current `main` with confirmation `DEPLOY_HOMEMEW_WEB_PRODUCTION`;
-2. require the workflow's tests/typecheck/build, LifeSpace production baseline, Worker deploy, Access front-door check and Mini provider-route smoke to pass;
-3. record the run ID and deployed main commit in this plan and HomeMew #79, then mark the final Phase-1 evidence checkbox complete;
-4. only after that gate, begin Phase 2 by rebasing the one-time Mini caller migration on current main.
+1. re-read the merged runtime inventory and current Mini request/config/service/startup/deep-link code from `main`;
+2. change the shared Mini runtime boundary and every active service caller to the final `/api/v1/miniprogram/*` product routes, preserving the LifeSpace user bearer and stable page DTOs;
+3. remove stored/returned public LifeSpace Core/Identity runtime addressing where no supported Mini flow still requires it, while leaving the separate WeChat login/provider route intact;
+4. add a durable architecture regression that fails if production Mini source reintroduces direct LifeSpace host/wire addressing, then run Mini and Web/BFF checks before manual WeChat smoke.
 
-Do not begin Mini caller changes before the production smoke gate, re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove LifeSpace/backend staging, transfer the Custom Domain, or remove the current Event compatibility adapter.
+Do not re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove the current Event compatibility adapter, or change the frozen Mini-facing DTO/query semantics.
 
 ## 15. Session handoff template / 每轮交接模板
 
@@ -667,3 +667,13 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Changed assumptions/decisions: none. This executes the accepted final-BFF decision; no Notion decision-log append is required.
 - Remaining: explicitly dispatch the production workflow, record its full smoke evidence in the plan and #79, then start the one-time Phase-2 Mini caller migration.
 - Do not do yet: no Mini caller change, no LifeSpace #234 cutover, no PR #77 merge, no Meow re-enable, and no LifeSpace/backend staging removal.
+
+
+### 2026-09-17 — Phase 1 production gate complete
+
+- Deployed commit: `835ee8037176cecbc227e463d20f63af947dc4be` from current `main`.
+- Production workflow: `Deploy HomeMew Web production` run `35169452659`, conclusion `success`.
+- Passed steps: production confirmation/config validation; LifeSpace production release baseline; Web BFF tests/typecheck/build; LifeSpace production reachability; `homemew-web-production` Worker deploy; Cloudflare Access front door and Mini Program provider-route smoke.
+- Phase result: Phase 1 gate complete. The final bounded BFF works against current production-compatible LifeSpace, Service Bindings are wired, HomeMew Web staging is retired, and production smoke is green.
+- Phase 2 entry state: Mini callers are still unchanged and Meow remains offline. Begin the one-time caller cutover from this deployed main; keep PR #77 frozen and LifeSpace #234 gated.
+- New architecture/product decision: none; no Notion decision-log append is required.
