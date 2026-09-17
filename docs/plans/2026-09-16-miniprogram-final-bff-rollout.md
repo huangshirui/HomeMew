@@ -650,7 +650,7 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Branch: `codex/phase-1-event-adapter-seam`
 - Base: merged Day/diagnostic handoff at `a77fa67bdb23095bdb8b2179237b1b359e3db760`.
 - Completed in branch: preserved the published Mini `/spaces/.../events` precursor route unchanged; added final bounded `/families/{familyId}/events` CRUD/list contract; current split Calendar and future `when: temporal_range` response mapping; current Calendar UTC-window lowering; future Canonical Query `local_date_window` lowering; user/`me` to Person mapping; atomic partial TemporalRange updates; fixed field/query/route denials.
-- Evidence: dual-representation fixtures produce the same stable Mini Event page; focused Event tests passed 11/11 and the full local Web BFF suite passed 55/55.
+- Evidence: dual-representation fixtures produce the same stable Mini Event page; focused Event tests passed 11/11 and the full local Web BFF suite passed 56/56, including final-route front-door ordering.
 - Authority checked: current Mini Event service/DTO, frozen PR #77 as Phase-4 source only, LifeSpace Canonical Query/time/model specifications, current Calendar compatibility tests, TemporalRange Runtime, and LifeSpace #234. No LifeSpace or Mini caller change was made.
 - Changed assumptions/decisions: none. `LIFESPACE_EVENT_CONTRACT=temporal_range` is a server-only Phase-4 adapter selector; absence continues to target production-compatible split Calendar. No Notion decision-log append is required.
 - Remaining: merge after Web CI; retire HomeMew Web staging; record Phase-1 BFF/Web and production-smoke evidence; then begin the one-time Phase-2 Mini cutover.
