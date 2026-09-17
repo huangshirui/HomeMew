@@ -12,9 +12,8 @@ export function normalizeAccessLinkChallengeId(value: string): string {
 
 export async function confirmWebAccessLink(challengeIdInput: string): Promise<void> {
   const challengeId = normalizeAccessLinkChallengeId(challengeIdInput);
-  await request<void>(`/api/v1/me/access-link-challenges/${encodeURIComponent(challengeId)}/confirm`, {
+  await request<void>(`/api/v1/miniprogram/me/access-link-challenges/${encodeURIComponent(challengeId)}/confirm`, {
     method: 'POST',
-    target: 'identity',
     skipRetry: true,
   });
 }
