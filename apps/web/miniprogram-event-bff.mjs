@@ -1,28 +1,16 @@
 import { errorResponse, forwardLifeSpace } from './miniprogram-upstream.mjs';
+import { handleMiniProgramFinalEventBff } from './miniprogram-final-event-bff.mjs';
 
 const EVENT_ROUTE = /^\/api\/v1\/miniprogram\/spaces\/([^/]+)\/events(?:\/([^/]+))?$/u;
 const SPACE_ID = /^spc_[A-Za-z0-9_-]+$/u;
 const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
 const LIST_QUERY_KEYS = new Set([
-  'rangeStart',
-  'rangeEnd',
-  'dateStart',
-  'dateEndExclusive',
-  'timezone',
-  'attendeePersonIds',
-  'status',
-  'q',
-  'sort',
-  'cursor',
-  'limit',
+  'rangeStart', 'rangeEnd', 'dateStart', 'dateEndExclusive', 'timezone',
+  'attendeePersonIds', 'status', 'q', 'sort', 'cursor', 'limit',
 ]);
 
 function decodeSegment(value) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return null;
-  }
+  try { return decodeURIComponent(value); } catch { return null; }
 }
 
 export function matchMiniProgramEventRoute(pathname) {
@@ -52,19 +40,18 @@ function copyListQuery(input, output) {
 export async function handleMiniProgramEventBff(request, env) {
   const incomingUrl = new URL(request.url);
   const route = matchMiniProgramEventRoute(incomingUrl.pathname);
-  if (!route) return null;
+  if (!route) return handleMiniProgramFinalEventBff(request, env);
 
+  // Phase-1 compatibility: the published Mini still calls this precursor route.
+  // Keep its transport byte-compatible until the one-time Phase-2 caller cutover.
   if (!allowedMethod(request.method, route.recordId)) {
     return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for Mini Program Event BFF');
   }
-
   let upstreamPath = `/api/v1/spaces/${encodeURIComponent(route.spaceId)}/models/event/records${route.recordId ? `/${encodeURIComponent(route.recordId)}` : ''}`;
-
   if (request.method === 'GET' && !route.recordId) {
     const query = new URLSearchParams();
-    try {
-      copyListQuery(incomingUrl.searchParams, query);
-    } catch (queryError) {
+    try { copyListQuery(incomingUrl.searchParams, query); }
+    catch (queryError) {
       const message = queryError instanceof Error ? queryError.message : '';
       if (message.startsWith('unsupported-query:')) {
         return errorResponse(400, 'INVALID_QUERY', `Unsupported Event query parameter: ${message.slice('unsupported-query:'.length)}`);
@@ -75,6 +62,5 @@ export async function handleMiniProgramEventBff(request, env) {
   } else if ([...incomingUrl.searchParams.keys()].length > 0) {
     return errorResponse(400, 'INVALID_QUERY', 'Query parameters are not supported for this Event operation');
   }
-
   return forwardLifeSpace(request, env, { target: 'core', upstreamPath });
 }
