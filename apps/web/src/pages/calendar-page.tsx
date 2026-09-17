@@ -263,14 +263,14 @@ export function CalendarPage() {
           },
           { field: 'status', op: 'eq' as const, value: 'active' },
         ];
-        const page = await queryModelRecords<EventRecord>(currentFamily.id, 'event', {
+        const resultPage: { items: EventRecord[]; nextCursor: string | null } = await queryModelRecords<EventRecord>(currentFamily.id, 'event', {
           filter: { and: filters },
           sort: [{ field: 'when', direction: 'asc' }],
           page: { limit: 200, ...(cursor ? { cursor } : {}) },
           context: { viewingTimezone: currentFamily.timezone },
         });
-        collected.push(...page.items);
-        cursor = page.nextCursor;
+        collected.push(...resultPage.items);
+        cursor = resultPage.nextCursor;
       } while (cursor);
       setEvents(collected);
     } catch (cause) {
