@@ -1,10 +1,9 @@
-/** 用户头像 -> LifeSpace Identity；家庭头像 -> LifeSpace Space。 */
+/** Avatar uploads through the stable HomeMew Mini BFF. */
 
 import { AppError, request } from './api';
 import { getStoredToken, loginAndSaveToken } from './auth';
 import {
-  getCoreBaseUrl,
-  getIdentityBaseUrl,
+  getApplicationBaseUrl,
   generateRequestId,
   isTokenValid,
   UPLOAD_TIMEOUT,
@@ -165,14 +164,14 @@ async function uploadMultipartTo(
 }
 
 export function uploadAvatar(tempFilePath: string): Promise<string> {
-  return uploadMultipartTo(`${getIdentityBaseUrl()}/api/v1/me/avatar`, tempFilePath);
+  return uploadMultipartTo(`${getApplicationBaseUrl()}/api/v1/miniprogram/me/avatar`, tempFilePath);
 }
 
 export async function uploadFamilyAvatar(familyId: string, tempFilePath: string): Promise<string> {
-  const space = await request<{ version: number }>(`/api/v1/spaces/${encodeURIComponent(familyId)}`);
+  const family = await request<{ version: number }>(`/api/v1/miniprogram/families/${encodeURIComponent(familyId)}`);
   return uploadMultipartTo(
-    `${getCoreBaseUrl()}/api/v1/spaces/${encodeURIComponent(familyId)}/avatar`,
+    `${getApplicationBaseUrl()}/api/v1/miniprogram/families/${encodeURIComponent(familyId)}/avatar`,
     tempFilePath,
-    { version: String(space.version) },
+    { version: String(family.version) },
   );
 }
