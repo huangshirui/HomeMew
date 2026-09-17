@@ -217,7 +217,7 @@ Last verified: 2026-09-17
 | Meow / Creation Draft scope | ✅ Offline / scope corrected | PR #89 merged at `6724fc9`; Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed |
 | Day / diagnostic BFF slice | ✅ Merged | PR #91 merged at `875faeb`; Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
 | HomeMew Web staging retirement | ✅ Complete | PR #94 merged; production workflow run `35169452659` passed deploy and smoke |
-| One-time Mini migration | 🟡 Caller cutover complete in Phase-2 branch; PR/CI/manual smoke pending | Shared request/login/profile/account-link/family/media/activity/diagnostic plus Event/Task/Day/Wish now use final product routes; active-source regression protects the boundary. Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build pass locally. |
+| One-time Mini migration | 🟡 Caller cutover complete in PR #97; CI/manual smoke pending | Shared request/login/profile/account-link/family/media/activity/diagnostic plus Event/Task/Day/Wish now use final product routes; active-source regression protects the boundary. Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build pass locally. |
 | WeChat review | ⬜ Not done | Phase 3 |
 | Event new-contract cutover | ⏸ Gated | HomeMew #77 is Draft/Phase 4 only |
 | Compatibility cleanup | ⬜ Not started | Phase 5 |
@@ -417,7 +417,8 @@ Add a durable check that fails when production Mini source reintroduces direct L
 - [x] keep Meow offline, with only its exact dormant source files allowlisted by the architecture regression;
 - [x] replace direct-LifeSpace/Event-only tests and add the active-production-source regression;
 - [x] run local Mini tests/typecheck/build and full Web/BFF tests/typecheck/build;
-- [ ] open the Phase-2 PR and pass CI;
+- [x] open the Phase-2 PR (#97);
+- [ ] pass PR #97 CI;
 - [ ] complete WeChat Developer Tools and real-device smoke before closing the Phase-2 gate.
 
 ### Manual smoke coverage
@@ -554,7 +555,7 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Finish the Phase-2 PR and manual smoke for `codex/phase-2-mini-final-bff-cutover`.**
+**Finish PR #97 CI and manual smoke for `codex/phase-2-mini-final-bff-cutover`.**
 
 1. review the complete PR diff and CI for the one-time caller cutover; fix any CI or contract drift while keeping the final Mini-facing DTOs stable;
 2. run the WeChat Developer Tools and real-device smoke matrix below against the resulting review candidate, recording actual outcomes rather than inferring them from CLI checks;
@@ -701,10 +702,10 @@ The **Exact next action** must be specific enough that a new conversation can co
 
 ### 2026-09-17 — Phase 2 local caller cutover and verification
 
-- Branch: `codex/phase-2-mini-final-bff-cutover`; LifeSpace read-only `origin/main@cd25c8b` refreshed without changing its checkout.
+- Branch: `codex/phase-2-mini-final-bff-cutover`; PR #97 opened with caller cutover commit `baaae33`. LifeSpace read-only `origin/main@cd25c8b` refreshed without changing its checkout.
 - Completed: active Event, Task, Day and Wish services now call the final HomeMew product routes. Person/Canonical Query/Calendar wire mapping remains in the BFF. The shared request layer rejects paths outside `/api/v1/miniprogram/*`; Meow remains offline.
 - Regression: replaced stale direct-LifeSpace/Event-only Mini assertions and added an active production-source scan for public LifeSpace hosts, raw Space/model paths, target selectors and active imports of dormant wire helpers. The allowlist contains exact Meow history files only.
 - Local evidence: Mini 27 tests passed; Mini typecheck/build passed; Web/BFF 103 tests passed; Web typecheck/build passed; `git diff --check` passed. CI and WeChat Developer Tools/real-device smoke are still pending.
 - Authority checked: HomeMew root/Mini AGENTS, plan/inventory/accepted decision/architecture/product rules; LifeSpace root/docs AGENTS, current `docs/canonical-query.md`, `docs/time-space-semantics.md`, and open #234. HomeMew #79 remains open; #77 remains Draft/FROZEN for Phase 4.
 - Changed assumptions/decisions: none. No Notion decision-log append needed.
-- Exact next action: open the Phase-2 PR, wait for CI and repair failures, then run and record the manual smoke matrix before closing the gate.
+- Exact next action: wait for PR #97 CI and repair failures, then run and record the manual smoke matrix before closing the gate.
