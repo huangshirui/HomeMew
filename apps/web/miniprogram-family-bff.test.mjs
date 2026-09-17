@@ -78,7 +78,7 @@ test('family detail composes Space, members and current Core principal', async (
   const response = await handleMiniProgramFamilyBff(request('/api/v1/miniprogram/families/spc_home'), env(async incoming => {
     const path = new URL(incoming.url).pathname;
     if (path === '/api/v1/spaces/spc_home') return ok({
-      id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, access: { role: 'editor' },
+      id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, version: 7, access: { role: 'editor' },
     });
     if (path === '/api/v1/spaces/spc_home/members') return ok([
       { userId: 'usr_owner', role: 'owner', displayName: 'Owner', createdAt: '2026-01-01T00:00:00Z' },
@@ -89,7 +89,7 @@ test('family detail composes Space, members and current Core principal', async (
   }));
   assert.deepEqual((await response.json()).data, {
     id: 'spc_home', name: 'Home', avatarUrl: null, timezone: 'Asia/Shanghai', status: 'active',
-    createdBy: 'usr_owner', currentUserRole: 'member', memberCount: 2, createdAt: '2026-01-01T00:00:00Z',
+    createdBy: 'usr_owner', currentUserRole: 'member', isOwner: false, version: 7, memberCount: 2, createdAt: '2026-01-01T00:00:00Z',
   });
 });
 
