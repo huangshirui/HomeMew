@@ -1,7 +1,7 @@
 import { runCoreLatencyTest } from '../../services/core-latency';
 
 type LatencyView = {
-  networkRttText: string;
+  clientDiagnosticText: string;
   healthText: string;
   statusText: string;
   extraText: string;
@@ -10,7 +10,7 @@ type LatencyView = {
   statusSamplesText: string;
   businessSamplesText: string;
   networkTypeText: string;
-  coreBaseUrl: string;
+  applicationBaseUrl: string;
   testedAtText: string;
 };
 
@@ -40,7 +40,7 @@ function formatLocalTime(iso: string): string {
 
 Page({
   data: {
-    version: '1.6.2',
+    version: '1.6.3',
     testing: false,
     errorText: '',
     latency: null as LatencyView | null,
@@ -62,7 +62,7 @@ Page({
       this.setData({
         testing: false,
         latency: {
-          networkRttText: report.networkRttMedianMs === null ? '—' : `${report.networkRttMedianMs} ms`,
+          clientDiagnosticText: `${report.clientDiagnosticElapsedMs} ms`,
           healthText: `${report.healthMedianMs} ms`,
           statusText: `${report.statusMedianMs} ms`,
           extraText: `≈ ${report.workerD1ExtraMs} ms`,
@@ -71,7 +71,7 @@ Page({
           statusSamplesText: formatSamples(report.statusSamples),
           businessSamplesText: report.businessSamples.length ? formatSamples(report.businessSamples) : '无当前家庭',
           networkTypeText: networkTypeLabel(report.networkType),
-          coreBaseUrl: report.coreBaseUrl,
+          applicationBaseUrl: report.applicationBaseUrl,
           testedAtText: formatLocalTime(report.testedAt),
         } as LatencyView,
       });

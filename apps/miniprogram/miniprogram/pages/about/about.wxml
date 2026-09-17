@@ -12,7 +12,7 @@
     <view class="latency-header">
       <view>
         <text class="section-title">响应时间测试</text>
-        <text class="section-subtitle">Core production · 每项 3 次取中位数</text>
+        <text class="section-subtitle">HomeMew 诊断 · Core 各项 3 次取中位数</text>
       </view>
       <button class="retry-btn" bindtap="onStartLatency" disabled="{{testing}}">
         {{testing ? '测试中…' : (latency ? '重新测试' : '开始测试')}}
@@ -20,7 +20,7 @@
     </view>
 
     <view wx:if="{{!testing && !latency}}" class="idle-state">
-      <text class="idle-text">点击下方「开始测试」测量当前网络到 Core 的响应时间</text>
+      <text class="idle-text">点击下方「开始测试」测量 HomeMew 诊断请求和 Core 内部探针耗时</text>
     </view>
 
     <view wx:if="{{testing && !latency}}" class="testing-state">
@@ -40,14 +40,14 @@
 
       <view class="metric-grid">
         <view class="metric-item">
-          <text class="metric-label">网络 RTT</text>
-          <text class="metric-value">{{latency.networkRttText}}</text>
-          <text class="metric-note">微信网络栈提供时显示</text>
+          <text class="metric-label">小程序端诊断总耗时</text>
+          <text class="metric-value">{{latency.clientDiagnosticText}}</text>
+          <text class="metric-note">含可能的登录刷新、BFF 处理及下方 9 次 Core 探针；不是网络 RTT</text>
         </view>
         <view class="metric-item">
-          <text class="metric-label">/health 端到端</text>
+          <text class="metric-label">Core /health</text>
           <text class="metric-value">{{latency.healthText}}</text>
-          <text class="metric-note">设备 → Edge → Core Worker → 设备</text>
+          <text class="metric-note">BFF → Core Service Binding → BFF</text>
         </view>
         <view class="metric-item">
           <text class="metric-label">Core + D1</text>
@@ -83,7 +83,7 @@
 
       <view class="environment-block">
         <text class="environment-line">网络：{{latency.networkTypeText}}</text>
-        <text class="environment-line">Core：{{latency.coreBaseUrl}}</text>
+        <text class="environment-line">HomeMew：{{latency.applicationBaseUrl}}</text>
         <text class="environment-line">测试时间：{{latency.testedAtText}}</text>
       </view>
     </block>
@@ -91,7 +91,7 @@
 
   <view class="card note-card">
     <text class="note-title">怎么看这些数字</text>
-    <text class="note-text">/health 不访问 D1，所以它更接近当前设备到 Core Worker 的网络与 Edge 基线。</text>
+    <text class="note-text">Core /health 不访问 D1，反映 BFF 通过 Service Binding 调用 Core 的基线，不包含设备到 HomeMew 的网络耗时。</text>
     <text class="note-text">/api/v1/status 会读取 LifeSpace Core 的 schema metadata，因此包含一次真实 D1 往返。</text>
     <text class="note-text">真实业务链路会读取当前家庭的一条 pending Task，并经过正常用户鉴权、Space/模型权限和业务查询，更接近日常页面的一次 API。</text>
     <text class="note-text">status 与 health 的差值会受到连接复用、网络抖动和 Worker 调度影响，不等于 D1 SQL 执行时间。</text>

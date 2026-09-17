@@ -218,6 +218,7 @@ Last verified: 2026-09-17
 | Day / diagnostic BFF slice | ✅ Merged | PR #91 merged at `875faeb`; Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
 | HomeMew Web staging retirement | ✅ Complete | PR #94 merged; production workflow run `35169452659` passed deploy and smoke |
 | One-time Mini migration | ✅ Phase 2 gate complete | PR #97 merged; Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build passed locally; both PR checks passed. User reported manual testing complete on 2026-09-17 and found no Mini requests to LifeSpace; individual device/test logs were not supplied. |
+| Phase 3 Mini diagnostics correction | 🟡 Local verification complete; device check pending | The old Network RTT display was always empty after Phase 2 because Core samples no longer carry WeChat `profile.rtt`. Local 1.6.3 work replaces it with measured Mini-to-HomeMew diagnostic total elapsed time and labels BFF-to-Core samples accurately. Mini 27 tests, typecheck and build passed locally; WeChat Developer Tools/real-device display remains to be checked. |
 | WeChat review | ⬜ Not submitted | Phase 3; Mini-facing contract is frozen for review preparation |
 | Event new-contract cutover | ⏸ Gated | HomeMew #77 is Draft/Phase 4 only |
 | Compatibility cleanup | ⬜ Not started | Phase 5 |
@@ -557,12 +558,13 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Prepare Phase 3 WeChat review using the merged Phase-2 Mini build; do not submit until the user directs submission.**
+**Verify the local 1.6.3 About-page diagnostic correction in WeChat Developer Tools and on a real device, then prepare Phase 3 review; do not submit until the user directs submission.**
 
 1. Keep the Mini-facing route/DTO/query/time contract frozen, allowing only strictly backward-compatible review fixes;
-2. when the user directs review submission, build from current `main`, submit through WeChat Developer Tools, and record the submitted version/build and review status in this plan and #79;
-3. after approval, verify that the reviewed Mini version is production-active before opening the LifeSpace #234 / HomeMew Phase-4 Event cutover;
-4. re-evaluate frozen PR #77 against then-current `main` and LifeSpace contracts; do not merge it as-is.
+2. Confirm that the About page shows a finite Mini-to-HomeMew diagnostic total elapsed time, three Core health/status/business samples, and no direct LifeSpace request; the displayed total includes BFF processing and is not network RTT;
+3. when the user directs review submission, build from current `main`, submit through WeChat Developer Tools, and record the submitted version/build and review status in this plan and #79;
+4. after approval, verify that the reviewed Mini version is production-active before opening the LifeSpace #234 / HomeMew Phase-4 Event cutover;
+5. re-evaluate frozen PR #77 against then-current `main` and LifeSpace contracts; do not merge it as-is.
 
 Do not re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove the current Event compatibility adapter, or change the frozen Mini-facing DTO/query semantics.
 
@@ -587,6 +589,14 @@ Do not do yet:
 The **Exact next action** must be specific enough that a new conversation can continue from repository state without asking for chat history.
 
 ## 16. Session log
+
+### 2026-09-17 — Phase 3 About-page latency display correction (local)
+
+- Branch: `main`; user locally changed the Mini package and About-page display version to `1.6.3`; those edits were preserved.
+- Cause: the pre-BFF probe read optional WeChat `wx.request.profile.rtt`, while the Phase-2 diagnostic maps all BFF-to-Core samples with `rttMs: null`; the About page therefore always displayed an empty Network RTT. This is unrelated to the version change.
+- Correction: show the measured Mini-to-HomeMew diagnostic request total elapsed time instead of a nonexistent RTT; clarify that health/status/business samples measure BFF-to-Core Service Binding calls. The BFF route and stable Mini-facing DTO/query/time contracts are unchanged.
+- Evidence: Mini 27 tests passed; Mini typecheck and build passed using the local TypeScript 5.9.3 copy because the pnpm junction was unreadable in the current sandbox; `git diff --check` passed. Developer Tools and real-device display are not yet verified.
+- Exact next action: check the 1.6.3 About-page diagnostic display in Developer Tools and on a real device, then continue Phase 3 review preparation without submitting until directed.
 
 ### 2026-09-16 — Phase 1 inventory and contract baseline
 

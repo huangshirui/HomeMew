@@ -1,6 +1,6 @@
 import { request } from './api';
 import { getApplicationBaseUrl, STORAGE_KEYS } from './config';
-import { LatencySample, LatencySummary, median, summarizeLatency } from './latency-metrics';
+import { LatencySummary, median, summarizeLatency } from './latency-metrics';
 
 type DiagnosticResponse = {
   target: string;
@@ -12,7 +12,8 @@ type DiagnosticResponse = {
 };
 
 export type CoreLatencyReport = LatencySummary & {
-  coreBaseUrl: string;
+  applicationBaseUrl: string;
+  clientDiagnosticElapsedMs: number;
   networkType: string;
   healthSamples: number[];
   statusSamples: number[];
@@ -33,30 +34,32 @@ function currentFamilyId(): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function samples(values: number[]): LatencySample[] {
-  return values.map(elapsedMs => ({ elapsedMs, rttMs: null }));
-}
-
 export async function runCoreLatencyTest(): Promise<CoreLatencyReport> {
   const familyId = currentFamilyId();
   if (!familyId) throw new Error('请先选择家庭后再测试');
-  const [networkType, result] = await Promise.all([
-    currentNetworkType(),
-    request<DiagnosticResponse>('/api/v1/miniprogram/diagnostics/lifespace-core', {
+  const diagnostic = async (): Promise<{ result: DiagnosticResponse; elapsedMs: number }> => {
+    const startedAt = Date.now();
+    const result = await request<DiagnosticResponse>('/api/v1/miniprogram/diagnostics/lifespace-core', {
       method: 'POST',
       data: { familyId },
       skipRetry: true,
       timeout: 40_000,
-    }),
+    });
+    return { result, elapsedMs: Date.now() - startedAt };
+  };
+  const [networkType, { result, elapsedMs }] = await Promise.all([
+    currentNetworkType(),
+    diagnostic(),
   ]);
   return {
-    coreBaseUrl: getApplicationBaseUrl(),
+    applicationBaseUrl: getApplicationBaseUrl(),
+    clientDiagnosticElapsedMs: elapsedMs,
     networkType,
     healthSamples: result.healthSamples,
     statusSamples: result.statusSamples,
     businessSamples: result.businessSamples,
     businessMedianMs: result.businessSamples.length ? median(result.businessSamples) : null,
     testedAt: result.testedAt,
-    ...summarizeLatency(samples(result.healthSamples), samples(result.statusSamples)),
+    ...summarizeLatency(result.healthSamples, result.statusSamples),
   };
 }

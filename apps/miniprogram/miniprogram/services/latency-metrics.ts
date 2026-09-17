@@ -1,12 +1,6 @@
-export type LatencySample = {
-  elapsedMs: number;
-  rttMs: number | null;
-};
-
 export type LatencySummary = {
   healthMedianMs: number;
   statusMedianMs: number;
-  networkRttMedianMs: number | null;
   workerD1ExtraMs: number;
 };
 
@@ -19,20 +13,16 @@ export function median(values: number[]): number {
 }
 
 export function summarizeLatency(
-  healthSamples: LatencySample[],
-  statusSamples: LatencySample[],
+  healthSamples: number[],
+  statusSamples: number[],
 ): LatencySummary {
-  const healthMedianMs = median(healthSamples.map(sample => sample.elapsedMs));
-  const statusMedianMs = median(statusSamples.map(sample => sample.elapsedMs));
-  const rtts = healthSamples
-    .map(sample => sample.rttMs)
-    .filter((value): value is number => typeof value === 'number' && value > 0);
+  const healthMedianMs = median(healthSamples);
+  const statusMedianMs = median(statusSamples);
 
   return {
     healthMedianMs,
     statusMedianMs,
-    networkRttMedianMs: rtts.length ? median(rtts) : null,
-    // 这个差值包含 Core route、D1 往返与瞬时网络抖动，只作为附加耗时估算。
+    // 两组 BFF -> Core Service Binding 耗时的差值仅作附加耗时估算。
     workerD1ExtraMs: Math.max(0, statusMedianMs - healthMedianMs),
   };
 }

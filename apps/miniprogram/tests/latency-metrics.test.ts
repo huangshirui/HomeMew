@@ -9,31 +9,21 @@ test('median is robust to sample ordering and outliers', () => {
   assert.equal(median([]), 0);
 });
 
-test('summarizeLatency reports health, D1 and optional network RTT medians', () => {
+test('summarizeLatency reports BFF-to-Core health and status medians', () => {
   const summary = summarizeLatency(
-    [
-      { elapsedMs: 70, rttMs: 32 },
-      { elapsedMs: 62, rttMs: 28 },
-      { elapsedMs: 210, rttMs: null },
-    ],
-    [
-      { elapsedMs: 130, rttMs: null },
-      { elapsedMs: 125, rttMs: null },
-      { elapsedMs: 300, rttMs: null },
-    ],
+    [70, 62, 210],
+    [130, 125, 300],
   );
 
   assert.equal(summary.healthMedianMs, 70);
   assert.equal(summary.statusMedianMs, 130);
-  assert.equal(summary.networkRttMedianMs, 30);
   assert.equal(summary.workerD1ExtraMs, 60);
 });
 
 test('summarizeLatency never reports a negative Worker+D1 estimate', () => {
   const summary = summarizeLatency(
-    [{ elapsedMs: 120, rttMs: null }],
-    [{ elapsedMs: 90, rttMs: null }],
+    [120],
+    [90],
   );
-  assert.equal(summary.networkRttMedianMs, null);
   assert.equal(summary.workerD1ExtraMs, 0);
 });
