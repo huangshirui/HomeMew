@@ -378,7 +378,7 @@ local tests/typecheck/build
 - [x] Task/Wish Canonical Query, Person mapping, CRUD and Action adapter slice (PR #87);
 - [x] current-LifeSpace adapters for Day/diagnostic; Creation Draft remains explicitly excluded while Meow is offline (PR #91);
 - [x] one production-compatible Event old/new adapter seam;
-- [ ] HomeMew Web staging workflow/config retirement;
+- [x] HomeMew Web staging workflow/config retirement;
 - [ ] BFF/Web checks and production smoke evidence.
 
 ### Phase-1 gate
@@ -540,18 +540,18 @@ Phase 0 documentation drift is resolved in merged PR #82. The Phase-1 source-der
 
 No external blocker prevents the remaining Phase-1 implementation slices. PR #84, the Family / Member / Invitation slice in PR #85, and the Task / Wish slice in PR #87 are merged. Meow is now intentionally offline and its former LifeSpace Creation Draft calls are removed from active migration scope. The main correctness risks remain accidentally introducing a generic proxy, returning public LifeSpace avatar URLs, changing cursor semantics through client/BFF post-processing, or moving Person/time mapping into the Mini. Contract and deny tests must accompany each bounded route slice.
 
-The existing HomeMew Web staging workflow/config remains a known Phase-1 retirement item. Its presence is implementation evidence to remove, not current release authority.
+The HomeMew Web staging workflow, deployment command/script and staging Worker environment have been removed in the Phase-1 retirement slice. Historical staging acceptance records remain explicitly historical; LifeSpace and backend staging are unaffected.
 
 ## 14. Exact next action / 下一步动作
 
-**Retire HomeMew Web staging without changing the active production deployment path.**
+**Verify the production-only Web release boundary, record Phase-1 CI/smoke evidence, then prepare the one-time Phase-2 Mini cutover.**
 
-1. re-read the Web staging workflow, deployment script/config, Web README and operational references under their nearest AGENTS constraints;
-2. remove only the HomeMew Web staging workflow/config/script and active staging instructions, preserving historical records as clearly historical;
-3. verify the remaining release path is local test/typecheck/build -> CI -> explicit production deployment -> production smoke;
-4. run the full Web/BFF checks and record CI plus production-smoke evidence before closing Phase 1.
+1. run the full Web BFF tests, Web typecheck and Web build on the staging-retirement branch;
+2. verify the explicit production workflow/config and read-only production front-door/provider/BFF smoke without transferring domains or changing secrets;
+3. merge the retirement slice and update HomeMew #79 with Phase-1 final evidence;
+4. only after the Phase-1 gate is recorded, begin Phase 2 by rebasing the Mini caller migration on current main.
 
-Do not change Mini runtime calls, re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove LifeSpace staging, or remove the current Event compatibility adapter.
+Do not change Mini runtime calls before the Phase-1 gate, re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove LifeSpace/backend staging, deploy or transfer domains implicitly, or remove the current Event compatibility adapter.
 
 ## 15. Session handoff template / 每轮交接模板
 
@@ -655,3 +655,15 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Changed assumptions/decisions: none. `LIFESPACE_EVENT_CONTRACT=temporal_range` is a server-only Phase-4 adapter selector; absence continues to target production-compatible split Calendar. No Notion decision-log append is required.
 - Remaining: merge after Web CI; retire HomeMew Web staging; record Phase-1 BFF/Web and production-smoke evidence; then begin the one-time Phase-2 Mini cutover.
 - Blockers: none. PR #77 remains frozen and #234 remains gated.
+
+
+### 2026-09-17 — Phase 1 HomeMew Web staging retirement
+
+- Branch: `codex/retire-web-staging`
+- Base: merged Event seam at `788c45d7d77335c7a4fc88e9ca4b37c6b92f1ab5`.
+- Completed in branch: removed only the HomeMew Web staging deployment workflow, staging deploy script/commands and `wrangler.jsonc` staging environment; retained the explicit production workflow/config and left LifeSpace/backend staging untouched; added a production-only release-boundary regression test.
+- Documentation: current architecture/Web README/web plan/staging acceptance already distinguish the retired environment from preserved historical evidence, so no historical acceptance content was deleted.
+- Evidence pending: Web CI (BFF tests, typecheck, build) and read-only production smoke; record both before closing Phase 1.
+- Changed assumptions/decisions: none. This executes the accepted final-BFF decision; no Notion decision-log append is required.
+- Remaining: merge after checks, comment #79 with Phase-1 gate evidence, then start the one-time Phase-2 Mini caller migration.
+- Do not do yet: no Mini caller change, no LifeSpace #234 cutover, no PR #77 merge, no Meow re-enable, and no LifeSpace/backend staging removal.
