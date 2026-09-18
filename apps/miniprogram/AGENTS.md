@@ -101,7 +101,7 @@ Follow the active HomeMew BFF contract and underlying LifeSpace semantics:
 - pass current resource `version` for operations that require optimistic concurrency;
 - on version conflict, reload and ask the user to review rather than silently overwrite.
 
-The BFF may translate any stable Mini product DTO to the active LifeSpace representation. In particular, Event may move between split Calendar fields and TemporalRange internally, but observable Mini semantics must not change.
+The BFF translates the stable Mini Event DTO to the current LifeSpace `when: temporal_range` Event contract while preserving observable Mini semantics. The retired split Calendar fields are historical upstream compatibility only and must not be reintroduced as an active adapter path.
 
 ## Local storage
 
