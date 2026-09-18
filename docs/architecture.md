@@ -291,7 +291,7 @@ The code may be deployed before the integrations application credential is insta
 - Do not dual-write HomeMew Core and LifeSpace.
 - Do not recreate the retired broad legacy `/api/v1/families/...` facade. The final Mini BFF may expose explicit HomeMew product routes, but never an arbitrary generic proxy or second business model.
 - HomeMew production business data is authoritative in LifeSpace after the completed production cutover.
-- HomeMew Web has no active dedicated staging release environment. LifeSpace staging and any independently approved test resources remain separate concerns.
+- HomeMew Web has no permanent dedicated staging release environment. During the 2026-09-18 Phase 4 review window only, `docs/decisions/2026-09-18-phase4-temporary-web-staging-validation.md` permits a temporary branch-scoped release-candidate Worker at `homemew-web-staging.aisr.online` bound exclusively to HomeMew/LifeSpace staging services; it must be removed after Phase 4 validation.
 - `apps/backend/` keeps the application-owned WeChat identity mapping; `apps/web/` never duplicates it.
 - Production Web activation must not break the existing Mini Program `/api/v1/login/wechat` application-provider endpoint.
 - The legacy HomeMew Core source is retired from the active repository. Any still-existing old HomeMew Worker/D1 resources remain frozen/read-only only for the explicit stabilization/rollback-evidence window and require a separate operations decision before physical deletion.
