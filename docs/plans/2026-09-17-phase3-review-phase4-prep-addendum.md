@@ -1,24 +1,27 @@
 # Phase 3 Review + Phase 4 Preparation Addendum
 
-Status: Active addendum  
+Status: Completed  
 Date: 2026-09-17  
 Parent plan: `docs/plans/2026-09-16-miniprogram-final-bff-rollout.md`  
 Accepted decision: `docs/decisions/2026-09-17-phase4-preparation-during-wechat-review.md`
 
-> This addendum supersedes only the parent plan's statements that Phase 4 engineering work must wait until WeChat approval. The production cutover gate remains unchanged.
+> Historical execution record. Phase 4 completed successfully on 2026-09-18; the production cutover gate described below has been satisfied and is no longer active.
 
 ## Current state
 
 - Phase 0: complete.
 - Phase 1: complete.
 - Phase 2: complete.
-- Mini Program 1.6.3 real-device verification: complete.
-- Mini Program 1.6.3 WeChat submission: complete.
-- WeChat review: **in progress**.
-- Mini-facing HomeMew BFF contract: frozen for review.
-- HomeMew PR #77: stale reference / Draft only; not an implementation branch.
-- Phase 4 non-production preparation: **implementation complete on both LifeSpace and HomeMew branches; production cutover remains blocked**.
-- Phase 4 production cutover: blocked until the reviewed Mini version is approved and production-active.
+- Phase 3: complete — Mini Program 1.6.3 passed review and is production-active.
+- Phase 4: **complete**.
+- LifeSpace Event v6 / schema 41 / canonical time DSL: production verified.
+- LifeSpace exact-SHA final chain: staging #93 -> APAC #16 -> production #25: all successful on `5b5f43ffdf7a34f429551bdaf50a02f4b9cb8bce`.
+- HomeMew PR #99: merged to `main@0d472dc00d39a72b37ccb06b2fdbde197d63dbbe`.
+- HomeMew Web production #9: successful.
+- Mini 1.6.3 and HomeMew Web production smoke: successful.
+- Mini-facing HomeMew BFF contract remained unchanged through the platform cutover.
+- Temporary Phase 4 Web staging repository launchers/config/test: retired after successful production verification.
+- Phase 5 compatibility cleanup may start from this completed production baseline.
 
 ## 2026-09-18 review-window validation update
 
@@ -115,25 +118,20 @@ Evidence:
 
 ## Production gate
 
-Do not activate production cutover until all are true:
+All Phase 4 production gates were satisfied:
 
-- [ ] Mini Program 1.6.3 review approved;
-- [ ] approved version is production-active;
-- [x] LifeSpace Event migration/backfill tests pass;
-- [x] LifeSpace Event v6 staging deployment and migration verification pass;
-- [x] HomeMew BFF old/new equivalence tests pass;
-- [x] HomeMew Web new-contract tests/typecheck/build pass;
-- [ ] rolling cutover and rollback runbook is reviewed;
-- [ ] production deploy order is explicit and reversible.
+- [x] Mini Program 1.6.3 review approved;
+- [x] approved version production-active;
+- [x] LifeSpace Event migration/backfill tests passed;
+- [x] LifeSpace Event v6 staging deployment and migration verification passed;
+- [x] exact-SHA APAC performance gate passed;
+- [x] LifeSpace production cutover and postflight verification passed;
+- [x] HomeMew BFF old/new equivalence tests passed;
+- [x] HomeMew Web new-contract tests/typecheck/build passed;
+- [x] HomeMew Web production deployment passed;
+- [x] Mini/Web production smoke passed.
 
 ## Exact next actions
 
-While WeChat review remains in progress:
+Phase 4 has no remaining implementation or release action. Start Phase 5 only as cleanup of compatibility code that is no longer required by any active client; do not change the stable Mini-facing DTO solely for cleanup.
 
-1. Keep LifeSpace #252 and HomeMew #99 Draft; do not merge/deploy production.
-2. Prepare and review the coordinated production cutover/rollback runbook. It must explicitly sequence LifeSpace schema 41/Event v6 and HomeMew BFF/Web activation without exposing a window where production HomeMew requires a contract production LifeSpace does not yet provide.
-3. Define verification gates for production data count/integrity, Event CRUD/query, stable Mini DTO behavior, Web Calendar/Home behavior, Eventing and rollback decision points.
-4. Continue monitoring WeChat review status externally; the production gate opens only after Mini 1.6.3 is approved and production-active.
-5. Once the gate opens, rebase/recheck both Draft PRs against current `main`, rerun CI, execute the reviewed cutover runbook, then begin Phase 5 only after the new production path is verified stable.
-
-At the end of each preparation/cutover session, update HomeMew #79 and LifeSpace #234 with branch/PR/test evidence and the exact next action.
