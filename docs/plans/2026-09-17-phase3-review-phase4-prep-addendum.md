@@ -20,6 +20,15 @@ Accepted decision: `docs/decisions/2026-09-17-phase4-preparation-during-wechat-r
 - Phase 4 non-production preparation: **implementation complete on both LifeSpace and HomeMew branches; production cutover remains blocked**.
 - Phase 4 production cutover: blocked until the reviewed Mini version is approved and production-active.
 
+## 2026-09-18 review-window validation update
+
+- LifeSpace canonical time DSL correction is merged to `main` via #255 (Core Kernel 0.36.0).
+- LifeSpace Event v6 + canonical time DSL are combined in Draft PR #257 on `phase4/event-temporal-range-staging-candidate-2026-09-18`.
+- LifeSpace staging deploy run #90 failed because it was dispatched from `main` (schema 40 expectation) while live staging was already schema 41. The deploy workflow is now hardened via #258 to reject any staging schema/contract downgrade **before** migration or Worker deployment.
+- The next LifeSpace staging deploy must select the exact #257 branch, not `main`.
+- HomeMew Web has a temporary Phase 4 release-candidate staging surface only for this review window. It is manual, branch-scoped, binds only to `homemew-backend-staging`, `lifespace-core-staging`, and `lifespace-identity-staging`, and uses `LIFESPACE_EVENT_CONTRACT=temporal_range`.
+- This temporary surface does not restore a permanent HomeMew Web staging environment and must be removed after Phase 4 validation.
+
 ## LifeSpace Phase 4 preparation — completed and staging-validated
 
 Branch: `phase4/event-temporal-range-prep-2026-09-17`  
