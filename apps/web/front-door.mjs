@@ -1,6 +1,5 @@
 import webHandler from './worker.mjs';
 import { handleMiniProgramBff } from './miniprogram-bff.mjs';
-import { handleMiniProgramEventBff } from './miniprogram-event-bff.mjs';
 import { handleMiniProgramFamilyBff } from './miniprogram-family-bff.mjs';
 import { handleMiniProgramTaskWishBff } from './miniprogram-task-wish-bff.mjs';
 import { handleMiniProgramDayDiagnosticBff } from './miniprogram-day-diagnostic-bff.mjs';
@@ -34,9 +33,6 @@ async function proxyBackend(request, env) {
 export function createFrontDoorHandler({ app = webHandler } = {}) {
   return {
     async fetch(request, env, context) {
-      const eventBffResponse = await handleMiniProgramEventBff(request, env);
-      if (eventBffResponse) return eventBffResponse;
-
       const familyBffResponse = await handleMiniProgramFamilyBff(request, env);
       if (familyBffResponse) return familyBffResponse;
 
