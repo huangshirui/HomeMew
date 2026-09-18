@@ -115,7 +115,7 @@ homemew.aisr.online
 
 同一生产 Worker 承载两类边界：Web same-origin BFF 负责 Access assertion、App Session、HttpOnly Cookie、Origin/CSRF 与浏览器凭据隔离；Mini BFF 提供稳定、显式的 HomeMew 产品路由并在内部适配当前 LifeSpace 契约。两者都不保存家庭业务数据、不复制 LifeSpace 授权逻辑，也不接受任意上游 URL/路径或提供通用模型代理。
 
-当前过渡态已实现 Access session exchange、existing-user link challenge、same-origin Core/Identity proxy、外部系统管理编排、微信登录 provider pass-through 和 Event Mini BFF 先导路由。最终 Mini BFF 全量迁移由 `docs/plans/2026-09-16-miniprogram-final-bff-rollout.md` 跟踪；HomeMew Web 不暴露 LifeSpace Access registration。
+当前已完成 Final Mini BFF 全量迁移与 LifeSpace Event `when: temporal_range` production cutover。Mini-facing 路由/DTO 保持稳定，BFF 只使用当前 LifeSpace Canonical Query + TemporalRange Event adapter；旧 Event precursor、split Calendar adapter 和 old/new selector 属于已退休兼容层。后续状态由 `docs/plans/2026-09-16-miniprogram-final-bff-rollout.md` 跟踪；HomeMew Web 不暴露 LifeSpace Access registration。
 
 ## LifeSpace 模型映射
 
