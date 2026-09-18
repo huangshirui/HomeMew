@@ -1,9 +1,9 @@
 # LifeSpace Query/Temporal -> HomeMew Final Mini BFF Rollout Plan
 
-Status: Active / Living Plan  
+Status: Complete / Historical execution record  
 Started: 2026-09-16  
 Tracking issue: HomeMew #79  
-Current phase: Phase 5 — Remove obsolete Event upstream compatibility
+Current phase: Complete — Phases 0–5 finished
 Related platform work: LifeSpace #234  
 Accepted architecture decisions:
 - `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
@@ -221,7 +221,7 @@ Last verified: 2026-09-18
 | Phase 3 Mini diagnostics correction | ✅ Complete | Mini 1.6.3 was verified on real device, submitted, approved, and became production-active |
 | WeChat review | ✅ Complete | Mini 1.6.3 approved and production-active; Mini-facing contract remains frozen |
 | Event new-contract cutover | ✅ Phase 4 complete | LifeSpace Event v6 + HomeMew BFF/Web production cutover verified; stale PR #77 is reference only |
-| Compatibility cleanup | 🟡 Code merged; production gate pending | PR #102 merged as `9e74513`; Web check #140 and Mini Program Check #162 passed; Mini contract unchanged |
+| Compatibility cleanup | ✅ Phase 5 complete | PR #102 merged as `9e74513`; Web check #140 and Mini Program Check #162 passed; user confirmed the production workflow completed successfully; Mini contract unchanged |
 
 ## 6. Phase 0 — Documentation and architecture alignment / 文档先收口
 
@@ -526,8 +526,8 @@ Retain tests for the stable Mini-facing contract.
 - [x] retain the stable Mini Event DTO and deterministic TemporalRange projection;
 - [x] add regressions that the retired precursor fails closed and split upstream Event resources are rejected;
 - [x] pass full Web/BFF tests, typecheck and build in CI (Web check #140; Mini Program Check #162);
-- [ ] deploy the merged cleanup to HomeMew Web production and pass production smoke;
-- [ ] update HomeMew #79 and this plan with final evidence, then close Phase 5.
+- [x] deploy the merged cleanup to HomeMew Web production and pass the workflow's production smoke gates (user-confirmed successful run on 2026-09-18);
+- [x] update HomeMew #79 and this plan with final evidence, then close Phase 5.
 
 Final state:
 
@@ -558,7 +558,7 @@ Do not:
 
 ## 13. Current blockers / 当前阻塞
 
-Phases 0–4 are complete. Mini 1.6.3 is production-active, LifeSpace Event v6 / schema 41 is the production baseline, and the HomeMew BFF/Web TemporalRange cutover has been verified. Phase 5 has no architecture or release blocker; only compatibility cleanup, CI, production deploy/smoke, and durable closeout evidence remain.
+None. Phases 0–5 are complete. Mini 1.6.3 remains production-active and unchanged; LifeSpace Event v6 / schema 41 is authoritative; HomeMew BFF now has one Canonical Query + TemporalRange Event upstream path with the old compatibility layer removed.
 
 Historical Phase-0/1 evidence follows.
 
@@ -570,15 +570,9 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Deploy and verify the merged Phase 5 cleanup from current `main` (which contains PR #102); do not change Mini code or its stable route/DTO contract.**
+**No further action remains in this migration.** HomeMew #79 may be closed after this closeout commit/comment.
 
-1. dispatch the existing `Deploy HomeMew Web production` workflow from current `main` using the normal production confirmation gate;
-2. verify the workflow's LifeSpace release baseline, Web/BFF checks, Worker deployment, Access front-door smoke, and Mini provider-route smoke;
-3. run the normal Event/Mini/Web post-deploy smoke against production without changing Mini 1.6.3;
-4. record deployment/smoke evidence in this plan and HomeMew #79;
-5. mark Phase 5 and HomeMew #79 complete only after production evidence is green.
-
-Do not change Mini 1.6.3, reintroduce split Calendar Event truth, delete LifeSpace migration/history evidence, or broaden this cleanup into unrelated platform work.
+Future changes to Mini-facing contracts, Event semantics, Meow, or broader LifeSpace Query/Temporal work must start as separate scoped work and must not reopen the retired split-Calendar compatibility path.
 
 ## 15. Session handoff template / 每轮交接模板
 
@@ -601,6 +595,18 @@ Do not do yet:
 The **Exact next action** must be specific enough that a new conversation can continue from repository state without asking for chat history.
 
 ## 16. Session log
+
+### 2026-09-18 — Phase 5 complete / rollout closed
+
+- PR #102 merged as `9e74513de718172902e7379c506099a22bfa1022`.
+- CI evidence: Web check #140 passed BFF tests, Web typecheck and build; Mini Program Check #162 passed.
+- Production evidence: the user confirmed `Deploy HomeMew Web production` completed successfully on 2026-09-18. That workflow's fixed success path includes production confirmation/config validation, LifeSpace release-baseline verification, Web/BFF tests/typecheck/build, LifeSpace reachability, Worker deployment, Access front-door smoke and Mini provider-route smoke.
+- Connector limitation: the workflow-dispatch run list/run ID was not independently retrievable in this session, so the success assertion above is explicitly recorded as user-confirmed rather than independently queried.
+- Final architecture: Mini 1.6.3 stable route/DTO unchanged; BFF uses one current Event adapter path via Canonical Query + `when: temporal_range`; the old Event precursor, split Calendar adapter/fallback and old/new selector are retired.
+- Mini code changed in Phase 5: no.
+- LifeSpace code changed in Phase 5: no.
+- New architecture/product decision: none; Phase 5 only executed the previously accepted rollout decision, so no new Notion decision-log entry is required.
+- Remaining: none. Close HomeMew #79.
 
 ### 2026-09-18 — Phase 5 Event compatibility cleanup started
 
