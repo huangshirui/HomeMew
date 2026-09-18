@@ -64,14 +64,6 @@ function recordPath(familyId, recordId) {
   return `${collection(familyId)}/${encodeURIComponent(recordId)}`;
 }
 
-function queryString(values) {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(values)) {
-    if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
-  }
-  return params.size ? `?${params.toString()}` : '';
-}
-
 function validDate(value) {
   if (!DATE.test(value ?? '')) return false;
   const [year, month, day] = value.split('-').map(Number);
@@ -81,25 +73,6 @@ function validDate(value) {
 
 function validTimezone(value) {
   try { new Intl.DateTimeFormat('en-US', { timeZone: value }).format(); return true; } catch { return false; }
-}
-
-// Used only by the current Calendar compatibility adapter. Canonical Query owns
-// local-window projection after the Event -> TemporalRange cutover.
-function localMidnightUtc(date, timezone) {
-  const [year, month, day] = date.split('-').map(Number);
-  const desired = Date.UTC(year, month - 1, day);
-  let guess = desired;
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-  });
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const parts = Object.fromEntries(formatter.formatToParts(new Date(guess))
-      .filter(part => part.type !== 'literal').map(part => [part.type, Number(part.value)]));
-    const shown = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
-    guess += desired - shown;
-  }
-  return new Date(guess).toISOString();
 }
 
 function parseList(url) {
@@ -175,17 +148,17 @@ export function eventDto(request, raw, list) {
     createdBy: actor(raw.createdBy), updatedBy: actor(raw.updatedBy), version: raw.version,
     createdAt: raw.createdAt, updatedAt: raw.updatedAt,
   };
-  if (raw.when?.kind === 'date' || raw.isAllDay === true) return {
+  if (raw.when?.kind === 'date') return {
     ...common, isAllDay: true,
-    startDate: raw.when?.kind === 'date' ? raw.when.start : raw.startDate,
-    endDateExclusive: raw.when?.kind === 'date' ? raw.when.endExclusive : raw.endDateExclusive,
+    startDate: raw.when.start,
+    endDateExclusive: raw.when.endExclusive,
   };
-  if (raw.when?.kind === 'instant' || raw.isAllDay === false) return {
+  if (raw.when?.kind === 'instant') return {
     ...common, isAllDay: false,
-    startAt: raw.when?.kind === 'instant' ? raw.when.start : raw.startAt,
-    endAt: raw.when?.kind === 'instant' ? raw.when.endExclusive : raw.endAt,
-    startTimezone: raw.when?.kind === 'instant' ? null : raw.startTimezone ?? null,
-    endTimezone: raw.when?.kind === 'instant' ? null : raw.endTimezone ?? null,
+    startAt: raw.when.start,
+    endAt: raw.when.endExclusive,
+    startTimezone: null,
+    endTimezone: null,
   };
   throw new Error('invalid temporal representation');
 }
@@ -200,20 +173,20 @@ function temporalRange(input) {
   return null;
 }
 
-function legacyTemporal(input) {
-  return input.isAllDay
-    ? { isAllDay: true, startDate: input.startDate, endDateExclusive: input.endDateExclusive, startAt: null, endAt: null, startTimezone: null, endTimezone: null }
-    : { isAllDay: false, startAt: input.startAt, endAt: input.endAt, startTimezone: input.startTimezone ?? null, endTimezone: input.endTimezone ?? null, startDate: null, endDateExclusive: null };
-}
-
 function stableTemporal(raw) {
-  if (raw.when?.kind === 'date') return { isAllDay: true, startDate: raw.when.start, endDateExclusive: raw.when.endExclusive };
-  if (raw.when?.kind === 'instant') return { isAllDay: false, startAt: raw.when.start, endAt: raw.when.endExclusive, startTimezone: null, endTimezone: null };
-  return Object.fromEntries(TIME_FIELDS.map(key => [key, raw[key]]));
-}
-
-function temporalMode(env) {
-  return env.LIFESPACE_EVENT_CONTRACT === 'temporal_range';
+  if (raw.when?.kind === 'date') {
+    return { isAllDay: true, startDate: raw.when.start, endDateExclusive: raw.when.endExclusive };
+  }
+  if (raw.when?.kind === 'instant') {
+    return {
+      isAllDay: false,
+      startAt: raw.when.start,
+      endAt: raw.when.endExclusive,
+      startTimezone: null,
+      endTimezone: null,
+    };
+  }
+  return null;
 }
 
 async function listEvents(request, env, route, url) {
@@ -227,30 +200,19 @@ async function listEvents(request, env, route, url) {
     if (!resolved.ok) return resolved.response;
     attendeePersonId = resolved.data;
   }
-  let result;
-  if (temporalMode(env)) {
-    const filters = [{ field: 'when', op: 'overlaps', value: {
-      kind: 'local_date_window', startDate: params.startDate,
-      endDateExclusive: params.endDateExclusive, timezone: params.timezone,
-    } }];
-    if (attendeePersonId) filters.push({ field: 'attendeePersonIds', op: 'contains', value: attendeePersonId });
-    if (params.status) filters.push({ field: 'status', op: 'eq', value: params.status });
-    result = await callJson(request, env, `${collection(route.familyId)}/query`, { method: 'POST', data: {
-      ...(params.q ? { search: { text: params.q } } : {}),
-      filter: filters.length === 1 ? filters[0] : { and: filters },
-      sort: [{ field: 'when', direction: 'asc' }],
-      page: { limit: params.limit, ...(params.cursor ? { cursor: params.cursor } : {}) },
-      context: { viewingTimezone: params.timezone },
-    } });
-  } else {
-    result = await callJson(request, env, `${collection(route.familyId)}${queryString({
-      rangeStart: localMidnightUtc(params.startDate, params.timezone),
-      rangeEnd: localMidnightUtc(params.endDateExclusive, params.timezone),
-      dateStart: params.startDate, dateEndExclusive: params.endDateExclusive,
-      attendeePersonIds: attendeePersonId, status: params.status, q: params.q,
-      sort: 'calendarStart:asc', cursor: params.cursor, limit: params.limit,
-    })}`);
-  }
+  const filters = [{ field: 'when', op: 'overlaps', value: {
+    kind: 'local_date_window', startDate: params.startDate,
+    endDateExclusive: params.endDateExclusive, timezone: params.timezone,
+  } }];
+  if (attendeePersonId) filters.push({ field: 'attendeePersonIds', op: 'contains', value: attendeePersonId });
+  if (params.status) filters.push({ field: 'status', op: 'eq', value: params.status });
+  const result = await callJson(request, env, `${collection(route.familyId)}/query`, { method: 'POST', data: {
+    ...(params.q ? { search: { text: params.q } } : {}),
+    filter: filters.length === 1 ? filters[0] : { and: filters },
+    sort: [{ field: 'when', direction: 'asc' }],
+    page: { limit: params.limit, ...(params.cursor ? { cursor: params.cursor } : {}) },
+    context: { viewingTimezone: params.timezone },
+  } });
   if (!result.ok) return result.response;
   if (!Array.isArray(result.data?.items)) return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'LifeSpace returned an invalid Event page');
   try {
@@ -292,16 +254,16 @@ async function writeEvent(request, env, route, method) {
     if (method === 'PATCH') {
       const current = await callJson(request, env, recordPath(route.familyId, route.recordId));
       if (!current.ok) return current.response;
-      complete = { ...stableTemporal(current.data), ...data };
+      const currentTemporal = stableTemporal(current.data);
+      if (!currentTemporal) {
+        return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'LifeSpace returned an invalid Event temporal range');
+      }
+      complete = { ...currentTemporal, ...data };
     }
     const when = temporalRange(complete);
     if (!when) return errorResponse(422, 'VALIDATION_ERROR', 'Event time range is invalid');
-    if (temporalMode(env)) {
-      for (const key of TIME_FIELDS) delete data[key];
-      data.when = when;
-    } else {
-      Object.assign(data, legacyTemporal(complete));
-    }
+    for (const key of TIME_FIELDS) delete data[key];
+    data.when = when;
   }
   const path = method === 'POST' ? collection(route.familyId) : recordPath(route.familyId, route.recordId);
   const result = await callJson(request, env, path, { method, data });

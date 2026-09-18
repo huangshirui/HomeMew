@@ -21,6 +21,7 @@ test('HomeMew Web has one explicit production release path and no active staging
   assert.equal(production.name, 'homemew-web-production');
   assert.equal(production.workers_dev, false);
   assert.equal(production.vars?.ENVIRONMENT, 'production');
+  assert.equal(Object.hasOwn(production.vars ?? {}, 'LIFESPACE_EVENT_CONTRACT'), false);
   assert.equal(production.services?.find(item => item.binding === 'LIFESPACE_CORE')?.service, 'lifespace-core');
   assert.equal(production.services?.find(item => item.binding === 'LIFESPACE_IDENTITY')?.service, 'lifespace-identity');
 

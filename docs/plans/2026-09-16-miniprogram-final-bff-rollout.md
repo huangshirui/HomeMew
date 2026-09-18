@@ -3,7 +3,7 @@
 Status: Active / Living Plan  
 Started: 2026-09-16  
 Tracking issue: HomeMew #79  
-Current phase: Phase 3 — WeChat review preparation; not submitted
+Current phase: Phase 5 — Remove obsolete Event upstream compatibility
 Related platform work: LifeSpace #234  
 Accepted architecture decisions:
 - `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md`
@@ -198,30 +198,30 @@ The Mini-facing DTO may be simpler than Canonical Query, but BFF lowering must p
 
 ## 5. Current state / 当前状态
 
-Last verified: 2026-09-17
+Last verified: 2026-09-18
 
 | Area | State | Evidence / Note |
 | --- | --- | --- |
 | LifeSpace Canonical Query semantics | ✅ Platform foundation complete | `docs/canonical-query.md`; Query composition/filter/sort/cursor implemented |
 | LifeSpace TemporalRange CRUD/filter/sort | ✅ Complete | LifeSpace #247/#248/#249; summarized in #234 |
-| LifeSpace Event resource/storage migration | ⏸ Gated | #234 open; current Event still Calendar split truth |
+| LifeSpace Event resource/storage migration | ✅ Production complete | Event v6 / schema 41 / canonical `when: temporal_range` is the production baseline; Phase 4 complete |
 | Final HomeMew BFF architecture decision | ✅ Accepted | `2026-09-16-miniprogram-final-bff-boundary.md` |
 | Durable rollout tracking | ✅ | HomeMew #79 + this plan |
-| Event-only BFF precursor | ✅ Merged | HomeMew #74 |
+| Event-only BFF precursor | ✅ Retired in Phase 5 | Historical #74 route removed by PR #102 after Mini 1.6.3 final-contract production cutover |
 | HomeMew normative documentation alignment | ✅ Phase 0 complete | root/nested AGENTS, architecture/product rules, READMEs and historical decisions aligned in PR #82 |
 | Full Mini -> LifeSpace runtime call inventory | ✅ Complete | Source-derived inventory at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md` |
 | Final cross-surface Mini BFF route/DTO map | ✅ Design baseline complete | Every observed runtime dependency has a bounded product route/DTO and current/Phase-4 adapter note |
-| BFF -> LifeSpace Service Bindings | 🟡 Foundation merged | PR #84 merged at `53a04ce`; fixed Core/Identity adapter is used by Event/profile/access-link/avatar, Family, and Task/Wish slices |
+| BFF -> LifeSpace Service Bindings | ✅ Complete | Fixed Core/Identity adapters are the active Mini upstream transport; production cutover verified |
 | Family / Member / Invitation BFF slice | ✅ Merged | PR #85 merged at `9229ee3`; fixed product routes/DTOs run against current Core/Identity; Mini callers remain unchanged |
 | Task / Wish BFF slice | ✅ Merged | PR #87 merged at `81d4b6e`; Canonical Query lowering, Person translation, CRUD/Actions and stable DTOs are in main; Mini callers remain unchanged |
 | Meow / Creation Draft scope | ✅ Offline / scope corrected | PR #89 merged at `6724fc9`; Mini page registration and create-sheet entry removed; future orchestration is HomeMew BFF-owned, not LifeSpace-backed |
 | Day / diagnostic BFF slice | ✅ Merged | PR #91 merged at `875faeb`; Day CRUD/Actions/occurrences, subject Person mapping, Temporal computed projection, fixed Core diagnostic, and absent Creation Draft route covered; Mini callers unchanged |
 | HomeMew Web staging retirement | ✅ Complete | PR #94 merged; production workflow run `35169452659` passed deploy and smoke |
 | One-time Mini migration | ✅ Phase 2 gate complete | PR #97 merged; Mini 27 tests/typecheck/build and Web 103 tests/typecheck/build passed locally; both PR checks passed. User reported manual testing complete on 2026-09-17 and found no Mini requests to LifeSpace; individual device/test logs were not supplied. |
-| Phase 3 Mini diagnostics correction | 🟡 Local verification complete; device check pending | The old Network RTT display was always empty after Phase 2 because Core samples no longer carry WeChat `profile.rtt`. Local 1.6.3 work replaces it with measured Mini-to-HomeMew diagnostic total elapsed time and labels BFF-to-Core samples accurately. Mini 27 tests, typecheck and build passed locally; WeChat Developer Tools/real-device display remains to be checked. |
-| WeChat review | ⬜ Not submitted | Phase 3; Mini-facing contract is frozen for review preparation |
-| Event new-contract cutover | ⏸ Gated | HomeMew #77 is Draft/Phase 4 only |
-| Compatibility cleanup | ⬜ Not started | Phase 5 |
+| Phase 3 Mini diagnostics correction | ✅ Complete | Mini 1.6.3 was verified on real device, submitted, approved, and became production-active |
+| WeChat review | ✅ Complete | Mini 1.6.3 approved and production-active; Mini-facing contract remains frozen |
+| Event new-contract cutover | ✅ Phase 4 complete | LifeSpace Event v6 + HomeMew BFF/Web production cutover verified; stale PR #77 is reference only |
+| Compatibility cleanup | 🟡 In progress | Branch `phase5/event-compat-cleanup-2026-09-18`; remove old Event upstream path only, Mini contract unchanged |
 
 ## 6. Phase 0 — Documentation and architecture alignment / 文档先收口
 
@@ -517,6 +517,18 @@ Retain tests for the stable Mini-facing contract.
 
 **No Mini Program code change belongs to Phase 5.**
 
+### Phase-5 execution checklist
+
+- [x] verify production Mini 1.6.3 uses only the final `/families/{familyId}/events` contract;
+- [x] remove the obsolete Phase-1 `/spaces/{spaceId}/events` precursor handler and compatibility-only tests;
+- [x] remove `LIFESPACE_EVENT_CONTRACT` old/new selector from production configuration;
+- [x] remove legacy Calendar GET range lowering, split-time write mapping, and split-resource read fallback from the final Event BFF;
+- [x] retain the stable Mini Event DTO and deterministic TemporalRange projection;
+- [x] add regressions that the retired precursor fails closed and split upstream Event resources are rejected;
+- [ ] pass full Web/BFF tests, typecheck and build in CI;
+- [ ] deploy the merged cleanup to HomeMew Web production and pass production smoke;
+- [ ] update HomeMew #79 and this plan with final evidence, then close Phase 5.
+
 Final state:
 
 ```text
@@ -546,7 +558,7 @@ Do not:
 
 ## 13. Current blockers / 当前阻塞
 
-Phase 2 is complete based on merged PR #97, passing local/CI checks, and the user's 2026-09-17 report that manual testing was finished with no Mini requests to LifeSpace. This is user-reported manual evidence; device/version details and per-scenario logs were not supplied. Phase 3 has not been submitted for WeChat review. The earlier instruction not to submit review remains in force until the user directs that step; LifeSpace #234 and PR #77 remain gated until the reviewed Mini version is approved and production-active.
+Phases 0–4 are complete. Mini 1.6.3 is production-active, LifeSpace Event v6 / schema 41 is the production baseline, and the HomeMew BFF/Web TemporalRange cutover has been verified. Phase 5 has no architecture or release blocker; only compatibility cleanup, CI, production deploy/smoke, and durable closeout evidence remain.
 
 Historical Phase-0/1 evidence follows.
 
@@ -558,15 +570,15 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Verify the local 1.6.3 About-page diagnostic correction in WeChat Developer Tools and on a real device, then prepare Phase 3 review; do not submit until the user directs submission.**
+**Complete and verify Phase 5 from branch `phase5/event-compat-cleanup-2026-09-18`; do not change Mini code or its stable route/DTO contract.**
 
-1. Keep the Mini-facing route/DTO/query/time contract frozen, allowing only strictly backward-compatible review fixes;
-2. Confirm that the About page shows a finite Mini-to-HomeMew diagnostic total elapsed time, three Core health/status/business samples, and no direct LifeSpace request; the displayed total includes BFF processing and is not network RTT;
-3. when the user directs review submission, build from current `main`, submit through WeChat Developer Tools, and record the submitted version/build and review status in this plan and #79;
-4. after approval, verify that the reviewed Mini version is production-active before opening the LifeSpace #234 / HomeMew Phase-4 Event cutover;
-5. re-evaluate frozen PR #77 against then-current `main` and LifeSpace contracts; do not merge it as-is.
+1. finish removing Event old-upstream compatibility and associated selector/tests/docs;
+2. run the full Web/BFF test suite, Web typecheck/build, and repository checks through PR CI;
+3. merge only after the cleanup proves the final `when: temporal_range` adapter remains behaviorally identical at the Mini boundary;
+4. deploy the merged HomeMew Web cleanup to production and run normal production smoke;
+5. record merge/deploy/smoke evidence in this plan and HomeMew #79, then mark Phase 5 complete.
 
-Do not re-enable Meow, merge PR #77 directly, start LifeSpace #234's breaking migration, remove the current Event compatibility adapter, or change the frozen Mini-facing DTO/query semantics.
+Do not change Mini 1.6.3, reintroduce split Calendar Event truth, delete LifeSpace migration/history evidence, or broaden this cleanup into unrelated platform work.
 
 ## 15. Session handoff template / 每轮交接模板
 
@@ -589,6 +601,18 @@ Do not do yet:
 The **Exact next action** must be specific enough that a new conversation can continue from repository state without asking for chat history.
 
 ## 16. Session log
+
+### 2026-09-18 — Phase 5 Event compatibility cleanup started
+
+- Branch: `phase5/event-compat-cleanup-2026-09-18`, based on `main@d583c430f06aa3a9eb4bb37e377688399848baf6`.
+- Preconditions verified: Mini 1.6.3 uses only the final HomeMew Event route; Phase 4 production cutover is complete; LifeSpace Event v6 / schema 41 and `when: temporal_range` are authoritative.
+- Completed in branch: removed the Phase-1 Event precursor handler/tests; removed the Event old/new environment selector; collapsed the final Event BFF to Canonical Query + TemporalRange only; removed split Calendar resource fallback; retained the stable reviewed Mini Event DTO; added fail-closed regressions.
+- Mini code changed: no.
+- LifeSpace code changed: no.
+- New architecture/product decision: none; this executes the already accepted Phase-5 boundary, so no new Notion decision-log append is required.
+- Remaining: PR CI, merge, production deployment/smoke, and final #79/plan closeout.
+- Exact next action: open the Phase-5 PR, pass Web/Mini checks, then deploy and smoke after merge.
+
 
 ### 2026-09-17 — Phase 3 About-page latency display correction (local)
 
