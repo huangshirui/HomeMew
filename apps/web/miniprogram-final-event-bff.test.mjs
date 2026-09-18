@@ -32,18 +32,6 @@ function common(overrides = {}) {
   };
 }
 
-const legacyItems = [
-  common({
-    isAllDay: true, startDate: '2026-09-15', endDateExclusive: '2026-09-16',
-    startAt: null, endAt: null, startTimezone: null, endTimezone: null,
-  }),
-  common({
-    id: 'rec_timed', isAllDay: false, startAt: '2026-09-15T10:00:00.000Z',
-    endAt: '2026-09-15T11:00:00.000Z', startTimezone: null, endTimezone: null,
-    startDate: null, endDateExclusive: null,
-  }),
-];
-
 const temporalItems = [
   common({ when: { kind: 'date', start: '2026-09-15', endExclusive: '2026-09-16' } }),
   common({ id: 'rec_timed', when: { kind: 'instant', start: '2026-09-15T10:00:00.000Z', endExclusive: '2026-09-15T11:00:00.000Z' } }),
@@ -60,10 +48,9 @@ test('matches only bounded final family Event routes', () => {
   assert.equal(matchMiniProgramFinalEventRoute('/api/v1/miniprogram/families/bad/events'), null);
 });
 
-async function listWith(mode, items) {
+async function list(items = temporalItems) {
   const calls = [];
   const env = {
-    ...(mode ? { LIFESPACE_EVENT_CONTRACT: mode } : {}),
     LIFESPACE_CORE: { fetch: async incoming => {
       calls.push(incoming);
       const url = new URL(incoming.url);
@@ -78,35 +65,21 @@ async function listWith(mode, items) {
   return { result, payload: await result.json(), calls };
 }
 
-test('current Calendar and future TemporalRange fixtures produce the same stable Event page', async () => {
-  const legacy = await listWith(undefined, legacyItems);
-  const temporal = await listWith('temporal_range', temporalItems);
-  assert.equal(legacy.result.status, 200);
-  assert.deepEqual(legacy.payload, temporal.payload);
-  assert.equal(legacy.payload.data.items[0].isAllDay, true);
-  assert.equal(legacy.payload.data.items[1].isAllDay, false);
-  assert.deepEqual(legacy.payload.data.items[0].attendees[0], {
+test('TemporalRange resources project to the stable Mini Event DTO', async () => {
+  const listed = await list();
+  assert.equal(listed.result.status, 200);
+  assert.equal(listed.payload.data.items[0].isAllDay, true);
+  assert.equal(listed.payload.data.items[0].startDate, '2026-09-15');
+  assert.equal(listed.payload.data.items[1].isAllDay, false);
+  assert.equal(listed.payload.data.items[1].startAt, '2026-09-15T10:00:00.000Z');
+  assert.deepEqual(listed.payload.data.items[0].attendees[0], {
     userId: 'usr_alice', displayName: 'Alice',
     avatarUrl: 'https://homemew.example.test/api/v1/miniprogram/media/users/usr_alice/avatar',
   });
 });
 
-test('legacy adapter derives DST-safe UTC bounds only for current Calendar transport', async () => {
-  const { calls } = await listWith(undefined, legacyItems);
-  const upstream = new URL(calls[1].url);
-  assert.equal(calls[1].method, 'GET');
-  assert.equal(upstream.pathname, '/api/v1/spaces/spc_family/models/event/records');
-  assert.equal(upstream.searchParams.get('rangeStart'), '2026-09-14T16:00:00.000Z');
-  assert.equal(upstream.searchParams.get('rangeEnd'), '2026-09-15T16:00:00.000Z');
-  assert.equal(upstream.searchParams.get('dateStart'), '2026-09-15');
-  assert.equal(upstream.searchParams.get('dateEndExclusive'), '2026-09-16');
-  assert.equal(upstream.searchParams.get('attendeePersonIds'), 'per_alice');
-  assert.equal(upstream.searchParams.get('sort'), 'calendarStart:asc');
-  assert.equal(upstream.searchParams.has('timezone'), false);
-});
-
-test('future adapter sends the authoritative Canonical Query local_date_window', async () => {
-  const { calls } = await listWith('temporal_range', temporalItems);
+test('list sends the authoritative Canonical Query local_date_window', async () => {
+  const { calls } = await list();
   assert.equal(new URL(calls[1].url).pathname, '/api/v1/spaces/spc_family/models/event/records/query');
   assert.equal(calls[1].method, 'POST');
   assert.deepEqual(await calls[1].json(), {
@@ -125,10 +98,9 @@ test('future adapter sends the authoritative Canonical Query local_date_window',
   });
 });
 
-test('future create maps user attendees and stable all-day fields to Person IDs and TemporalRange', async () => {
+test('create maps stable all-day fields and user attendees to TemporalRange and Person IDs', async () => {
   const calls = [];
   const env = {
-    LIFESPACE_EVENT_CONTRACT: 'temporal_range',
     LIFESPACE_CORE: { fetch: async incoming => {
       calls.push(incoming);
       if (new URL(incoming.url).pathname.endsWith('/members')) return response(members);
@@ -149,11 +121,10 @@ test('future create maps user attendees and stable all-day fields to Person IDs 
   });
 });
 
-test('future partial time update fetches and atomically rewrites the complete TemporalRange', async () => {
+test('partial time update fetches and atomically rewrites the complete TemporalRange', async () => {
   const calls = [];
   const current = temporalItems[1];
   const env = {
-    LIFESPACE_EVENT_CONTRACT: 'temporal_range',
     LIFESPACE_CORE: { fetch: async incoming => {
       calls.push(incoming);
       const path = new URL(incoming.url).pathname;
@@ -173,6 +144,17 @@ test('future partial time update fetches and atomically rewrites the complete Te
       endExclusive: '2026-09-15T12:00:00.000Z',
     },
   });
+});
+
+test('legacy split Event resources are rejected instead of silently becoming truth again', async () => {
+  const legacy = common({
+    isAllDay: true,
+    startDate: '2026-09-15',
+    endDateExclusive: '2026-09-16',
+  });
+  const result = await list([legacy]);
+  assert.equal(result.result.status, 502);
+  assert.equal(result.payload.error.code, 'INVALID_UPSTREAM_RESPONSE');
 });
 
 test('rejects client-controlled transport knobs and invalid temporal ranges', async () => {
