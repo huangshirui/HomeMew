@@ -9,7 +9,6 @@ on:
       - pnpm-workspace.yaml
       - .github/workflows/web-check.yml
       - .github/workflows/web-production-deploy.yml
-      - .github/workflows/phase4-web-staging.yml
 
 permissions:
   contents: read
