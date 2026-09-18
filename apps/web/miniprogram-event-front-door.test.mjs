@@ -15,41 +15,24 @@ function request(path, { method = 'GET', body } = {}) {
   });
 }
 
-test('Mini Program Event BFF is handled through the Core binding before the Access-protected Web app', async () => {
+test('retired Mini Program Event precursor route fails closed', async () => {
   let appCalled = false;
-  let upstreamCalled = false;
   const handler = createFrontDoorHandler({
-    app: {
-      async fetch() {
-        appCalled = true;
-        return new Response('web');
-      },
-    },
+    app: { async fetch() { appCalled = true; return new Response('web'); } },
   });
   const response = await handler.fetch(
     request('/api/v1/miniprogram/spaces/spc_family/events/rec_abc123'),
-    {
-      LIFESPACE_CORE: {
-        async fetch(incoming) {
-          upstreamCalled = true;
-          assert.equal(new URL(incoming.url).pathname, '/api/v1/spaces/spc_family/models/event/records/rec_abc123');
-          assert.equal(incoming.headers.get('authorization'), 'Bearer user-token-1234567890');
-          return new Response(JSON.stringify({ data: { id: 'rec_abc123' } }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          });
-        },
-      },
-    },
+    { LIFESPACE_CORE: { async fetch() { assert.fail('retired precursor must not reach Core'); } } },
   );
-  assert.equal(response.status, 200);
-  assert.equal(upstreamCalled, true);
+  assert.equal(response.status, 404);
+  assert.equal((await response.json()).error.code, 'BFF_ROUTE_NOT_FOUND');
   assert.equal(appCalled, false);
 });
 
 test('final Mini Program Event route is handled before the generic catch-all', async () => {
   let appCalled = false;
   const calls = [];
+  let query;
   const handler = createFrontDoorHandler({
     app: { async fetch() { appCalled = true; return new Response('web'); } },
   });
@@ -64,6 +47,8 @@ test('final Mini Program Event route is handled before the generic catch-all', a
             status: 200, headers: { 'content-type': 'application/json' },
           });
         }
+        assert.equal(incoming.method, 'POST');
+        query = await incoming.json();
         return new Response(JSON.stringify({ data: { items: [], nextCursor: null } }), {
           status: 200, headers: { 'content-type': 'application/json' },
         });
@@ -73,8 +58,23 @@ test('final Mini Program Event route is handled before the generic catch-all', a
   assert.equal(response.status, 200);
   assert.deepEqual(calls, [
     '/api/v1/spaces/spc_family/members',
-    '/api/v1/spaces/spc_family/models/event/records',
+    '/api/v1/spaces/spc_family/models/event/records/query',
   ]);
+  assert.deepEqual(query, {
+    filter: {
+      field: 'when',
+      op: 'overlaps',
+      value: {
+        kind: 'local_date_window',
+        startDate: '2026-09-15',
+        endDateExclusive: '2026-09-16',
+        timezone: 'Asia/Shanghai',
+      },
+    },
+    sort: [{ field: 'when', direction: 'asc' }],
+    page: { limit: 100 },
+    context: { viewingTimezone: 'Asia/Shanghai' },
+  });
   assert.equal(appCalled, false);
 });
 
