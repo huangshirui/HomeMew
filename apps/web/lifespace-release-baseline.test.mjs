@@ -6,7 +6,7 @@ function payload(service, environment, contractVersion, schemaVersion) {
   return { data: { status: 'ok', service, environment, contractVersion, schemaVersion } };
 }
 
-test('release baseline accepts the current staging Identity and Core contract floors', () => {
+test('release baseline accepts the Event v6 staging Identity and Core contract floors', () => {
   assert.equal(
     assertLifeSpaceStatus(
       payload('identity', 'staging', LIFESPACE_RELEASE_BASELINE.identity.contractVersion, 8),
@@ -17,18 +17,18 @@ test('release baseline accepts the current staging Identity and Core contract fl
   );
   assert.equal(
     assertLifeSpaceStatus(
-      payload('core', 'staging', LIFESPACE_RELEASE_BASELINE.core.contractVersion, '40'),
+      payload('core', 'staging', LIFESPACE_RELEASE_BASELINE.core.contractVersion, '41'),
       'core',
       'staging',
     ).schemaVersion,
-    '40',
+    '41',
   );
 });
 
-test('release baseline rejects a Core deployment that predates the HomeMew Canonical Query rollout', () => {
+test('release baseline rejects a Core deployment that predates Event v6 TemporalRange migration', () => {
   assert.throws(
     () => assertLifeSpaceStatus(
-      payload('core', 'production', LIFESPACE_RELEASE_BASELINE.core.contractVersion, 39),
+      payload('core', 'production', LIFESPACE_RELEASE_BASELINE.core.contractVersion, 40),
       'core',
       'production',
     ),
@@ -38,7 +38,7 @@ test('release baseline rejects a Core deployment that predates the HomeMew Canon
 
 test('release baseline rejects contract and environment drift', () => {
   assert.throws(
-    () => assertLifeSpaceStatus(payload('core', 'production', '0.34.0', 40), 'core', 'production'),
+    () => assertLifeSpaceStatus(payload('core', 'production', '0.34.0', 41), 'core', 'production'),
     /contract mismatch/,
   );
   assert.throws(

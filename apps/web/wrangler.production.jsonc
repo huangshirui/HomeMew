@@ -18,7 +18,8 @@
   "vars": {
     "ENVIRONMENT": "production",
     "LIFESPACE_IDENTITY_URL": "https://auth.aisr.online",
-    "LIFESPACE_CORE_URL": "https://core.aisr.online"
+    "LIFESPACE_CORE_URL": "https://core.aisr.online",
+    "LIFESPACE_EVENT_CONTRACT": "temporal_range"
   },
   "services": [
     { "binding": "HOMEMEW_BACKEND", "service": "homemew-backend-production" },

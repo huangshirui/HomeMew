@@ -16,73 +16,102 @@ Accepted decision: `docs/decisions/2026-09-17-phase4-preparation-during-wechat-r
 - Mini Program 1.6.3 WeChat submission: complete.
 - WeChat review: **in progress**.
 - Mini-facing HomeMew BFF contract: frozen for review.
-- LifeSpace Event production truth: still current split Calendar fields.
 - HomeMew PR #77: stale reference / Draft only; not an implementation branch.
-- Phase 4 non-production preparation: **allowed and now active**.
+- Phase 4 non-production preparation: **implementation complete on both LifeSpace and HomeMew branches; production cutover remains blocked**.
 - Phase 4 production cutover: blocked until the reviewed Mini version is approved and production-active.
 
-## Parallel workstreams during review
+## 2026-09-18 review-window validation update
 
-### A. LifeSpace Event migration preparation
+- LifeSpace canonical time DSL correction is merged to `main` via #255 (Core Kernel 0.36.0).
+- LifeSpace Event v6 + canonical time DSL are combined in Draft PR #257 on `phase4/event-temporal-range-staging-candidate-2026-09-18`.
+- LifeSpace staging deploy run #90 failed because it was dispatched from `main` (schema 40 expectation) while live staging was already schema 41. The deploy workflow is now hardened via #258 to reject any staging schema/contract downgrade **before** migration or Worker deployment.
+- The next LifeSpace staging deploy must select the exact #257 branch, not `main`.
+- HomeMew Web has a temporary Phase 4 release-candidate staging surface only for this review window. It is manual, branch-scoped, binds only to `homemew-backend-staging`, `lifespace-core-staging`, and `lifespace-identity-staging`, and uses `LIFESPACE_EVENT_CONTRACT=temporal_range`.
+- This temporary surface does not restore a permanent HomeMew Web staging environment and must be removed after Phase 4 validation.
 
-Prepare on a fresh branch from current LifeSpace `main`:
+## LifeSpace Phase 4 preparation — completed and staging-validated
 
-1. re-read LifeSpace `AGENTS.md`, required architecture/contracts/model-definition docs and nearest nested `AGENTS.md`;
-2. re-check `docs/canonical-query.md`, `docs/time-space-semantics.md` and LifeSpace #234;
-3. define the exact compatibility-classified Event Model Definition revision using one authoritative `when: temporal_range` field;
-4. define deterministic migration/backfill from:
-   - timed: `startAt/endAt`;
-   - all-day: `startDate/endDateExclusive`;
-5. define what happens to `isAllDay`, start/end timezone metadata and Calendar capability bindings;
-6. update generated contracts/runtime/migrations/tests together;
-7. prove rollback/cutover safety without touching production;
-8. validate in staging only if the staging change cannot leak into production.
+Branch: `phase4/event-temporal-range-prep-2026-09-17`  
+Draft PR: LifeSpace #252  
+Tracking: LifeSpace #234
 
-### B. HomeMew BFF new-contract adapter preparation
+Completed target state:
 
-Prepare on a fresh HomeMew branch from current `main`:
+- Event v6 uses required `when: temporal_range` as the single persisted time truth;
+- canonical Calendar Capability binds `rangeField: "when"`;
+- historical split Calendar bindings remain interpretable only for historical published definitions;
+- schema 41 / migration `0041_event_temporal_range.sql` deterministically backfills Event v5 to v6 and fails closed on unexpected/invalid source state;
+- Canonical Query, Model Contract, Runtime Discovery and OpenAPI all expose the canonical TemporalRange model correctly;
+- legacy compatibility tests use historical probes instead of requiring current `mdl_event` to retain split storage.
 
-1. keep `/api/v1/miniprogram/families/{familyId}/events` stable;
-2. keep Mini request/response DTOs unchanged;
-3. preserve the existing old/new adapter seam in `apps/web/miniprogram-final-event-bff.mjs`;
-4. adapt the new branch to the exact LifeSpace #234 contract once defined;
-5. add equivalence fixtures proving old split Event and new TemporalRange Event produce the same stable Mini DTO;
-6. add create/update/list/delete tests for both adapter modes;
-7. do not deploy the new upstream mode to production during review.
+Evidence:
 
-### C. HomeMew Web new-contract preparation
+- LifeSpace `Check` run #1425: success;
+- LifeSpace `Deploy staging` run #89 / run id `35223959131`: success;
+- staging applied schema 41 / Event v5 -> v6 migration;
+- staging DB convergence passed;
+- HomeMew integration readiness passed;
+- Kernel / Model Contract and proving-model regressions passed;
+- Creation Draft Queue verification passed;
+- real Eventing outbox / Queue / signed Webhook flow passed;
+- disabled-subscriber Eventing security boundary passed;
+- performance and candidate handoff evidence passed.
 
-Prepare Web changes on a non-production branch:
+LifeSpace production remains untouched. PR #252 stays Draft until the production gate opens.
 
-1. change Event resource typing from split Calendar truth to `when: TemporalRange`;
-2. change list query to Canonical Query:
-   - `when overlaps local_date_window`;
-   - explicit `sort: when ASC`;
-   - explicit `context.viewingTimezone`;
-3. create/update Event using the canonical `when` value;
-4. keep UI all-day/timed behavior unchanged;
-5. add regression coverage for date-only, instant, timezone and half-open interval semantics;
-6. do not merge/deploy a Web version that requires the new LifeSpace production contract before cutover.
+## HomeMew Phase 4 preparation — completed and CI-validated
 
-## Re-evaluation of HomeMew PR #77
+Branch: `phase4/event-temporal-range-prep-2026-09-17`  
+Draft PR: HomeMew #99  
+Tracking: HomeMew #79
 
-PR #77 should not be rebased wholesale.
+### Stable Mini BFF boundary
 
-Useful concepts that remain valid:
+The submitted Mini Program contract is unchanged.
 
-- Web Event list should use Canonical Query with `when overlaps local_date_window`;
-- TemporalRange sorting requires `context.viewingTimezone`;
-- Event writes should use one canonical `when` value after the LifeSpace cutover;
-- Mini-facing Event DTO remains legacy/product-friendly and stable behind the BFF.
+The current Event BFF already contained an internal `LIFESPACE_EVENT_CONTRACT` adapter seam. The Phase 4 branch prepares the production switch to `temporal_range` while preserving the stable Mini routes and DTOs.
 
-Parts that are stale relative to current `main`:
+The canonical internal adapter:
 
-- it modifies the old `/spaces/{spaceId}/events` precursor BFF path, while the reviewed Mini now uses final `/families/{familyId}/events` routes;
-- current `main` already has a stronger final Event adapter seam with `LIFESPACE_EVENT_CONTRACT` old/new mode support;
-- Phase 1/2 introduced Service Bindings, user-to-Person mapping, final product DTOs and broader BFF architecture that #77 predates;
-- Web and BFF tests must now target the final current architecture, not the pre-Phase-2 layout.
+- lowers stable Mini calendar-window requests to LifeSpace Canonical Query;
+- writes Event v6 `when` values;
+- maps Event v6 responses back to the existing Mini DTO;
+- preserves partial-update semantics by reading the current record and rewriting the complete TemporalRange when necessary.
 
-Therefore #77 is reference material only. Fresh Phase 4 branches should reimplement the still-correct pieces against current `main`.
+`apps/web/wrangler.production.jsonc` on the Phase 4 branch is prepared with `LIFESPACE_EVENT_CONTRACT=temporal_range`, but that configuration is **not deployed** while review is in progress.
+
+### HomeMew Web
+
+Web Calendar and the Home page Event summary now consume LifeSpace Event v6 directly:
+
+- Event typing uses `when: TemporalRange`;
+- list queries use `POST .../records/query`;
+- calendar windows use `when overlaps local_date_window`;
+- ordering is explicit `when ASC`;
+- `context.viewingTimezone` is explicit;
+- create/update write canonical `when`;
+- legacy Calendar GET range parameters are no longer used by current Web Event consumers.
+
+Web timezone rule:
+
+- LifeSpace persisted timed Event truth is the absolute `when.kind=instant` range;
+- the selected family IANA timezone is Web viewing/editor context only;
+- changing family timezone changes projection and does not rewrite Event instants;
+- nullable timezone fields exposed by the stable Mini-facing DTO remain compatibility/presentation projection and are not LifeSpace Event truth.
+
+Release guard:
+
+- HomeMew LifeSpace Core minimum schema floor is prepared as `>= 41` for this cutover.
+
+Evidence:
+
+- HomeMew PR #99 is Draft and must not merge before the production gate;
+- Web Check #124 passed after Event v6 consumer migration and TypeScript fixes;
+- latest Web Check #125 on head `c57a7835f2ce0c52ddfe208e424d10da67b0f211` also passed;
+- Web tests: 103/103 passed;
+- Web TypeScript check: passed;
+- Web build: passed;
+- `docs/web-calendar.md` and `docs/product-rules.md` are aligned with Event v6 / TemporalRange semantics.
 
 ## Production gate
 
@@ -90,19 +119,21 @@ Do not activate production cutover until all are true:
 
 - [ ] Mini Program 1.6.3 review approved;
 - [ ] approved version is production-active;
-- [ ] LifeSpace Event migration/backfill tests pass;
-- [ ] HomeMew BFF old/new equivalence tests pass;
-- [ ] HomeMew Web new-contract tests/build pass;
+- [x] LifeSpace Event migration/backfill tests pass;
+- [x] LifeSpace Event v6 staging deployment and migration verification pass;
+- [x] HomeMew BFF old/new equivalence tests pass;
+- [x] HomeMew Web new-contract tests/typecheck/build pass;
 - [ ] rolling cutover and rollback runbook is reviewed;
 - [ ] production deploy order is explicit and reversible.
 
 ## Exact next actions
 
-Work in parallel while review is in progress:
+While WeChat review remains in progress:
 
-1. LifeSpace: create a fresh Phase 4 preparation branch and turn #234 into an executable migration implementation, starting with the exact Event Model Definition + storage/backfill compatibility plan.
-2. HomeMew: create a fresh Phase 4 preparation branch from current `main`; do not build on #77.
-3. Once the LifeSpace target Event contract is explicit, implement the HomeMew BFF new adapter and Web consumer against that target on their preparation branches.
-4. Keep all runtime changes non-production until the production gate above opens.
+1. Keep LifeSpace #252 and HomeMew #99 Draft; do not merge/deploy production.
+2. Prepare and review the coordinated production cutover/rollback runbook. It must explicitly sequence LifeSpace schema 41/Event v6 and HomeMew BFF/Web activation without exposing a window where production HomeMew requires a contract production LifeSpace does not yet provide.
+3. Define verification gates for production data count/integrity, Event CRUD/query, stable Mini DTO behavior, Web Calendar/Home behavior, Eventing and rollback decision points.
+4. Continue monitoring WeChat review status externally; the production gate opens only after Mini 1.6.3 is approved and production-active.
+5. Once the gate opens, rebase/recheck both Draft PRs against current `main`, rerun CI, execute the reviewed cutover runbook, then begin Phase 5 only after the new production path is verified stable.
 
-At the end of each preparation session, update HomeMew #79 and LifeSpace #234 with branch/PR/test evidence and the exact next action.
+At the end of each preparation/cutover session, update HomeMew #79 and LifeSpace #234 with branch/PR/test evidence and the exact next action.

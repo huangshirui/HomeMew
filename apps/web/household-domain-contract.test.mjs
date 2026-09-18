@@ -20,7 +20,10 @@ test('household pages keep their canonical LifeSpace modelKey and Action routes'
   const canonicalQuery = source('./src/lib/canonical-query.ts');
 
   requireAll(calendar, [
-    /\/models\/event\/records\?\$\{params\}/u,
+    /queryModelRecords<EventRecord>\(currentFamily\.id, 'event'/u,
+    /field: 'when'/u,
+    /op: 'overlaps'/u,
+    /kind: 'local_date_window'/u,
     /\/models\/event\/records`/u,
     /\/models\/event\/records\/\$\{encodeURIComponent\(editing\.id\)\}/u,
     /method: 'POST'/u,
@@ -57,7 +60,9 @@ test('household pages keep their canonical LifeSpace modelKey and Action routes'
   ], 'Canonical Query transport');
 
   requireAll(home, [
-    /\/models\/event\/records\?\$\{eventParams\}/u,
+    /queryModelRecords<EventRecord>\(currentFamily\.id, 'event'/u,
+    /field: 'when'/u,
+    /kind: 'local_date_window'/u,
     /\/models\/task\/records\?\$\{taskParams\}/u,
     /\/models\/day_record\/records\?\$\{dayParams\}/u,
     /\/models\/task\/records\/\$\{encodeURIComponent\(task\.id\)\}\/actions\/complete/u,

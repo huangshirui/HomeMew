@@ -50,14 +50,18 @@ Rules:
 
 ## 5. Events
 
-### 5.1 Core fields
+### 5.1 LifeSpace truth and HomeMew projections
 
-Every event has common identity, family, content, attendee, status, audit, and
-version fields. Its time fields are one of two mutually exclusive shapes:
+Every Event has common identity, family/Space, content, attendee, status, audit, and version fields. The current LifeSpace Event resource has one authoritative time field: required `when: temporal_range`.
 
-- Timed: `isAllDay=false`, `startAt`, `endAt`, optional nullable
-  `startTimezone`, and optional nullable `endTimezone`.
-- All-day: `isAllDay=true`, `startDate`, and `endDateExclusive`.
+`when` has exactly two product-relevant variants:
+
+- Timed: `{ kind: "instant", start, endExclusive }`.
+- All-day: `{ kind: "date", start, endExclusive }`.
+
+The old LifeSpace split Calendar fields (`isAllDay`, `startAt`, `endAt`, endpoint timezone fields, `startDate`, `endDateExclusive`) are historical platform transport and are not current Event truth.
+
+The reviewed Mini Program intentionally keeps a stable HomeMew-owned Event DTO that may expose `isAllDay`, timed `startAt/endAt`, all-day `startDate/endDateExclusive`, and nullable timezone presentation fields. The Mini BFF deterministically maps that application DTO to/from LifeSpace `when`; those DTO fields do not recreate a second Event model or become LifeSpace authority.
 
 ### 5.2 Access and editing
 
@@ -69,39 +73,41 @@ version fields. Its time fields are one of two mutually exclusive shapes:
 
 ### 5.3 Timed events
 
-- `startAt` and `endAt` are RFC 3339 UTC strings ending in `Z`; Core stores and returns canonical millisecond-precision UTC.
-- `endAt` must be later than `startAt`.
-- `startTimezone` and `endTimezone` are independently nullable IANA display metadata and never participate in calculations.
-- On create, an omitted endpoint timezone defaults to the family timezone while an explicit `null` remains `null`.
-- On update, an omitted endpoint timezone is unchanged while an explicit `null` clears it.
-- Changing the family timezone does not rewrite existing event display metadata.
+- `when.kind=instant` stores absolute RFC 3339 instants in `start` and `endExclusive`.
+- `endExclusive` must be later than `start`.
+- Event timezone is not persisted as part of the LifeSpace TemporalRange truth.
+- HomeMew Web uses the selected family's IANA timezone as viewing/editor context when projecting instants into local date/time controls and converting edited local values back to instants.
+- Changing the family timezone changes projection only; it does not rewrite stored Event instants.
+- Mini-facing nullable start/end timezone fields are compatibility/presentation data only. They must not be treated as authoritative platform time semantics.
 
 ### 5.4 All-day events
 
-- `startDate` and `endDateExclusive` are date-only strings in `YYYY-MM-DD` format.
-- The range is half-open: `[startDate, endDateExclusive)`.
-- A one-day event on July 25 uses `startDate=2026-07-25` and `endDateExclusive=2026-07-26`.
-- `endDateExclusive` must be later than `startDate`.
-- Time-point and timezone fields are forbidden and all-day dates are never converted to UTC.
-- Clients may show inclusive end dates in forms, but must convert to the exclusive Core representation.
+- `when.kind=date` stores date-only `start` and `endExclusive` in `YYYY-MM-DD` format.
+- The range is half-open: `[start, endExclusive)`.
+- A one-day event on July 25 uses `start=2026-07-25` and `endExclusive=2026-07-26`.
+- `endExclusive` must be later than `start`.
+- All-day dates are never converted to UTC instants.
+- Clients may show an inclusive end date in forms, but must convert it to the exclusive LifeSpace TemporalRange end on submission.
 
 ### 5.5 Updates and deletion
 
 - Updates require the version read by the client.
-- Core increments `version` on every successful write.
+- LifeSpace increments `version` on every successful write.
 - A stale update or delete is rejected with a conflict error.
 - Deletion is soft deletion.
 - If event cancellation is implemented, cancellation is distinct from deletion: a cancelled event remains visible with cancelled status.
 
 ### 5.6 Event list queries
 
-- Every query supplies `startDate` and `endDateExclusive`; there is no implicit default range.
-- An optional IANA `timezone` determines the viewing-day UTC bounds for timed events and defaults to the family timezone.
-- Timed and all-day overlap checks both use half-open query ranges.
+- Current Web and platform-aware consumers use LifeSpace Canonical Query, not legacy Calendar GET range parameters.
+- A calendar window filters `when` with `overlaps` and a `local_date_window` value carrying `startDate`, `endDateExclusive`, and IANA `timezone`.
+- `context.viewingTimezone` carries the viewing timezone when TemporalRange ordering/projection requires it.
+- Timed and all-day overlap checks both use half-open interval semantics.
 - Return events that overlap the requested range, not only events whose start falls inside it.
-- Deleted events are excluded by default.
-- Default ordering is ascending by start.
+- Deleted events are excluded by default; HomeMew calendar views normally filter `status=active`.
+- Calendar ordering is ascending by `when` for the selected viewing timezone.
 - The first version may filter by attendee and status.
+- Mini callers continue using the stable HomeMew query DTO; the BFF lowers it to the active LifeSpace Canonical Query without exposing Canonical Query structure to the Mini Program.
 
 ### 5.7 Out of first scope
 
