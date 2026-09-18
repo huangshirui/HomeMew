@@ -207,7 +207,7 @@ Last verified: 2026-09-18
 | LifeSpace Event resource/storage migration | ✅ Production complete | Event v6 / schema 41 / canonical `when: temporal_range` is the production baseline; Phase 4 complete |
 | Final HomeMew BFF architecture decision | ✅ Accepted | `2026-09-16-miniprogram-final-bff-boundary.md` |
 | Durable rollout tracking | ✅ | HomeMew #79 + this plan |
-| Event-only BFF precursor | ✅ Merged | HomeMew #74 |
+| Event-only BFF precursor | ✅ Retired in Phase 5 | Historical #74 route removed by PR #102 after Mini 1.6.3 final-contract production cutover |
 | HomeMew normative documentation alignment | ✅ Phase 0 complete | root/nested AGENTS, architecture/product rules, READMEs and historical decisions aligned in PR #82 |
 | Full Mini -> LifeSpace runtime call inventory | ✅ Complete | Source-derived inventory at `docs/plans/2026-09-16-miniprogram-runtime-call-inventory.md` |
 | Final cross-surface Mini BFF route/DTO map | ✅ Design baseline complete | Every observed runtime dependency has a bounded product route/DTO and current/Phase-4 adapter note |
