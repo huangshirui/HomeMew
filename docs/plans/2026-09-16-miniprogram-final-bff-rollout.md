@@ -570,9 +570,9 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Deploy and verify the merged Phase 5 cleanup from current `main@9e74513`; do not change Mini code or its stable route/DTO contract.**
+**Deploy and verify the merged Phase 5 cleanup from current `main` (which contains PR #102); do not change Mini code or its stable route/DTO contract.**
 
-1. dispatch the existing `Deploy HomeMew Web production` workflow from current `main@9e74513` using the normal production confirmation gate;
+1. dispatch the existing `Deploy HomeMew Web production` workflow from current `main` using the normal production confirmation gate;
 2. verify the workflow's LifeSpace release baseline, Web/BFF checks, Worker deployment, Access front-door smoke, and Mini provider-route smoke;
 3. run the normal Event/Mini/Web post-deploy smoke against production without changing Mini 1.6.3;
 4. record deployment/smoke evidence in this plan and HomeMew #79;
@@ -612,7 +612,7 @@ The **Exact next action** must be specific enough that a new conversation can co
 - New architecture/product decision: none; this executes the already accepted Phase-5 boundary, so no new Notion decision-log append is required.
 - Evidence: PR #102 merged as `9e74513de718172902e7379c506099a22bfa1022`; Web check #140 and Mini Program Check #162 passed on the final PR head.
 - Remaining: production deployment/smoke and final #79/plan closeout.
-- Exact next action: dispatch `Deploy HomeMew Web production` from current `main@9e74513`, run production smoke, then mark Phase 5 complete.
+- Exact next action: dispatch `Deploy HomeMew Web production` from current `main` containing PR #102, run production smoke, then mark Phase 5 complete.
 
 
 ### 2026-09-17 — Phase 3 About-page latency display correction (local)
