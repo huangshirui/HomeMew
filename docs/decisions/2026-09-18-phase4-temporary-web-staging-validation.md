@@ -4,7 +4,7 @@ Date: 2026-09-18
 
 ## Status
 
-Accepted for the Mini 1.6.3 review window only.
+Completed and retired after the successful Phase 4 production cutover on 2026-09-18.
 
 ## Context
 
@@ -30,11 +30,11 @@ This is a **temporary release-candidate validation surface**, not restoration of
 
 ## Exit
 
-After Phase 4 production cutover is complete and stable:
+Phase 4 production cutover completed successfully on 2026-09-18:
 
-1. delete the temporary Phase 4 Web staging workflow/configuration;
-2. retire or remove the temporary Web staging Worker/domain when no longer needed;
-3. retain only the test/evidence in the rollout record.
+1. repository launchers/configuration/tests for the temporary Web staging surface were removed after successful Mini 1.6.3 and Web production smoke verification;
+2. the Cloudflare `homemew-web-staging` Worker/domain is no longer part of the active deployment model and may be physically removed once no rollback investigation needs it;
+3. this decision page remains only as historical release evidence.
 
 ## Production gate
 
