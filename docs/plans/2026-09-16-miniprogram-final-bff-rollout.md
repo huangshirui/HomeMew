@@ -221,7 +221,7 @@ Last verified: 2026-09-18
 | Phase 3 Mini diagnostics correction | ✅ Complete | Mini 1.6.3 was verified on real device, submitted, approved, and became production-active |
 | WeChat review | ✅ Complete | Mini 1.6.3 approved and production-active; Mini-facing contract remains frozen |
 | Event new-contract cutover | ✅ Phase 4 complete | LifeSpace Event v6 + HomeMew BFF/Web production cutover verified; stale PR #77 is reference only |
-| Compatibility cleanup | 🟡 In progress | Branch `phase5/event-compat-cleanup-2026-09-18`; remove old Event upstream path only, Mini contract unchanged |
+| Compatibility cleanup | 🟡 Code merged; production gate pending | PR #102 merged as `9e74513`; Web check #140 and Mini Program Check #162 passed; Mini contract unchanged |
 
 ## 6. Phase 0 — Documentation and architecture alignment / 文档先收口
 
@@ -525,7 +525,7 @@ Retain tests for the stable Mini-facing contract.
 - [x] remove legacy Calendar GET range lowering, split-time write mapping, and split-resource read fallback from the final Event BFF;
 - [x] retain the stable Mini Event DTO and deterministic TemporalRange projection;
 - [x] add regressions that the retired precursor fails closed and split upstream Event resources are rejected;
-- [ ] pass full Web/BFF tests, typecheck and build in CI;
+- [x] pass full Web/BFF tests, typecheck and build in CI (Web check #140; Mini Program Check #162);
 - [ ] deploy the merged cleanup to HomeMew Web production and pass production smoke;
 - [ ] update HomeMew #79 and this plan with final evidence, then close Phase 5.
 
@@ -570,13 +570,13 @@ The HomeMew Web staging workflow, deployment command/script and staging Worker e
 
 ## 14. Exact next action / 下一步动作
 
-**Complete and verify Phase 5 from branch `phase5/event-compat-cleanup-2026-09-18`; do not change Mini code or its stable route/DTO contract.**
+**Deploy and verify the merged Phase 5 cleanup from current `main@9e74513`; do not change Mini code or its stable route/DTO contract.**
 
-1. finish removing Event old-upstream compatibility and associated selector/tests/docs;
-2. run the full Web/BFF test suite, Web typecheck/build, and repository checks through PR CI;
-3. merge only after the cleanup proves the final `when: temporal_range` adapter remains behaviorally identical at the Mini boundary;
-4. deploy the merged HomeMew Web cleanup to production and run normal production smoke;
-5. record merge/deploy/smoke evidence in this plan and HomeMew #79, then mark Phase 5 complete.
+1. dispatch the existing `Deploy HomeMew Web production` workflow from current `main@9e74513` using the normal production confirmation gate;
+2. verify the workflow's LifeSpace release baseline, Web/BFF checks, Worker deployment, Access front-door smoke, and Mini provider-route smoke;
+3. run the normal Event/Mini/Web post-deploy smoke against production without changing Mini 1.6.3;
+4. record deployment/smoke evidence in this plan and HomeMew #79;
+5. mark Phase 5 and HomeMew #79 complete only after production evidence is green.
 
 Do not change Mini 1.6.3, reintroduce split Calendar Event truth, delete LifeSpace migration/history evidence, or broaden this cleanup into unrelated platform work.
 
@@ -610,8 +610,9 @@ The **Exact next action** must be specific enough that a new conversation can co
 - Mini code changed: no.
 - LifeSpace code changed: no.
 - New architecture/product decision: none; this executes the already accepted Phase-5 boundary, so no new Notion decision-log append is required.
-- Remaining: PR CI, merge, production deployment/smoke, and final #79/plan closeout.
-- Exact next action: open the Phase-5 PR, pass Web/Mini checks, then deploy and smoke after merge.
+- Evidence: PR #102 merged as `9e74513de718172902e7379c506099a22bfa1022`; Web check #140 and Mini Program Check #162 passed on the final PR head.
+- Remaining: production deployment/smoke and final #79/plan closeout.
+- Exact next action: dispatch `Deploy HomeMew Web production` from current `main@9e74513`, run production smoke, then mark Phase 5 complete.
 
 
 ### 2026-09-17 — Phase 3 About-page latency display correction (local)
