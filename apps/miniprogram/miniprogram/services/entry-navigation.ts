@@ -68,10 +68,21 @@ function targetUrl(target: EntryTarget): string {
   return `/${target.path}${query ? `?${query}` : ''}`;
 }
 
+function isIncompleteProfileDisplayName(displayName: string | null | undefined): boolean {
+  const name = String(displayName || '').trim();
+  if (!name) return true;
+
+  // HomeMew Backend creates a first-seen LifeSpace user with a temporary
+  // "微信用户xxxxxx" display name before the user completes Mini onboarding.
+  // Detect it so an interrupted first launch resumes onboarding on the next
+  // process instead of mistaking the placeholder for a completed profile.
+  return /^微信用户.{6}$/u.test(name);
+}
+
 function needsProfileSetup(): boolean {
   const user = userStore.value;
   if (!user) return false;
-  return isNewUserOnboardingPending() || !user.displayName?.trim();
+  return isNewUserOnboardingPending() || isIncompleteProfileDisplayName(user.displayName);
 }
 
 function reLaunchProfileSetup(): void {
