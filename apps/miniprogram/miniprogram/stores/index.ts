@@ -57,21 +57,34 @@ class Store<T> {
 // ==================== 用户状态 ====================
 
 export const userStore = new Store<UserProfile | null>(null);
+let userLoadInFlight: Promise<UserProfile> | null = null;
 
 /**
  * 从远程加载当前用户并更新 store。
+ * 并发调用共享同一个请求，避免 App 启动协调与入口页面同时重复拉取 profile。
  * 失败时抛出原始错误（不吞掉网络 / 401 / 403 / 500）。
  */
 export async function loadCurrentUser(): Promise<UserProfile> {
-  const { getCurrentUser } = require('../services/users');
-  const user = await getCurrentUser();
-  userStore.value = user;
-  // 同步到 globalData
-  const app = getApp<IAppOption>();
-  if (app) {
-    app.globalData.userInfo = user;
+  if (userLoadInFlight) return userLoadInFlight;
+
+  const request = (async () => {
+    const { getCurrentUser } = require('../services/users');
+    const user = await getCurrentUser();
+    userStore.value = user;
+    // 同步到 globalData
+    const app = getApp<IAppOption>();
+    if (app) {
+      app.globalData.userInfo = user;
+    }
+    return user;
+  })();
+
+  userLoadInFlight = request;
+  try {
+    return await request;
+  } finally {
+    if (userLoadInFlight === request) userLoadInFlight = null;
   }
-  return user;
 }
 
 // ==================== 家庭状态 ====================
@@ -215,6 +228,7 @@ export function clearUserState(): void {
   userStore.value = null;
   familiesStore.value = [];
   currentFamilyStore.value = null;
+  userLoadInFlight = null;
   familiesLoadedAt = 0;
 
   const app = getApp<IAppOption>();
