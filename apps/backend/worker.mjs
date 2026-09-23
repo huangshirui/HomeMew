@@ -13,6 +13,8 @@ const ACTIVITY_CHANNEL_FIELDS = {
 const FIRST_PARTY_ACTIVITY_CHANNELS = new Set(['miniprogram', 'web']);
 const MAX_ACTIVITY_QUERY_USERS = 50;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
+const MAX_FAMILY_CATALOG_BATCH = 200;
+const FAMILY_SPACE_ID = /^spc_[A-Za-z0-9_-]+$/u;
 
 class HttpError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -42,6 +44,39 @@ function isLoginReady(env) {
 function isActivityReady(env) {
   return Boolean(env.MEMBER_ACTIVITIES && typeof env.MEMBER_ACTIVITIES.getByName === 'function');
 }
+function isFamilyCatalogReady(env) {
+  return Boolean(env.FAMILY_CATALOG && typeof env.FAMILY_CATALOG.getByName === 'function');
+}
+
+function familyCatalogStub(env) {
+  if (!isFamilyCatalogReady(env)) {
+    throw new HttpError(503, 'FAMILY_CATALOG_NOT_CONFIGURED', 'Family catalog is not configured');
+  }
+  return env.FAMILY_CATALOG.getByName('catalog:v1');
+}
+
+function validateFamilySpaceId(value) {
+  const spaceId = typeof value === 'string' ? value.trim() : '';
+  if (!FAMILY_SPACE_ID.test(spaceId)) {
+    throw new HttpError(422, 'INVALID_FAMILY_SPACE_ID', 'spaceId must be a LifeSpace spc_* ID');
+  }
+  return spaceId;
+}
+
+function validateFamilySpaceIds(value) {
+  if (!Array.isArray(value) || value.length > MAX_FAMILY_CATALOG_BATCH) {
+    throw new HttpError(422, 'INVALID_FAMILY_SPACE_IDS', `spaceIds must contain at most ${MAX_FAMILY_CATALOG_BATCH} entries`);
+  }
+  return [...new Set(value.map(validateFamilySpaceId))];
+}
+
+function requireInternalFamilyCatalogRequest(request) {
+  const url = new URL(request.url);
+  if (url.hostname !== 'homemew-backend.internal') {
+    throw new HttpError(404, 'NOT_FOUND', 'Not found');
+  }
+}
+
 function isExternalActivityReady(env) {
   return isActivityReady(env)
     && typeof env.ACTIVITY_API_SECRET === 'string'
@@ -166,6 +201,44 @@ export class WechatIdentity extends DurableObject {
       createdAt: now,
     });
     return { userId, isNewUser: true };
+  }
+}
+
+export class FamilyCatalog extends DurableObject {
+  async register(spaceId, source = 'runtime') {
+    if (!FAMILY_SPACE_ID.test(spaceId)) throw new Error('Invalid family Space ID');
+    const key = `family:${spaceId}`;
+    const existing = await this.ctx.storage.get(key);
+    if (!existing) {
+      await this.ctx.storage.put(key, {
+        spaceId,
+        source,
+        registeredAt: new Date().toISOString(),
+      });
+    }
+    return existing ?? await this.ctx.storage.get(key);
+  }
+
+  async registerMany(spaceIds, source = 'migration') {
+    const unique = [...new Set(spaceIds)];
+    if (unique.length > MAX_FAMILY_CATALOG_BATCH) throw new Error('Family catalog batch is too large');
+    for (const spaceId of unique) await this.register(spaceId, source);
+    return { registered: unique.length };
+  }
+
+  async filter(spaceIds) {
+    const unique = [...new Set(spaceIds)];
+    if (unique.length > MAX_FAMILY_CATALOG_BATCH) throw new Error('Family catalog batch is too large');
+    const result = [];
+    for (const spaceId of unique) {
+      if (await this.ctx.storage.get(`family:${spaceId}`)) result.push(spaceId);
+    }
+    return result;
+  }
+
+  async status() {
+    const entries = await this.ctx.storage.list({ prefix: 'family:' });
+    return { count: entries.size };
   }
 }
 
@@ -365,6 +438,51 @@ async function queryActivity(request, env, url) {
   return json({ data: { activities } });
 }
 
+async function registerFamilyCatalog(request, env) {
+  requireInternalFamilyCatalogRequest(request);
+  const input = await readJson(request);
+  if (Object.keys(input).some(key => !['spaceId', 'source'].includes(key))) {
+    throw new HttpError(400, 'INVALID_REQUEST', 'Request contains unsupported fields');
+  }
+  const spaceId = validateFamilySpaceId(input.spaceId);
+  const source = typeof input.source === 'string' && input.source.trim() ? input.source.trim().slice(0, 80) : 'runtime';
+  const entry = await familyCatalogStub(env).register(spaceId, source);
+  return json({ data: entry });
+}
+
+async function reconcileFamilyCatalog(request, env) {
+  requireInternalFamilyCatalogRequest(request);
+  const input = await readJson(request);
+  if (Object.keys(input).some(key => !['spaceIds', 'legacyFamilySpaceIds', 'source'].includes(key))) {
+    throw new HttpError(400, 'INVALID_REQUEST', 'Request contains unsupported fields');
+  }
+  const spaceIds = validateFamilySpaceIds(input.spaceIds);
+  const legacyFamilySpaceIds = validateFamilySpaceIds(input.legacyFamilySpaceIds ?? []);
+  const allowed = new Set(spaceIds);
+  const compatibleLegacy = legacyFamilySpaceIds.filter(spaceId => allowed.has(spaceId));
+  if (compatibleLegacy.length) {
+    await familyCatalogStub(env).registerMany(compatibleLegacy, input.source === 'operator-import' ? 'operator-import' : 'legacy-kind-backfill');
+  }
+  const familySpaceIds = await familyCatalogStub(env).filter(spaceIds);
+  return json({ data: { familySpaceIds } });
+}
+
+async function importFamilyCatalog(request, env) {
+  requireInternalFamilyCatalogRequest(request);
+  const input = await readJson(request);
+  if (Object.keys(input).some(key => !['spaceIds'].includes(key))) {
+    throw new HttpError(400, 'INVALID_REQUEST', 'Request contains unsupported fields');
+  }
+  const spaceIds = validateFamilySpaceIds(input.spaceIds);
+  const result = await familyCatalogStub(env).registerMany(spaceIds, 'operator-import');
+  return json({ data: result });
+}
+
+async function familyCatalogStatus(request, env) {
+  requireInternalFamilyCatalogRequest(request);
+  return json({ data: await familyCatalogStub(env).status() });
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -377,6 +495,7 @@ export default {
           loginReady: isLoginReady(env),
           activityReady: isActivityReady(env),
           externalActivityReady: isExternalActivityReady(env),
+          familyCatalogReady: isFamilyCatalogReady(env),
           identityBootstrapConfigured: Boolean(env.WECHAT_IDENTITY_BOOTSTRAP_MAP),
         });
       }
@@ -384,6 +503,10 @@ export default {
       if (request.method === 'POST' && url.pathname === '/api/v1/activity/me') return await reportOwnActivity(request, env);
       if (request.method === 'POST' && url.pathname === '/api/v1/activity/report') return await reportExternalActivity(request, env);
       if (request.method === 'GET' && url.pathname === '/api/v1/activity') return await queryActivity(request, env, url);
+      if (request.method === 'POST' && url.pathname === '/internal/v1/family-catalog/register') return await registerFamilyCatalog(request, env);
+      if (request.method === 'POST' && url.pathname === '/internal/v1/family-catalog/reconcile') return await reconcileFamilyCatalog(request, env);
+      if (request.method === 'POST' && url.pathname === '/internal/v1/family-catalog/import') return await importFamilyCatalog(request, env);
+      if (request.method === 'GET' && url.pathname === '/internal/v1/family-catalog/status') return await familyCatalogStatus(request, env);
       return json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
     } catch (error) {
       if (error instanceof HttpError) return json({ error: { code: error.code, message: error.message } }, error.status);

@@ -19,8 +19,27 @@ function ok(data, status = 200) {
   });
 }
 
-function env(core, identity = async () => assert.fail('unexpected Identity call')) {
-  return { LIFESPACE_CORE: { fetch: core }, LIFESPACE_IDENTITY: { fetch: identity } };
+function env(core, identity = async () => assert.fail('unexpected Identity call'), initialFamilyIds = []) {
+  const familyIds = new Set(initialFamilyIds);
+  return {
+    LIFESPACE_CORE: { fetch: core },
+    LIFESPACE_IDENTITY: { fetch: identity },
+    HOMEMEW_BACKEND: {
+      async fetch(incoming) {
+        const path = new URL(incoming.url).pathname;
+        const body = incoming.method === 'POST' ? await incoming.json() : {};
+        if (path === '/internal/v1/family-catalog/register') {
+          familyIds.add(body.spaceId);
+          return ok({ spaceId: body.spaceId, source: body.source, registeredAt: '2026-09-23T00:00:00Z' });
+        }
+        if (path === '/internal/v1/family-catalog/reconcile') {
+          for (const spaceId of body.legacyFamilySpaceIds ?? []) familyIds.add(spaceId);
+          return ok({ familySpaceIds: (body.spaceIds ?? []).filter(spaceId => familyIds.has(spaceId)) });
+        }
+        return assert.fail(`unexpected backend path ${path}`);
+      },
+    },
+  };
 }
 
 test('matches only bounded family/member/invitation routes', () => {
@@ -33,7 +52,7 @@ test('matches only bounded family/member/invitation routes', () => {
   assert.equal(matchMiniProgramFamilyRoute('/api/v1/miniprogram/families/spc_home/invites/not-invite/revoke'), null);
 });
 
-test('family list filters family Spaces, composes member counts, and rewrites avatars', async () => {
+test('family list reconciles legacy kind into the HomeMew catalog before filtering', async () => {
   const calls = [];
   const response = await handleMiniProgramFamilyBff(request('/api/v1/miniprogram/families'), env(async incoming => {
     const path = new URL(incoming.url).pathname;
@@ -53,7 +72,7 @@ test('family list filters family Spaces, composes member counts, and rewrites av
   }]);
 });
 
-test('family creation obtains the current Identity display name and fixes kind/owner role', async () => {
+test('family creation shadows the created Space into the HomeMew catalog during compatibility', async () => {
   let coreBody;
   const response = await handleMiniProgramFamilyBff(
     request('/api/v1/miniprogram/families', { method: 'POST', body: { name: 'Home' } }),
@@ -188,7 +207,7 @@ test('invite preview/join map code and obtain display name from Identity only fo
     const body = await incoming.json();
     if (path.endsWith('/preview')) {
       assert.deepEqual(body, { token: 'LS-CODE' });
-      return ok({ space: { id: 'spc_home', name: 'Home', memberCount: 2 }, expiresAt: '2026-09-17T00:00:00Z', canJoin: true });
+      return ok({ space: { id: 'spc_home', kind: 'family', name: 'Home', memberCount: 2 }, expiresAt: '2026-09-17T00:00:00Z', canJoin: true });
     }
     joinBody = body;
     return ok({ spaceId: 'spc_home', role: 'editor', joinedAt: '2026-09-16T01:00:00Z' }, 201);
@@ -203,8 +222,24 @@ test('invite preview/join map code and obtain display name from Identity only fo
   );
   assert.deepEqual(joinBody, { token: 'LS-CODE', displayName: 'Me' });
   assert.deepEqual((await joined.json()).data, {
-    familyId: 'spc_home', familyName: '', role: 'member', joinedAt: '2026-09-16T01:00:00Z',
+    familyId: 'spc_home', familyName: 'Home', role: 'member', joinedAt: '2026-09-16T01:00:00Z',
   });
+});
+
+test('invite preview rejects a non-HomeMew Space even when LifeSpace invite is otherwise valid', async () => {
+  const response = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/family-invites/preview', { method: 'POST', body: { code: 'LS-OTHER' } }),
+    env(async incoming => {
+      assert.equal(new URL(incoming.url).pathname, '/api/v1/space-invites/preview');
+      return ok({
+        space: { id: 'spc_other', kind: 'personal', name: 'Other', memberCount: 1 },
+        expiresAt: '2026-09-17T00:00:00Z',
+        canJoin: true,
+      });
+    }),
+  );
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error.code, 'NOT_HOMEMEW_FAMILY_INVITE');
 });
 
 test('family routes reject arbitrary fields, query parameters and invalid product roles', async () => {

@@ -24,7 +24,7 @@ When HomeMew needs a durable platform capability LifeSpace does not provide, do 
 ## Mandatory architecture rules
 
 - HomeMew household business data lives in LifeSpace, not in a HomeMew database or WeChat Cloud Database.
-- HomeMew “family” maps to LifeSpace `Space(kind=family)`.
+- HomeMew “family” is a HomeMew product classification recorded in the HomeMew Family Catalog and points to a LifeSpace `Space`. LifeSpace `Space.kind` is deprecated migration evidence only and must not remain the product-classification source.
 - HomeMew users map to LifeSpace Identity users; member-facing domain references map through Space Person IDs where the LifeSpace contract requires them.
 - The Mini Program's normal runtime contract is the **final bounded HomeMew Mini BFF** defined by `docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md` and tracked by `docs/plans/2026-09-16-miniprogram-final-bff-rollout.md`. After the one-time migration it must not address public LifeSpace Identity/Core URLs or wire paths directly.
 - Mini household-domain adapters are stateless application adaptation only: explicit HomeMew product routes may translate request/response DTOs, deterministically lower product filters/sorts to the active LifeSpace Canonical Query contract, and forward the current LifeSpace user bearer. A separately accepted HomeMew-owned application capability may own bounded ephemeral orchestration state, but it must not persist household business truth, duplicate LifeSpace authorization, accept arbitrary upstream URLs/paths, expose a generic model proxy, or become a generic `/api/v1/*` proxy.
@@ -69,7 +69,7 @@ The production HomeMew Web/front-door Worker may host bounded public Mini BFF ro
 
 Use explicit product-to-platform mappings:
 
-- family -> Space (`kind=family`)
+- family -> HomeMew Family Catalog entry -> LifeSpace Space (`spc_*`)
 - family admin -> Space `owner`/`admin`
 - ordinary writable HomeMew member -> Space `editor`
 - Mini family/member/profile/business operations -> explicit HomeMew Mini BFF product routes -> current LifeSpace Identity/Core contracts

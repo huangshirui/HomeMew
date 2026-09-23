@@ -171,6 +171,117 @@ test('link challenge is created from the verified Access assertion only', async 
   assert.equal((await payload(response)).data.challengeId, 'alc_123');
 });
 
+test('Web family list intersects current LifeSpace Spaces with the HomeMew family catalog', async () => {
+  const fetcher = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/internal/v1/access/tokens')) {
+      return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+    }
+    if (url.endsWith('/api/v1/me/spaces')) {
+      return jsonResponse(200, { data: [
+        { id: 'spc_home', kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1 },
+        { id: 'spc_other', kind: 'personal', name: 'Other', timezone: 'UTC', avatarUrl: null, role: 'owner', version: 1 },
+      ] });
+    }
+    assert.fail(`unexpected upstream ${url}`);
+  };
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: {
+      async fetch(incoming) {
+        assert.equal(new URL(incoming.url).pathname, '/internal/v1/family-catalog/reconcile');
+        const body = await incoming.json();
+        assert.deepEqual(body.spaceIds, ['spc_home', 'spc_other']);
+        assert.deepEqual(body.legacyFamilySpaceIds, ['spc_home']);
+        return jsonResponse(200, { data: { familySpaceIds: ['spc_home'] } });
+      },
+    },
+  };
+  const handler = createWebHandler({ fetcher, now: () => NOW });
+  const response = await handler.fetch(request('/api/families'), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await payload(response)).data, [
+    { id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1 },
+  ]);
+});
+
+test('Web family creation registers the created Space in HomeMew application metadata', async () => {
+  let createdBody;
+  let registered;
+  const fetcher = async (input, init = {}) => {
+    const url = String(input);
+    if (url.endsWith('/internal/v1/access/tokens')) {
+      return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+    }
+    if (url.endsWith('/api/v1/me')) {
+      return jsonResponse(200, { data: { id: 'usr_1', displayName: 'User One' } });
+    }
+    if (url.endsWith('/api/v1/spaces')) {
+      createdBody = JSON.parse(init.body);
+      return jsonResponse(201, { data: {
+        id: 'spc_home', kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1,
+      } });
+    }
+    assert.fail(`unexpected upstream ${url}`);
+  };
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: {
+      async fetch(incoming) {
+        assert.equal(new URL(incoming.url).pathname, '/internal/v1/family-catalog/register');
+        registered = await incoming.json();
+        return jsonResponse(200, { data: { spaceId: registered.spaceId, source: registered.source } });
+      },
+    },
+  };
+  const handler = createWebHandler({ fetcher, now: () => NOW });
+  const response = await handler.fetch(request('/api/families', {
+    method: 'POST',
+    body: { name: 'Home', timezone: 'Asia/Shanghai' },
+  }), env);
+  assert.equal(response.status, 201);
+  assert.deepEqual(createdBody, {
+    kind: 'family',
+    name: 'Home',
+    timezone: 'Asia/Shanghai',
+    ownerDisplayName: 'User One',
+  });
+  assert.deepEqual(registered, { spaceId: 'spc_home', source: 'created' });
+  assert.equal(Object.hasOwn((await payload(response)).data, 'kind'), false);
+});
+
+test('Web family invite preview rejects a LifeSpace invite outside the HomeMew catalog', async () => {
+  const fetcher = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/internal/v1/access/tokens')) {
+      return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+    }
+    if (url.endsWith('/api/v1/space-invites/preview')) {
+      return jsonResponse(200, { data: {
+        space: { id: 'spc_other', kind: 'personal', name: 'Other', memberCount: 1 },
+        expiresAt: '2026-09-24T00:00:00Z',
+        canJoin: true,
+      } });
+    }
+    assert.fail(`unexpected upstream ${url}`);
+  };
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: {
+      async fetch() {
+        return jsonResponse(200, { data: { familySpaceIds: [] } });
+      },
+    },
+  };
+  const handler = createWebHandler({ fetcher, now: () => NOW });
+  const response = await handler.fetch(request('/api/family-invites/preview', {
+    method: 'POST',
+    body: { token: 'LS-OTHER' },
+  }), env);
+  assert.equal(response.status, 422);
+  assert.equal((await payload(response)).error.code, 'NOT_HOMEMEW_FAMILY_INVITE');
+});
+
 test('Web activity reporting uses the verified LifeSpace session and backend binding', async () => {
   const fetcher = async (input) => {
     const url = String(input);

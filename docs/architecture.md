@@ -159,7 +159,7 @@ HomeMew keeps product-friendly terms in the UI but maps them explicitly at the c
 
 | HomeMew | LifeSpace |
 |---|---|
-| family | `Space(kind=family)` |
+| family | HomeMew Family Catalog entry -> LifeSpace `Space` |
 | family admin | Space `owner` / `admin` |
 | writable member | Space `editor` |
 | member reference in business models | Space Person |
@@ -170,6 +170,8 @@ HomeMew keeps product-friendly terms in the UI but maps them explicitly at the c
 | 喵一下 | Currently offline; future bounded HomeMew BFF-owned draft orchestration, while confirmed domain records still write to LifeSpace |
 
 HomeMew services may expose `familyId`, `attendeeIds`, `assigneeIds` and similar product DTOs to pages, but translate them to Space IDs/Person IDs before calling LifeSpace.
+
+During the Space-kind retirement window, LifeSpace 0.38 `kind=family` may be consumed only to backfill the HomeMew Family Catalog. New product behavior must use the catalog as classification authority, and final cutover requires a complete production catalog reconciliation before LifeSpace removes the deprecated field.
 
 ## 7. Normal Mini Program requests
 
@@ -206,9 +208,9 @@ Web uploads go through the same-origin BFF and preserve the LifeSpace multipart 
 
 ## 10. Data ownership
 
-HomeMew-owned Durable Object storage may hold provider/application integration metadata such as the WeChat identity mapping. It must not become an authoritative household data store.
+HomeMew-owned Durable Object storage may hold provider/application integration metadata such as the WeChat identity mapping and the Family Catalog (`spc_*` classification only). It must not become an authoritative household data store. Family Catalog entries classify a LifeSpace Space for HomeMew presentation; Space name, membership, authorization and household records remain LifeSpace truth.
 
-The Web BFF may hold only short-lived browser application-session state and server-only application credentials. It must not persist an Access-principal mapping, service-token/client-secret plaintext, a HomeMew integration permission table, or household business records.
+The Web BFF may hold only short-lived browser application-session state and server-only application credentials; durable HomeMew application metadata is owned by the application backend. Neither may persist an Access-principal mapping, service-token/client-secret plaintext, a HomeMew integration permission table, or household business records.
 
 Authoritative household data, service-principal state, credentials and authorization live in LifeSpace. Mini Program/browser storage is cache/UI state only.
 
