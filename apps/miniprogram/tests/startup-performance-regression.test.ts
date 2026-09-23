@@ -62,6 +62,7 @@ test('first-time onboarding resumes the original deep-link target', () => {
   assert.match(entrySource, /export function resumePendingEntry/);
   assert.match(entrySource, /wx\.reLaunch\(\{ url: targetUrl\(target\) \}\)/);
   assert.match(entrySource, /options\.query/);
+  assert.match(entrySource, /\^微信用户\.\{6\}\$/);
 });
 
 test('home restores cache before issuing live domain refreshes', () => {
