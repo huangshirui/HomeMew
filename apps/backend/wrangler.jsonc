@@ -17,6 +17,10 @@
       {
         "name": "FAMILY_CATALOG",
         "class_name": "FamilyCatalog"
+      },
+      {
+        "name": "FAMILY_JOIN_COORDINATORS",
+        "class_name": "FamilyJoinCoordinator"
       }
     ]
   },
@@ -37,6 +41,12 @@
       "tag": "v3",
       "new_sqlite_classes": [
         "FamilyCatalog"
+      ]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": [
+        "FamilyJoinCoordinator"
       ]
     }
   ],
@@ -68,6 +78,10 @@
           {
             "name": "FAMILY_CATALOG",
             "class_name": "FamilyCatalog"
+          },
+          {
+            "name": "FAMILY_JOIN_COORDINATORS",
+            "class_name": "FamilyJoinCoordinator"
           }
         ]
       }
@@ -93,6 +107,10 @@
           {
             "name": "FAMILY_CATALOG",
             "class_name": "FamilyCatalog"
+          },
+          {
+            "name": "FAMILY_JOIN_COORDINATORS",
+            "class_name": "FamilyJoinCoordinator"
           }
         ]
       }
