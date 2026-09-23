@@ -345,7 +345,6 @@ test('buildCalendarMatrix: 6x7 grid, today and dots correct', () => {
 const appJsonPath = path.resolve(import.meta.dirname, '../miniprogram/app.json');
 const appJson = JSON.parse(readFileSync(appJsonPath, 'utf-8'));
 const REQUIRED_PAGES = [
-  'pages/launch/launch',
   'pages/launch/disabled',
   'pages/profile-setup/profile-setup',
   'pages/home/home',

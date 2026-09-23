@@ -92,6 +92,16 @@ An existing mapping is authoritative. If LifeSpace later refuses token issuance 
 
 The access token represents the LifeSpace user, has the HomeMew Mini Program application as its authorized party, and carries only the scopes granted to that application. Token refresh repeats this flow with a fresh WeChat code.
 
+### 4.1 Direct-entry startup and silent identity recovery
+
+The Mini Program has no application-level Logo/splash routing page. `pages/home/home` is the default page, while WeChat deep links, shares, notifications, QR codes and enterprise-WeChat entries may open any registered target page directly.
+
+`App.onShow` starts runtime preparation in parallel with the requested page. Short-lived token expiry is never modeled as a user-visible login state: all callers share one in-flight `wx.login() -> HomeMew backend -> LifeSpace token exchange` operation. User/profile and accessible-family initialization is also single-flighted so the App coordinator and the target page do not duplicate startup requests.
+
+First-time or incomplete-profile users are redirected to profile setup only after identity is resolved. The original entry path and query are kept in process memory and restored after profile completion, so onboarding does not collapse a task detail, invite, date anchor or other deep link back to Home. Disabled accounts use the dedicated disabled-state page; ordinary network/service failures stay on the requested page and use that page's retry/error UI.
+
+Non-idempotent writes are never blindly replayed after a 401. The client may silently refresh credentials so the next explicit user retry uses a fresh token.
+
 ## 5. HomeMew Web authentication and BFF
 
 `apps/web/` is the HomeMew browser application plus its same-origin BFF. It is separate from `apps/backend/` because Cloudflare Access is a platform Web authentication boundary, while WeChat `openid` remains application-provider mapping owned by the Mini Program adapter.

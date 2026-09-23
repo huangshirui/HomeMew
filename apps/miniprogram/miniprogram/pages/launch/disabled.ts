@@ -1,32 +1,30 @@
 /**
- * 账号禁用页
+ * 账号禁用页。
  *
- * 展示账号不可用，提供「重新登录」入口。
- * 重新登录后会回到启动页重新初始化；若仍被禁用，启动页会再次跳转回本页，
- * 不会产生自动无限循环（每次都需要用户主动点击重新登录）。
+ * 禁用是明确的业务状态，不属于 Token 过期或普通登录流程。
+ * 用户主动重试后重新建立运行时；若账号恢复，返回触发本次启动的原始入口。
  */
 
-import { clearAuth } from '../../services/auth';
+import { retryDisabledEntry } from '../../services/entry-navigation';
+import { showError } from '../../utils/index';
 
 Page({
   data: {
     retrying: false,
   },
 
-  onLoad(): void {
-    // 进入本页即视为处于禁用态，确保本地登录信息已被清除
-    clearAuth();
-  },
-
-  async onRelogin(): Promise<void> {
+  async onRetry(): Promise<void> {
     if (this.data.retrying) return;
     this.setData({ retrying: true });
     try {
-      clearAuth();
-      wx.reLaunch({
-        url: '/pages/launch/launch',
-      });
-    } catch (e) {
+      await retryDisabledEntry();
+    } catch (error) {
+      const value = error as { code?: string; message?: string };
+      if (value?.code === 'USER_DISABLED' || value?.message?.includes('禁用')) {
+        showError('账号当前仍不可用');
+      } else {
+        showError('暂时无法检查账号状态，请稍后重试');
+      }
       this.setData({ retrying: false });
     }
   },

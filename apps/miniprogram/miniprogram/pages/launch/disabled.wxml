@@ -7,9 +7,8 @@
   <text class="desc">你的账号已被禁用，暂时无法使用家事喵。如有疑问，请联系管理员。</text>
   <button
     class="btn-primary retry-btn"
+    bindtap="onRetry"
+    loading="{{retrying}}"
     disabled="{{retrying}}"
-    bindtap="onRelogin"
-  >
-    {{retrying ? '正在重新登录...' : '重新登录'}}
-  </button>
+  >重新检查</button>
 </view>
