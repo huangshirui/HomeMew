@@ -6,7 +6,7 @@
  */
 
 export const ERROR_MESSAGES: Record<string, string> = {
-  UNAUTHORIZED: '登录状态已过期，请重新登录',
+  UNAUTHORIZED: '请求未完成，请重试',
   FORBIDDEN: '你没有权限执行此操作',
   USER_NOT_FOUND: '用户不存在或已被删除',
   USER_DISABLED: '账号已被禁用',
