@@ -7,6 +7,8 @@
  */
 
 import { updateCurrentUser } from '../../services/users';
+import { markNewUserOnboardingComplete } from '../../services/auth';
+import { resumePendingEntry } from '../../services/entry-navigation';
 import { uploadAvatar } from '../../services/media';
 import { loadCurrentUser, userStore } from '../../stores/index';
 import { showSuccess, showError, showLoading, hideLoading } from '../../utils/index';
@@ -136,11 +138,10 @@ Page({
           wx.navigateBack();
         }, 1200);
       } else {
+        markNewUserOnboardingComplete();
         setTimeout(() => {
-          wx.switchTab({
-            url: '/pages/home/home',
-          });
-        }, 1500);
+          resumePendingEntry();
+        }, 600);
       }
     } catch (error: unknown) {
       hideLoading();
