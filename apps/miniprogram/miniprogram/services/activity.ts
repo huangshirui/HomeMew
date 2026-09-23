@@ -1,6 +1,5 @@
-import { getStoredToken, hasValidToken, loginAndSaveToken } from './auth';
+import { ensureAccessToken } from './auth';
 import { getApplicationBaseUrl, REQUEST_TIMEOUT } from './config';
-import { ensureRuntimeReady } from './runtime-bootstrap';
 
 let reportedLocalDay: string | null = null;
 let reportPromise: Promise<void> | null = null;
@@ -13,15 +12,8 @@ function localDayKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-async function ensureActivityToken(): Promise<string> {
-  if (!hasValidToken()) await loginAndSaveToken();
-  const token = getStoredToken();
-  if (!token) throw new Error('Activity 上报缺少有效登录令牌');
-  return token;
-}
-
 async function sendMiniProgramActivity(): Promise<void> {
-  const token = await ensureActivityToken();
+  const token = await ensureAccessToken();
   await new Promise<void>((resolve, reject) => wx.request({
     url: `${getApplicationBaseUrl()}/api/v1/activity/me`,
     method: 'POST',
@@ -48,7 +40,8 @@ export async function reportMiniProgramActivityOncePerDay(): Promise<void> {
   }
   reportPromiseDay = day;
   reportPromise = (async () => {
-    await ensureRuntimeReady();
+    // Activity reporting needs only a valid user bearer. It must not trigger
+    // profile/family bootstrap or compete with the requested entry page.
     await sendMiniProgramActivity();
     reportedLocalDay = day;
   })();
