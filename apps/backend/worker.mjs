@@ -252,7 +252,24 @@ export class FamilyCatalog extends DurableObject {
 }
 
 export class FamilyJoinCoordinator extends DurableObject {
-  async commit({ familyId, token, authorization, displayName }) {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.joinTail = Promise.resolve();
+  }
+
+  async commit(input) {
+    const previous = this.joinTail;
+    let release;
+    this.joinTail = new Promise(resolve => { release = resolve; });
+    await previous;
+    try {
+      return await this.commitSerial(input);
+    } finally {
+      release();
+    }
+  }
+
+  async commitSerial({ familyId, token, authorization, displayName }) {
     const coreBase = baseUrl(this.env.LIFESPACE_CORE_URL, 'LIFESPACE_CORE_URL');
     const core = async (path, { method = 'GET', body } = {}) => {
       const response = await fetch(`${coreBase}${path}`, {
