@@ -6,13 +6,15 @@ const appSource = readFileSync(new URL('../miniprogram/app.ts', import.meta.url)
 const activitySource = readFileSync(new URL('../miniprogram/services/activity.ts', import.meta.url), 'utf8');
 
 test('App.onShow reports Mini Program activity from every entry path', () => {
-  assert.match(appSource, /onShow\(\)[\s\S]*reportMiniProgramActivityOncePerDay\(\)/);
+  assert.match(appSource, /onShow\([^)]*\)[\s\S]*reportMiniProgramActivityOncePerDay\(\)/);
   assert.doesNotMatch(appSource, /Page\(/);
 });
 
 test('Mini Program activity reports once per local day per live process and retries failures', () => {
   assert.match(activitySource, /reportedLocalDay === day/);
-  assert.match(activitySource, /await ensureRuntimeReady\(\)/);
+  assert.match(activitySource, /await sendMiniProgramActivity\(\)/);
+  assert.match(activitySource, /ensureAccessToken\(\)/);
+  assert.doesNotMatch(activitySource, /ensureRuntimeReady/);
   assert.match(activitySource, /reportedLocalDay = day/);
   assert.match(activitySource, /finally[\s\S]*reportPromise = null/);
   assert.match(activitySource, /channel: 'miniprogram'/);
