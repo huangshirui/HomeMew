@@ -11,7 +11,6 @@ export type SessionUser = {
 
 export type FamilySpace = {
   id: string;
-  kind: 'family';
   name: string;
   timezone: string;
   avatarUrl: string | null;
@@ -30,7 +29,6 @@ export type FamilyMember = {
 };
 
 type SessionResponse = { authenticated: boolean; user: SessionUser };
-type SpaceResponse = FamilySpace | { id: string; kind: string; name: string; timezone: string; avatarUrl: string | null; role: FamilySpace['role']; version: number };
 
 type HouseholdContextValue = {
   user: SessionUser | null;
@@ -89,11 +87,10 @@ export function HouseholdProvider({ children }: PropsWithChildren) {
     setLoading(true);
     setError(null);
     try {
-      const [session, spaces] = await Promise.all([
+      const [session, nextFamilies] = await Promise.all([
         apiRequest<SessionResponse>('/api/session'),
-        apiRequest<SpaceResponse[]>('/api/lifespace/core/v1/me/spaces'),
+        apiRequest<FamilySpace[]>('/api/families'),
       ]);
-      const nextFamilies = spaces.filter((space): space is FamilySpace => space.kind === 'family');
       const remembered = rememberedFamilyId();
       const selected = nextFamilies.find((space) => space.id === remembered)?.id ?? nextFamilies[0]?.id ?? null;
       setUser(session.user);
