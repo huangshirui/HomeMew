@@ -1,17 +1,19 @@
 /**
  * 小程序运行时初始化。
  *
- * 企业微信菜单、扫码链接、分享卡片、通知跳转等场景可能直接进入业务页面，
- * 绕过 pages/launch/launch 的完整启动路径。业务页面在访问 LifeSpace 数据前
- * 调用 ensureRuntimeReady()，确保身份与家庭上下文已准备完成。
+ * 任意入口（首页、Tab、扫码、分享卡片、通知、企业微信菜单）都可能成为首个页面。
+ * 页面不依赖应用级 Launch 中转页；需要用户/家庭上下文的页面调用
+ * ensureRuntimeReady()，与 App 入口协调共享同一轮初始化。
  *
  * 设计要点：
- * - 本进程已经过初始化（用户已加载）时直接复用，避免重复登录 / 拉取家庭；
- * - 并发调用共享同一个进行中的初始化，避免重复请求；
- * - 不缓存家庭业务数据、不绕过 LifeSpace 权限，用户 / 家庭仍以 LifeSpace 为事实来源。
+ * - Access Token 通过 auth.ensureAccessToken() 静默恢复；
+ * - 用户与家庭权限并行加载；
+ * - 并发调用共享同一个进行中的初始化；
+ * - 成功后本进程直接复用；显式 reset 后才重新初始化；
+ * - 不缓存家庭业务事实、不绕过 LifeSpace 权限。
  */
 
-import { hasValidToken, loginAndSaveToken } from './auth';
+import { ensureAccessToken } from './auth';
 import {
   currentFamilyStore,
   userStore,
@@ -20,38 +22,53 @@ import {
   refreshFamilyState,
 } from '../stores/index';
 
-/** 进行中的初始化（用于并发去重）；成功后置空，后续调用走 userStore 快路径 */
+let runtimeReady = false;
 let readyPromise: Promise<void> | null = null;
 
-export async function ensureRuntimeReady(): Promise<void> {
-  // 本进程已初始化过（用户已加载）：直接进入业务页面，无需重复 bootstrap
-  if (userStore.value) return;
+function runtimeError(code: string, message: string): Error & { code: string } {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
+}
+
+export async function ensureRuntimeReady(options: { force?: boolean } = {}): Promise<void> {
+  const { force = false } = options;
+
+  if (!force && runtimeReady && userStore.value) return;
   if (readyPromise) return readyPromise;
 
   readyPromise = (async () => {
-    if (!hasValidToken()) {
-      await loginAndSaveToken();
+    await ensureAccessToken();
+
+    const [user, families] = await Promise.all([
+      loadCurrentUser(),
+      loadFamilies({ force: true }),
+    ]);
+
+    if (user.status === 'disabled') {
+      throw runtimeError('USER_DISABLED', '账号已被禁用');
     }
 
-    await loadCurrentUser();
-    const families = await loadFamilies({ force: true });
     refreshFamilyState(families);
 
-    // 列表非空时 refreshFamilyState 必然已选中一个家庭；
-    // 若仍为空，说明用户虽通过登录但无可访问的家庭空间，交由页面展示「创建 / 加入」。
+    // 列表非空时 refreshFamilyState 必然选中一个可访问家庭。
     if (!currentFamilyStore.value && families.length > 0) {
-      throw new Error('当前没有可访问的家庭空间');
+      throw runtimeError('RUNTIME_CONTEXT_INVALID', '当前家庭上下文初始化失败');
     }
+
+    runtimeReady = true;
   })();
 
   try {
     await readyPromise;
   } catch (error) {
-    // 初始化失败：清除进行中的 promise，允许下次重试
-    readyPromise = null;
+    runtimeReady = false;
     throw error;
+  } finally {
+    readyPromise = null;
   }
+}
 
-  // 成功后丢弃进行中的 promise：后续调用由 userStore 快路径直接放行
-  readyPromise = null;
+export function resetRuntimeReady(): void {
+  runtimeReady = false;
 }
