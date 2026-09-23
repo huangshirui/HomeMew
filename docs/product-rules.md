@@ -255,7 +255,7 @@ The first version has one task-level completion state. It does not track complet
 
 ## 13. External systems
 
-- Only a current family administrator may manage HomeMew external integrations. The client role check is UX only; the Web BFF must obtain an on-demand LifeSpace user token with `grants:manage`, and LifeSpace Core must verify current `manage` authority on the selected family `Space(kind=family)` before any integration-management operation proceeds.
+- Only a current family administrator may manage HomeMew external integrations. The client role check is UX only; the Web BFF must obtain an on-demand LifeSpace user token with `grants:manage`, and LifeSpace Core must verify current `manage` authority on the selected HomeMew family Space before any integration-management operation proceeds.
 - One HomeMew external system maps to one LifeSpace Service Principal and one explicit owning family Space. The service is not a Space member and receives no user/member/invitation/family-settings/avatar administration authority by default.
 - Credential scope names are stable platform scopes, currently `resources:read` and `resources:write`. Model permission is not encoded as legacy scopes such as `events:write`, `tasks:read`, or `day-records:write`.
 - The first HomeMew Web integration editor exposes `none`, `read`, or `write` for LifeSpace models `event`, `task`, and `day_record`. Effective data access remains Service Principal ∩ credential scope ∩ Application × Model Access ∩ current model-scoped Data Grant.
