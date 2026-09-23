@@ -14,6 +14,7 @@ const FIRST_PARTY_ACTIVITY_CHANNELS = new Set(['miniprogram', 'web']);
 const MAX_ACTIVITY_QUERY_USERS = 50;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const MAX_FAMILY_CATALOG_BATCH = 200;
+const FAMILY_MEMBER_LIMIT = 8;
 const FAMILY_SPACE_ID = /^spc_[A-Za-z0-9_-]+$/u;
 
 class HttpError extends Error {
@@ -54,6 +55,14 @@ function familyCatalogStub(env) {
   }
   return env.FAMILY_CATALOG.getByName('catalog:v1');
 }
+
+function familyJoinCoordinatorStub(env, familyId) {
+  if (!env.FAMILY_JOIN_COORDINATORS || typeof env.FAMILY_JOIN_COORDINATORS.getByName !== 'function') {
+    throw new HttpError(503, 'FAMILY_JOIN_NOT_CONFIGURED', 'Family join coordination is not configured');
+  }
+  return env.FAMILY_JOIN_COORDINATORS.getByName(`family-join:${familyId}`);
+}
+
 
 function validateFamilySpaceId(value) {
   const spaceId = typeof value === 'string' ? value.trim() : '';
@@ -239,6 +248,59 @@ export class FamilyCatalog extends DurableObject {
   async status() {
     const entries = await this.ctx.storage.list({ prefix: 'family:' });
     return { count: entries.size };
+  }
+}
+
+export class FamilyJoinCoordinator extends DurableObject {
+  async commit({ familyId, token, authorization, displayName }) {
+    const coreBase = baseUrl(this.env.LIFESPACE_CORE_URL, 'LIFESPACE_CORE_URL');
+    const core = async (path, { method = 'GET', body } = {}) => {
+      const response = await fetch(`${coreBase}${path}`, {
+        method,
+        headers: {
+          accept: 'application/json',
+          authorization,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const payload = await response.json().catch(() => ({}));
+      return { status: response.status, payload };
+    };
+
+    const preview = await core('/api/v1/space-invites/preview', {
+      method: 'POST',
+      body: { token },
+    });
+    if (preview.status !== 200) return preview;
+    if (preview.payload?.data?.space?.id !== familyId) {
+      return {
+        status: 409,
+        payload: { error: { code: 'FAMILY_INVITE_SPACE_MISMATCH', message: 'Family invite Space changed during join' } },
+      };
+    }
+
+    const [me, members] = await Promise.all([
+      core('/api/v1/me'),
+      core(`/api/v1/spaces/${encodeURIComponent(familyId)}/members`),
+    ]);
+    if (me.status !== 200) return me;
+    if (members.status !== 200) return members;
+
+    const userId = me.payload?.data?.principal?.id;
+    const list = Array.isArray(members.payload?.data) ? members.payload.data : [];
+    const alreadyMember = typeof userId === 'string' && list.some(member => member?.userId === userId);
+    if (!alreadyMember && list.length >= FAMILY_MEMBER_LIMIT) {
+      return {
+        status: 409,
+        payload: { error: { code: 'FAMILY_MEMBER_LIMIT_REACHED', message: '家庭成员已达到 8 人上限' } },
+      };
+    }
+
+    return core('/api/v1/space-invites/join', {
+      method: 'POST',
+      body: { token, displayName },
+    });
   }
 }
 
@@ -483,6 +545,31 @@ async function familyCatalogStatus(request, env) {
   return json({ data: await familyCatalogStub(env).status() });
 }
 
+async function commitFamilyJoin(request, env) {
+  requireInternalFamilyCatalogRequest(request);
+  const authorization = request.headers.get('authorization')?.trim() || '';
+  if (!authorization.startsWith('Bearer ') || authorization.slice(7).trim().length < 10) {
+    throw new HttpError(401, 'UNAUTHORIZED', 'LifeSpace user bearer is required');
+  }
+  const input = await readJson(request);
+  if (Object.keys(input).some(key => !['familyId', 'token', 'displayName'].includes(key))) {
+    throw new HttpError(400, 'INVALID_REQUEST', 'Request contains unsupported fields');
+  }
+  const familyId = validateFamilySpaceId(input.familyId);
+  const token = typeof input.token === 'string' ? input.token.trim() : '';
+  const displayName = typeof input.displayName === 'string' ? input.displayName.trim() : '';
+  if (!token || token.length > 200 || !displayName || displayName.length > 100) {
+    throw new HttpError(422, 'INVALID_REQUEST', 'Family join input is invalid');
+  }
+  const result = await familyJoinCoordinatorStub(env, familyId).commit({
+    familyId,
+    token,
+    authorization,
+    displayName,
+  });
+  return json(result.payload, result.status);
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -507,6 +594,7 @@ export default {
       if (request.method === 'POST' && url.pathname === '/internal/v1/family-catalog/reconcile') return await reconcileFamilyCatalog(request, env);
       if (request.method === 'POST' && url.pathname === '/internal/v1/family-catalog/import') return await importFamilyCatalog(request, env);
       if (request.method === 'GET' && url.pathname === '/internal/v1/family-catalog/status') return await familyCatalogStatus(request, env);
+      if (request.method === 'POST' && url.pathname === '/internal/v1/family-joins/commit') return await commitFamilyJoin(request, env);
       return json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
     } catch (error) {
       if (error instanceof HttpError) return json({ error: { code: error.code, message: error.message } }, error.status);
