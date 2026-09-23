@@ -8,8 +8,5 @@
   <button
     class="btn-primary retry-btn"
     disabled="{{retrying}}"
-    bindtap="onRelogin"
-  >
-    {{retrying ? '正在重新登录...' : '重新登录'}}
-  </button>
+    bindtap="onRetry" loading="{{retrying}}" disabled="{{retrying}}">重新检查</button>
 </view>
