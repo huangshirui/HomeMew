@@ -1,22 +1,23 @@
 /** Avatar uploads through the stable HomeMew Mini BFF. */
 
 import { AppError, request } from './api';
-import { getStoredToken, loginAndSaveToken } from './auth';
+import { ensureAccessToken } from './auth';
 import {
   getApplicationBaseUrl,
   generateRequestId,
-  isTokenValid,
   UPLOAD_TIMEOUT,
 } from './config';
 import type { ApiEnvelope, ErrorResponse } from '../types/index';
 
 interface AvatarUploadResult { avatarUrl: string; version?: number }
 
-async function ensureToken(): Promise<string> {
-  if (!isTokenValid()) await loginAndSaveToken();
-  const token = getStoredToken();
-  if (!token) throw new AppError('AUTH_REQUIRED', '登录状态不可用');
-  return token;
+async function ensureToken(forceRefresh = false): Promise<string> {
+  try {
+    return await ensureAccessToken({ forceRefresh });
+  } catch (error) {
+    console.error('[Media] Silent identity recovery failed:', error);
+    throw new AppError('AUTH_REQUIRED', '暂时无法验证身份，请稍后重试');
+  }
 }
 
 function parseUploadResponse(raw: unknown): unknown {
@@ -152,8 +153,7 @@ async function uploadMultipartTo(
   let token = await ensureToken();
   let result = await uploadOnceTo(url, tempFilePath, token, fields);
   if (result.statusCode === 401) {
-    await loginAndSaveToken();
-    token = await ensureToken();
+    token = await ensureToken(true);
     result = await uploadOnceTo(url, tempFilePath, token, fields);
   }
   if (result.statusCode < 200 || result.statusCode >= 300) throw uploadError(result);
