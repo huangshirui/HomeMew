@@ -1,4 +1,5 @@
 /* 首页：今天的家庭工作台 */
+@import "./home.skeleton.wxss";
 
 /* 欢迎卡片 */
 .greeting-card {

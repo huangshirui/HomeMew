@@ -1,0 +1,96 @@
+<!--
+此文件为开发者工具生成，生成时间: 2026/9/23 22:08:35
+使用方法：
+在 C:\Users\shirui\Antigravity\HomeMew\apps\miniprogram\miniprogram\pages\home\home.wxml 引入模板
+
+```
+<import src="home.skeleton.wxml"/>
+<template is="skeleton" wx:if="{{loading}}" />
+```
+
+在 C:\Users\shirui\Antigravity\HomeMew\apps\miniprogram\miniprogram\pages\home\home.wxss 中引入样式
+```
+@import "./home.skeleton.wxss";
+```
+
+更多详细信息可以参考文档：https://developers.weixin.qq.com/miniprogram/dev/devtools/skeleton.html
+-->
+<template name="skeleton">
+  <view class="sk-container">
+    <view class="container">
+      <view class="greeting-card sk-image">
+        <view class="greeting-main">
+          <text class="greeting-title sk-transparent sk-text-11-5385-372 sk-text">晚上好，朋友 👋</text>
+          <text class="greeting-date sk-transparent sk-text-16-6667-822 sk-text">—月—日 · 周—</text>
+          <text class="greeting-subtitle sk-transparent sk-text-16-6667-755 sk-text">今天有 — 个安排，— 件事情需要关注</text>
+        </view>
+        <view class="family-switch">
+          <image class="family-switch-avatar sk-image" mode="aspectFill"></image>
+          <text class="family-switch-name sk-transparent sk-text-16-6667-296 sk-text">我的家庭</text>
+          <text class="family-switch-caret sk-transparent sk-opacity">▾</text>
+        </view>
+      </view>
+      <view class="card section attention-section">
+        <view class="section-header">
+          <text class="section-title sk-transparent sk-text-16-6667-793 sk-text">需要关注</text>
+        </view>
+        <scroll-view enable-flex="true" scroll-x="true" class="attention-scroll">
+          <view class="attn-card attn-day attention-info">
+            <view class="attn-card-head">
+              <view class="attn-card-icon-wrap attention-info">
+                <text class="attn-card-icon sk-transparent sk-text-16-6667-92 sk-text">🔔</text>
+              </view>
+              <text class="attn-card-name sk-transparent sk-text-16-6667-118 sk-text">示例关注项</text>
+            </view>
+            <text class="attn-line-main sk-transparent"><text class="attn-num sk-transparent sk-text-14-2857-642 sk-text">—</text> 天
+            </text>
+            <text class="attn-line-sub attn-anchor sk-transparent sk-text-16-6667-157 sk-text">—年—月—日</text>
+          </view>
+        </scroll-view>
+      </view>
+      <view class="card section">
+        <view class="section-header">
+          <text class="section-title sk-transparent sk-text-16-6667-140 sk-text">今天安排</text>
+          <view class="section-header-right">
+            <text class="section-more sk-transparent sk-text-16-6667-648 sk-text">查看全部 ›</text>
+          </view>
+        </view>
+        <view class="empty-hint">
+          <text class="empty-link sk-transparent sk-text-16-6667-831 sk-text" style="background-position-x: 50%;">今天还没有安排 ＋ 添加日程</text>
+        </view>
+      </view>
+      <view class="card section">
+        <view class="section-header">
+          <text class="section-title sk-transparent sk-text-16-6667-133 sk-text">待办提醒</text>
+          <view class="section-header-right">
+            <text class="section-more sk-transparent sk-text-16-6667-587 sk-text">查看全部 ›</text>
+          </view>
+        </view>
+        <view class="empty-hint">
+          <text class="empty-link sk-transparent sk-text-16-6667-709 sk-text" style="background-position-x: 50%;">最近 3 天没有到期的待办 ＋ 添加待办</text>
+        </view>
+      </view>
+      <view class="card section tools-section">
+        <view class="section-header">
+          <text class="section-title sk-transparent sk-text-16-6667-337 sk-text">常用工具</text>
+        </view>
+        <view class="tools-row">
+          <view class="tool-card">
+            <text class="tool-emoji sk-transparent sk-text-16-6667-408 sk-text">🗓️</text>
+            <view class="tool-body">
+              <text class="tool-title sk-transparent sk-text-16-6667-497 sk-text">日子</text>
+              <text class="tool-desc sk-transparent sk-text-16-6667-439 sk-text">记录倒计时与周期</text>
+            </view>
+          </view>
+          <view class="tool-card">
+            <text class="tool-emoji sk-transparent sk-text-16-6667-207 sk-text">🌟</text>
+            <view class="tool-body">
+              <text class="tool-title sk-transparent sk-text-16-6667-612 sk-text">许愿池</text>
+              <text class="tool-desc sk-transparent sk-text-16-6667-32 sk-text">看看家人的愿望</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>

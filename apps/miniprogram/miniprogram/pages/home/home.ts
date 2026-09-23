@@ -143,6 +143,9 @@ function attentionLevelRank(level: string): number {
 
 Page({
   data: {
+    /** 首屏骨架屏开关：初始为 true，数据就绪后关闭，由真实内容替换 */
+    loading: true,
+
     greetingText: '',
     dateText: '',
     greetingSubtitle: '',
@@ -234,6 +237,7 @@ Page({
         families: families as FamilyView[],
         canSwitch: (families as FamilyView[]).length > 1,
         loaded: true,
+        loading: false,
         currentFamily: cf as FamilyView | null,
       });
     });
@@ -406,6 +410,7 @@ Page({
         currentFamily: current as FamilyView | null,
         canSwitch: families.length > 1,
         loaded: true,
+        loading: false,
       });
 
       const app = getApp<IAppOption>();
@@ -428,7 +433,7 @@ Page({
       }
     } catch (e) {
       console.error('[Home] Load data failed:', e);
-      this.setData({ loaded: true });
+      this.setData({ loaded: true, loading: false });
     }
   },
 

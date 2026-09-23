@@ -1,5 +1,9 @@
 <!-- 首页：今天的家庭工作台 -->
+<import src="home.skeleton.wxml" />
 <view class="container">
+
+  <!-- 骨架屏：首屏数据就绪前覆盖展示，避免白屏 -->
+  <template is="skeleton" wx:if="{{loading}}" />
 
   <!-- 有家庭时 -->
   <block wx:if="{{currentFamily}}">
