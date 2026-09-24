@@ -9,11 +9,23 @@ export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
   core: Object.freeze({
     contractVersion: '0.39.0',
     minimumSchemaVersion: 45,
+    productionTransitionFrom: Object.freeze({
+      contractVersion: '0.38.0',
+      schemaVersion: 44,
+    }),
   }),
 });
 
 function statusData(payload) {
   return payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+}
+
+function isAllowedProductionCoreTransition(data, schemaVersion, expected) {
+  const transition = expected.productionTransitionFrom;
+  return data.environment === 'production'
+    && transition
+    && data.contractVersion === transition.contractVersion
+    && schemaVersion === transition.schemaVersion;
 }
 
 export function assertLifeSpaceStatus(payload, service, environment) {
@@ -26,13 +38,22 @@ export function assertLifeSpaceStatus(payload, service, environment) {
   if (data.environment !== environment) {
     throw new Error(`Expected ${service} environment ${environment}, got ${String(data.environment ?? 'unknown')}`);
   }
+
+  const schemaVersion = Number(data.schemaVersion);
+  if (!Number.isInteger(schemaVersion)) {
+    throw new Error(`${service} schemaVersion must be an integer, got ${String(data.schemaVersion ?? 'unknown')}`);
+  }
+
+  if (service === 'core' && isAllowedProductionCoreTransition(data, schemaVersion, expected)) {
+    return data;
+  }
+
   if (data.contractVersion !== expected.contractVersion) {
     throw new Error(
       `${service} contract mismatch: HomeMew requires ${expected.contractVersion}, got ${String(data.contractVersion ?? 'unknown')}`,
     );
   }
-  const schemaVersion = Number(data.schemaVersion);
-  if (!Number.isInteger(schemaVersion) || schemaVersion < expected.minimumSchemaVersion) {
+  if (schemaVersion < expected.minimumSchemaVersion) {
     throw new Error(
       `${service} schema is behind the HomeMew release baseline: requires >=${expected.minimumSchemaVersion}, got ${String(data.schemaVersion ?? 'unknown')}`,
     );

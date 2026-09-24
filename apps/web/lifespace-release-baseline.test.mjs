@@ -25,20 +25,48 @@ test('release baseline accepts the LifeSpace 0.39 staging Identity and Core floo
   );
 });
 
-test('release baseline rejects a Core deployment that predates the Space kind removal baseline', () => {
-  assert.throws(
-    () => assertLifeSpaceStatus(
-      payload('core', 'production', LIFESPACE_RELEASE_BASELINE.core.contractVersion, 44),
+test('production transition accepts only the exact LifeSpace 0.38/schema44 cutover source', () => {
+  assert.equal(
+    assertLifeSpaceStatus(
+      payload('core', 'production', '0.38.0', 44),
       'core',
       'production',
-    ),
-    /schema is behind the HomeMew release baseline/,
+    ).schemaVersion,
+    44,
+  );
+
+  assert.throws(
+    () => assertLifeSpaceStatus(payload('core', 'production', '0.38.0', 43), 'core', 'production'),
+    /contract mismatch|schema is behind/,
+  );
+  assert.throws(
+    () => assertLifeSpaceStatus(payload('core', 'production', '0.38.0', 45), 'core', 'production'),
+    /contract mismatch/,
+  );
+  assert.throws(
+    () => assertLifeSpaceStatus(payload('core', 'staging', '0.38.0', 44), 'core', 'staging'),
+    /contract mismatch/,
   );
 });
 
-test('release baseline rejects contract and environment drift', () => {
+test('release baseline accepts the LifeSpace 0.39 target and later schema-only cleanup migrations', () => {
+  assert.equal(
+    assertLifeSpaceStatus(payload('core', 'production', '0.39.0', 45), 'core', 'production').schemaVersion,
+    45,
+  );
+  assert.equal(
+    assertLifeSpaceStatus(payload('core', 'production', '0.39.0', 46), 'core', 'production').schemaVersion,
+    46,
+  );
+});
+
+test('release baseline rejects contract, schema and environment drift outside the cutover window', () => {
   assert.throws(
-    () => assertLifeSpaceStatus(payload('core', 'production', '0.38.0', 45), 'core', 'production'),
+    () => assertLifeSpaceStatus(payload('core', 'production', '0.39.0', 44), 'core', 'production'),
+    /schema is behind the HomeMew release baseline/,
+  );
+  assert.throws(
+    () => assertLifeSpaceStatus(payload('core', 'production', '0.37.0', 44), 'core', 'production'),
     /contract mismatch/,
   );
   assert.throws(
