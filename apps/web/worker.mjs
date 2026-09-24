@@ -123,10 +123,9 @@ async function reconcileFamilySpaces(env, spaces) {
   const list = Array.isArray(spaces) ? spaces.filter(space => typeof space?.id === 'string' && space.id.startsWith('spc_')) : [];
   const catalog = await familyCatalogRequest(env, '/internal/v1/family-catalog/reconcile', {
     spaceIds: list.map(space => space.id),
-    legacyFamilySpaceIds: list.filter(space => space.kind === 'family').map(space => space.id),
   });
   const familyIds = new Set(catalog.familySpaceIds ?? []);
-  return list.filter(space => familyIds.has(space.id)).map(({ kind: _kind, ...space }) => space);
+  return list.filter(space => familyIds.has(space.id));
 }
 
 function accessAssertion(request) {
@@ -457,7 +456,6 @@ async function handleFamilies(request, env, fetcher, assertion, id, nowMs) {
   const created = await coreUserRequest(env, fetcher, '/api/v1/spaces', session.accessToken, id, {
     method: 'POST',
     body: {
-      kind: 'family',
       name,
       timezone: typeof input.timezone === 'string' && input.timezone ? input.timezone : 'Asia/Shanghai',
       ownerDisplayName: me.payload.data.displayName,
@@ -468,8 +466,7 @@ async function handleFamilies(request, env, fetcher, assertion, id, nowMs) {
   } catch (error) {
     console.warn('[HomeMew Web] family catalog registration failed after create', created.id, error instanceof Error ? error.message : 'unknown');
   }
-  const { kind: _kind, ...family } = created;
-  return json({ data: family }, 201, session.cookie ? { 'set-cookie': session.cookie } : {}, id);
+  return json({ data: created }, 201, session.cookie ? { 'set-cookie': session.cookie } : {}, id);
 }
 
 async function handleFamilyInvite(request, env, fetcher, assertion, id, nowMs, action) {
