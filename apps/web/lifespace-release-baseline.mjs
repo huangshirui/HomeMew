@@ -9,23 +9,11 @@ export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
   core: Object.freeze({
     contractVersion: '0.39.0',
     minimumSchemaVersion: 45,
-    productionTransitionFrom: Object.freeze({
-      contractVersion: '0.38.0',
-      schemaVersion: 44,
-    }),
   }),
 });
 
 function statusData(payload) {
   return payload?.data && typeof payload.data === 'object' ? payload.data : payload;
-}
-
-function isAllowedProductionCoreTransition(data, schemaVersion, expected) {
-  const transition = expected.productionTransitionFrom;
-  return data.environment === 'production'
-    && transition
-    && data.contractVersion === transition.contractVersion
-    && schemaVersion === transition.schemaVersion;
 }
 
 export function assertLifeSpaceStatus(payload, service, environment) {
@@ -42,10 +30,6 @@ export function assertLifeSpaceStatus(payload, service, environment) {
   const schemaVersion = Number(data.schemaVersion);
   if (!Number.isInteger(schemaVersion)) {
     throw new Error(`${service} schemaVersion must be an integer, got ${String(data.schemaVersion ?? 'unknown')}`);
-  }
-
-  if (service === 'core' && isAllowedProductionCoreTransition(data, schemaVersion, expected)) {
-    return data;
   }
 
   if (data.contractVersion !== expected.contractVersion) {
