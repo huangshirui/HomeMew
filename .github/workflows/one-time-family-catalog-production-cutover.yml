@@ -240,5 +240,5 @@ jobs:
             echo "- Imported family Spaces: 3"
             echo "- Exact reconcile: PASS"
             echo "- Evidence artifact: family-catalog-production-evidence-${{ github.run_id }}"
-            echo "- Next: deploy the explicit LifeSpace Core 0.38/schema44 bridge before the no-kind HomeMew Web cutover"
+            echo "- Next: enter a short maintenance window, deploy current LifeSpace production to Core 0.39/schema46, then deploy the no-kind HomeMew Web/BFF"
           } >> "$GITHUB_STEP_SUMMARY"
