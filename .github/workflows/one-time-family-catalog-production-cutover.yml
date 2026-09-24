@@ -163,7 +163,7 @@ jobs:
             "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
             "name": "homemew-family-catalog-cutover-local",
             "main": "worker.mjs",
-            "compatibility_date": "2026-09-24",
+            "compatibility_date": "2026-07-02",
             "workers_dev": false,
             "services": [
               {
