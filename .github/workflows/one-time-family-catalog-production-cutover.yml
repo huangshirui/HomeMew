@@ -49,10 +49,10 @@ jobs:
           if (data?.status !== 'ok' || data?.service !== 'core' || data?.environment !== 'production') {
             throw new Error('LifeSpace Core production status is not healthy');
           }
-          if (data.contractVersion !== '0.38.0' || Number(data.schemaVersion) !== 44) {
-            throw new Error(`Expected migration source Core 0.38.0/schema44, got ${String(data.contractVersion)}/schema${String(data.schemaVersion)}`);
+          if (data.contractVersion !== '0.37.0' || Number(data.schemaVersion) !== 43) {
+            throw new Error(`Expected migration source Core 0.37.0/schema43, got ${String(data.contractVersion)}/schema${String(data.schemaVersion)}`);
           }
-          console.log('Confirmed LifeSpace migration source: Core 0.38.0 / schema 44');
+          console.log('Confirmed LifeSpace migration source: Core 0.37.0 / schema 43');
           NODE
 
       - name: Import and exactly reconcile production Family Catalog
@@ -236,9 +236,9 @@ jobs:
           {
             echo "## HomeMew production Family Catalog cutover"
             echo
-            echo "- LifeSpace migration source verified: Core 0.38.0 / schema 44"
+            echo "- LifeSpace migration source verified: Core 0.37.0 / schema 43"
             echo "- Imported family Spaces: 3"
             echo "- Exact reconcile: PASS"
             echo "- Evidence artifact: family-catalog-production-evidence-${{ github.run_id }}"
-            echo "- Next: deploy no-kind HomeMew Web production before LifeSpace 0.39/schema45"
+            echo "- Next: deploy the explicit LifeSpace Core 0.38/schema44 bridge before the no-kind HomeMew Web cutover"
           } >> "$GITHUB_STEP_SUMMARY"
