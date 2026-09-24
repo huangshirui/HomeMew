@@ -102,7 +102,6 @@ async function reconcileFamilySpaces(env, spaces) {
   const list = Array.isArray(spaces) ? spaces.filter(space => space?.id && FAMILY_ID.test(space.id)) : [];
   const catalog = await callFamilyCatalog(env, '/internal/v1/family-catalog/reconcile', {
     spaceIds: list.map(space => space.id),
-    legacyFamilySpaceIds: list.filter(space => space.kind === 'family').map(space => space.id),
   });
   if (!catalog.ok) return catalog;
   const familyIds = new Set(catalog.data.familySpaceIds ?? []);
@@ -235,7 +234,6 @@ async function createFamily(request, env) {
   const created = await callJson(request, env, 'core', '/api/v1/spaces', {
     method: 'POST',
     data: {
-      kind: 'family',
       name: input.data.name,
       timezone: input.data.timezone ?? 'Asia/Shanghai',
       ownerDisplayName: me.data.displayName,

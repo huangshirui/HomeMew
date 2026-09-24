@@ -9,8 +9,8 @@ test('family catalog is HomeMew-owned application metadata in a dedicated Durabl
   assert.match(workerSource, /export class FamilyCatalog extends DurableObject/);
   assert.match(workerSource, /family:\$\{spaceId\}/);
   assert.match(workerSource, /registeredAt/);
-  assert.match(workerSource, /legacy-kind-backfill/);
   assert.match(workerSource, /operator-import/);
+  assert.doesNotMatch(workerSource, /legacyFamilySpaceIds|legacy-kind-backfill/);
 
   const rootBinding = wrangler.durable_objects.bindings.find((entry) => entry.name === 'FAMILY_CATALOG');
   assert.equal(rootBinding?.class_name, 'FamilyCatalog');

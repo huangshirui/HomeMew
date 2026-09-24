@@ -179,8 +179,8 @@ test('Web family list intersects current LifeSpace Spaces with the HomeMew famil
     }
     if (url.endsWith('/api/v1/me/spaces')) {
       return jsonResponse(200, { data: [
-        { id: 'spc_home', kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1 },
-        { id: 'spc_other', kind: 'personal', name: 'Other', timezone: 'UTC', avatarUrl: null, role: 'owner', version: 1 },
+        { id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1 },
+        { id: 'spc_other', name: 'Other', timezone: 'UTC', avatarUrl: null, role: 'owner', version: 1 },
       ] });
     }
     assert.fail(`unexpected upstream ${url}`);
@@ -192,7 +192,6 @@ test('Web family list intersects current LifeSpace Spaces with the HomeMew famil
         assert.equal(new URL(incoming.url).pathname, '/internal/v1/family-catalog/reconcile');
         const body = await incoming.json();
         assert.deepEqual(body.spaceIds, ['spc_home', 'spc_other']);
-        assert.deepEqual(body.legacyFamilySpaceIds, ['spc_home']);
         return jsonResponse(200, { data: { familySpaceIds: ['spc_home'] } });
       },
     },
@@ -219,7 +218,7 @@ test('Web family creation registers the created Space in HomeMew application met
     if (url.endsWith('/api/v1/spaces')) {
       createdBody = JSON.parse(init.body);
       return jsonResponse(201, { data: {
-        id: 'spc_home', kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1,
+        id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1,
       } });
     }
     assert.fail(`unexpected upstream ${url}`);
@@ -241,7 +240,6 @@ test('Web family creation registers the created Space in HomeMew application met
   }), env);
   assert.equal(response.status, 201);
   assert.deepEqual(createdBody, {
-    kind: 'family',
     name: 'Home',
     timezone: 'Asia/Shanghai',
     ownerDisplayName: 'User One',
@@ -258,7 +256,7 @@ test('Web family invite preview rejects a LifeSpace invite outside the HomeMew c
     }
     if (url.endsWith('/api/v1/space-invites/preview')) {
       return jsonResponse(200, { data: {
-        space: { id: 'spc_other', kind: 'personal', name: 'Other', memberCount: 1 },
+        space: { id: 'spc_other', name: 'Other', memberCount: 1 },
         expiresAt: '2026-09-24T00:00:00Z',
         canJoin: true,
       } });
@@ -290,7 +288,7 @@ test('Web family invite preview reports an eight-member family as full', async (
     }
     if (url.endsWith('/api/v1/space-invites/preview')) {
       return jsonResponse(200, { data: {
-        space: { id: 'spc_full', kind: 'family', name: 'Full', memberCount: 8 },
+        space: { id: 'spc_full', name: 'Full', memberCount: 8 },
         expiresAt: '2026-09-24T00:00:00Z',
         canJoin: true,
       } });
@@ -323,7 +321,7 @@ test('Web family join delegates the capacity-critical commit to the per-family b
     }
     if (url.endsWith('/api/v1/space-invites/preview')) {
       return jsonResponse(200, { data: {
-        space: { id: 'spc_home', kind: 'family', name: 'Home', memberCount: 7 },
+        space: { id: 'spc_home', name: 'Home', memberCount: 7 },
         expiresAt: '2026-09-24T00:00:00Z',
         canJoin: true,
       } });
@@ -423,7 +421,7 @@ test('Core proxy obtains a LifeSpace session and forwards only the user bearer',
     if (url.endsWith('/internal/v1/access/tokens')) {
       return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
     }
-    if (url === 'https://core.example.test/api/v1/spaces?kind=family') {
+    if (url === 'https://core.example.test/api/v1/me/spaces') {
       assert.equal(init.method, 'GET');
       assert.equal(init.headers.get('authorization'), 'Bearer life-token-a');
       assert.equal(init.headers.get('cookie'), null);
@@ -433,7 +431,7 @@ test('Core proxy obtains a LifeSpace session and forwards only the user bearer',
     assert.fail(`unexpected upstream ${url}`);
   };
   const handler = createWebHandler({ fetcher, now: () => NOW });
-  const response = await handler.fetch(request('/api/lifespace/core/v1/spaces?kind=family'), ENV);
+  const response = await handler.fetch(request('/api/lifespace/core/v1/me/spaces'), ENV);
   assert.equal(response.status, 200);
   assert.deepEqual((await payload(response)).data, [{ id: 'spc_1' }]);
   assert.equal(response.headers.get('x-request-id'), 'req_core');

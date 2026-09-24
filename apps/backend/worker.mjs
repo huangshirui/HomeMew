@@ -532,16 +532,10 @@ async function registerFamilyCatalog(request, env) {
 async function reconcileFamilyCatalog(request, env) {
   requireInternalFamilyCatalogRequest(request);
   const input = await readJson(request);
-  if (Object.keys(input).some(key => !['spaceIds', 'legacyFamilySpaceIds', 'source'].includes(key))) {
+  if (Object.keys(input).some(key => key !== 'spaceIds')) {
     throw new HttpError(400, 'INVALID_REQUEST', 'Request contains unsupported fields');
   }
   const spaceIds = validateFamilySpaceIds(input.spaceIds);
-  const legacyFamilySpaceIds = validateFamilySpaceIds(input.legacyFamilySpaceIds ?? []);
-  const allowed = new Set(spaceIds);
-  const compatibleLegacy = legacyFamilySpaceIds.filter(spaceId => allowed.has(spaceId));
-  if (compatibleLegacy.length) {
-    await familyCatalogStub(env).registerMany(compatibleLegacy, input.source === 'operator-import' ? 'operator-import' : 'legacy-kind-backfill');
-  }
   const familySpaceIds = await familyCatalogStub(env).filter(spaceIds);
   return json({ data: { familySpaceIds } });
 }

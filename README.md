@@ -121,7 +121,7 @@ homemew.aisr.online
 
 | HomeMew | LifeSpace |
 | --- | --- |
-| family | `Space(kind=family)` |
+| family | HomeMew Family Catalog entry → LifeSpace `Space` |
 | family admin | Space `owner` / `admin` |
 | writable member | Space `editor` |
 | member relation | Space Person |
