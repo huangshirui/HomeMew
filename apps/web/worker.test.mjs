@@ -218,7 +218,7 @@ test('Web family creation registers the created Space in HomeMew application met
     if (url.endsWith('/api/v1/spaces')) {
       createdBody = JSON.parse(init.body);
       return jsonResponse(201, { data: {
-        id: 'spc_home', kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1,
+        id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1,
       } });
     }
     assert.fail(`unexpected upstream ${url}`);
