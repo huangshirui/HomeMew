@@ -33,7 +33,6 @@ function env(core, identity = async () => assert.fail('unexpected Identity call'
           return ok({ spaceId: body.spaceId, source: body.source, registeredAt: '2026-09-23T00:00:00Z' });
         }
         if (path === '/internal/v1/family-catalog/reconcile') {
-          for (const spaceId of body.legacyFamilySpaceIds ?? []) familyIds.add(spaceId);
           return ok({ familySpaceIds: (body.spaceIds ?? []).filter(spaceId => familyIds.has(spaceId)) });
         }
         if (path === '/internal/v1/family-joins/commit') {
@@ -56,14 +55,14 @@ test('matches only bounded family/member/invitation routes', () => {
   assert.equal(matchMiniProgramFamilyRoute('/api/v1/miniprogram/families/spc_home/invites/not-invite/revoke'), null);
 });
 
-test('family list reconciles legacy kind into the HomeMew catalog before filtering', async () => {
+test('family list intersects current LifeSpace Spaces with the HomeMew catalog', async () => {
   const calls = [];
   const response = await handleMiniProgramFamilyBff(request('/api/v1/miniprogram/families'), env(async incoming => {
     const path = new URL(incoming.url).pathname;
     calls.push(path);
     if (path === '/api/v1/me/spaces') return ok([
-      { id: 'spc_home', kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: 'https://core/assets/spaces/spc_home/avatar', role: 'owner' },
-      { id: 'spc_personal', kind: 'personal', name: 'Mine', timezone: 'UTC', avatarUrl: null, role: 'owner' },
+      { id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: 'https://core/assets/spaces/spc_home/avatar', role: 'owner' },
+      { id: 'spc_personal', name: 'Mine', timezone: 'UTC', avatarUrl: null, role: 'owner' },
     ]);
     if (path === '/api/v1/spaces/spc_home/members') return ok([{ userId: 'usr_1' }, { userId: 'usr_2' }]);
     return assert.fail(`unexpected Core path ${path}`);
@@ -76,20 +75,20 @@ test('family list reconciles legacy kind into the HomeMew catalog before filteri
   }]);
 });
 
-test('family creation shadows the created Space into the HomeMew catalog during compatibility', async () => {
+test('family creation registers the created Space in the HomeMew catalog', async () => {
   let coreBody;
   const response = await handleMiniProgramFamilyBff(
     request('/api/v1/miniprogram/families', { method: 'POST', body: { name: 'Home' } }),
     env(async incoming => {
       assert.equal(incoming.method, 'POST');
       coreBody = await incoming.json();
-      return ok({ id: 'spc_home', kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner' }, 201);
+      return ok({ id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner' }, 201);
     }, async incoming => {
       assert.equal(new URL(incoming.url).pathname, '/api/v1/me');
       return ok({ id: 'usr_owner', displayName: 'Owner', avatarUrl: null, status: 'active' });
     }),
   );
-  assert.deepEqual(coreBody, { kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', ownerDisplayName: 'Owner' });
+  assert.deepEqual(coreBody, { name: 'Home', timezone: 'Asia/Shanghai', ownerDisplayName: 'Owner' });
   const result = (await response.json()).data;
   assert.equal(response.status, 201);
   assert.equal(result.role, 'admin');
@@ -211,7 +210,7 @@ test('invite preview/join map code and obtain display name from Identity only fo
     const body = await incoming.json();
     assert.ok(path.endsWith('/preview'));
     assert.deepEqual(body, { token: 'LS-CODE' });
-    return ok({ space: { id: 'spc_home', kind: 'family', name: 'Home', memberCount: 2 }, expiresAt: '2026-09-17T00:00:00Z', canJoin: true });
+    return ok({ space: { id: 'spc_home', name: 'Home', memberCount: 2 }, expiresAt: '2026-09-17T00:00:00Z', canJoin: true });
   };
   const identity = async () => ok({ id: 'usr_me', displayName: 'Me', avatarUrl: null, status: 'active' });
   const preview = await handleMiniProgramFamilyBff(
@@ -238,7 +237,7 @@ test('invite preview reports full HomeMew families as not joinable before commit
   const response = await handleMiniProgramFamilyBff(
     request('/api/v1/miniprogram/family-invites/preview', { method: 'POST', body: { code: 'LS-FULL' } }),
     env(async () => ok({
-      space: { id: 'spc_full', kind: 'family', name: 'Full', memberCount: 8 },
+      space: { id: 'spc_full', name: 'Full', memberCount: 8 },
       expiresAt: '2026-09-17T00:00:00Z',
       canJoin: true,
     })),
@@ -253,7 +252,7 @@ test('invite preview rejects a non-HomeMew Space even when LifeSpace invite is o
     env(async incoming => {
       assert.equal(new URL(incoming.url).pathname, '/api/v1/space-invites/preview');
       return ok({
-        space: { id: 'spc_other', kind: 'personal', name: 'Other', memberCount: 1 },
+        space: { id: 'spc_other', name: 'Other', memberCount: 1 },
         expiresAt: '2026-09-17T00:00:00Z',
         canJoin: true,
       });
