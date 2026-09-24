@@ -171,7 +171,7 @@ HomeMew keeps product-friendly terms in the UI but maps them explicitly at the c
 
 HomeMew services may expose `familyId`, `attendeeIds`, `assigneeIds` and similar product DTOs to pages, but translate them to Space IDs/Person IDs before calling LifeSpace.
 
-During the Space-kind retirement window, LifeSpace 0.38 `kind=family` may be consumed only to backfill the HomeMew Family Catalog. New product behavior must use the catalog as classification authority, and final cutover requires a complete production catalog reconciliation before LifeSpace removes the deprecated field.
+The HomeMew Family Catalog is the sole product-classification authority for family Spaces. LifeSpace 0.39 no longer exposes `Space.kind`; HomeMew create/list/invite flows must not send, read or infer a family classification from the LifeSpace Space representation.
 
 HomeMew's eight-active-member limit is enforced only on HomeMew membership-join flows. A `FamilyJoinCoordinator` Durable Object is keyed by LifeSpace `spc_*` and serializes invite revalidation, current LifeSpace membership count, and the final LifeSpace join call. It does not persist membership truth. LifeSpace remains authoritative for membership and permission; other generic LifeSpace Spaces are not subject to this product limit.
 
