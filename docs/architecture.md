@@ -173,6 +173,8 @@ HomeMew services may expose `familyId`, `attendeeIds`, `assigneeIds` and similar
 
 During the Space-kind retirement window, LifeSpace 0.38 `kind=family` may be consumed only to backfill the HomeMew Family Catalog. New product behavior must use the catalog as classification authority, and final cutover requires a complete production catalog reconciliation before LifeSpace removes the deprecated field.
 
+HomeMew's eight-active-member limit is enforced only on HomeMew membership-join flows. A `FamilyJoinCoordinator` Durable Object is keyed by LifeSpace `spc_*` and serializes invite revalidation, current LifeSpace membership count, and the final LifeSpace join call. It does not persist membership truth. LifeSpace remains authoritative for membership and permission; other generic LifeSpace Spaces are not subject to this product limit.
+
 ## 7. Normal Mini Program requests
 
 ```text

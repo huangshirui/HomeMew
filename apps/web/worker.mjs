@@ -411,7 +411,31 @@ async function familyInvitePreview(env, fetcher, token, id, inviteToken) {
   return {
     ...preview,
     space: classified[0],
+    canJoin: preview.canJoin === true && Number(preview.space?.memberCount ?? 0) < 8,
   };
+}
+
+async function commitWebFamilyJoin(env, accessToken, familyId, token, displayName) {
+  const response = await applicationBackend(env).fetch(new Request('https://homemew-backend.internal/internal/v1/family-joins/commit', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${accessToken}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ familyId, token, displayName }),
+  }));
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = payload?.error;
+    throw new HttpError(
+      response.status,
+      typeof error?.code === 'string' ? error.code : 'FAMILY_JOIN_FAILED',
+      typeof error?.message === 'string' ? error.message : '加入家庭失败',
+    );
+  }
+  if (!payload?.data) throw new HttpError(502, 'INVALID_UPSTREAM_RESPONSE', 'HomeMew 家庭加入服务返回无效响应');
+  return payload.data;
 }
 
 async function handleFamilies(request, env, fetcher, assertion, id, nowMs) {
@@ -462,10 +486,13 @@ async function handleFamilyInvite(request, env, fetcher, assertion, id, nowMs, a
   if (me.response.status !== 200 || !me.payload?.data?.displayName) {
     throw upstreamError(me.response, me.payload, 'LIFESPACE_PROFILE_FAILED');
   }
-  const joined = await coreUserRequest(env, fetcher, '/api/v1/space-invites/join', session.accessToken, id, {
-    method: 'POST',
-    body: { token, displayName: me.payload.data.displayName },
-  });
+  const joined = await commitWebFamilyJoin(
+    env,
+    session.accessToken,
+    preview.space.id,
+    token,
+    me.payload.data.displayName,
+  );
   try {
     await familyCatalogRequest(env, '/internal/v1/family-catalog/register', { spaceId: joined.spaceId, source: 'joined' });
   } catch (error) {

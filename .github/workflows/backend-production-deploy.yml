@@ -65,6 +65,8 @@ jobs:
           if (activity?.class_name !== 'MemberActivity') throw new Error('Production MEMBER_ACTIVITIES binding is missing');
           const familyCatalog = production.durable_objects?.bindings?.find((entry) => entry.name === 'FAMILY_CATALOG');
           if (familyCatalog?.class_name !== 'FamilyCatalog') throw new Error('Production FAMILY_CATALOG binding is missing');
+          const familyJoin = production.durable_objects?.bindings?.find((entry) => entry.name === 'FAMILY_JOIN_COORDINATORS');
+          if (familyJoin?.class_name !== 'FamilyJoinCoordinator') throw new Error('Production FAMILY_JOIN_COORDINATORS binding is missing');
           NODE
 
       - name: Verify LifeSpace production is reachable
@@ -108,5 +110,6 @@ jobs:
             echo "- Mini Program provider route: verified through the Web front door"
             echo "- Member activity: SQLite-backed Durable Object"
             echo "- Family catalog: SQLite-backed Durable Object application metadata"
+            echo "- Family join limit: per-family Durable Object coordinator"
             echo "- Custom Domain and Cloudflare Access configuration: untouched"
           } >> "$GITHUB_STEP_SUMMARY"

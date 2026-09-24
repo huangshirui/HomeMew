@@ -1,4 +1,4 @@
-import { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
+import { authorizationHeader, errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
 
 const MINI_PREFIX = '/api/v1/miniprogram';
 const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
@@ -113,6 +113,35 @@ async function registerFamilySpace(env, spaceId, source) {
   return callFamilyCatalog(env, '/internal/v1/family-catalog/register', { spaceId, source });
 }
 
+async function commitFamilyJoin(request, env, familyId, token, displayName) {
+  const backend = env.HOMEMEW_BACKEND;
+  const authorization = authorizationHeader(request);
+  if (!authorization) {
+    return { ok: false, response: errorResponse(401, 'UNAUTHORIZED', 'LifeSpace user bearer is required') };
+  }
+  if (!backend || typeof backend.fetch !== 'function') {
+    return { ok: false, response: errorResponse(503, 'FAMILY_JOIN_UNAVAILABLE', 'HomeMew 家庭加入服务暂时不可用') };
+  }
+  const response = await backend.fetch(new Request('https://homemew-backend.internal/internal/v1/family-joins/commit', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      authorization,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ familyId, token, displayName }),
+  }));
+  const payload = await response.json().catch(() => null);
+  if (!payload || typeof payload !== 'object') {
+    return { ok: false, response: errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'HomeMew 家庭加入服务返回无效响应') };
+  }
+  if (!response.ok) {
+    return { ok: false, response: json(payload, response.status, request.headers.get('x-request-id') || '') };
+  }
+  return { ok: true, data: payload.data, status: response.status };
+}
+
+
 async function requireFamilyInvite(request, env, token) {
   const preview = await callJson(request, env, 'core', '/api/v1/space-invites/preview', {
     method: 'POST', data: { token },
@@ -126,7 +155,13 @@ async function requireFamilyInvite(request, env, token) {
       response: errorResponse(422, 'NOT_HOMEMEW_FAMILY_INVITE', '这个邀请码不属于 HomeMew 家庭'),
     };
   }
-  return { ok: true, preview: preview.data };
+  return {
+    ok: true,
+    preview: {
+      ...preview.data,
+      canJoin: preview.data.canJoin === true && Number(preview.data.space?.memberCount ?? 0) < 8,
+    },
+  };
 }
 
 async function readBody(request, allowed) {
@@ -349,9 +384,13 @@ async function inviteAction(request, env, kind) {
   }
   const me = await callJson(request, env, 'identity', '/api/v1/me');
   if (!me.ok) return me.response;
-  const result = await callJson(request, env, 'core', '/api/v1/space-invites/join', {
-    method: 'POST', data: { token, displayName: me.data.displayName },
-  });
+  const result = await commitFamilyJoin(
+    request,
+    env,
+    familyInvite.preview.space.id,
+    token,
+    me.data.displayName,
+  );
   if (!result.ok) return result.response;
   const catalog = await registerFamilySpace(env, result.data.spaceId, 'joined');
   if (!catalog.ok) console.warn('[HomeMew Mini BFF] family catalog registration failed after join', result.data.spaceId);
@@ -360,7 +399,7 @@ async function inviteAction(request, env, kind) {
     familyName: familyInvite.preview.space.name ?? '',
     role: 'member',
     joinedAt: result.data.joinedAt ?? new Date().toISOString(),
-  } }, result.status, result.requestId);
+  } }, result.status);
 }
 
 export async function handleMiniProgramFamilyBff(request, env) {

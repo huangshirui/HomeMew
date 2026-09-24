@@ -19,7 +19,7 @@ function ok(data, status = 200) {
   });
 }
 
-function env(core, identity = async () => assert.fail('unexpected Identity call'), initialFamilyIds = []) {
+function env(core, identity = async () => assert.fail('unexpected Identity call'), initialFamilyIds = [], options = {}) {
   const familyIds = new Set(initialFamilyIds);
   return {
     LIFESPACE_CORE: { fetch: core },
@@ -35,6 +35,10 @@ function env(core, identity = async () => assert.fail('unexpected Identity call'
         if (path === '/internal/v1/family-catalog/reconcile') {
           for (const spaceId of body.legacyFamilySpaceIds ?? []) familyIds.add(spaceId);
           return ok({ familySpaceIds: (body.spaceIds ?? []).filter(spaceId => familyIds.has(spaceId)) });
+        }
+        if (path === '/internal/v1/family-joins/commit') {
+          if (typeof options.onFamilyJoin === 'function') return options.onFamilyJoin(incoming, body);
+          return ok({ spaceId: body.familyId, role: 'editor', joinedAt: '2026-09-16T01:00:00Z' }, 201);
         }
         return assert.fail(`unexpected backend path ${path}`);
       },
@@ -205,12 +209,9 @@ test('invite preview/join map code and obtain display name from Identity only fo
   const core = async incoming => {
     const path = new URL(incoming.url).pathname;
     const body = await incoming.json();
-    if (path.endsWith('/preview')) {
-      assert.deepEqual(body, { token: 'LS-CODE' });
-      return ok({ space: { id: 'spc_home', kind: 'family', name: 'Home', memberCount: 2 }, expiresAt: '2026-09-17T00:00:00Z', canJoin: true });
-    }
-    joinBody = body;
-    return ok({ spaceId: 'spc_home', role: 'editor', joinedAt: '2026-09-16T01:00:00Z' }, 201);
+    assert.ok(path.endsWith('/preview'));
+    assert.deepEqual(body, { token: 'LS-CODE' });
+    return ok({ space: { id: 'spc_home', kind: 'family', name: 'Home', memberCount: 2 }, expiresAt: '2026-09-17T00:00:00Z', canJoin: true });
   };
   const identity = async () => ok({ id: 'usr_me', displayName: 'Me', avatarUrl: null, status: 'active' });
   const preview = await handleMiniProgramFamilyBff(
@@ -218,12 +219,32 @@ test('invite preview/join map code and obtain display name from Identity only fo
   );
   assert.deepEqual((await preview.json()).data.family, { id: 'spc_home', name: 'Home', avatarUrl: null, memberCount: 2 });
   const joined = await handleMiniProgramFamilyBff(
-    request('/api/v1/miniprogram/family-invites/join', { method: 'POST', body: { code: 'LS-CODE' } }), env(core, identity),
+    request('/api/v1/miniprogram/family-invites/join', { method: 'POST', body: { code: 'LS-CODE' } }),
+    env(core, identity, [], {
+      onFamilyJoin(incoming, body) {
+        assert.equal(incoming.headers.get('authorization'), TOKEN);
+        joinBody = body;
+        return ok({ spaceId: 'spc_home', role: 'editor', joinedAt: '2026-09-16T01:00:00Z' }, 201);
+      },
+    }),
   );
-  assert.deepEqual(joinBody, { token: 'LS-CODE', displayName: 'Me' });
+  assert.deepEqual(joinBody, { familyId: 'spc_home', token: 'LS-CODE', displayName: 'Me' });
   assert.deepEqual((await joined.json()).data, {
     familyId: 'spc_home', familyName: 'Home', role: 'member', joinedAt: '2026-09-16T01:00:00Z',
   });
+});
+
+test('invite preview reports full HomeMew families as not joinable before commit', async () => {
+  const response = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/family-invites/preview', { method: 'POST', body: { code: 'LS-FULL' } }),
+    env(async () => ok({
+      space: { id: 'spc_full', kind: 'family', name: 'Full', memberCount: 8 },
+      expiresAt: '2026-09-17T00:00:00Z',
+      canJoin: true,
+    })),
+  );
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.canJoin, false);
 });
 
 test('invite preview rejects a non-HomeMew Space even when LifeSpace invite is otherwise valid', async () => {
