@@ -3,5 +3,6 @@
   "backgroundColor": "#F1F8F4",
   "usingComponents": {
     "date-calendar": "/components/date-calendar/index"
-  }
+  },
+  "navigationStyle": "custom"
 }

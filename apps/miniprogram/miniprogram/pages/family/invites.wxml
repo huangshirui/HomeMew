@@ -1,5 +1,7 @@
 <!-- 家庭邀请管理页 -->
 <view class="container">
+  <nav-bar title="家庭邀请" showBack="true" />
+
   <view class="header">
     <text class="title">邀请家人加入</text>
     <text class="subtitle">创建一个邀请链接，通过微信发送给家人。</text>

@@ -1,5 +1,18 @@
 /* 许愿池列表页 */
 
+/* 下拉刷新容器：nav-bar 在容器外固定，仅内容区可下拉刷新 */
+.wishes-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.wishes-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
 .filter-bar {
   white-space: nowrap;
   margin-bottom: 20rpx;

@@ -76,12 +76,31 @@ const KIND_CHOICES: { kind: DayRecordKind; icon: string; title: string; desc: st
 const DEFAULT_COUNTDOWN_BEFORE_DAYS = 30;
 const DEFAULT_CYCLE_BEFORE_DAYS = 7;
 
+/** 图标选择区固定 3 行，超出的列横向滑动 */
+const ICON_ROW_COUNT = 3;
+
+type IconRow = { key: number; icons: string[] };
+
+/**
+ * 把图标按「列优先」分配成固定 3 行：
+ * 第 0~2 个填第 1 列，第 3~5 个填第 2 列……
+ * 行数恒定，列数随图标总数增长，超出屏宽由 scroll-view 横向滚动。
+ * 不依赖 flex 列换行（column + wrap 在部分小程序内核不可靠）。
+ */
+function buildIconRows(icons: string[], rowCount: number = ICON_ROW_COUNT): IconRow[] {
+  const rows: IconRow[] = Array.from({ length: rowCount }, (_, i) => ({ key: i, icons: [] }));
+  icons.forEach((icon, index) => {
+    rows[index % rowCount].icons.push(icon);
+  });
+  return rows;
+}
+
 Page({
   data: {
     mode: 'create' as Mode,
     step: 'kind' as Step,
     kindChoices: KIND_CHOICES,
-    iconChoices: ICON_CHOICES,
+    iconRows: buildIconRows(ICON_CHOICES),
 
     familyId: '',
     dayRecordId: '',

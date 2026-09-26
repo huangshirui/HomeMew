@@ -1,1 +1,4 @@
-{ "navigationBarTitleText": "家庭邀请" }
+{
+  "navigationBarTitleText": "家庭邀请",
+  "navigationStyle": "custom"
+}

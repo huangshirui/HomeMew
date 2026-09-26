@@ -131,7 +131,7 @@ Page({
 
     // 成员范围
     scope: 'me' as EventsScope,
-    scopeLabel: '我的日历',
+    scopeLabel: '我的',
     scopeOptions: [] as ScopeOption[],
     showScopeSheet: false,
 
@@ -428,10 +428,10 @@ Page({
     const uid = userStore.value?.id || '';
     const user = userStore.value;
     const options: ScopeOption[] = [
-      { key: 'all', label: '全家日历', avatarUrl: '', showAvatar: false },
+      { key: 'all', label: '全家', avatarUrl: '', showAvatar: false },
       {
         key: 'me',
-        label: '我的日历',
+        label: '我的',
         avatarUrl: safeAvatarUrl(user?.avatarUrl),
         showAvatar: true,
       },
@@ -450,8 +450,8 @@ Page({
   },
 
   labelForScope(scope: EventsScope): string {
-    if (scope === 'all') return '全家日历';
-    if (scope === 'me') return '我的日历';
+    if (scope === 'all') return '全家';
+    if (scope === 'me') return '我的';
     const member = this._members.find(m => m.userId === scope);
     return member ? `${member.displayName}的日历` : '家人日历';
   },

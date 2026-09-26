@@ -7,6 +7,19 @@
   padding-bottom: 160rpx;
 }
 
+/* 下拉刷新容器：nav-bar 在容器外固定，仅内容区可下拉刷新 */
+.tasks-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.tasks-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
 /* 首屏加载骨架屏（对齐日程页，仅占位任务列表区） */
 .skeleton {
   padding: 8rpx 0 0;

@@ -40,6 +40,9 @@ Page({
     canFulfill: false,
     isOwner: false,
     version: 0,
+
+    /** 下拉刷新指示器状态（scroll-view refresher） */
+    refreshing: false,
   },
 
   _wish: null as Wish | null,
@@ -71,9 +74,12 @@ Page({
     if (this._celebrationTimer) clearTimeout(this._celebrationTimer);
   },
 
-  async onPullDownRefresh(): Promise<void> {
-    await this.loadWish(true);
-    wx.stopPullDownRefresh();
+  /** 下拉刷新：仅内容区下拉（nav-bar 固定），重新拉取愿望详情 */
+  onRefresh(): void {
+    this.setData({ refreshing: true });
+    Promise.resolve(this.loadWish(true))
+      .then(() => this.setData({ refreshing: false }))
+      .catch(() => this.setData({ refreshing: false }));
   },
 
   async loadWish(silent = false): Promise<void> {

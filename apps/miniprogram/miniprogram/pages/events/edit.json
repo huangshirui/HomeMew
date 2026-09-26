@@ -2,5 +2,6 @@
   "navigationBarTitleText": "添加日程",
   "usingComponents": {
     "date-calendar": "/components/date-calendar/index"
-  }
+  },
+  "navigationStyle": "custom"
 }

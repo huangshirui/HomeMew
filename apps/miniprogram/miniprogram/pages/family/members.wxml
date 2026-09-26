@@ -1,5 +1,7 @@
 <!-- 家庭成员列表页 -->
 <view class="container">
+  <nav-bar title="家庭成员" showBack="true" />
+
   <view class="header">
     <text class="title">家庭成员</text>
     <text class="subtitle">{{members.length}} 位成员</text>

@@ -1,4 +1,6 @@
 <view class="container account-link-page">
+  <nav-bar title="关联 Web 登录" showBack="true" />
+
   <view class="card link-card">
     <view class="link-header">
       <text class="link-title">关联 Web 登录</text>

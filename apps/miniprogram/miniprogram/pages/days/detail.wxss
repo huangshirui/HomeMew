@@ -1,5 +1,18 @@
 /* 日子详情页 */
 
+/* 下拉刷新容器：nav-bar 在容器外固定，仅内容区可下拉刷新 */
+.days-detail-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.days-detail-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
 /* 头部 */
 .hero {
   background-color: var(--color-card);

@@ -1,5 +1,7 @@
 <!-- 加入家庭页 -->
 <view class="container">
+  <nav-bar title="加入家庭" showBack="true" />
+
   <view class="header">
     <text class="title">加入家庭</text>
     <text class="subtitle">输入家人分享的邀请码，加入对应的家庭</text>

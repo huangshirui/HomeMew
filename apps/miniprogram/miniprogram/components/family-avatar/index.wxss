@@ -1,0 +1,11 @@
+:host {
+  display: inline-block;
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.family-avatar {
+  display: block;
+  border-radius: 50%;
+  background-color: var(--color-border, #e5e7eb);
+}

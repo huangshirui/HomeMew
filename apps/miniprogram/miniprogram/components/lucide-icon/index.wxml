@@ -1,0 +1,4 @@
+<view
+  class="lucide-icon"
+  style="width:{{sizePx}}px;height:{{sizePx}}px;background-image:{{bg}};"
+></view>

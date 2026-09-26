@@ -74,6 +74,9 @@ Page({
     listError: false,
     noFamily: false,
     familyId: '' as string,
+
+    /** 下拉刷新指示器状态（scroll-view refresher） */
+    refreshing: false,
   },
 
   /** 请求序号：用于丢弃过期（家庭切换 / 范围切换 / 慢网络）返回结果 */
@@ -256,10 +259,10 @@ Page({
     const uid = userStore.value?.id || '';
     const user = userStore.value;
     const options: ScopeOption[] = [
-      { key: 'all', label: '全家待办', avatarUrl: '', showAvatar: false },
+      { key: 'all', label: '全家', avatarUrl: '', showAvatar: false },
       {
         key: 'me',
-        label: '我的待办',
+        label: '我的',
         avatarUrl: safeAvatarUrl(user?.avatarUrl),
         showAvatar: true,
       },
@@ -278,8 +281,8 @@ Page({
   },
 
   labelForScope(scope: TasksScope): string {
-    if (scope === 'all') return '全家待办';
-    if (scope === 'me') return '我的待办';
+    if (scope === 'all') return '全家';
+    if (scope === 'me') return '我的';
     const member = this._members.find(m => m.userId === scope);
     return member ? `${member.displayName}的待办` : '家人待办';
   },
@@ -355,13 +358,16 @@ Page({
     this.onLoad(this._initOptions || {});
   },
 
-  async onPullDownRefresh(): Promise<void> {
+  /** 下拉刷新：仅内容区下拉（nav-bar 固定），重新拉取待办与成员 */
+  onRefresh(): void {
     if (this.data.noFamily) {
-      wx.stopPullDownRefresh();
+      this.setData({ refreshing: false });
       return;
     }
-    await Promise.all([this.loadTasks(), this.loadMembers()]);
-    wx.stopPullDownRefresh();
+    this.setData({ refreshing: true });
+    Promise.all([this.loadTasks(), this.loadMembers()])
+      .then(() => this.setData({ refreshing: false }))
+      .catch(() => this.setData({ refreshing: false }));
   },
 
   mapTasks(tasks: Task[]): TaskView[] {

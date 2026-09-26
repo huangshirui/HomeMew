@@ -1,5 +1,15 @@
 <!-- 已完成待办列表页 -->
-<view class="container">
+<view class="container completed-root">
+  <nav-bar title="已完成待办" showBack="true" />
+
+  <scroll-view
+    class="completed-scroll"
+    scroll-y
+    enable-flex
+    refresher-enabled
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+  >
   <!-- 顶部：只读展示继承自待办页的成员范围 -->
   <view class="scope-bar">
     <text class="scope-bar-text">{{scopeLabel}}</text>
@@ -55,4 +65,5 @@
     <text class="empty-title">还没有已完成的待办</text>
     <text class="empty-desc">完成待办后会出现在这里。</text>
   </view>
+  </scroll-view>
 </view>

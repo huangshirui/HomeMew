@@ -1,5 +1,16 @@
 <!-- 许愿池列表页 -->
-<view class="container">
+<view class="container wishes-root">
+  <nav-bar title="许愿池" showBack="true" />
+
+  <scroll-view
+    class="wishes-scroll"
+    scroll-y
+    enable-flex
+    refresher-enabled
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+    bindscrolltolower="onReachBottom"
+  >
   <block wx:if="{{noFamily}}">
     <view class="empty-state">
       <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
@@ -95,11 +106,13 @@
       </view>
     </block>
 
-    <view class="fab fab-small wish-fab" bindtap="onCreate">
-      <view class="fab-plus">
-        <view class="fab-plus-line fab-plus-horizontal"></view>
-        <view class="fab-plus-line fab-plus-vertical"></view>
-      </view>
-    </view>
   </block>
+  </scroll-view>
+
+  <view wx:if="{{!noFamily}}" class="fab fab-small wish-fab" bindtap="onCreate">
+    <view class="fab-plus">
+      <view class="fab-plus-line fab-plus-horizontal"></view>
+      <view class="fab-plus-line fab-plus-vertical"></view>
+    </view>
+  </view>
 </view>

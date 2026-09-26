@@ -1,6 +1,6 @@
 <!-- 首页：今天的家庭工作台 -->
 <import src="home.skeleton.wxml" />
-<view class="container">
+<view class="container home-root">
 
   <!-- 骨架屏：首屏数据就绪前覆盖展示，避免白屏 -->
   <template is="skeleton" wx:if="{{loading}}" />
@@ -8,30 +8,24 @@
   <!-- 有家庭时 -->
   <block wx:if="{{currentFamily}}">
 
-    <!-- 欢迎卡片 -->
-    <view class="greeting-card">
-      <view class="greeting-main">
-        <text class="greeting-title">{{greetingText}}</text>
-        <text class="greeting-date">{{dateText}}</text>
-        <text class="greeting-subtitle">{{greetingSubtitle}}</text>
+    <!-- 自定义导航栏：家庭圆形徽章 + 家庭名称（统一 nav-bar 组件） -->
+    <nav-bar>
+      <view slot="left" class="home-nav-left">
+        <family-avatar src="{{currentFamily.avatarUrl}}" size="{{64}}" alt="{{currentFamily.name}}" />
+        <text class="home-nav-title">{{currentFamily.name}}</text>
       </view>
-
-      <!-- 当前家庭入口：始终显示；多家庭显示名称与下拉箭头，单家庭只显示头像 -->
-      <view class="family-switch {{canSwitch ? '' : 'single'}}" bindtap="onSwitchFamily">
-        <image
-          class="family-switch-avatar"
-          src="{{currentFamily.avatarUrl || '/assets/images/default-family.png'}}"
-          mode="aspectFill"
-        />
-        <block wx:if="{{canSwitch}}">
-          <text class="family-switch-name">{{currentFamily.name}}</text>
-          <text class="family-switch-caret">▾</text>
-        </block>
-      </view>
-    </view>
+    </nav-bar>
 
     <!-- 需要关注：横向滚动卡片（有内容时才显示） -->
-    <view wx:if="{{attentionCards.length > 0}}" class="card section attention-section">
+    <scroll-view
+      class="home-scroll"
+      scroll-y
+      enable-flex
+      refresher-enabled
+      refresher-triggered="{{refreshing}}"
+      bindrefresherrefresh="onRefresh"
+    >
+    <view wx:if="{{attentionCards.length > 0}}" class="attention-section">
       <view class="section-header">
         <text class="section-title">需要关注</text>
       </view>
@@ -207,6 +201,7 @@
         </view>
       </view>
     </view>
+  </scroll-view>
   </block>
 
   <!-- 无家庭时 -->

@@ -1,5 +1,7 @@
 <!-- 家庭详情页 -->
 <view class="container">
+  <nav-bar title="家庭详情" showBack="true" />
+
   <!-- 家庭资料卡 -->
   <view class="card family-card">
     <image

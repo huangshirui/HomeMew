@@ -1,5 +1,7 @@
 <!-- 我的页面 -->
 <view class="container">
+  <nav-bar title="我的" />
+
   <!-- 用户信息卡片 -->
   <block wx:if="{{userInfo}}">
     <view class="user-card card">
@@ -36,10 +38,11 @@
         bindtap="onFamilyTap"
         data-id="{{item.id}}"
       >
-        <image
+        <family-avatar
           class="family-item-avatar"
-          src="{{item.avatarUrl || '/assets/images/default-family.png'}}"
-          mode="aspectFill"
+          src="{{item.avatarUrl}}"
+          size="{{80}}"
+          alt="{{item.name}}"
         />
         <view class="family-item-info">
           <view class="family-item-name-row">

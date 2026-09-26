@@ -17,19 +17,8 @@
 -->
 <template name="skeleton">
   <view class="sk-container">
+    <nav-bar background="#FFFFFF" topInset="{{0}}"></nav-bar>
     <view class="container">
-      <view class="greeting-card sk-image">
-        <view class="greeting-main">
-          <text class="greeting-title sk-transparent sk-text-11-5385-372 sk-text">晚上好，朋友 👋</text>
-          <text class="greeting-date sk-transparent sk-text-16-6667-822 sk-text">—月—日 · 周—</text>
-          <text class="greeting-subtitle sk-transparent sk-text-16-6667-755 sk-text">今天有 — 个安排，— 件事情需要关注</text>
-        </view>
-        <view class="family-switch">
-          <image class="family-switch-avatar sk-image" mode="aspectFill"></image>
-          <text class="family-switch-name sk-transparent sk-text-16-6667-296 sk-text">我的家庭</text>
-          <text class="family-switch-caret sk-transparent sk-opacity">▾</text>
-        </view>
-      </view>
       <view class="card section attention-section">
         <view class="section-header">
           <text class="section-title sk-transparent sk-text-16-6667-793 sk-text">需要关注</text>

@@ -1,5 +1,15 @@
 <!-- 日子详情页 -->
-<view class="container">
+<view class="container days-detail-root">
+  <nav-bar title="日子详情" showBack="true" />
+
+  <scroll-view
+    class="days-detail-scroll"
+    scroll-y
+    enable-flex
+    refresher-enabled
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+  >
   <!-- 加载失败 -->
   <view wx:if="{{loadError}}" class="load-error-state">
     <text class="load-error-text">加载失败</text>
@@ -96,6 +106,7 @@
       >删除</button>
     </view>
   </block>
+  </scroll-view>
 
   <!-- 记录 occurrence 弹层 -->
   <view wx:if="{{sheetOpen}}" class="sheet-mask" bindtap="onCloseSheet">

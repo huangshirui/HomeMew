@@ -51,6 +51,9 @@ Page({
     loadError: false,
     submitting: false,
 
+    /** 下拉刷新指示器状态（scroll-view refresher） */
+    refreshing: false,
+
     /** 展示字段 */
     name: '',
     icon: '',
@@ -118,9 +121,12 @@ Page({
     if (this.data.loaded) this.loadRecord(true);
   },
 
-  async onPullDownRefresh(): Promise<void> {
-    await this.loadRecord(true);
-    wx.stopPullDownRefresh();
+  /** 下拉刷新：仅内容区下拉（nav-bar 固定），重新拉取日子详情 */
+  onRefresh(): void {
+    this.setData({ refreshing: true });
+    Promise.resolve(this.loadRecord(true))
+      .then(() => this.setData({ refreshing: false }))
+      .catch(() => this.setData({ refreshing: false }));
   },
 
   async loadRecord(silent = false): Promise<void> {

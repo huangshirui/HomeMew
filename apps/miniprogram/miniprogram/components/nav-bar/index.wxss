@@ -1,0 +1,65 @@
+.nav-bar {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  margin-bottom: 24rpx;
+  display: flex;
+}
+
+.nav-bar-inner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nav-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  /* 撑大点击热区：高度填满导航条，左右留白保证最小触控宽度 */
+  padding: 0 18rpx;
+  margin-right: 6rpx;
+  flex-shrink: 0;
+}
+
+.nav-back--hover .nav-back-icon {
+  opacity: 0.4;
+}
+
+.nav-back-icon {
+  /* 用左右边框旋转 45° 画出的实心 chevron 返回箭头，比文字符号更清晰统一 */
+  width: 22rpx;
+  height: 22rpx;
+  box-sizing: border-box;
+  border-left: 5rpx solid #222222;
+  border-bottom: 5rpx solid #222222;
+  transform: rotate(45deg);
+  /* 旋转后视觉偏右，向左补偿使箭头居中于热区 */
+  margin-left: 4rpx;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.nav-title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #222222;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}

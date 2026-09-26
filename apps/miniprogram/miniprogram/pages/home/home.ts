@@ -1,14 +1,16 @@
 /**
  * 首页 —— 今天的家庭工作台
  *
- * 首页顺序（见需求「四、首页最终结构」）：
- *   欢迎卡 → 需要关注 → 今天安排 → 待办提醒 → 常用工具
+ * 首页顺序（见需求「11. 首页需求」）：
+ *   导航栏显示当前家庭名称 → 需要关注 → 今天安排 → 待办提醒 → 常用工具
  *
  * 设计目标：
  * - 删除两个统计数字卡片；
  * - 删除原单条 urgent banner，紧急日程并入「需要关注」横向卡片；
- * - 欢迎卡右上角始终显示当前家庭（单家庭只显示头像、多家庭显示下拉箭头）；
- * - 「需要关注」横向滚动聚合：日子关注项 + 逾期待办汇总卡 + 紧急日程卡；
+ * - 删除原欢迎卡片：当前家庭名称显示于导航栏（运行时替换固定的“家事喵”标题），
+ *   切换家庭统一在「我的」页完成，首页不再承载家庭切换入口；
+ * - 「需要关注」保持简洁：区块底色为浅绿、内部卡片为浅白（与原配色互换），
+ *   critical 卡片整卡高亮并放大数字，让逾期/紧急真正跳出来；
  * - 没有关注项时整个「需要关注」区域隐藏；
  * - 家庭管理统一收归「我的」，首页只展示常用工具入口。
  */
@@ -19,7 +21,6 @@ import {
   userStore,
   loadFamilies,
   loadCurrentUser,
-  setCurrentFamily,
   restoreCurrentFamily,
 } from '../../stores/index';
 import {
@@ -146,13 +147,7 @@ Page({
     /** 首屏骨架屏开关：初始为 true，数据就绪后关闭，由真实内容替换 */
     loading: true,
 
-    greetingText: '',
-    dateText: '',
-    greetingSubtitle: '',
-
     currentFamily: null as FamilyView | null,
-    families: [] as FamilyView[],
-    canSwitch: false,
     loaded: false,
 
     todayEvents: [] as TodayEventView[],
@@ -175,6 +170,9 @@ Page({
     attentionDays: [] as DayRecordView[],
     daysLoading: false,
     daysError: false,
+
+    /** 下拉刷新指示器状态（scroll-view refresher） */
+    refreshing: false,
   },
 
   // 原始列表（不参与渲染，仅用于派生视图与排序）
@@ -184,7 +182,6 @@ Page({
   /** 本页已尝试恢复启动缓存的家庭；避免同一次页面生命周期反复读取 Storage。 */
   _homeCacheHydratedFamilyId: '' as string,
 
-  _userUnsubscribe: null as (() => void) | null,
   _familyUnsubscribe: null as (() => void) | null,
   _familiesUnsubscribe: null as (() => void) | null,
   _dirtyUnsubscribe: null as (() => void) | null,
@@ -197,10 +194,12 @@ Page({
   /** 上次重算得到的「已结束 / 进行中」指纹，用于跳过无变化的 setData */
   _statusFingerprint: '' as string,
 
-  /** 页面显示：刷新问候 + 订阅状态 + 启动每分钟本地重算 */
+  /** 页面显示：同步导航栏家庭名 + 订阅状态 + 启动每分钟本地重算 */
   onShow(): void {
     this.getTabBar()?.setData({ selected: 0 });
-    this.refreshGreeting();
+
+    // 先以 store 中的当前家庭刷新标题，避免 setData 异步导致读取到旧数据。
+    this.applyNavTitle(currentFamilyStore.value as FamilyView | null);
 
     const storeFamilyId = currentFamilyStore.value?.id || '';
     const shownFamilyId = this.data.currentFamily?.id || '';
@@ -213,11 +212,12 @@ Page({
       this.loadData();
     }
 
-    this._userUnsubscribe = userStore.subscribe(() => this.refreshGreeting());
     this._familyUnsubscribe = currentFamilyStore.subscribe((family) => {
       const newFamily = family as FamilyView | null;
       const prevId = this.data.currentFamily?.id;
-      this.setData({ currentFamily: newFamily });
+      this.setData({ currentFamily: newFamily }, () => {
+        this.applyNavTitle(newFamily);
+      });
       const newId = newFamily?.id;
       if (newId && newId !== prevId) {
         // 家庭切换：先清空旧家庭的所有缓存与派生展示数据，避免「需要关注」、
@@ -234,11 +234,11 @@ Page({
     this._familiesUnsubscribe = familiesStore.subscribe((families) => {
       const cf = currentFamilyStore.value;
       this.setData({
-        families: families as FamilyView[],
-        canSwitch: (families as FamilyView[]).length > 1,
         loaded: true,
         loading: false,
         currentFamily: cf as FamilyView | null,
+      }, () => {
+        this.applyNavTitle(cf as FamilyView | null);
       });
     });
 
@@ -248,7 +248,6 @@ Page({
   },
 
   onHide(): void {
-    if (this._userUnsubscribe) this._userUnsubscribe();
     if (this._familyUnsubscribe) this._familyUnsubscribe();
     if (this._familiesUnsubscribe) this._familiesUnsubscribe();
     this._stopTick();
@@ -365,7 +364,6 @@ Page({
       pendingTaskMore: 0,
       attentionDays: [],
       attentionCards: [],
-      greetingSubtitle: '',
     });
   },
 
@@ -387,15 +385,17 @@ Page({
     }
   },
 
-  /** 下拉刷新：家庭信息 + 今日日程 + 待办 */
-  async onPullDownRefresh(): Promise<void> {
+  /** 下拉刷新：仅内容区下拉（nav-bar 固定），家庭信息 + 今日日程 + 待办 */
+  onRefresh(): void {
     this._markFetched();
-    await Promise.all([
+    this.setData({ refreshing: true });
+    Promise.all([
       this.loadData(),
       this.data.currentFamily ? this.loadTodayEvents(this.data.currentFamily.id) : Promise.resolve(),
       this.data.currentFamily ? this.loadTasks(this.data.currentFamily.id) : Promise.resolve(),
-    ]);
-    wx.stopPullDownRefresh();
+    ])
+      .then(() => this.setData({ refreshing: false }))
+      .catch(() => this.setData({ refreshing: false }));
   },
 
   async loadData(): Promise<void> {
@@ -403,14 +403,19 @@ Page({
     try {
       await Promise.all([loadFamilies(), this.ensureUser()]);
       const families = familiesStore.value;
-      const current = restoreCurrentFamily(families) || currentFamilyStore.value;
+      // 优先信任 store 中当前家庭（其它页面切换后已同步），若无效再尝试恢复缓存。
+      const storeCurrent = currentFamilyStore.value;
+      const current =
+        (storeCurrent && families.some((f) => f.id === storeCurrent.id)
+          ? storeCurrent
+          : restoreCurrentFamily(families)) || null;
       const prevId = this.data.currentFamily?.id;
       this.setData({
-        families: families as FamilyView[],
         currentFamily: current as FamilyView | null,
-        canSwitch: families.length > 1,
         loaded: true,
         loading: false,
+      }, () => {
+        this.applyNavTitle(current as FamilyView | null);
       });
 
       const app = getApp<IAppOption>();
@@ -418,8 +423,6 @@ Page({
         app.globalData.families = families;
         app.globalData.currentFamily = current;
       }
-
-      this.refreshGreeting();
 
       if (current) {
         // 家庭发生变化时先清空旧数据，避免新家庭加载完成前残留上一个家庭的内容
@@ -447,16 +450,13 @@ Page({
     }
   },
 
-  /** 根据时间 + 用户昵称刷新问候语与日期 */
-  refreshGreeting(): void {
-    const user = userStore.value;
-    const nickname = user?.displayName ? truncateName(user.displayName, 8) : '';
-    const greeting = greetingByHour(new Date().getHours());
-    const greetingText = nickname ? `${greeting}，${nickname} 👋` : `${greeting} 👋`;
-    this.setData({
-      greetingText,
-      dateText: formatTodayDate(),
-    });
+  /** 将导航栏标题同步为当前家庭名称（运行时替换固定的“家事喵”） */
+  applyNavTitle(family?: FamilyView | null): void {
+    const current = family || this.data.currentFamily;
+    const name = current?.name;
+    if (name) {
+      wx.setNavigationBarTitle({ title: name });
+    }
   },
 
   /**
@@ -574,7 +574,7 @@ Page({
         attentionDays: records.map(mapDayRecordView),
         daysLoading: false,
       });
-      // attentionCards / greetingSubtitle 都是由 attentionDays 派生的。
+      // attentionCards 由 attentionDays 派生。
       // 日子请求可能比日程和待办更晚返回，因此必须在这里主动重算，
       // 不能依赖其它并发请求“顺便”触发 recompute。
       this.recompute();
@@ -673,7 +673,7 @@ Page({
       `#${pendingTaskCount}:${pendingTaskMore}#` +
       attentionCards.map((c) => `${c.kind}:${c.id}:${c.level}`).join('|');
     // 每分钟重算时：若「进行中 / 已结束 / 逾期 / 提交中 / 关注卡」展示态都没有变化，跳过 setData，
-    // 避免列表无谓闪动；计数与副标题也随指纹一并稳定。
+    // 避免列表无谓闪动；计数也随指纹一并稳定。
     if (fingerprint === this._statusFingerprint) return;
     this._statusFingerprint = fingerprint;
 
@@ -684,7 +684,6 @@ Page({
       pendingTaskCount,
       pendingTaskMore,
       attentionCards,
-      greetingSubtitle: buildSubtitle(todayEventCount, pendingTaskCount, attentionCards.length),
     });
   },
 
@@ -757,23 +756,6 @@ Page({
     }
   },
 
-  /** 切换当前家庭（仅在多个家庭时可用） */
-  onSwitchFamily(): void {
-    const { families, currentFamily } = this.data;
-    if (!families || families.length <= 1) return;
-
-    wx.showActionSheet({
-      itemList: families.map((f) => f.name),
-      success: (res) => {
-        const selected = families[res.tapIndex];
-        if (selected.id !== currentFamily?.id) {
-          setCurrentFamily(selected);
-          showSuccess(`已切换到 ${selected.name}`);
-        }
-      },
-    });
-  },
-
   /** 查看全部日程 */
   onViewEvents(): void {
     wx.switchTab({ url: '/pages/events/events' });
@@ -812,23 +794,6 @@ Page({
 });
 
 /* ----------------- 工具函数 ----------------- */
-
-function truncateName(name: string, max = 8): string {
-  return name.length > max ? `${name.slice(0, max)}…` : name;
-}
-
-function greetingByHour(h: number): string {
-  if (h >= 5 && h < 11) return '早上好';
-  if (h >= 11 && h < 14) return '中午好';
-  if (h >= 14 && h < 18) return '下午好';
-  return '晚上好';
-}
-
-function formatTodayDate(): string {
-  const d = new Date();
-  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
-  return `${d.getMonth() + 1}月${d.getDate()}日 · ${week}`;
-}
 
 /**
  * 主时间使用查看时区（与「今天」的判断一致）；
@@ -905,27 +870,6 @@ function findUrgentEvent(
     }
   }
   return best;
-}
-
-function buildSubtitle(
-  todayEventCount: number,
-  pendingTaskCount: number,
-  attentionCount: number,
-): string {
-  // 有关注事项：今天有 X 个安排，Y 件事情需要关注
-  if (attentionCount > 0) {
-    return `今天有 ${todayEventCount} 个安排，${attentionCount} 件事情需要关注`;
-  }
-  // 无关注事项但有待办：今天有 X 个安排，还有 Y 件待办
-  if (pendingTaskCount > 0) {
-    return `今天有 ${todayEventCount} 个安排，还有 ${pendingTaskCount} 件待办`;
-  }
-  // 只有日程：今天有 X 个安排，记得按时参加
-  if (todayEventCount > 0) {
-    return `今天有 ${todayEventCount} 个安排，记得按时参加`;
-  }
-  // 全部为空：今天也要元气满满哦
-  return '今天也要元气满满哦';
 }
 
 /**

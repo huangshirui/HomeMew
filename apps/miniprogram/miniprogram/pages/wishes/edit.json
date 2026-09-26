@@ -1,4 +1,5 @@
 {
   "navigationBarTitleText": "许愿",
-  "backgroundColor": "#F1F8F4"
+  "backgroundColor": "#F1F8F4",
+  "navigationStyle": "custom"
 }

@@ -1,5 +1,7 @@
 <!-- 待办任务列表页（进行中） -->
-<view class="container">
+<view class="container tasks-root">
+  <nav-bar title="待办任务" topInset="{{0}}" />
+
   <!-- 无家庭引导 -->
   <block wx:if="{{noFamily}}">
     <view class="empty-state">
@@ -14,6 +16,14 @@
   </block>
 
   <block wx:else>
+    <scroll-view
+      class="tasks-scroll"
+      scroll-y
+      enable-flex
+      refresher-enabled
+      refresher-triggered="{{refreshing}}"
+      bindrefresherrefresh="onRefresh"
+    >
     <!-- 顶栏：成员范围 + 已完成入口 -->
     <view class="topbar">
       <view class="scope-btn" bindtap="onOpenScope">
@@ -90,6 +100,8 @@
         <button class="btn-primary btn-sm" bindtap="onCreate">新建待办</button>
       </view>
     </view>
+
+    </scroll-view>
 
     <!-- 成员范围选择弹层 -->
     <view wx:if="{{showScopeSheet}}" class="sheet-mask" bindtap="onCloseScope" catchtouchmove="noop">

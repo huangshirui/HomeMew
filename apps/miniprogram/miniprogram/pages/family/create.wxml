@@ -1,5 +1,7 @@
 <!-- 创建家庭页 -->
 <view class="container">
+  <nav-bar title="创建家庭" showBack="true" />
+
   <view class="card">
     <!-- 家庭图片（可选） -->
     <view class="avatar-row">

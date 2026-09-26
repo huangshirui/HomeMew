@@ -1,5 +1,18 @@
 /* 已完成待办列表页样式（与待办页卡片保持一致） */
 
+/* 下拉刷新容器：nav-bar 在容器外固定，仅内容区可下拉刷新 */
+.completed-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.completed-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
 .container {
   padding-bottom: 60rpx;
 }

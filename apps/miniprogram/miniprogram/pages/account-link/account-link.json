@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "关联 Web 登录"
+  "navigationBarTitleText": "关联 Web 登录",
+  "navigationStyle": "custom"
 }

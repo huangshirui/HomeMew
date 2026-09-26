@@ -4,13 +4,13 @@
 
   <!-- 首页 -->
   <view class="tab-item" data-path="{{list[0].pagePath}}" bindtap="switchTab">
-    <image class="tab-icon" src="{{selected === 0 ? list[0].selectedIcon : list[0].icon}}" />
+    <lucide-icon class="tab-icon" name="{{list[0].icon}}" size="27" color="{{selected === 0 ? '#43A047' : '#999999'}}" />
     <text class="tab-text {{selected === 0 ? 'tab-text-active' : ''}}">{{list[0].text}}</text>
   </view>
 
   <!-- 日程 -->
   <view class="tab-item" data-path="{{list[1].pagePath}}" bindtap="switchTab">
-    <image class="tab-icon" src="{{selected === 1 ? list[1].selectedIcon : list[1].icon}}" />
+    <lucide-icon class="tab-icon" name="{{list[1].icon}}" size="27" color="{{selected === 1 ? '#43A047' : '#999999'}}" />
     <text class="tab-text {{selected === 1 ? 'tab-text-active' : ''}}">{{list[1].text}}</text>
   </view>
 
@@ -23,13 +23,13 @@
 
   <!-- 待办 -->
   <view class="tab-item" data-path="{{list[2].pagePath}}" bindtap="switchTab">
-    <image class="tab-icon" src="{{selected === 2 ? list[2].selectedIcon : list[2].icon}}" />
+    <lucide-icon class="tab-icon" name="{{list[2].icon}}" size="27" color="{{selected === 2 ? '#43A047' : '#999999'}}" />
     <text class="tab-text {{selected === 2 ? 'tab-text-active' : ''}}">{{list[2].text}}</text>
   </view>
 
   <!-- 我的 -->
   <view class="tab-item" data-path="{{list[3].pagePath}}" bindtap="switchTab">
-    <image class="tab-icon" src="{{selected === 3 ? list[3].selectedIcon : list[3].icon}}" />
+    <lucide-icon class="tab-icon" name="{{list[3].icon}}" size="27" color="{{selected === 3 ? '#43A047' : '#999999'}}" />
     <text class="tab-text {{selected === 3 ? 'tab-text-active' : ''}}">{{list[3].text}}</text>
   </view>
 </view>

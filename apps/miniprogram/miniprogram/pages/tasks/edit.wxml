@@ -1,5 +1,7 @@
 <!-- 待办任务创建/编辑页 -->
 <view class="container">
+  <nav-bar title="添加待办" showBack="true" />
+
   <!-- 加载失败 -->
   <view wx:if="{{loadError}}" class="load-error-state">
     <text class="load-error-text">加载失败</text>

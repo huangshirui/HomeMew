@@ -28,7 +28,9 @@
     "pages/wishes/edit"
   ],
   "usingComponents": {
-    "user-avatar": "/components/user-avatar/index"
+    "user-avatar": "/components/user-avatar/index",
+    "family-avatar": "/components/family-avatar/index",
+    "nav-bar": "/components/nav-bar/index"
   },
   "window": {
     "navigationBarBackgroundColor": "#43A047",

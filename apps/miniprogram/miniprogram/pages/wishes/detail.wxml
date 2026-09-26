@@ -1,5 +1,15 @@
 <!-- 愿望详情页 -->
-<view class="container">
+<view class="container wishes-detail-root">
+  <nav-bar title="愿望详情" showBack="true" />
+
+  <scroll-view
+    class="wishes-detail-scroll"
+    scroll-y
+    enable-flex
+    refresher-enabled
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+  >
   <view wx:if="{{loadError}}" class="load-error-state">
     <text class="load-error-text">加载失败</text>
     <button class="btn-outline btn-sm" bindtap="onRetry">重新加载</button>
@@ -60,6 +70,7 @@
       >删除</button>
     </view>
   </block>
+  </scroll-view>
 </view>
 
 <view wx:if="{{celebrating}}" class="wish-celebration">

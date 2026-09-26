@@ -41,6 +41,9 @@ Page({
     loaded: false,
     listError: false,
     familyId: '' as string,
+
+    /** 下拉刷新指示器状态（scroll-view refresher） */
+    refreshing: false,
   },
 
   /** 请求序号：用于丢弃过期返回结果 */
@@ -156,9 +159,12 @@ Page({
     this.onLoad(this._initOptions || {});
   },
 
-  async onPullDownRefresh(): Promise<void> {
-    await this.loadTasks();
-    wx.stopPullDownRefresh();
+  /** 下拉刷新：仅内容区下拉（nav-bar 固定），重新拉取已完成待办 */
+  onRefresh(): void {
+    this.setData({ refreshing: true });
+    Promise.resolve(this.loadTasks())
+      .then(() => this.setData({ refreshing: false }))
+      .catch(() => this.setData({ refreshing: false }));
   },
 
   /** 恢复为进行中 */
@@ -208,8 +214,8 @@ Page({
 /* ----------------- 工具函数 ----------------- */
 
 function labelForScope(scope: TasksScope, members: FamilyMember[]): string {
-  if (scope === 'all') return '全家待办';
-  if (scope === 'me') return '我的待办';
+  if (scope === 'all') return '全家';
+  if (scope === 'me') return '我的';
   const member = members.find(m => m.userId === scope);
   return member ? `${member.displayName}的待办` : '家人待办';
 }

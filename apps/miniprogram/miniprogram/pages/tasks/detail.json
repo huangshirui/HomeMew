@@ -1,1 +1,5 @@
-{"navigationBarTitleText": "任务详情", "backgroundColor": "#f5f6f7"}
+{
+  "navigationBarTitleText": "任务详情",
+  "backgroundColor": "#f5f6f7",
+  "navigationStyle": "custom"
+}

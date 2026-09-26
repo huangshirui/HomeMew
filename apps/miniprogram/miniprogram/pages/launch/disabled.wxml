@@ -1,4 +1,5 @@
 <!-- 账号禁用页 -->
+<nav-bar title="账号不可用" />
 <view class="disabled-container">
   <view class="icon-wrapper">
     <text class="icon">!</text>

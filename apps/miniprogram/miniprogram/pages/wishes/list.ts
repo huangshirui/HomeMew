@@ -187,10 +187,13 @@ Page({
     }
   },
 
-  async onPullDownRefresh(): Promise<void> {
+  /** 下拉刷新：仅内容区下拉（nav-bar 固定），重新拉取许愿池列表 */
+  onRefresh(): void {
+    this.setData({ refreshing: true });
     this._cursor = null;
-    await this.loadFirstPage();
-    wx.stopPullDownRefresh();
+    Promise.resolve(this.loadFirstPage())
+      .then(() => this.setData({ refreshing: false }))
+      .catch(() => this.setData({ refreshing: false }));
   },
 
   applyWishes(): void {

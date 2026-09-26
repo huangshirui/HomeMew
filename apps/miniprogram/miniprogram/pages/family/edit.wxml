@@ -1,5 +1,7 @@
 <!-- 编辑家庭资料页 -->
 <view class="container">
+  <nav-bar title="编辑家庭" showBack="true" />
+
   <view class="card">
     <!-- 点击图片更换 -->
     <view class="avatar-row">

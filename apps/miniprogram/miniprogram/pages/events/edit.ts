@@ -48,6 +48,20 @@ import { markDirty } from '../../stores/dirty';
 import { consumePendingDraft } from '../../stores/draft-buffer';
 import { consumeCloneSource } from '../../stores/clone-buffer';
 
+/** 新增日程（非全天）的默认时间：开始取当前时间的下一个整点，结束 +1 小时；跨天则顺延日期 */
+function nextWholeHourDefaults(now: Date): { startTime: string; endTime: string; dayOffset: number } {
+  let startHour = now.getHours();
+  if (now.getMinutes() > 0 || now.getSeconds() > 0) startHour += 1;
+  let dayOffset = 0;
+  if (startHour >= 24) {
+    startHour -= 24;
+    dayOffset = 1;
+  }
+  const endHour = (startHour + 1) % 24;
+  const pad = (h: number) => String(h).padStart(2, '0');
+  return { startTime: `${pad(startHour)}:00`, endTime: `${pad(endHour)}:00`, dayOffset };
+}
+
 type MemberOption = {
   userId: string;
   displayName: string;
@@ -117,16 +131,22 @@ Page({
     } catch (error) {
       console.error('[EventEdit] Runtime bootstrap failed:', error);
     }
-    const today = formatYmd(new Date());
+    const now = new Date();
+    const today = formatYmd(now);
     const initialDate = options?.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date)
       ? options.date
       : today;
+    // 新增日程默认非全天时间：当前时间的下一个整点，结束 +1 小时
+    const times = nextWholeHourDefaults(now);
+    const startDate = times.dayOffset ? addDaysToDateOnly(initialDate, times.dayOffset) : initialDate;
     this.setData({
       familyId,
       mode: options?.id ? 'edit' : 'create',
       eventId: options?.id || '',
-      startDate: initialDate,
-      endDate: initialDate,
+      startDate,
+      endDate: startDate,
+      startTime: times.startTime,
+      endTime: times.endTime,
       minDate: '1970-01-01',
       ...initialTimeZoneState(familyId),
     });
@@ -239,8 +259,10 @@ Page({
     const selectedIds = new Set(source.attendees.map(a => a.userId));
     let startDateStr: string;
     let endDateStr: string;
-    let startTimeStr = '09:00';
-    let endTimeStr = '10:00';
+    // 同源（全天）克隆无真实时间，复用新增日程默认逻辑：当前时间的下一个整点，结束 +1 小时
+    const cloneTimes = nextWholeHourDefaults(new Date());
+    let startTimeStr = cloneTimes.startTime;
+    let endTimeStr = cloneTimes.endTime;
     let startTimezone = this.data.deviceTimezone;
     let endTimezone = this.data.deviceTimezone;
     let startTimezoneMetadata: string | null = this.data.deviceTimezone;

@@ -1,5 +1,7 @@
 <!-- 待办任务详情页 -->
 <view class="container">
+  <nav-bar title="任务详情" showBack="true" />
+
   <view wx:if="{{!loaded}}" class="loading-state">
     <text class="loading-text">加载中...</text>
   </view>

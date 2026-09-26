@@ -1,5 +1,7 @@
 <!-- 设置页 -->
 <view class="container">
+  <nav-bar title="设置" showBack="true" />
+
   <view class="section card account-section">
     <view class="section-header">
       <text class="section-title">账号与登录</text>

@@ -140,12 +140,25 @@
   color: var(--color-text-hint);
 }
 
-/* 图标选择 */
-.icon-grid {
+/* 图标选择：固定三行，超出部分左右滑动 */
+.icon-scroll {
+  margin-top: 20rpx;
+  width: 100%;
+  white-space: nowrap;
+}
+
+/* inline-block 让内容按最宽一行撑开，触发 scroll-view 横向滚动 */
+.icon-rows {
+  display: inline-block;
+}
+
+.icon-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
-  padding-top: 20rpx;
+  flex-direction: row;
+}
+
+.icon-row + .icon-row {
+  margin-top: 12rpx;
 }
 
 .icon-cell {
@@ -157,6 +170,8 @@
   border-radius: 20rpx;
   background-color: var(--color-bg);
   border: 2rpx solid transparent;
+  margin-right: 16rpx;
+  flex: 0 0 auto;
 }
 
 .icon-cell.icon-selected {

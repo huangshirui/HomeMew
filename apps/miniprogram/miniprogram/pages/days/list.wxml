@@ -6,7 +6,18 @@ module.exports.attentionClass = function (level, required) {
 };
 </wxs>
 
-<view class="container">
+<view class="container days-root">
+  <nav-bar title="日子" showBack="true" />
+
+  <scroll-view
+    class="days-scroll"
+    scroll-y
+    enable-flex
+    refresher-enabled
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+    bindscrolltolower="onReachBottom"
+  >
   <!-- 无家庭引导 -->
   <block wx:if="{{noFamily}}">
     <view class="empty-state">
@@ -132,12 +143,14 @@ module.exports.attentionClass = function (level, required) {
       </view>
     </block>
 
-    <!-- 页面内新增入口（二级页面不显示自定义 TabBar） -->
-    <view class="fab fab-small" bindtap="onCreate">
-      <view class="fab-plus">
-        <view class="fab-plus-line fab-plus-horizontal"></view>
-        <view class="fab-plus-line fab-plus-vertical"></view>
-      </view>
-    </view>
   </block>
+  </scroll-view>
+
+  <!-- 页面内新增入口（二级页面不显示自定义 TabBar） -->
+  <view wx:if="{{!noFamily}}" class="fab fab-small" bindtap="onCreate">
+    <view class="fab-plus">
+      <view class="fab-plus-line fab-plus-horizontal"></view>
+      <view class="fab-plus-line fab-plus-vertical"></view>
+    </view>
+  </view>
 </view>

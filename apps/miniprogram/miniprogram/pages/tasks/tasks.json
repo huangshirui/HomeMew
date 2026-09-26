@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "待办任务",
+  "navigationStyle": "custom",
   "backgroundColor": "#f5f6f7",
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": false
 }

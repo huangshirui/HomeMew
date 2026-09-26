@@ -1,1 +1,4 @@
-{ "navigationBarTitleText": "家庭成员" }
+{
+  "navigationBarTitleText": "家庭成员",
+  "navigationStyle": "custom"
+}

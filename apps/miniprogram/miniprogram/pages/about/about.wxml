@@ -1,4 +1,6 @@
 <view class="container about-page">
+  <nav-bar title="关于家事喵" showBack="true" />
+
   <view class="card brand-card">
     <view class="brand-mark">喵</view>
     <view class="brand-copy">

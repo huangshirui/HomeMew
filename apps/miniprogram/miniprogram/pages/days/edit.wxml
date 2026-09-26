@@ -1,5 +1,7 @@
 <!-- 日子创建 / 编辑页 -->
 <view class="container">
+  <nav-bar title="添加日子" showBack="true" />
+
   <!-- 加载失败 -->
   <view wx:if="{{loadError}}" class="load-error-state">
     <text class="load-error-text">加载失败</text>
@@ -154,17 +156,21 @@
     <!-- 图标（内置 Emoji） -->
     <view class="card">
       <text class="field-label">图标</text>
-      <view class="icon-grid">
-        <view
-          wx:for="{{iconChoices}}"
-          wx:key="*this"
-          class="icon-cell {{icon === item ? 'icon-selected' : ''}}"
-          data-icon="{{item}}"
-          bindtap="onIconSelect"
-        >{{item}}</view>
-      </view>
+      <scroll-view class="icon-scroll" scroll-x="true" enhanced="true" show-scrollbar="false">
+        <view class="icon-rows">
+          <view wx:for="{{iconRows}}" wx:for-item="row" wx:key="key" class="icon-row">
+            <view
+              wx:for="{{row.icons}}"
+              wx:key="*this"
+              class="icon-cell {{icon === item ? 'icon-selected' : ''}}"
+              data-icon="{{item}}"
+              bindtap="onIconSelect"
+            >{{item}}</view>
+          </view>
+        </view>
+      </scroll-view>
       <view class="field-hint">
-        <text class="hint-text">选填，再次点击可取消</text>
+        <text class="hint-text">选填，再次点击可取消；可左右滑动查看更多</text>
       </view>
     </view>
 
