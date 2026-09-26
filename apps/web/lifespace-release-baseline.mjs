@@ -7,8 +7,8 @@ export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
     minimumSchemaVersion: 8,
   }),
   core: Object.freeze({
-    contractVersion: '0.36.0',
-    minimumSchemaVersion: 41,
+    contractVersion: '0.39.0',
+    minimumSchemaVersion: 45,
   }),
 });
 
@@ -26,13 +26,18 @@ export function assertLifeSpaceStatus(payload, service, environment) {
   if (data.environment !== environment) {
     throw new Error(`Expected ${service} environment ${environment}, got ${String(data.environment ?? 'unknown')}`);
   }
+
+  const schemaVersion = Number(data.schemaVersion);
+  if (!Number.isInteger(schemaVersion)) {
+    throw new Error(`${service} schemaVersion must be an integer, got ${String(data.schemaVersion ?? 'unknown')}`);
+  }
+
   if (data.contractVersion !== expected.contractVersion) {
     throw new Error(
       `${service} contract mismatch: HomeMew requires ${expected.contractVersion}, got ${String(data.contractVersion ?? 'unknown')}`,
     );
   }
-  const schemaVersion = Number(data.schemaVersion);
-  if (!Number.isInteger(schemaVersion) || schemaVersion < expected.minimumSchemaVersion) {
+  if (schemaVersion < expected.minimumSchemaVersion) {
     throw new Error(
       `${service} schema is behind the HomeMew release baseline: requires >=${expected.minimumSchemaVersion}, got ${String(data.schemaVersion ?? 'unknown')}`,
     );

@@ -12,7 +12,7 @@ This document defines HomeMew product and business rules. Current platform API s
 ## 2. Families
 
 - A user may create at most three active families.
-- A family may contain at most eight active members.
+- A family may contain at most eight active members. This is a HomeMew product invariant, not a LifeSpace Space invariant.
 - The creator automatically becomes an administrator.
 - A family may have multiple administrators.
 - A family has an IANA default timezone; new families default to `Asia/Shanghai`.
@@ -44,9 +44,9 @@ Rules:
 - Core stores only a hash of the invitation code, not the plaintext.
 - Plaintext code is returned only when the invitation is created.
 - Invitations have an expiry time, maximum uses, current use count, and revocation state.
-- Joining must verify invitation state and the family's current active-member count in the same transactional operation that creates/reactivates membership and increments use count.
+- Every HomeMew join path must pass through the per-family HomeMew join coordinator. The coordinator serializes the complete critical section, rechecks the invite target and current authoritative LifeSpace membership immediately before join, and rejects a new ninth active member. LifeSpace remains the membership/invite authority; HomeMew stores no member-list copy.
 - An already active member is not added again.
-- Invitation preview reveals only limited family information: family name, optional avatar, member count, expiry, and whether joining is possible.
+- Invitation preview reveals only limited family information: family name, optional avatar, member count, expiry, and whether joining is possible. Its capacity result is UX guidance; the coordinator rechecks capacity at commit time.
 
 ## 5. Events
 
@@ -255,7 +255,7 @@ The first version has one task-level completion state. It does not track complet
 
 ## 13. External systems
 
-- Only a current family administrator may manage HomeMew external integrations. The client role check is UX only; the Web BFF must obtain an on-demand LifeSpace user token with `grants:manage`, and LifeSpace Core must verify current `manage` authority on the selected family `Space(kind=family)` before any integration-management operation proceeds.
+- Only a current family administrator may manage HomeMew external integrations. The client role check is UX only; the Web BFF must obtain an on-demand LifeSpace user token with `grants:manage`, and LifeSpace Core must verify current `manage` authority on the selected HomeMew family Space before any integration-management operation proceeds.
 - One HomeMew external system maps to one LifeSpace Service Principal and one explicit owning family Space. The service is not a Space member and receives no user/member/invitation/family-settings/avatar administration authority by default.
 - Credential scope names are stable platform scopes, currently `resources:read` and `resources:write`. Model permission is not encoded as legacy scopes such as `events:write`, `tasks:read`, or `day-records:write`.
 - The first HomeMew Web integration editor exposes `none`, `read`, or `write` for LifeSpace models `event`, `task`, and `day_record`. Effective data access remains Service Principal ∩ credential scope ∩ Application × Model Access ∩ current model-scoped Data Grant.

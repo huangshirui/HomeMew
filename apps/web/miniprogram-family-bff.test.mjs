@@ -19,8 +19,30 @@ function ok(data, status = 200) {
   });
 }
 
-function env(core, identity = async () => assert.fail('unexpected Identity call')) {
-  return { LIFESPACE_CORE: { fetch: core }, LIFESPACE_IDENTITY: { fetch: identity } };
+function env(core, identity = async () => assert.fail('unexpected Identity call'), initialFamilyIds = [], options = {}) {
+  const familyIds = new Set(initialFamilyIds);
+  return {
+    LIFESPACE_CORE: { fetch: core },
+    LIFESPACE_IDENTITY: { fetch: identity },
+    HOMEMEW_BACKEND: {
+      async fetch(incoming) {
+        const path = new URL(incoming.url).pathname;
+        const body = incoming.method === 'POST' ? await incoming.json() : {};
+        if (path === '/internal/v1/family-catalog/register') {
+          familyIds.add(body.spaceId);
+          return ok({ spaceId: body.spaceId, source: body.source, registeredAt: '2026-09-23T00:00:00Z' });
+        }
+        if (path === '/internal/v1/family-catalog/reconcile') {
+          return ok({ familySpaceIds: (body.spaceIds ?? []).filter(spaceId => familyIds.has(spaceId)) });
+        }
+        if (path === '/internal/v1/family-joins/commit') {
+          if (typeof options.onFamilyJoin === 'function') return options.onFamilyJoin(incoming, body);
+          return ok({ spaceId: body.familyId, role: 'editor', joinedAt: '2026-09-16T01:00:00Z' }, 201);
+        }
+        return assert.fail(`unexpected backend path ${path}`);
+      },
+    },
+  };
 }
 
 test('matches only bounded family/member/invitation routes', () => {
@@ -33,18 +55,18 @@ test('matches only bounded family/member/invitation routes', () => {
   assert.equal(matchMiniProgramFamilyRoute('/api/v1/miniprogram/families/spc_home/invites/not-invite/revoke'), null);
 });
 
-test('family list filters family Spaces, composes member counts, and rewrites avatars', async () => {
+test('family list intersects current LifeSpace Spaces with the HomeMew catalog', async () => {
   const calls = [];
   const response = await handleMiniProgramFamilyBff(request('/api/v1/miniprogram/families'), env(async incoming => {
     const path = new URL(incoming.url).pathname;
     calls.push(path);
     if (path === '/api/v1/me/spaces') return ok([
-      { id: 'spc_home', kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: 'https://core/assets/spaces/spc_home/avatar', role: 'owner' },
-      { id: 'spc_personal', kind: 'personal', name: 'Mine', timezone: 'UTC', avatarUrl: null, role: 'owner' },
+      { id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: 'https://core/assets/spaces/spc_home/avatar', role: 'owner' },
+      { id: 'spc_personal', name: 'Mine', timezone: 'UTC', avatarUrl: null, role: 'owner' },
     ]);
     if (path === '/api/v1/spaces/spc_home/members') return ok([{ userId: 'usr_1' }, { userId: 'usr_2' }]);
     return assert.fail(`unexpected Core path ${path}`);
-  }));
+  }, undefined, ['spc_home']));
   assert.equal(response.status, 200);
   assert.deepEqual(calls, ['/api/v1/me/spaces', '/api/v1/spaces/spc_home/members']);
   assert.deepEqual((await response.json()).data.items, [{
@@ -53,20 +75,20 @@ test('family list filters family Spaces, composes member counts, and rewrites av
   }]);
 });
 
-test('family creation obtains the current Identity display name and fixes kind/owner role', async () => {
+test('family creation registers the created Space in the HomeMew catalog', async () => {
   let coreBody;
   const response = await handleMiniProgramFamilyBff(
     request('/api/v1/miniprogram/families', { method: 'POST', body: { name: 'Home' } }),
     env(async incoming => {
       assert.equal(incoming.method, 'POST');
       coreBody = await incoming.json();
-      return ok({ id: 'spc_home', kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner' }, 201);
+      return ok({ id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner' }, 201);
     }, async incoming => {
       assert.equal(new URL(incoming.url).pathname, '/api/v1/me');
       return ok({ id: 'usr_owner', displayName: 'Owner', avatarUrl: null, status: 'active' });
     }),
   );
-  assert.deepEqual(coreBody, { kind: 'family', name: 'Home', timezone: 'Asia/Shanghai', ownerDisplayName: 'Owner' });
+  assert.deepEqual(coreBody, { name: 'Home', timezone: 'Asia/Shanghai', ownerDisplayName: 'Owner' });
   const result = (await response.json()).data;
   assert.equal(response.status, 201);
   assert.equal(result.role, 'admin');
@@ -186,25 +208,58 @@ test('invite preview/join map code and obtain display name from Identity only fo
   const core = async incoming => {
     const path = new URL(incoming.url).pathname;
     const body = await incoming.json();
-    if (path.endsWith('/preview')) {
-      assert.deepEqual(body, { token: 'LS-CODE' });
-      return ok({ space: { id: 'spc_home', name: 'Home', memberCount: 2 }, expiresAt: '2026-09-17T00:00:00Z', canJoin: true });
-    }
-    joinBody = body;
-    return ok({ spaceId: 'spc_home', role: 'editor', joinedAt: '2026-09-16T01:00:00Z' }, 201);
+    assert.ok(path.endsWith('/preview'));
+    assert.deepEqual(body, { token: 'LS-CODE' });
+    return ok({ space: { id: 'spc_home', name: 'Home', memberCount: 2 }, expiresAt: '2026-09-17T00:00:00Z', canJoin: true });
   };
   const identity = async () => ok({ id: 'usr_me', displayName: 'Me', avatarUrl: null, status: 'active' });
   const preview = await handleMiniProgramFamilyBff(
-    request('/api/v1/miniprogram/family-invites/preview', { method: 'POST', body: { code: 'LS-CODE' } }), env(core, identity),
+    request('/api/v1/miniprogram/family-invites/preview', { method: 'POST', body: { code: 'LS-CODE' } }), env(core, identity, ['spc_home']),
   );
   assert.deepEqual((await preview.json()).data.family, { id: 'spc_home', name: 'Home', avatarUrl: null, memberCount: 2 });
   const joined = await handleMiniProgramFamilyBff(
-    request('/api/v1/miniprogram/family-invites/join', { method: 'POST', body: { code: 'LS-CODE' } }), env(core, identity),
+    request('/api/v1/miniprogram/family-invites/join', { method: 'POST', body: { code: 'LS-CODE' } }),
+    env(core, identity, ['spc_home'], {
+      onFamilyJoin(incoming, body) {
+        assert.equal(incoming.headers.get('authorization'), TOKEN);
+        joinBody = body;
+        return ok({ spaceId: 'spc_home', role: 'editor', joinedAt: '2026-09-16T01:00:00Z' }, 201);
+      },
+    }),
   );
-  assert.deepEqual(joinBody, { token: 'LS-CODE', displayName: 'Me' });
+  assert.deepEqual(joinBody, { familyId: 'spc_home', token: 'LS-CODE', displayName: 'Me' });
   assert.deepEqual((await joined.json()).data, {
-    familyId: 'spc_home', familyName: '', role: 'member', joinedAt: '2026-09-16T01:00:00Z',
+    familyId: 'spc_home', familyName: 'Home', role: 'member', joinedAt: '2026-09-16T01:00:00Z',
   });
+});
+
+test('invite preview reports full HomeMew families as not joinable before commit', async () => {
+  const response = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/family-invites/preview', { method: 'POST', body: { code: 'LS-FULL' } }),
+    env(async () => ok({
+      space: { id: 'spc_full', name: 'Full', memberCount: 8 },
+      expiresAt: '2026-09-17T00:00:00Z',
+      canJoin: true,
+    }), undefined, ['spc_full']),
+  );
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.canJoin, false);
+});
+
+test('invite preview rejects a non-HomeMew Space even when LifeSpace invite is otherwise valid', async () => {
+  const response = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/family-invites/preview', { method: 'POST', body: { code: 'LS-OTHER' } }),
+    env(async incoming => {
+      assert.equal(new URL(incoming.url).pathname, '/api/v1/space-invites/preview');
+      return ok({
+        space: { id: 'spc_other', name: 'Other', memberCount: 1 },
+        expiresAt: '2026-09-17T00:00:00Z',
+        canJoin: true,
+      });
+    }),
+  );
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error.code, 'NOT_HOMEMEW_FAMILY_INVITE');
 });
 
 test('family routes reject arbitrary fields, query parameters and invalid product roles', async () => {

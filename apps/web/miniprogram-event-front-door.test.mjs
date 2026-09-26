@@ -109,6 +109,18 @@ test('Mini Program Family BFF is handled before the generic Mini catch-all and W
           });
         },
       },
+      HOMEMEW_BACKEND: {
+        async fetch(incoming) {
+          assert.equal(new URL(incoming.url).pathname, '/internal/v1/family-catalog/reconcile');
+          const body = await incoming.json();
+          assert.deepEqual(body.spaceIds, ['spc_home']);
+          assert.equal(Object.hasOwn(body, 'legacyFamilySpaceIds'), false);
+          return new Response(JSON.stringify({ data: { familySpaceIds: ['spc_home'] } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        },
+      },
     },
   );
   assert.equal(response.status, 200);

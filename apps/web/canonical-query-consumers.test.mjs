@@ -29,9 +29,8 @@ test('Web Task, Wish, and Event lists use the LifeSpace structured Canonical Que
 
 test('Web Space invite bearer tokens stay in request bodies instead of URL paths', () => {
   const family = read('src/pages/family-page.tsx');
-  assert.match(family, /'\/api\/lifespace\/core\/v1\/space-invites\/preview'/);
+  assert.match(family, /'\/api\/family-invites\/preview'/);
   assert.match(family, /JSON\.stringify\(\{ token \}\)/);
-  assert.match(family, /'\/api\/lifespace\/core\/v1\/space-invites\/join'/);
-  assert.match(family, /JSON\.stringify\(\{ token, displayName \}\)/);
+  assert.match(family, /'\/api\/family-invites\/join'/);
   assert.doesNotMatch(family, /space-invites\/\$\{pathToken\}/);
 });

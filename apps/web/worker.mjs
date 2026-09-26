@@ -99,6 +99,35 @@ function activityBackend(env) {
   return env.HOMEMEW_BACKEND;
 }
 
+function applicationBackend(env) {
+  if (!env.HOMEMEW_BACKEND || typeof env.HOMEMEW_BACKEND.fetch !== 'function') {
+    throw new HttpError(503, 'APPLICATION_BACKEND_NOT_CONFIGURED', 'HomeMew 应用服务暂时不可用');
+  }
+  return env.HOMEMEW_BACKEND;
+}
+
+async function familyCatalogRequest(env, path, data) {
+  const response = await applicationBackend(env).fetch(new Request(`https://homemew-backend.internal${path}`, {
+    method: 'POST',
+    headers: { accept: 'application/json', 'content-type': 'application/json' },
+    body: JSON.stringify(data),
+  }));
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload?.data) {
+    throw new HttpError(503, 'FAMILY_CATALOG_UNAVAILABLE', 'HomeMew 家庭目录暂时不可用');
+  }
+  return payload.data;
+}
+
+async function reconcileFamilySpaces(env, spaces) {
+  const list = Array.isArray(spaces) ? spaces.filter(space => typeof space?.id === 'string' && space.id.startsWith('spc_')) : [];
+  const catalog = await familyCatalogRequest(env, '/internal/v1/family-catalog/reconcile', {
+    spaceIds: list.map(space => space.id),
+  });
+  const familyIds = new Set(catalog.familySpaceIds ?? []);
+  return list.filter(space => familyIds.has(space.id));
+}
+
 function accessAssertion(request) {
   const assertion = request.headers.get(ACCESS_ASSERTION_HEADER)?.trim();
   if (!assertion) {
@@ -340,6 +369,135 @@ async function reportWebActivity(request, env, fetcher, assertion, id, nowMs) {
   });
 }
 
+async function coreUserRequest(env, fetcher, path, token, id, { method = 'GET', body } = {}) {
+  const response = await fetcher(`${baseUrl(env.LIFESPACE_CORE_URL, 'LIFESPACE_CORE_URL')}${path}`, {
+    method,
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'x-request-id': id,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !Object.hasOwn(payload, 'data')) {
+    throw upstreamError(response, payload, 'LIFESPACE_CORE_FAILED');
+  }
+  return payload.data;
+}
+
+async function readObjectBody(request, allowed) {
+  const input = await request.json().catch(() => null);
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new HttpError(400, 'INVALID_REQUEST', 'Request body is invalid');
+  }
+  if (Object.keys(input).some(key => !allowed.includes(key))) {
+    throw new HttpError(400, 'INVALID_REQUEST', 'Request contains unsupported fields');
+  }
+  return input;
+}
+
+async function familyInvitePreview(env, fetcher, token, id, inviteToken) {
+  const preview = await coreUserRequest(env, fetcher, '/api/v1/space-invites/preview', token, id, {
+    method: 'POST',
+    body: { token: inviteToken },
+  });
+  const classified = await reconcileFamilySpaces(env, [preview.space]);
+  if (classified.length !== 1) {
+    throw new HttpError(422, 'NOT_HOMEMEW_FAMILY_INVITE', '这个邀请码不属于 HomeMew 家庭');
+  }
+  return {
+    ...preview,
+    space: classified[0],
+    canJoin: preview.canJoin === true && Number(preview.space?.memberCount ?? 0) < 8,
+  };
+}
+
+async function commitWebFamilyJoin(env, accessToken, familyId, token, displayName) {
+  const response = await applicationBackend(env).fetch(new Request('https://homemew-backend.internal/internal/v1/family-joins/commit', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${accessToken}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ familyId, token, displayName }),
+  }));
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = payload?.error;
+    throw new HttpError(
+      response.status,
+      typeof error?.code === 'string' ? error.code : 'FAMILY_JOIN_FAILED',
+      typeof error?.message === 'string' ? error.message : '加入家庭失败',
+    );
+  }
+  if (!payload?.data) throw new HttpError(502, 'INVALID_UPSTREAM_RESPONSE', 'HomeMew 家庭加入服务返回无效响应');
+  return payload.data;
+}
+
+async function handleFamilies(request, env, fetcher, assertion, id, nowMs) {
+  const session = await ensureSession(request, env, fetcher, assertion, id, nowMs);
+  if (request.method === 'GET') {
+    const spaces = await coreUserRequest(env, fetcher, '/api/v1/me/spaces', session.accessToken, id);
+    const families = await reconcileFamilySpaces(env, spaces);
+    return json({ data: families }, 200, session.cookie ? { 'set-cookie': session.cookie } : {}, id);
+  }
+  if (request.method !== 'POST') throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
+  requireSameOrigin(request);
+  const input = await readObjectBody(request, ['name', 'timezone']);
+  const name = typeof input.name === 'string' ? input.name.trim() : '';
+  if (!name || name.length > 100) throw new HttpError(422, 'VALIDATION_ERROR', '家庭名称无效');
+  const me = await identityUserRequest(env, fetcher, '/api/v1/me', session.accessToken, id);
+  if (me.response.status !== 200 || !me.payload?.data?.displayName) {
+    throw upstreamError(me.response, me.payload, 'LIFESPACE_PROFILE_FAILED');
+  }
+  const created = await coreUserRequest(env, fetcher, '/api/v1/spaces', session.accessToken, id, {
+    method: 'POST',
+    body: {
+      name,
+      timezone: typeof input.timezone === 'string' && input.timezone ? input.timezone : 'Asia/Shanghai',
+      ownerDisplayName: me.payload.data.displayName,
+    },
+  });
+  try {
+    await familyCatalogRequest(env, '/internal/v1/family-catalog/register', { spaceId: created.id, source: 'created' });
+  } catch (error) {
+    console.warn('[HomeMew Web] family catalog registration failed after create', created.id, error instanceof Error ? error.message : 'unknown');
+  }
+  return json({ data: created }, 201, session.cookie ? { 'set-cookie': session.cookie } : {}, id);
+}
+
+async function handleFamilyInvite(request, env, fetcher, assertion, id, nowMs, action) {
+  requireSameOrigin(request);
+  const session = await ensureSession(request, env, fetcher, assertion, id, nowMs);
+  const input = await readObjectBody(request, ['token']);
+  const token = typeof input.token === 'string' ? input.token.trim() : '';
+  if (!token || token.length > 200) throw new HttpError(422, 'VALIDATION_ERROR', '邀请码无效');
+  const preview = await familyInvitePreview(env, fetcher, session.accessToken, id, token);
+  if (action === 'preview') {
+    return json({ data: preview }, 200, session.cookie ? { 'set-cookie': session.cookie } : {}, id);
+  }
+  const me = await identityUserRequest(env, fetcher, '/api/v1/me', session.accessToken, id);
+  if (me.response.status !== 200 || !me.payload?.data?.displayName) {
+    throw upstreamError(me.response, me.payload, 'LIFESPACE_PROFILE_FAILED');
+  }
+  const joined = await commitWebFamilyJoin(
+    env,
+    session.accessToken,
+    preview.space.id,
+    token,
+    me.payload.data.displayName,
+  );
+  try {
+    await familyCatalogRequest(env, '/internal/v1/family-catalog/register', { spaceId: joined.spaceId, source: 'joined' });
+  } catch (error) {
+    console.warn('[HomeMew Web] family catalog registration failed after join', joined.spaceId, error instanceof Error ? error.message : 'unknown');
+  }
+  return json({ data: joined }, 201, session.cookie ? { 'set-cookie': session.cookie } : {}, id);
+}
+
 async function proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, service) {
   requireSameOrigin(request);
   const prefix = `/api/lifespace/${service}`;
@@ -410,6 +568,15 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         }
         if (request.method === 'POST' && url.pathname === '/api/activity/me') {
           return await reportWebActivity(request, env, fetcher, assertion, id, nowMs);
+        }
+        if (url.pathname === '/api/families') {
+          return await handleFamilies(request, env, fetcher, assertion, id, nowMs);
+        }
+        if (request.method === 'POST' && url.pathname === '/api/family-invites/preview') {
+          return await handleFamilyInvite(request, env, fetcher, assertion, id, nowMs, 'preview');
+        }
+        if (request.method === 'POST' && url.pathname === '/api/family-invites/join') {
+          return await handleFamilyInvite(request, env, fetcher, assertion, id, nowMs, 'join');
         }
         if (url.pathname === '/api/integrations' || url.pathname.startsWith('/api/integrations/')) {
           return await handleIntegrationRequest(request, env, { fetcher, assertion, id });

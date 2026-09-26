@@ -171,6 +171,206 @@ test('link challenge is created from the verified Access assertion only', async 
   assert.equal((await payload(response)).data.challengeId, 'alc_123');
 });
 
+test('Web family list intersects current LifeSpace Spaces with the HomeMew family catalog', async () => {
+  const fetcher = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/internal/v1/access/tokens')) {
+      return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+    }
+    if (url.endsWith('/api/v1/me/spaces')) {
+      return jsonResponse(200, { data: [
+        { id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1 },
+        { id: 'spc_other', name: 'Other', timezone: 'UTC', avatarUrl: null, role: 'owner', version: 1 },
+      ] });
+    }
+    assert.fail(`unexpected upstream ${url}`);
+  };
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: {
+      async fetch(incoming) {
+        assert.equal(new URL(incoming.url).pathname, '/internal/v1/family-catalog/reconcile');
+        const body = await incoming.json();
+        assert.deepEqual(body.spaceIds, ['spc_home', 'spc_other']);
+        return jsonResponse(200, { data: { familySpaceIds: ['spc_home'] } });
+      },
+    },
+  };
+  const handler = createWebHandler({ fetcher, now: () => NOW });
+  const response = await handler.fetch(request('/api/families'), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await payload(response)).data, [
+    { id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1 },
+  ]);
+});
+
+test('Web family creation registers the created Space in HomeMew application metadata', async () => {
+  let createdBody;
+  let registered;
+  const fetcher = async (input, init = {}) => {
+    const url = String(input);
+    if (url.endsWith('/internal/v1/access/tokens')) {
+      return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+    }
+    if (url.endsWith('/api/v1/me')) {
+      return jsonResponse(200, { data: { id: 'usr_1', displayName: 'User One' } });
+    }
+    if (url.endsWith('/api/v1/spaces')) {
+      createdBody = JSON.parse(init.body);
+      return jsonResponse(201, { data: {
+        id: 'spc_home', name: 'Home', timezone: 'Asia/Shanghai', avatarUrl: null, role: 'owner', version: 1,
+      } });
+    }
+    assert.fail(`unexpected upstream ${url}`);
+  };
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: {
+      async fetch(incoming) {
+        assert.equal(new URL(incoming.url).pathname, '/internal/v1/family-catalog/register');
+        registered = await incoming.json();
+        return jsonResponse(200, { data: { spaceId: registered.spaceId, source: registered.source } });
+      },
+    },
+  };
+  const handler = createWebHandler({ fetcher, now: () => NOW });
+  const response = await handler.fetch(request('/api/families', {
+    method: 'POST',
+    body: { name: 'Home', timezone: 'Asia/Shanghai' },
+  }), env);
+  assert.equal(response.status, 201);
+  assert.deepEqual(createdBody, {
+    name: 'Home',
+    timezone: 'Asia/Shanghai',
+    ownerDisplayName: 'User One',
+  });
+  assert.deepEqual(registered, { spaceId: 'spc_home', source: 'created' });
+  assert.equal(Object.hasOwn((await payload(response)).data, 'kind'), false);
+});
+
+test('Web family invite preview rejects a LifeSpace invite outside the HomeMew catalog', async () => {
+  const fetcher = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/internal/v1/access/tokens')) {
+      return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+    }
+    if (url.endsWith('/api/v1/space-invites/preview')) {
+      return jsonResponse(200, { data: {
+        space: { id: 'spc_other', name: 'Other', memberCount: 1 },
+        expiresAt: '2026-09-24T00:00:00Z',
+        canJoin: true,
+      } });
+    }
+    assert.fail(`unexpected upstream ${url}`);
+  };
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: {
+      async fetch() {
+        return jsonResponse(200, { data: { familySpaceIds: [] } });
+      },
+    },
+  };
+  const handler = createWebHandler({ fetcher, now: () => NOW });
+  const response = await handler.fetch(request('/api/family-invites/preview', {
+    method: 'POST',
+    body: { token: 'LS-OTHER' },
+  }), env);
+  assert.equal(response.status, 422);
+  assert.equal((await payload(response)).error.code, 'NOT_HOMEMEW_FAMILY_INVITE');
+});
+
+test('Web family invite preview reports an eight-member family as full', async () => {
+  const fetcher = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/internal/v1/access/tokens')) {
+      return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+    }
+    if (url.endsWith('/api/v1/space-invites/preview')) {
+      return jsonResponse(200, { data: {
+        space: { id: 'spc_full', name: 'Full', memberCount: 8 },
+        expiresAt: '2026-09-24T00:00:00Z',
+        canJoin: true,
+      } });
+    }
+    assert.fail(`unexpected upstream ${url}`);
+  };
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: {
+      async fetch(incoming) {
+        assert.equal(new URL(incoming.url).pathname, '/internal/v1/family-catalog/reconcile');
+        return jsonResponse(200, { data: { familySpaceIds: ['spc_full'] } });
+      },
+    },
+  };
+  const handler = createWebHandler({ fetcher, now: () => NOW });
+  const response = await handler.fetch(request('/api/family-invites/preview', {
+    method: 'POST',
+    body: { token: 'LS-FULL' },
+  }), env);
+  assert.equal(response.status, 200);
+  assert.equal((await payload(response)).data.canJoin, false);
+});
+
+test('Web family join delegates the capacity-critical commit to the per-family backend coordinator', async () => {
+  const fetcher = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/internal/v1/access/tokens')) {
+      return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+    }
+    if (url.endsWith('/api/v1/space-invites/preview')) {
+      return jsonResponse(200, { data: {
+        space: { id: 'spc_home', name: 'Home', memberCount: 7 },
+        expiresAt: '2026-09-24T00:00:00Z',
+        canJoin: true,
+      } });
+    }
+    if (url.endsWith('/api/v1/me')) {
+      return jsonResponse(200, { data: { id: 'usr_1', displayName: 'User One' } });
+    }
+    assert.fail(`unexpected upstream ${url}`);
+  };
+  const backendCalls = [];
+  const env = {
+    ...ENV,
+    HOMEMEW_BACKEND: {
+      async fetch(incoming) {
+        const path = new URL(incoming.url).pathname;
+        backendCalls.push(path);
+        const body = await incoming.json();
+        if (path === '/internal/v1/family-catalog/reconcile') {
+          return jsonResponse(200, { data: { familySpaceIds: ['spc_home'] } });
+        }
+        if (path === '/internal/v1/family-joins/commit') {
+          assert.equal(incoming.headers.get('authorization'), 'Bearer life-token-a');
+          assert.deepEqual(body, { familyId: 'spc_home', token: 'LS-JOIN', displayName: 'User One' });
+          return jsonResponse(201, { data: { spaceId: 'spc_home', role: 'editor', joinedAt: '2026-09-23T12:00:00Z' } });
+        }
+        if (path === '/internal/v1/family-catalog/register') {
+          assert.deepEqual(body, { spaceId: 'spc_home', source: 'joined' });
+          return jsonResponse(200, { data: { spaceId: 'spc_home', source: 'joined' } });
+        }
+        return assert.fail(`unexpected backend path ${path}`);
+      },
+    },
+  };
+  const handler = createWebHandler({ fetcher, now: () => NOW });
+  const response = await handler.fetch(request('/api/family-invites/join', {
+    method: 'POST',
+    body: { token: 'LS-JOIN' },
+  }), env);
+  assert.equal(response.status, 201);
+  assert.deepEqual((await payload(response)).data, {
+    spaceId: 'spc_home', role: 'editor', joinedAt: '2026-09-23T12:00:00Z',
+  });
+  assert.deepEqual(backendCalls, [
+    '/internal/v1/family-catalog/reconcile',
+    '/internal/v1/family-joins/commit',
+    '/internal/v1/family-catalog/register',
+  ]);
+});
+
 test('Web activity reporting uses the verified LifeSpace session and backend binding', async () => {
   const fetcher = async (input) => {
     const url = String(input);
@@ -221,7 +421,7 @@ test('Core proxy obtains a LifeSpace session and forwards only the user bearer',
     if (url.endsWith('/internal/v1/access/tokens')) {
       return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
     }
-    if (url === 'https://core.example.test/api/v1/spaces?kind=family') {
+    if (url === 'https://core.example.test/api/v1/me/spaces') {
       assert.equal(init.method, 'GET');
       assert.equal(init.headers.get('authorization'), 'Bearer life-token-a');
       assert.equal(init.headers.get('cookie'), null);
@@ -231,7 +431,7 @@ test('Core proxy obtains a LifeSpace session and forwards only the user bearer',
     assert.fail(`unexpected upstream ${url}`);
   };
   const handler = createWebHandler({ fetcher, now: () => NOW });
-  const response = await handler.fetch(request('/api/lifespace/core/v1/spaces?kind=family'), ENV);
+  const response = await handler.fetch(request('/api/lifespace/core/v1/me/spaces'), ENV);
   assert.equal(response.status, 200);
   assert.deepEqual((await payload(response)).data, [{ id: 'spc_1' }]);
   assert.equal(response.headers.get('x-request-id'), 'req_core');

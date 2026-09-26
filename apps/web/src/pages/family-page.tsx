@@ -17,7 +17,6 @@ type InvitePreview = {
   space: {
     id: string;
     name: string;
-    kind: string;
     timezone: string;
     memberCount: number;
   };
@@ -81,14 +80,9 @@ export function FamilyPage() {
     setCreateFamilyBusy(true);
     setActionError(null);
     try {
-      await apiRequest('/api/lifespace/core/v1/spaces', {
+      await apiRequest('/api/families', {
         method: 'POST',
-        body: JSON.stringify({
-          kind: 'family',
-          name,
-          ownerDisplayName: displayName,
-          timezone: 'Asia/Shanghai',
-        }),
+        body: JSON.stringify({ name, timezone: 'Asia/Shanghai' }),
       });
       setFamilyName('');
       await refresh();
@@ -115,21 +109,17 @@ export function FamilyPage() {
     setJoinFamilyBusy(true);
     setActionError(null);
     try {
-      const preview = await apiRequest<InvitePreview>('/api/lifespace/core/v1/space-invites/preview', {
+      const preview = await apiRequest<InvitePreview>('/api/family-invites/preview', {
         method: 'POST',
         body: JSON.stringify({ token }),
       });
-      if (preview.space.kind !== 'family') {
-        setActionError('这个邀请码不是 HomeMew 家庭邀请');
-        return;
-      }
       if (!preview.canJoin) {
         setActionError('这个家庭邀请码当前不可加入');
         return;
       }
-      await apiRequest('/api/lifespace/core/v1/space-invites/join', {
+      await apiRequest('/api/family-invites/join', {
         method: 'POST',
-        body: JSON.stringify({ token, displayName }),
+        body: JSON.stringify({ token }),
       });
       setJoinToken('');
       await refresh();
