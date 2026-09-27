@@ -26,6 +26,18 @@ const homeSource = readFileSync(
   new URL('../miniprogram/pages/home/home.ts', import.meta.url),
   'utf8',
 );
+const profileSource = readFileSync(
+  new URL('../miniprogram/pages/profile-setup/profile-setup.ts', import.meta.url),
+  'utf8',
+);
+const profileTemplate = readFileSync(
+  new URL('../miniprogram/pages/profile-setup/profile-setup.wxml', import.meta.url),
+  'utf8',
+);
+const backendSource = readFileSync(
+  new URL('../../backend/worker.mjs', import.meta.url),
+  'utf8',
+);
 
 test('Home is the default page and the application splash route is retired', () => {
   assert.equal(appJson.pages[0], 'pages/home/home');
@@ -56,13 +68,19 @@ test('profile and family loading single-flight duplicate startup callers', () =>
   assert.match(storeSource, /if \(familiesLoadInFlight\) return familiesLoadInFlight/);
 });
 
-test('first-time onboarding resumes the original deep-link target', () => {
+test('first-time users keep the default profile and are not forced through profile editing', () => {
+  assert.ok(backendSource.includes('displayName: `微信用户${openid.slice(-6)}`'));
+  assert.doesNotMatch(authSource, /newUserPending|isNewUserOnboardingPending|markNewUserOnboardingComplete/);
+  assert.doesNotMatch(entrySource, /reLaunchProfileSetup|needsProfileSetup|微信用户/);
   assert.match(entrySource, /pendingEntry/);
-  assert.match(entrySource, /reLaunchProfileSetup/);
   assert.match(entrySource, /export function resumePendingEntry/);
-  assert.match(entrySource, /wx\.reLaunch\(\{ url: targetUrl\(target\) \}\)/);
   assert.match(entrySource, /options\.query/);
-  assert.match(entrySource, /\^微信用户\.\{6\}\$/);
+});
+
+test('profile customization is user-initiated and a saved nickname cannot be empty', () => {
+  assert.match(profileSource, /if \(!displayName\.trim\(\)\)/);
+  assert.match(profileTemplate, /编辑资料/);
+  assert.doesNotMatch(profileTemplate, /开始使用|设置资料/);
 });
 
 test('home restores cache before issuing live domain refreshes', () => {
