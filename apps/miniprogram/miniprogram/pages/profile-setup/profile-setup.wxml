@@ -1,9 +1,9 @@
-<!-- 首次资料设置 / 编辑资料页 -->
+<!-- 用户资料编辑页 -->
 <view class="container">
-  <nav-bar title="{{isEditMode ? '编辑资料' : '设置资料'}}" showBack="{{isEditMode}}" topInset="{{48}}" />
+  <nav-bar title="编辑资料" showBack="true" topInset="{{48}}" />
 
   <view class="header">
-    <text class="subtitle">{{isEditMode ? '修改你的昵称和头像' : '设置昵称和头像，方便家人认识你'}}</text>
+    <text class="subtitle">修改你的昵称和头像</text>
   </view>
 
   <!-- 头像预览 -->
@@ -59,7 +59,7 @@
       disabled="{{submitting || avatarUploading}}"
       bindtap="onSubmit"
     >
-      {{submitting ? '保存中...' : (isEditMode ? '保存' : '开始使用')}}
+      {{submitting ? '保存中...' : '保存'}}
     </button>
   </view>
 </view>
