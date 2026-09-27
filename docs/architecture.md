@@ -98,7 +98,7 @@ The Mini Program has no application-level Logo/splash routing page. `pages/home/
 
 `App.onShow` starts runtime preparation in parallel with the requested page. Short-lived token expiry is never modeled as a user-visible login state: all callers share one in-flight `wx.login() -> HomeMew backend -> LifeSpace token exchange` operation. User/profile and accessible-family initialization is also single-flighted so the App coordinator and the target page do not duplicate startup requests.
 
-First-time or incomplete-profile users are redirected to profile setup only after identity is resolved. The original entry path and query are kept in process memory and restored after profile completion, so onboarding does not collapse a task detail, invite, date anchor or other deep link back to Home. Disabled accounts use the dedicated disabled-state page; ordinary network/service failures stay on the requested page and use that page's retry/error UI.
+A first-seen WeChat identity is created immediately as a usable LifeSpace user with a HomeMew-assigned placeholder display name (`微信用户xxxxxx`). A missing uploaded avatar is presented with the Mini Program's local default avatar. First entry is never blocked on profile editing: the requested business page remains visible and usable, including deep links. The user may later open “我的 → 编辑资料” to replace the nickname or avatar; a saved nickname must remain non-empty, while avatar customization is optional. Disabled accounts still use the dedicated disabled-state page; ordinary network/service failures stay on the requested page and use that page's retry/error UI.
 
 Non-idempotent writes are never blindly replayed after a 401. The client may silently refresh credentials so the next explicit user retry uses a fresh token.
 
