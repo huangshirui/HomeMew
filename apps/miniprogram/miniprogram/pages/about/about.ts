@@ -40,7 +40,7 @@ function formatLocalTime(iso: string): string {
 
 Page({
   data: {
-    version: '1.7.0',
+    version: '1.7.1',
     testing: false,
     errorText: '',
     latency: null as LatencyView | null,
