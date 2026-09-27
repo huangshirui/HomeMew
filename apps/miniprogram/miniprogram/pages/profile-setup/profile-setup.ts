@@ -1,14 +1,15 @@
 /**
- * 首次资料设置 / 编辑资料页。
+ * 用户资料编辑页。
+ *
+ * 首次进入不会强制打开本页。新用户直接使用后端分配的“微信用户xxxxxx”
+ * 昵称与客户端默认头像浏览产品；用户从“我的”主动进入本页后再修改资料。
  *
  * 用户可以使用微信头像按钮或从相册/相机选择图片。临时文件会直接上传到
- * HomeMew Core，由 Core 持久化到 R2 并返回正式 avatarUrl。资料保存接口只
- * 更新昵称，不再提交头像路径或任意 URL。
+ * HomeMew BFF / LifeSpace Identity，由 Identity 持久化并返回正式 avatarUrl。
+ * 昵称保存时不能为空。
  */
 
 import { updateCurrentUser } from '../../services/users';
-import { markNewUserOnboardingComplete } from '../../services/auth';
-import { resumePendingEntry } from '../../services/entry-navigation';
 import { uploadAvatar } from '../../services/media';
 import { loadCurrentUser, userStore } from '../../stores/index';
 import { showSuccess, showError, showLoading, hideLoading } from '../../utils/index';
@@ -17,37 +18,32 @@ Page({
   data: {
     displayName: '',
     avatarUrl: '',
-    isEditMode: false,
     submitting: false,
     avatarUploading: false,
   },
 
-  onLoad(options: { mode?: string }): void {
-    const isEditMode = options?.mode === 'edit';
-    this.setData({ isEditMode });
-
-    if (isEditMode) {
-      const current = userStore.value;
-      if (current) {
-        this.setData({
-          displayName: current.displayName || '',
-          avatarUrl: current.avatarUrl || '',
-        });
-      } else {
-        loadCurrentUser()
-          .then((user) => {
-            if (user) {
-              this.setData({
-                displayName: user.displayName || '',
-                avatarUrl: user.avatarUrl || '',
-              });
-            }
-          })
-          .catch(() => {
-            /* 预填失败不阻断页面 */
-          });
-      }
+  onLoad(): void {
+    const current = userStore.value;
+    if (current) {
+      this.setData({
+        displayName: current.displayName || '',
+        avatarUrl: current.avatarUrl || '',
+      });
+      return;
     }
+
+    loadCurrentUser()
+      .then((user) => {
+        if (user) {
+          this.setData({
+            displayName: user.displayName || '',
+            avatarUrl: user.avatarUrl || '',
+          });
+        }
+      })
+      .catch(() => {
+        /* 预填失败不阻断页面 */
+      });
   },
 
   onDisplayNameInput(e: WechatMiniprogram.Input): void {
@@ -107,7 +103,7 @@ Page({
   },
 
   async onSubmit(): Promise<void> {
-    const { displayName, submitting, isEditMode, avatarUploading } = this.data;
+    const { displayName, submitting, avatarUploading } = this.data;
 
     if (submitting || avatarUploading) return;
 
@@ -133,16 +129,12 @@ Page({
       hideLoading();
       showSuccess('设置成功');
 
-      if (isEditMode) {
-        setTimeout(() => {
-          wx.navigateBack();
-        }, 1200);
-      } else {
-        markNewUserOnboardingComplete();
-        setTimeout(() => {
-          resumePendingEntry();
-        }, 600);
-      }
+      setTimeout(() => {
+        wx.navigateBack({
+          delta: 1,
+          fail: () => wx.switchTab({ url: '/pages/profile/profile' }),
+        });
+      }, 600);
     } catch (error: unknown) {
       hideLoading();
       console.error('[ProfileSetup] Save failed:', error);
