@@ -2,23 +2,19 @@
  * App-level entry coordination for direct-entry Mini Program UX.
  *
  * The first visible page is always the requested business page (or Home by default).
- * This coordinator only redirects when a cross-cutting product state requires it:
- * - first-time/incomplete profile -> profile setup, then resume the original entry;
- * - disabled account -> disabled page, then retry/resume after the account is restored.
+ * New users keep the default profile created by the HomeMew backend and are never
+ * forced through profile editing before they can browse the product.
  *
- * Token refresh and runtime bootstrap remain silent infrastructure concerns.
+ * This coordinator only redirects for an explicit disabled-account state. Token
+ * refresh and runtime bootstrap remain silent infrastructure concerns.
  */
 
-import {
-  isNewUserOnboardingPending,
-} from './auth';
 import {
   ensureRuntimeReady,
   resetRuntimeReady,
 } from './runtime-bootstrap';
 import {
   clearUserState,
-  userStore,
 } from '../stores/index';
 
 type EntryQuery = Record<string, string | number | boolean | null | undefined>;
@@ -34,7 +30,6 @@ type EntryTarget = {
 };
 
 const HOME_PATH = 'pages/home/home';
-const PROFILE_SETUP_PATH = 'pages/profile-setup/profile-setup';
 const DISABLED_PATH = 'pages/launch/disabled';
 
 let pendingEntry: EntryTarget | null = null;
@@ -45,15 +40,9 @@ function normalizedPath(path?: string): string {
   return value.startsWith('pages/') ? value : HOME_PATH;
 }
 
-function currentPath(): string {
-  const pages = getCurrentPages();
-  const current = pages[pages.length - 1] as { route?: string } | undefined;
-  return normalizedPath(current?.route);
-}
-
 function rememberEntry(options: AppEntryOptions): void {
   const path = normalizedPath(options.path);
-  if (path === PROFILE_SETUP_PATH || path === DISABLED_PATH) return;
+  if (path === DISABLED_PATH) return;
   pendingEntry = {
     path,
     query: { ...(options.query || {}) },
@@ -68,32 +57,10 @@ function targetUrl(target: EntryTarget): string {
   return `/${target.path}${query ? `?${query}` : ''}`;
 }
 
-function isIncompleteProfileDisplayName(displayName: string | null | undefined): boolean {
-  const name = String(displayName || '').trim();
-  if (!name) return true;
-
-  // HomeMew Backend creates a first-seen LifeSpace user with a temporary
-  // "微信用户xxxxxx" display name before the user completes Mini onboarding.
-  // Detect it so an interrupted first launch resumes onboarding on the next
-  // process instead of mistaking the placeholder for a completed profile.
-  return /^微信用户.{6}$/u.test(name);
-}
-
-function needsProfileSetup(): boolean {
-  const user = userStore.value;
-  if (!user) return false;
-  return isNewUserOnboardingPending() || isIncompleteProfileDisplayName(user.displayName);
-}
-
-function reLaunchProfileSetup(): void {
-  if (currentPath() === PROFILE_SETUP_PATH) return;
-  wx.reLaunch({
-    url: '/pages/profile-setup/profile-setup?onboarding=1',
-  });
-}
-
 function reLaunchDisabled(): void {
-  if (currentPath() === DISABLED_PATH) return;
+  const pages = getCurrentPages();
+  const current = pages[pages.length - 1] as { route?: string } | undefined;
+  if (normalizedPath(current?.route) === DISABLED_PATH) return;
   wx.reLaunch({
     url: '/pages/launch/disabled',
   });
@@ -105,8 +72,8 @@ function isDisabledError(error: unknown): boolean {
 }
 
 /**
- * Called from App.onShow. It never inserts a splash page and never changes a
- * normal authenticated user's requested navigation path.
+ * Called from App.onShow. It never inserts a splash/profile gate and never changes
+ * a normal user's requested navigation path.
  */
 export async function coordinateAppEntry(options: AppEntryOptions = {}): Promise<void> {
   rememberEntry(options);
@@ -115,10 +82,6 @@ export async function coordinateAppEntry(options: AppEntryOptions = {}): Promise
   coordinationPromise = (async () => {
     try {
       await ensureRuntimeReady();
-
-      if (needsProfileSetup()) {
-        reLaunchProfileSetup();
-      }
     } catch (error) {
       if (isDisabledError(error)) {
         resetRuntimeReady();
@@ -141,8 +104,7 @@ export async function coordinateAppEntry(options: AppEntryOptions = {}): Promise
 }
 
 /**
- * Called after first-time profile setup. reLaunch is used so query parameters
- * from a deep link (task detail, invite, date anchor, etc.) are preserved.
+ * Used after a disabled-account retry so a deep link can resume where it started.
  */
 export function resumePendingEntry(): void {
   const target = pendingEntry || { path: HOME_PATH, query: {} };
@@ -157,16 +119,6 @@ export function resumePendingEntry(): void {
 export async function retryDisabledEntry(): Promise<void> {
   resetRuntimeReady();
   clearUserState();
-
-  try {
-    await ensureRuntimeReady({ force: true });
-    if (needsProfileSetup()) {
-      reLaunchProfileSetup();
-      return;
-    }
-    resumePendingEntry();
-  } catch (error) {
-    if (isDisabledError(error)) throw error;
-    throw error;
-  }
+  await ensureRuntimeReady({ force: true });
+  resumePendingEntry();
 }

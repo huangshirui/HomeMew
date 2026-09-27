@@ -6,7 +6,6 @@ import { getApplicationBaseUrl, isTokenValid, REQUEST_TIMEOUT, STORAGE_KEYS } fr
 type LoginPayload = LoginResponse & { error?: { code?: string; message?: string } };
 
 let refreshPromise: Promise<LoginResponse> | null = null;
-let newUserPending = false;
 
 export async function callLogin(): Promise<LoginResponse> {
   const code = await new Promise<string>((resolve, reject) => wx.login({
@@ -35,7 +34,6 @@ export async function callLogin(): Promise<LoginResponse> {
 function persistLogin(result: LoginResponse): LoginResponse {
   wx.setStorageSync(STORAGE_KEYS.accessToken, result.accessToken);
   wx.setStorageSync(STORAGE_KEYS.tokenExpiresAt, result.expiresAt);
-  if (result.isNewUser) newUserPending = true;
   return result;
 }
 
@@ -79,16 +77,8 @@ export async function loginAndSaveToken(): Promise<{ isNewUser: boolean }> {
   return { isNewUser: result.isNewUser };
 }
 
-export function isNewUserOnboardingPending(): boolean {
-  return newUserPending;
-}
-
-export function markNewUserOnboardingComplete(): void {
-  newUserPending = false;
-}
 
 export function clearAuth(): void {
-  newUserPending = false;
   for (const key of [
     STORAGE_KEYS.accessToken, STORAGE_KEYS.tokenExpiresAt, STORAGE_KEYS.currentFamilyId, STORAGE_KEYS.homeCache,
     'coreApiUrl', 'identityApiUrl', 'loginBackendUrl',
