@@ -34,6 +34,7 @@ import {
   clearBufferedIntegrationCredential,
   getBufferedIntegrationCredential,
 } from '../lib/integration-secret-buffer';
+import { AgentAccessSection } from './agent-access-section';
 import { EventSubscriptionsSection } from './event-subscriptions-page';
 
 function PermissionEditor({ value, onChange, disabled = false }: {
@@ -372,7 +373,7 @@ export function IntegrationDetailPage() {
 
   async function disable() {
     if (!integration || !currentFamily) return;
-    if (!window.confirm(`确认禁用“${integration.displayName}”吗？系统会禁用 Service Principal，并尝试撤销当前家庭授权和全部有效凭据。相关事件订阅也会因 Data Grant 撤销而停止投递。`)) return;
+    if (!window.confirm(`确认禁用“${integration.displayName}”吗？系统会禁用 Service Principal，并尝试撤销服务凭据、Agent API Token 和当前家庭授权。相关事件订阅也会因 Data Grant 撤销而停止投递。`)) return;
     setBusy('disable');
     setError(null);
     try {
@@ -551,6 +552,13 @@ export function IntegrationDetailPage() {
         </Card>
       </section>
 
+      <AgentAccessSection
+        spaceId={currentFamily.id}
+        integrationId={integration.id}
+        integrationName={integration.displayName}
+        readOnly={!editable}
+      />
+
       <EventSubscriptionsSection
         spaceId={currentFamily.id}
         familyName={currentFamily.name}
@@ -564,7 +572,7 @@ export function IntegrationDetailPage() {
           <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-semibold text-stone-900">禁用外部系统</p>
-              <p className="mt-1 text-sm leading-6 text-stone-500">禁用会撤销服务凭据和当前家庭 Data Grant；绑定到该服务的事件订阅也会停止投递。</p>
+              <p className="mt-1 text-sm leading-6 text-stone-500">禁用会撤销服务凭据、Agent API Token 和当前家庭 Data Grant；绑定到该服务的事件订阅也会停止投递。</p>
             </div>
             <Button variant="ghost" disabled={busy !== null} onClick={() => void disable()}>
               {busy === 'disable' ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}禁用
