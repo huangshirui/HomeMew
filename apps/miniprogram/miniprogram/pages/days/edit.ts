@@ -38,9 +38,7 @@ import {
   FamilyMember,
   CreateDayRecordRequest,
   UpdateDayRecordRequest,
-  DayRecordCreationDraft,
 } from '../../types/index';
-import { consumePendingDraft } from '../../stores/draft-buffer';
 
 type Step = 'kind' | 'form';
 type Mode = 'create' | 'edit';
@@ -184,42 +182,12 @@ Page({
     try {
       const members = await listFamilyMembers(this.data.familyId);
       this.setData({ members: mapMembers(members), loaded: true });
-      this.applyConsumedDraft();
     } catch (error: unknown) {
       console.error('[DayEdit] Load members failed:', error);
       const err = error as { code?: string; message?: string };
       this.setData({ loadError: true, loaded: true });
       showError(getErrorMessage(err.code, err.message));
     }
-  },
-
-  /** 喵一下：消费草稿后预填日子字段（创建模式、成员加载完成后调用） */
-  applyConsumedDraft(): void {
-    if (this.data.mode !== 'create') return;
-    const draft = consumePendingDraft('day_record');
-    if (!draft || draft.status !== 'ready' || draft.kind !== 'day_record') return;
-    const d = (draft as DayRecordCreationDraft).draft;
-    const kind = (d.dayRecordKind || 'elapsed') as DayRecordKind;
-    const patch: Record<string, unknown> = { step: 'form', kind };
-    if (d.name != null) patch.name = d.name;
-    if (d.description != null) patch.description = d.description;
-    if (d.icon != null) patch.icon = d.icon;
-    if (d.anchorDate != null) patch.anchorDate = d.anchorDate;
-    if (d.subjectUserId != null) {
-      patch.subjectUserId = d.subjectUserId;
-      const subject = this.data.members.find((m) => m.userId === d.subjectUserId);
-      patch.subjectText = subject ? subject.displayName : '全家';
-    }
-    if (d.attentionAfterDays != null && kind === 'elapsed') {
-      patch.attentionAfterDays = String(d.attentionAfterDays);
-    }
-    if (d.attentionBeforeDays != null && (kind === 'countdown' || kind === 'cycle')) {
-      patch.attentionBeforeDays = String(d.attentionBeforeDays);
-    }
-    if (d.cycleDays != null && kind === 'cycle') {
-      patch.cycleDays = String(d.cycleDays);
-    }
-    this.setData(patch);
   },
 
   async loadRecord(): Promise<void> {
