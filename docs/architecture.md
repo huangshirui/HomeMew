@@ -4,11 +4,15 @@
 
 HomeMew is a household application built on LifeSpace. LifeSpace is the platform source of truth for Identity, Spaces/authorization, domain models, Actions, contracts, migrations and business data. HomeMew owns household product UX plus provider-specific application integration.
 
+From LifeSpace's perspective, **HomeMew is one Application**. Mini Program, Web/PWA, BFFs, Workers, the WeChat provider adapter and integration orchestration are HomeMew implementation/deployment boundaries and are not separate LifeSpace Application identities. This boundary is fixed by `docs/decisions/2026-10-08-single-lifespace-application.md`.
+
 The legacy HomeMew business Core was retired from the active repository on 2026-08-26 after the completed LifeSpace production migration/cutover. Git history is the archive for its old implementation, OpenAPI and migrations; new HomeMew business behavior must use LifeSpace rather than recreate a local Core.
 
 ## 2. Target context
 
 ```text
+LifeSpace Application: HomeMew
+
 WeChat Mini Program
   ├─ wx.login code ───────────────> HomeMew production front door
   │                                  └─ /api/v1/login/wechat
@@ -24,24 +28,26 @@ HomeMew Web browser
   -> Cloudflare Access
   -> HomeMew Web Worker / same-origin Web session BFF
       ├─ original Cf-Access-Jwt-Assertion
-      ├─ dedicated HomeMew-Web lsa_* credential
+      ├─ HomeMew Application lsa_* credential
       ├─ LifeSpace Identity Access principal exchange/linking
       ├─ signed host-only HttpOnly application session
       └─ current LifeSpace Identity/Core contract
 
 HomeMew-managed n8n / Agents / scripts
-  -> dedicated LifeSpace Service Principal
-  -> one active API Token OR OAuth Client Credentials at steady state
-  -> HomeMew integrations application context
+  -> dedicated LifeSpace Service Principal / Agent identity
+  -> one active service/Agent credential at steady state
+  -> owned by the HomeMew Application context
   -> model-scoped Data Grants for the intended family
   -> LifeSpace Core
 ```
 
-The Mini BFF and Web same-origin BFF are distinct contracts even when hosted by the same production Worker. The Mini BFF is a stable HomeMew product/anti-corruption boundary for a review-constrained downloadable client; the Web BFF is a browser trust/session boundary whose server-controlled application follows the current LifeSpace contract. Neither persists household business truth or duplicates LifeSpace authorization.
+The Mini BFF and Web same-origin BFF are distinct HomeMew contracts even when hosted by the same production Worker. The Mini BFF is a stable HomeMew product/anti-corruption boundary for a review-constrained downloadable client; the Web BFF is a browser trust/session boundary whose server-controlled implementation follows the current LifeSpace contract. Neither persists household business truth or duplicates LifeSpace authorization. These boundaries do not create separate LifeSpace Applications.
 
 After Phase 2, Mini runtime code does not address public LifeSpace Core/Identity URLs or wire routes. BFF-to-LifeSpace calls use Cloudflare Service Bindings where supported while preserving the LifeSpace user bearer, request IDs, errors, timeouts and authoritative checks. There is no WeChat Cloud Development dependency and no second HomeMew business Core.
 
-External-system administration is an advanced HomeMew Web capability. The Mini Program remains a lightweight household client and does not create, configure, rotate, revoke or display service credentials or Data Grants. This product boundary is fixed by `docs/decisions/2026-08-24-external-integrations-web-only.md`.
+External-system administration is an advanced HomeMew Web capability. The Mini Program remains a lightweight household client and does not create, configure, rotate, revoke or display service credentials or Data Grants. This product boundary is fixed by `docs/decisions/2026-08-24-external-integrations-web-only.md` and is independent from the LifeSpace Application identity boundary.
+
+A HomeMew Application may own multiple active `lsa_*` credentials when operationally useful for independent deployment, zero-downtime rotation or independent revocation. Credential count is not client count. The provider backend and Web Worker may therefore use different `lsa_*` values while still representing the same canonical HomeMew Application.
 
 ## 3. HomeMew Cloudflare application backend
 
@@ -53,7 +59,7 @@ Responsibilities:
 - call the WeChat `jscode2session` server API with the server-only app secret;
 - resolve and persist `openid -> LifeSpace user_id` in a HomeMew-owned SQLite-backed Durable Object;
 - create a LifeSpace Identity user when the provider identity is first seen;
-- authenticate as the registered HomeMew Mini Program LifeSpace application using a server-only `lsa_*` credential;
+- authenticate as the canonical HomeMew LifeSpace Application using a server-only `lsa_*` credential;
 - request a short-lived LifeSpace user token and return it to the Mini Program.
 
 The Durable Object is keyed by `WeChat appid + openid`, so each external identity has its own coordination/storage unit. Concurrent first-login requests to the same live object share one in-flight user-creation promise before the mapping is persisted. A dedicated HomeMew D1 is intentionally not provisioned for this small identity mapping.
@@ -90,7 +96,7 @@ Mini Program
 
 An existing mapping is authoritative. If LifeSpace later refuses token issuance for a mapped user, HomeMew does not silently create a replacement user and overwrite the mapping; the inconsistency must be investigated instead.
 
-The access token represents the LifeSpace user, has the HomeMew Mini Program application as its authorized party, and carries only the scopes granted to that application. Token refresh repeats this flow with a fresh WeChat code.
+The access token represents the LifeSpace user, has the canonical HomeMew Application as its authorized party, and carries only the scopes granted to that Application. Token refresh repeats this flow with a fresh WeChat code.
 
 ### 4.1 Direct-entry startup and silent identity recovery
 
@@ -104,7 +110,7 @@ Non-idempotent writes are never blindly replayed after a 401. The client may sil
 
 ## 5. HomeMew Web authentication and BFF
 
-`apps/web/` is the HomeMew browser application plus its same-origin BFF. It is separate from `apps/backend/` because Cloudflare Access is a platform Web authentication boundary, while WeChat `openid` remains application-provider mapping owned by the Mini Program adapter.
+`apps/web/` is the HomeMew browser application plus its same-origin BFF. It is separate from `apps/backend/` as a HomeMew implementation/trust boundary because Cloudflare Access is a Web authentication boundary, while WeChat `openid` remains application-provider mapping owned by the Mini Program adapter. This separation does not create another LifeSpace Application.
 
 Target Web stack:
 
@@ -112,7 +118,7 @@ Target Web stack:
 - Vite + the official Cloudflare Vite plugin;
 - Cloudflare Worker serving the Web assets and same-origin API/BFF;
 - Cloudflare Access protecting the Web application;
-- LifeSpace Identity 0.5.0+ for Access principal verification, audience registration, exchange and account linking.
+- LifeSpace Identity with Access principal verification, audience registration, exchange and account linking.
 
 Authentication flow:
 
@@ -120,11 +126,11 @@ Authentication flow:
 Browser
 -> Cloudflare Access login / SSO
 -> HomeMew Web Worker receives Cf-Access-Jwt-Assertion
--> Worker authenticates to Identity with the dedicated HomeMew-Web lsa_*
+-> Worker authenticates to Identity with a HomeMew Application lsa_*
 -> POST /internal/v1/access/tokens
 -> Identity independently verifies Access JWT signature / issuer / expiry / audience
 -> Identity resolves verified (iss, sub) -> global usr_*
--> Identity issues short-lived HomeMew-Web-scoped LifeSpace user token
+-> Identity issues short-lived HomeMew-scoped LifeSpace user token
 -> Web Worker stores it only in a signed host-only HttpOnly application session
 -> browser calls same-origin /api/lifespace/* BFF paths
 -> BFF calls LifeSpace Identity/Core with the LifeSpace user bearer
@@ -136,7 +142,9 @@ The HomeMew application session uses a dedicated `WEB_SESSION_SECRET`, `Secure`,
 
 State-changing same-origin BFF/proxy routes require an exact `Origin` match. This remains necessary because cookie SameSite behavior is not an application authorization boundary between sibling subdomains.
 
-Normal Web sessions intentionally do not carry `grants:manage`. `/api/integrations*` performs a fresh Access exchange for only `profile:read grants:manage` when an administrator starts an integration-management operation. Core then independently requires current `manage` authority on the selected family Space before the BFF may create/update service credentials with the separate HomeMew integrations application credential. This is privilege-on-demand, not a second HomeMew role check.
+Normal Web sessions intentionally do not carry `grants:manage`. `/api/integrations*` performs a fresh Access exchange for only `profile:read grants:manage` when an administrator starts an integration-management operation. Core independently requires current `manage` authority on the selected family Space before HomeMew may manage Service Principals/credentials. The trusted backend call uses the same canonical HomeMew Application context as ordinary Web exchange. This is privilege-on-demand, not a second HomeMew role check or a second Application identity.
+
+For compatibility with the existing integration orchestration modules, the Web front door currently exposes `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` as an internal alias of `LIFESPACE_APPLICATION_CREDENTIAL`. The alias is not a separately provisioned secret source and must not be interpreted as a synthetic integrations Application.
 
 For HomeMew, an unknown Access principal has exactly one onboarding path: link the already-existing HomeMew/LifeSpace account through the Mini Program. HomeMew Web does not expose LifeSpace Access registration and does not create a new LifeSpace user. LifeSpace Identity may retain explicit Access registration as a platform capability for other applications.
 
@@ -198,7 +206,7 @@ Browser
 -> LifeSpace Core/Identity
 ```
 
-The browser never receives the LifeSpace user bearer or the HomeMew-Web `lsa_*` application credential. The BFF is a narrow authenticated transport boundary; it does not translate LifeSpace authorization into a separate HomeMew server authorization model.
+The browser never receives the LifeSpace user bearer or any HomeMew `lsa_*` application credential. The BFF is a narrow authenticated transport boundary; it does not translate LifeSpace authorization into a separate HomeMew server authorization model.
 
 ## 9. Media
 
@@ -222,9 +230,9 @@ A Data Grant by itself is deliberately **not** treated as credential-management 
 
 ## 11. External systems
 
-LifeSpace Core Kernel 0.15.0+ and Identity 0.5.0 provide the approved HomeMew external-system authority:
+LifeSpace provides the approved HomeMew external-system authority:
 
-- Identity owns Service Principals, `lsp_pat_*` API Tokens and OAuth Client Credentials;
+- Identity owns Service Principals, canonical `lsp_svc_*` Service API Tokens, OAuth Client Credentials and Agent identities/credentials; legacy `lsp_pat_*` is migration compatibility only;
 - Core owns Data Grants, Application × Model Access, reusable Eventing Webhook Endpoints, model/event subscription filters and delivery;
 - model-collection Data Grants can target a published `modelKey` with `read`, `write` or `manage`;
 - stable credential scopes remain `resources:read`, `resources:write`, and where needed `resources:manage`.
@@ -239,34 +247,36 @@ HomeMew Web uses a low-frequency list/detail information architecture:
   -> external-system detail
        -> Authentication
        -> Event subscriptions
+       -> Agent access
        -> future integration capabilities
 ```
 
 The list page is intentionally compact and does not expose every editable setting. A family administrator enters a specific external system before changing credentials, Data Grants or integration behavior. Future synchronization rules, notification channels, MCP/Agent settings and similar external-system-specific capabilities must be added to this detail container instead of creating new top-level Settings entries.
 
-Each HomeMew external system corresponds to one independent LifeSpace Service Principal with one explicit owning family Space binding. The external-system detail treats the following as child configuration of that same principal:
+Each HomeMew external system corresponds to one independent LifeSpace Service Principal with one explicit owning family Space binding. It is a connector instance owned by the HomeMew Application, not another Application. The external-system detail treats the following as child configuration of that same principal:
 
 - **Authentication**: credential mode, active credential, controlled rotation/mode switching, family model Data Grants and direct LifeSpace API connection information;
-- **Event push**: one HomeMew-managed Webhook Endpoint for this external system, with one callback URL/signing secret and selectable model/event subscription filters.
+- **Event push**: one HomeMew-managed Webhook Endpoint for this external system, with one callback URL/signing secret and selectable model/event subscription filters;
+- **Agent access**: optional HomeMew-owned Agent identity/binding and Agent credential/authority orchestration.
 
 ```text
 current Access-authenticated family administrator
-  -> HomeMew Web lsa_* exchanges Access assertion for profile:read + grants:manage / spaces:manage as required
+  -> HomeMew Application lsa_* exchanges Access assertion for profile:read + grants:manage / spaces:manage as required
   -> Core verifies current family Space manage authority
 
 HomeMew integrations BFF
   -> verifies Service Principal HomeMew Space ownership binding
-  -> separate LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL (lsa_*)
-  -> Identity Service Principal / API Token / OAuth credential APIs
+  -> same canonical HomeMew Application context
+  -> Identity Service Principal / API Token / OAuth / Agent APIs
 
 resulting service
   -> stable credential scopes
-  ∩ integrations Application × Model Access
+  ∩ HomeMew Application × Model Access
   ∩ current per-family model Data Grants
   -> LifeSpace Core business records
 
 Event push
-  -> managing HomeMew application context
+  -> HomeMew Application context
   -> one Webhook Endpoint for current family Space + external-system Service Principal
   -> shared Webhook URL + signing secret
   -> Event Subscription filters select model + created/updated/deleted
@@ -277,6 +287,7 @@ Event push
 Rules:
 
 - one HomeMew external system gets one independent Service Principal and one explicit owning family Space binding;
+- external systems are owned by the canonical HomeMew Application and never require a synthetic integrations Application;
 - steady state is exactly one authentication mode (`api_token` or `oauth_client_credentials`) and one active credential;
 - the platform's 1:N credential storage is not exposed as normal multi-key management;
 - rotation is create-new -> update external system -> verify -> explicitly complete; only during this transition may old and new credentials coexist;
@@ -293,12 +304,12 @@ Rules:
 - an Event Subscription filter is not an authorization grant: Core requires the Endpoint subscriber Service Principal to hold a current `read`/`write`/`manage` Data Grant for the selected model (or equivalent whole-Space Grant);
 - Core re-checks the subscriber Data Grant before matching and delivering events, so Grant revocation/expiry or HomeMew integration disable stops new event delivery without a duplicate HomeMew event-authority store;
 - Webhook payloads remain reference-only; the same external system uses its Service Principal credential and current Data Grant to read full business data when needed;
-- the browser never receives either the Web `lsa_*` or the integrations `lsa_*`;
+- the browser never receives any HomeMew `lsa_*`;
 - the Mini Program does not expose external-system administration or secret handling.
 
-The integrations application must be separately registered/configured in LifeSpace and should have only the intended stable scope ceiling and Application × Model Access. The HomeMew Web application must allow the narrow on-demand manager scopes needed by external-system and subscription administration; the normal ambient browser session still does not request those elevated scopes.
+The canonical HomeMew Application must include the scope ceiling and Application × Model Access needed by both ordinary HomeMew behavior and external-system administration. Normal ambient browser sessions still do not request elevated manager scopes; integrations use a fresh privilege-on-demand Access exchange and Core re-checks current Space authority.
 
-The code may be deployed before the integrations application credential is installed. In that state `/health` reports `integrationsReady=false`, normal HomeMew Web continues to operate, and integration routes fail closed with `INTEGRATIONS_NOT_CONFIGURED`. After staging provisioning and E2E verification, the integrations credential should become a required deployment secret.
+Integration readiness is tied to the normal Web `LIFESPACE_APPLICATION_CREDENTIAL`. The old `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` name survives only as a front-door compatibility alias inside HomeMew code and is not a required separately provisioned deployment secret.
 
 ## 12. Migration/cutover rules
 
@@ -309,6 +320,10 @@ The code may be deployed before the integrations application credential is insta
 - `apps/backend/` keeps the application-owned WeChat identity mapping; `apps/web/` never duplicates it.
 - Production Web activation must not break the existing Mini Program `/api/v1/login/wechat` application-provider endpoint.
 - The legacy HomeMew Core source is retired from the active repository. Any still-existing old HomeMew Worker/D1 resources remain frozen/read-only only for the explicit stabilization/rollback-evidence window and require a separate operations decision before physical deletion.
+- The existing production LifeSpace registrations for HomeMew Mini, HomeMew Web and HomeMew integrations are migration inputs only. Cutover creates one neutral canonical HomeMew Application and new `lsa_*` credentials.
+- Existing HomeMew external systems do not need cross-Application migration. They may be disabled/revoked before cutover and manually recreated from HomeMew Web afterward.
+- Historical audit/application attribution is immutable and must not be rewritten to the new canonical Application.
+- The HomeMew single-Application code must not be deployed before the compatible LifeSpace Application model, canonical HomeMew registration, Access audience, scope/model access and replacement `lsa_*` credentials are ready.
 
 ## 13. LifeSpace change boundary
 
