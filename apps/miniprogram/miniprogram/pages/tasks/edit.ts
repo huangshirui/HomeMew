@@ -21,10 +21,9 @@ import {
   getErrorMessage,
   isVersionConflict,
 } from '../../utils/index';
-import { Task, FamilyMember, CreateTaskRequest, UpdateTaskRequest, TaskCreationDraft } from '../../types/index';
+import { Task, FamilyMember, CreateTaskRequest, UpdateTaskRequest } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
-import { consumePendingDraft } from '../../stores/draft-buffer';
 
 type MemberOption = {
   userId: string;
@@ -130,7 +129,6 @@ Page({
         loaded: true,
       });
       this.refreshDerived();
-      this.applyConsumedDraft();
     } catch (error: unknown) {
       hideLoading();
       console.error('[TaskEdit] Load members failed:', error);
@@ -138,26 +136,6 @@ Page({
       this.setData({ loadError: true });
       showError(getErrorMessage(err.code, err.message) || '成员加载失败');
     }
-  },
-
-  /** 喵一下：消费草稿后预填待办字段（创建模式、成员加载完成后调用） */
-  applyConsumedDraft(): void {
-    if (this.data.mode !== 'create') return;
-    const draft = consumePendingDraft('task');
-    if (!draft || draft.status !== 'ready' || draft.kind !== 'task') return;
-    const d = (draft as TaskCreationDraft).draft;
-    const patch: Record<string, unknown> = {};
-    if (d.name != null) patch.name = d.name;
-    if (d.description != null) patch.description = d.description;
-    if (d.dueDate != null) patch.dueDate = d.dueDate;
-    if (d.assigneeIds && d.assigneeIds.length) {
-      patch.members = this.data.members.map((m) => ({
-        ...m,
-        selected: d.assigneeIds.includes(m.userId),
-      }));
-    }
-    this.setData(patch);
-    this.refreshDerived();
   },
 
   applyTask(task: Task, members: FamilyMember[]): void {
