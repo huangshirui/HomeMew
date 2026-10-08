@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 const USER_SCOPES = [
   'profile:read', 'profile:write', 'spaces:read', 'spaces:write', 'spaces:manage',
-  'resources:read', 'resources:write',
+  'resources:read', 'resources:write', 'creation-drafts:read', 'creation-drafts:write',
 ];
 
 const ACTIVITY_CHANNEL_FIELDS = {
@@ -260,7 +260,7 @@ export class FamilyJoinCoordinator extends DurableObject {
   async commit(input) {
     const previous = this.joinTail;
     let release;
-    this.joinTail = new Promise(resolve => { release = resolve(); });
+    this.joinTail = new Promise(resolve => { release = resolve; });
     await previous;
     try {
       return await this.commitSerial(input);
