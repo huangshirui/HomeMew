@@ -24,6 +24,22 @@ HomeMew Web
 
 HomeMew 不再拥有独立的家庭业务 Core。旧 HomeMew Core 已在 2026-08-26 从 active tree 退休；需要追溯旧实现、OpenAPI 或 migration 时使用 Git 历史，不再把历史 Core 作为当前工作区的一部分。
 
+## LifeSpace Application 边界
+
+从 LifeSpace 的视角，**HomeMew 是一个 Application**。Mini Program、Web、Mini/Web BFF、`homemew-backend-production`、`homemew-web-production` 和 integration orchestration 都是 HomeMew 内部客户端/部署实现，不是独立 LifeSpace Application。
+
+```text
+LifeSpace Application: HomeMew
+  ├─ trusted application credentials (`lsa_*`)
+  ├─ Cloudflare Access audience(s)
+  ├─ HomeMew-managed Service Principals / external systems
+  └─ HomeMew-managed Agents
+```
+
+一个 HomeMew Application 可以有多把 active `lsa_*`，用于无停机轮换、独立部署、降低 secret 泄露爆炸半径或独立撤销；credential 数量不代表客户端数量，也不会产生新的 Application identity。
+
+当前改造以 `docs/decisions/2026-10-08-single-lifespace-application.md` 为准。旧 production 中 Mini/Web/integrations 三个 Application registration 只作为迁移输入；在 LifeSpace 对应改造和 production cutover 完成前，不应单独部署本分支。
+
 ## 目录
 
 ```text
@@ -59,11 +75,13 @@ homemew.aisr.online -> homemew-web-production
 
 微信 `openid` 是 HomeMew 应用自己的 provider identity，不进入 LifeSpace Identity。`apps/backend` 使用 SQLite-backed Durable Object 保存 `openid -> usr_*`，并使用 server-only `lsa_*` 向 LifeSpace Identity 换取短期用户 Token。
 
+这把 `lsa_*` 属于 canonical HomeMew Application。它可以与 Web Worker 使用不同 credential 以支持独立部署/轮换，但两者仍代表同一个 HomeMew Application。
+
 ### Web
 
 Cloudflare Access 是 HomeMew Web 的长期登录/SSO 层。HomeMew Web 不保存 `Access sub -> usr_*` 映射；它把原始 `Cf-Access-Jwt-Assertion` 交给 LifeSpace Identity 独立验证，由 Identity 负责 `(iss, sub) -> usr_*` 解析和账户链接。
 
-Web BFF 使用独立的 HomeMew-Web `lsa_*`，不能复用 Mini Program application credential。LifeSpace user bearer 只保存在签名、host-only、HttpOnly 的短期应用 session 中，不暴露给浏览器 JavaScript。
+Web BFF 使用 server-only `LIFESPACE_APPLICATION_CREDENTIAL` 代表 canonical HomeMew Application。现有 integration/Agent orchestration 模块中的 `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` 仅作为 HomeMew 内部兼容别名，由 front door 强制映射到同一个 Web Application credential；它不再是独立 secret 来源，也不表示 `HomeMew integrations` Application。LifeSpace user bearer 只保存在签名、host-only、HttpOnly 的短期应用 session 中，不暴露给浏览器 JavaScript。
 
 ## HomeMew Web 技术栈
 
@@ -115,7 +133,25 @@ homemew.aisr.online
 
 同一生产 Worker 承载两类边界：Web same-origin BFF 负责 Access assertion、App Session、HttpOnly Cookie、Origin/CSRF 与浏览器凭据隔离；Mini BFF 提供稳定、显式的 HomeMew 产品路由并在内部适配当前 LifeSpace 契约。两者都不保存家庭业务数据、不复制 LifeSpace 授权逻辑，也不接受任意上游 URL/路径或提供通用模型代理。
 
+这些 BFF/客户端边界是 HomeMew 内部架构边界，不映射成多个 LifeSpace Applications。
+
 当前已完成 Final Mini BFF 全量迁移与 LifeSpace Event `when: temporal_range` production cutover。Mini-facing 路由/DTO 保持稳定，BFF 只使用当前 LifeSpace Canonical Query + TemporalRange Event adapter；旧 Event precursor、split Calendar adapter 和 old/new selector 属于已退休兼容层。现有 Web 边界继续保留 Access session exchange、existing-user link challenge、same-origin Core/Identity proxy 和外部系统管理编排；HomeMew Web 不暴露 LifeSpace Access registration。后续状态由 `docs/plans/2026-09-16-miniprogram-final-bff-rollout.md` 跟踪。
+
+## 外部系统 / External systems
+
+HomeMew Web 的外部系统是 **HomeMew Application 对外 connector 的实例**。每一个外部系统映射为一个 LifeSpace Service Principal，并由对应 credential、Data Grants、Eventing 和可选 Agent binding 描述其能力。
+
+```text
+HomeMew Application
+  └─ External system / connector
+       └─ Service Principal (`svc_*`)
+            ├─ credential
+            ├─ Data Grants
+            ├─ Eventing
+            └─ optional Agent binding
+```
+
+外部系统不是 LifeSpace Application，也不再由 synthetic `HomeMew integrations production` Application 持有。当前已有外部系统允许在 cutover 前清理，上线后由用户在 HomeMew Web 中重新添加，不做跨 Application ownership 迁移。
 
 ## LifeSpace 模型映射
 
@@ -157,4 +193,5 @@ corepack pnpm test:web
 - `docs/product-rules.md`
 - `docs/web-plan.md`
 - `apps/web/README.md`
+- `docs/decisions/2026-10-08-single-lifespace-application.md`
 - 当前 LifeSpace 对应 contract / architecture（平台 API 与权限的唯一源码来源）
