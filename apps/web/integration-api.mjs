@@ -1,8 +1,15 @@
+import { cleanupIntegrationAgent, handleIntegrationAgentRequest } from './agent-integration-api.mjs';
+import {
+  decodeIntegrationBinding,
+  encodeDiscardedIntegrationBinding,
+  encodeIntegrationBinding,
+  isDiscardedIntegrationDescription,
+  isReservedIntegrationDescription,
+} from './integration-binding.mjs';
+
 const MANAGER_SCOPES = ['profile:read', 'grants:manage'];
 const MODEL_KEYS = ['event', 'task', 'day_record'];
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
-const BINDING_PREFIX = 'homemew:v1:space=';
-const DISCARDED_PREFIX = 'homemew:v1:discarded=';
 const MAX_USER_DESCRIPTION_LENGTH = 400;
 const CREDENTIAL_MODES = ['api_token', 'oauth_client_credentials'];
 
@@ -132,34 +139,10 @@ function parseDescription(value) {
   if (description.length > MAX_USER_DESCRIPTION_LENGTH) {
     throw new IntegrationError(422, 'VALIDATION_ERROR', `说明不能超过 ${MAX_USER_DESCRIPTION_LENGTH} 个字符`);
   }
-  if (description.startsWith(BINDING_PREFIX) || description.startsWith(DISCARDED_PREFIX)) {
+  if (isReservedIntegrationDescription(description)) {
     throw new IntegrationError(422, 'VALIDATION_ERROR', '说明使用了 HomeMew 保留前缀');
   }
   return description || null;
-}
-
-function encodeBoundDescription(spaceId, description) {
-  return `${BINDING_PREFIX}${spaceId}\n${description ?? ''}`;
-}
-
-function encodeDiscardedDescription(spaceId, description) {
-  return `${DISCARDED_PREFIX}${spaceId}\n${description ?? ''}`;
-}
-
-function isDiscardedDescription(value) {
-  return typeof value === 'string' && value.startsWith(DISCARDED_PREFIX);
-}
-
-function decodeBoundDescription(value) {
-  if (typeof value !== 'string' || !value.startsWith(BINDING_PREFIX)) {
-    return { spaceId: null, description: typeof value === 'string' && value.trim() ? value.trim() : null };
-  }
-  const newline = value.indexOf('\n');
-  const marker = newline < 0 ? value : value.slice(0, newline);
-  const spaceId = marker.slice(BINDING_PREFIX.length);
-  if (!isSpaceId(spaceId)) return { spaceId: null, description: value.trim() || null };
-  const description = newline < 0 ? '' : value.slice(newline + 1).trim();
-  return { spaceId, description: description || null };
 }
 
 function parsePermissions(value) {
@@ -252,7 +235,7 @@ function sortCredentials(credentials) {
 }
 
 function integrationDto(principal, grants, credentials, bindingStatus = 'bound') {
-  const decoded = decodeBoundDescription(principal.description);
+  const decoded = decodeIntegrationBinding(principal.description);
   const activeWholeSpaceGrants = grants.filter((grant) => activeGrant(grant)
     && grant.resourceType === 'space'
     && grant.resourceId === null
@@ -428,10 +411,10 @@ async function listCredentials(env, fetcher, principalId, id) {
 async function resolveBoundIntegration(env, fetcher, spaceId, principalId, id) {
   const principals = await listPrincipals(env, fetcher, id);
   const principal = principals.find((item) => item.id === principalId);
-  if (!principal || isDiscardedDescription(principal.description)) {
+  if (!principal || isDiscardedIntegrationDescription(principal.description)) {
     throw new IntegrationError(404, 'INTEGRATION_NOT_FOUND', '当前家庭没有这个外部系统');
   }
-  const binding = decodeBoundDescription(principal.description);
+  const binding = decodeIntegrationBinding(principal.description);
   if (!binding.spaceId) {
     throw new IntegrationError(409, 'INTEGRATION_BINDING_REQUIRED', '这个迁移外部系统尚未建立 HomeMew 家庭管理归属，当前仅可查看');
   }
@@ -609,7 +592,7 @@ async function compensateFailedCreation(env, fetcher, managerToken, spaceId, pri
     try {
       await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}`, {
         method: 'PATCH',
-        body: { status: 'disabled', description: encodeDiscardedDescription(spaceId, description) },
+        body: { status: 'disabled', description: encodeDiscardedIntegrationBinding(spaceId, description) },
         id,
         fallbackCode: 'INTEGRATION_COMPENSATION_FAILED',
       });
@@ -632,10 +615,10 @@ async function reconcileDisabledPartialIntegration(env, fetcher, managerToken, s
   for (const grant of activeGrants) {
     await revokeGrant(env, fetcher, managerToken, spaceId, grant.id, id);
   }
-  const description = decodeBoundDescription(principal.description).description;
+  const description = decodeIntegrationBinding(principal.description).description;
   await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principal.id)}`, {
     method: 'PATCH',
-    body: { status: 'disabled', description: encodeDiscardedDescription(spaceId, description) },
+    body: { status: 'disabled', description: encodeDiscardedIntegrationBinding(spaceId, description) },
     id,
     fallbackCode: 'INTEGRATION_COMPENSATION_FAILED',
   });
@@ -658,8 +641,8 @@ async function handleList(request, env, fetcher, assertion, id) {
   const integrations = [];
 
   for (const principal of principals) {
-    if (isDiscardedDescription(principal.description)) continue;
-    const binding = decodeBoundDescription(principal.description);
+    if (isDiscardedIntegrationDescription(principal.description)) continue;
+    const binding = decodeIntegrationBinding(principal.description);
     if (binding.spaceId === spaceId) {
       const principalGrants = grantsForPrincipal(grants, principal.id);
       const credentials = await listCredentials(env, fetcher, principal.id, id);
@@ -700,7 +683,7 @@ async function handleCreate(request, env, fetcher, assertion, id) {
     method: 'POST',
     body: {
       displayName,
-      description: encodeBoundDescription(spaceId, description),
+      description: encodeIntegrationBinding(spaceId, description),
       maxScopes: scopes,
       createdByUserId: manager.userId,
     },
@@ -739,6 +722,7 @@ async function handleUpdate(request, env, fetcher, assertion, id, principalId) {
   const spaceId = parseSpaceId(body.spaceId);
   const { manager, grants } = await managementContext(env, fetcher, assertion, spaceId, id);
   const principal = await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
+  const binding = decodeIntegrationBinding(principal.description);
   if (principal.status !== 'active') throw new IntegrationError(409, 'INTEGRATION_DISABLED', '已禁用的外部系统不能继续编辑');
 
   const principalGrants = grantsForPrincipal(grants, principalId);
@@ -752,7 +736,7 @@ async function handleUpdate(request, env, fetcher, assertion, id, principalId) {
 
   const patch = {};
   if (body.displayName !== undefined) patch.displayName = parseName(body.displayName);
-  if (body.description !== undefined) patch.description = encodeBoundDescription(spaceId, parseDescription(body.description));
+  if (body.description !== undefined) patch.description = encodeIntegrationBinding(spaceId, parseDescription(body.description), binding.agentId);
   let permissions = null;
   if (body.permissions !== undefined) {
     permissions = parsePermissions(body.permissions);
@@ -837,7 +821,8 @@ async function handleDisable(request, env, fetcher, assertion, id, principalId) 
   const body = await readJson(request);
   const spaceId = parseSpaceId(body.spaceId);
   const { manager, grants } = await managementContext(env, fetcher, assertion, spaceId, id);
-  await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
+  const principal = await resolveBoundIntegration(env, fetcher, spaceId, principalId, id);
+  const binding = decodeIntegrationBinding(principal.description);
 
   await identityIntegrationRequest(env, fetcher, `/api/v1/service-principals/${encodeURIComponent(principalId)}`, {
     method: 'PATCH',
@@ -862,6 +847,9 @@ async function handleDisable(request, env, fetcher, assertion, id, principalId) 
       cleanupWarnings.push(`credential:${credential.id}`);
     }
   }
+  if (binding.agentId) {
+    cleanupWarnings.push(...await cleanupIntegrationAgent(env, fetcher, manager.accessToken, spaceId, binding.agentId, id));
+  }
   return json({ data: { disabled: true, cleanupWarnings } }, 200, id);
 }
 
@@ -880,6 +868,9 @@ export async function handleIntegrationRequest(request, env, { fetcher = fetch, 
     }
     const principalId = parsePrincipalId(decodeURIComponent(parts[2]));
 
+    if (parts[3] === 'agent') {
+      return await handleIntegrationAgentRequest(request, env, { fetcher, assertion, id, principalId });
+    }
     if (parts.length === 3 && request.method === 'PATCH') {
       return await handleUpdate(request, env, fetcher, assertion, id, principalId);
     }
