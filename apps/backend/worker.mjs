@@ -260,7 +260,7 @@ export class FamilyJoinCoordinator extends DurableObject {
   async commit(input) {
     const previous = this.joinTail;
     let release;
-    this.joinTail = new Promise(resolve => { release = resolve; });
+    this.joinTail = new Promise(resolve => { release = resolve(); });
     await previous;
     try {
       return await this.commitSerial(input);
@@ -533,7 +533,7 @@ async function reconcileFamilyCatalog(request, env) {
   requireInternalFamilyCatalogRequest(request);
   const input = await readJson(request);
   if (Object.keys(input).some(key => key !== 'spaceIds')) {
-    throw new HttpError(400, 'INVALID_REQUEST', 'Request contains only spaceIds');
+    throw new HttpError(400, 'INVALID_REQUEST', 'Request contains unsupported fields');
   }
   const spaceIds = validateFamilySpaceIds(input.spaceIds);
   const familySpaceIds = await familyCatalogStub(env).filter(spaceIds);
