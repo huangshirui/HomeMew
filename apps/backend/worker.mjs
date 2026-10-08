@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 const USER_SCOPES = [
   'profile:read', 'profile:write', 'spaces:read', 'spaces:write', 'spaces:manage',
-  'resources:read', 'resources:write', 'creation-drafts:read', 'creation-drafts:write',
+  'resources:read', 'resources:write',
 ];
 
 const ACTIVITY_CHANNEL_FIELDS = {
