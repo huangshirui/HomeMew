@@ -31,6 +31,17 @@ async function proxyBackend(request, env) {
   return backend.fetch(request);
 }
 
+function webApplicationEnv(env) {
+  const credential = env.LIFESPACE_APPLICATION_CREDENTIAL;
+  if (typeof credential !== 'string' || !credential.startsWith('lsa_')) return env;
+  return {
+    ...env,
+    // Compatibility alias for the existing integration orchestration modules. Both names
+    // deliberately resolve to the same canonical HomeMew LifeSpace Application context.
+    LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL: credential,
+  };
+}
+
 export function createFrontDoorHandler({ app = webHandler } = {}) {
   return {
     async fetch(request, env, context) {
@@ -53,7 +64,7 @@ export function createFrontDoorHandler({ app = webHandler } = {}) {
       if (isBackendPublicRoute(request, url)) {
         return proxyBackend(request, env);
       }
-      return app.fetch(request, env, context);
+      return app.fetch(request, webApplicationEnv(env), context);
     },
   };
 }
