@@ -19,7 +19,7 @@ test('read-only consumer smoke proves the pinned LifeSpace baseline and HomeMew 
     const target = String(url);
     calls.push(target);
     if (target === 'https://auth.example/api/v1/status') {
-      return jsonResponse({ data: { status: 'ok', service: 'identity', environment: 'production', contractVersion: '0.10.0', schemaVersion: 9 } });
+      return jsonResponse({ data: { status: 'ok', service: 'identity', environment: 'production', contractVersion: '0.11.0', schemaVersion: 10 } });
     }
     if (target === 'https://core.example/api/v1/status') {
       return jsonResponse({ data: { status: 'ok', service: 'core', environment: 'production', contractVersion: '0.48.0', schemaVersion: 53 } });
@@ -48,7 +48,7 @@ test('read-only consumer smoke proves the pinned LifeSpace baseline and HomeMew 
       fetcher: fakeFetch,
     });
     assert.deepEqual(result, {
-      baseline: { identity: '0.10.0', core: '0.48.0' },
+      baseline: { identity: '0.11.0', core: '0.48.0' },
       families: 1,
       familyId: 'spc_home',
       resources: { members: 1, events: 1, tasks: 1, dayRecords: 0, wishes: 0 },
@@ -64,7 +64,7 @@ test('read-only consumer smoke never requires a family when the user has none', 
   const fakeFetch = async (url) => {
     const target = String(url);
     if (target.includes('auth.example')) {
-      return jsonResponse({ data: { status: 'ok', service: 'identity', environment: 'production', contractVersion: '0.10.0', schemaVersion: 9 } });
+      return jsonResponse({ data: { status: 'ok', service: 'identity', environment: 'production', contractVersion: '0.11.0', schemaVersion: 10 } });
     }
     if (target.includes('core.example')) {
       return jsonResponse({ data: { status: 'ok', service: 'core', environment: 'production', contractVersion: '0.48.0', schemaVersion: 53 } });
