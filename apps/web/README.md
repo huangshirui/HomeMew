@@ -2,6 +2,8 @@
 
 HomeMew Web is the primary browser application for HomeMew. It is a LifeSpace client, not a second business Core.
 
+HomeMew as a product owns one canonical LifeSpace `Application` access subject. Web, Mini Program, Mini BFF, Web BFF, provider backend and integration-management orchestration are application-owned client/runtime boundaries, not separate LifeSpace Applications. See `docs/decisions/2026-10-08-canonical-lifespace-application.md`.
+
 ## Current stack
 
 ```text
@@ -57,12 +59,12 @@ Browser
        -> /api/* and /health -> Worker BFF
 ```
 
-The Worker hosts two deliberately separate application boundaries:
+The Worker hosts two deliberately separate **client/BFF contract boundaries inside the same HomeMew LifeSpace Application**:
 
 - the Web same-origin BFF, an authentication/session/application-orchestration boundary whose server-controlled Web client follows the current LifeSpace contract;
 - explicit public Mini BFF product routes, a stable anti-corruption/release-lag contract for the reviewed Mini Program.
 
-Both boundaries must not:
+Those boundaries may evolve and release independently without becoming separate LifeSpace Applications. Both boundaries must not:
 
 - create a HomeMew `/families/...` business contract;
 - persist Spaces, events, tasks, day records, wishes or other household data;
@@ -79,13 +81,15 @@ Browser
   -> HomeMew Web Worker
        reads Cf-Access-Jwt-Assertion
        never trusts browser-supplied sub/email/userId
-       -> LifeSpace Identity /internal/v1/access/* with dedicated server-only lsa_*
+       -> LifeSpace Identity /internal/v1/access/* with a server-only HomeMew lsa_*
        -> Identity independently verifies Access JWT + audience
        -> Identity resolves (iss, sub) -> global usr_*
-       -> short-lived HomeMew-Web-scoped LifeSpace user token
+       -> short-lived HomeMew-Application-scoped LifeSpace user token
   -> signed host-only HttpOnly HomeMew session
   -> same-origin BFF -> LifeSpace Identity/Core
 ```
+
+The Web Worker credential is independently rotatable, but it belongs to the same canonical HomeMew Application as the provider backend and integration-management credentials. The credential identifies a trusted backend for HomeMew; it does not create a `HomeMew Web` Application identity.
 
 HomeMew Web never stores its own Access-subject -> `usr_*` mapping. That mapping belongs to LifeSpace Identity.
 
@@ -158,18 +162,21 @@ Future synchronization rules, notification channels, MCP/Agent configuration or 
 
 HomeMew uses LifeSpace Service Principals, API Tokens / OAuth Client Credentials and model-scoped Data Grants directly; HomeMew does not own a credential store or permission table.
 
-Two separate LifeSpace application contexts are involved:
+One canonical LifeSpace Application context is involved, with purpose-separated backend credentials:
 
 ```text
-HomeMew Web application
-  lsa_* -> Access exchange for the current human
-  normal session scopes do not include grants:manage
+HomeMew Application
+  Web/session lsa_*
+    -> Access exchange for the current human
+    -> normal session does not request grants:manage
 
-HomeMew integrations application
-  separate lsa_* held only by the Worker
-  -> create/update Service Principals
-  -> create/list/revoke service credentials
+  integration-management lsa_*
+    -> separate server-only credential, same Application/azp
+    -> create/update HomeMew-owned Service Principals
+    -> create/list/revoke service credentials
 ```
+
+The separate credentials provide operational least privilege, independent rotation and revocation. They do not create a second `HomeMew integrations` Application.
 
 For every integration-management request the Worker performs a fresh Access exchange for only `profile:read grants:manage`, obtains the current `usr_*`, and calls `GET /api/v1/spaces/{spaceId}/grants?includeRevoked=true`. Core therefore proves both the `grants:manage` credential scope and the user's current `manage` authority on the selected Space before the BFF performs any service-principal operation.
 
@@ -177,7 +184,7 @@ The UI exposes model collection permissions for `event`, `task`, and `day_record
 
 One HomeMew external system has exactly one selected authentication mode and one active credential at steady state:
 
-- `api_token` -> long-lived opaque `lsp_pat_*` bearer;
+- `api_token` -> long-lived opaque LifeSpace Service API bearer;
 - `oauth_client_credentials` -> OAuth 2.0 Client Credentials.
 
 LifeSpace may hold multiple credential rows, but HomeMew does not expose arbitrary multi-key management. Rotation is a controlled temporary exception: create a candidate, update and verify the external system, then explicitly complete by revoking the previous credential(s). Cancel revokes the candidate and keeps the previous credential. Switching authentication mode uses the same controlled flow.
@@ -206,15 +213,17 @@ With both 日程 and 待办 wired through this shared Endpoint, the current even
 
 Server-only Worker secrets:
 
-- `LIFESPACE_APPLICATION_CREDENTIAL` — dedicated trusted **HomeMew Web** LifeSpace application credential (`lsa_*`), not the Mini Program credential;
+- `LIFESPACE_APPLICATION_CREDENTIAL` — trusted `lsa_*` used by the Web/session BFF. It belongs to the canonical HomeMew Application;
 - `WEB_SESSION_SECRET` — at least 32 characters;
-- `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` — separate trusted LifeSpace application credential used only for HomeMew-managed service principals and credentials.
+- `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` — independently rotatable `lsa_*` used only for HomeMew integration-management orchestration. Despite the legacy environment-variable name, it belongs to the **same canonical HomeMew Application**, not a separate integrations Application.
 
-The HomeMew Web LifeSpace application must allow `grants:manage` so the BFF can request the narrow on-demand manager token. The normal ambient Web session intentionally does not request that scope.
+The canonical HomeMew Application scope ceiling includes `grants:manage` so the BFF can request the narrow on-demand manager token, plus the ordinary HomeMew and stable service-management resource scopes required by the product. The normal ambient Web session intentionally does not request `grants:manage`.
 
-The integrations LifeSpace application has only the stable service scope ceiling needed by the product (`resources:read` / `resources:write`) and Core Application × Model Access for the explicitly supported HomeMew models.
+HomeMew-managed Service Principals remain independently scoped by their own max/token scopes, Application × Model Access and Data Grants. The broader product-level Application ceiling is never sufficient authority by itself.
 
 All three Worker secrets above are required production runtime prerequisites. Deployment checks binding names without printing secret values.
+
+The provider backend has its own `LIFESPACE_APPLICATION_CREDENTIAL` Worker secret. It is a different credential value from the Web Worker when operational isolation is desired, but it must belong to the same canonical HomeMew Application.
 
 Non-secret configuration:
 
@@ -245,6 +254,8 @@ homemew.aisr.online
 ```
 
 Since the accepted production cutover on 2026-08-24, it is owned by `homemew-web-production`. Browser Web traffic remains behind Cloudflare Access. The exact Mini login route `POST /api/v1/login/wechat` uses its narrow Access bypass and delegates through the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. The stable Mini BFF surface uses only its explicit bypass/routes, requires the LifeSpace user bearer where applicable, and delegates only to fixed internal operations.
+
+A canonical-Application release is additionally gated on LifeSpace Identity Application Contract `0.11.0` and Identity schema `>=10`. Both Web and provider-backend production deploy workflows verify the shared LifeSpace release baseline before deployment.
 
 Release path:
 
