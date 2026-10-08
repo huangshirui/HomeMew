@@ -42,10 +42,8 @@ import {
   FamilyMember,
   CreateEventRequest,
   UpdateEventRequest,
-  EventCreationDraft,
 } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
-import { consumePendingDraft } from '../../stores/draft-buffer';
 import { consumeCloneSource } from '../../stores/clone-buffer';
 
 /** 新增日程（非全天）的默认时间：开始取当前时间的下一个整点，结束 +1 小时；跨天则顺延日期 */
@@ -203,7 +201,6 @@ Page({
         loaded: true,
       });
       this.refreshDerived();
-      this.applyConsumedDraft();
       this.applyConsumedClone();
     } catch (error: unknown) {
       hideLoading();
@@ -212,43 +209,6 @@ Page({
       this.setData({ loadError: true });
       showError(getErrorMessage(err.code, err.message) || '成员加载失败');
     }
-  },
-
-  /** 喵一下：消费草稿后预填日程字段（创建模式、成员加载完成后调用） */
-  applyConsumedDraft(): void {
-    if (this.data.mode !== 'create') return;
-    const draft = consumePendingDraft('event');
-    if (!draft || draft.status !== 'ready' || draft.kind !== 'event') return;
-    const d = (draft as EventCreationDraft).draft;
-    const isAllDay = d.isAllDay == null ? true : d.isAllDay;
-    const patch: Record<string, unknown> = { isAllDay };
-    if (d.summary != null) patch.summary = d.summary;
-    if (d.description != null) patch.description = d.description;
-    if (d.location != null) patch.location = d.location;
-    if (d.startDate != null) patch.startDate = d.startDate;
-    if (d.endDate != null) patch.endDate = isAllDay ? d.endDate : d.endDate;
-    if (!isAllDay) {
-      if (d.startTime != null) patch.startTime = d.startTime;
-      if (d.endTime != null) patch.endTime = d.endTime;
-      if (d.startTimezone != null) {
-        patch.startTimezone = d.startTimezone;
-        patch.startTimezoneMetadata = d.startTimezone;
-        patch.startTimezoneLabel = timeZoneLabel(d.startTimezone);
-      }
-      if (d.endTimezone != null) {
-        patch.endTimezone = d.endTimezone;
-        patch.endTimezoneMetadata = d.endTimezone;
-        patch.endTimezoneLabel = timeZoneLabel(d.endTimezone);
-      }
-    }
-    if (d.attendeeIds && d.attendeeIds.length) {
-      patch.members = this.data.members.map((m) => ({
-        ...m,
-        selected: d.attendeeIds.includes(m.userId),
-      }));
-    }
-    this.setData(patch);
-    this.refreshDerived();
   },
 
   /** 复制入口：消费 clone buffer 中的源日程并预填创建表单（保留原日期，用户可改） */
