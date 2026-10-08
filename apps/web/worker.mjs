@@ -14,8 +14,6 @@ const USER_SCOPES = [
   'spaces:manage',
   'resources:read',
   'resources:write',
-  'creation-drafts:read',
-  'creation-drafts:write',
 ];
 
 class HttpError extends Error {
