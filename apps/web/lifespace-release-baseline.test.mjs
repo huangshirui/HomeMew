@@ -6,14 +6,14 @@ function payload(service, environment, contractVersion, schemaVersion) {
   return { data: { status: 'ok', service, environment, contractVersion, schemaVersion } };
 }
 
-test('release baseline accepts the LifeSpace 0.48 staging Identity and Core floors', () => {
+test('release baseline accepts the client-agnostic Identity and LifeSpace 0.48 Core floors', () => {
   assert.equal(
     assertLifeSpaceStatus(
-      payload('identity', 'staging', LIFESPACE_RELEASE_BASELINE.identity.contractVersion, 9),
+      payload('identity', 'staging', LIFESPACE_RELEASE_BASELINE.identity.contractVersion, 10),
       'identity',
       'staging',
     ).schemaVersion,
-    9,
+    10,
   );
   assert.equal(
     assertLifeSpaceStatus(
@@ -52,5 +52,13 @@ test('release baseline rejects contract, schema and environment drift', () => {
       'production',
     ),
     /environment production/,
+  );
+  assert.throws(
+    () => assertLifeSpaceStatus(
+      payload('identity', 'production', LIFESPACE_RELEASE_BASELINE.identity.contractVersion, 9),
+      'identity',
+      'production',
+    ),
+    /schema is behind the HomeMew release baseline/,
   );
 });
