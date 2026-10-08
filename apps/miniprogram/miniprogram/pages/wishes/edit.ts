@@ -17,8 +17,7 @@ import {
   isVersionConflict,
   formatInstantInTimeZone,
 } from '../../utils/index';
-import { CreateWishRequest, UpdateWishRequest, WishCreationDraft } from '../../types/index';
-import { consumePendingDraft } from '../../stores/draft-buffer';
+import { CreateWishRequest, UpdateWishRequest } from '../../types/index';
 
 type Mode = 'create' | 'edit';
 
@@ -63,22 +62,10 @@ Page({
     });
     wx.setNavigationBarTitle({ title: isEdit ? '编辑愿望' : '许个愿望' });
     if (isEdit) this.loadWish();
-    else this.applyConsumedDraft();
   },
 
   onUnload(): void {
     if (this._successTimer) clearTimeout(this._successTimer);
-  },
-
-  applyConsumedDraft(): void {
-    const draft = consumePendingDraft('wish');
-    if (!draft || draft.status !== 'ready' || draft.kind !== 'wish') return;
-    const d = (draft as WishCreationDraft).draft;
-    const patch: Record<string, unknown> = {};
-    if (d.title != null) patch.title = d.title;
-    if (d.description != null) patch.description = d.description;
-    if (d.desiredDate != null) patch.desiredDate = d.desiredDate;
-    this.setData(patch);
   },
 
   resolveFamilyToday(): string {
