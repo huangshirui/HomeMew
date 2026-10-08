@@ -44,20 +44,40 @@ test('Mini Program login is forwarded to the bound backend before Web Access han
   assert.equal(appCalled, false);
 });
 
-test('non-login traffic stays on the HomeMew Web handler', async () => {
+test('non-login traffic stays on the HomeMew Web handler and uses one LifeSpace Application credential', async () => {
   let appCalled = false;
   const handler = createFrontDoorHandler({
     app: {
-      async fetch(incoming) {
+      async fetch(incoming, receivedEnv) {
         appCalled = true;
         assert.equal(new URL(incoming.url).pathname, '/api/session');
+        assert.equal(receivedEnv.LIFESPACE_APPLICATION_CREDENTIAL, 'lsa_homemew');
+        assert.equal(receivedEnv.LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL, 'lsa_homemew');
         return new Response('web', { status: 401 });
       },
     },
   });
-  const response = await handler.fetch(request('/api/session'), {});
+  const response = await handler.fetch(request('/api/session'), {
+    LIFESPACE_APPLICATION_CREDENTIAL: 'lsa_homemew',
+    LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL: 'lsa_old_integrations',
+  });
   assert.equal(response.status, 401);
   assert.equal(appCalled, true);
+});
+
+test('invalid or missing application credential is not synthesized for integrations', async () => {
+  const handler = createFrontDoorHandler({
+    app: {
+      async fetch(_incoming, receivedEnv) {
+        assert.equal(receivedEnv.LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL, 'lsa_old_integrations');
+        return new Response('web', { status: 500 });
+      },
+    },
+  });
+  const response = await handler.fetch(request('/api/session'), {
+    LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL: 'lsa_old_integrations',
+  });
+  assert.equal(response.status, 500);
 });
 
 test('only POST on the exact login path bypasses the Web handler', async () => {
