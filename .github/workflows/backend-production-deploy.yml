@@ -69,6 +69,13 @@ jobs:
           if (familyJoin?.class_name !== 'FamilyJoinCoordinator') throw new Error('Production FAMILY_JOIN_COORDINATORS binding is missing');
           NODE
 
+      - name: Verify LifeSpace production release baseline
+        run: >-
+          node apps/web/lifespace-release-baseline.mjs
+          production
+          https://auth.aisr.online
+          https://core.aisr.online
+
       - name: Verify LifeSpace production is reachable
         shell: bash
         run: |
@@ -106,6 +113,7 @@ jobs:
             echo "## HomeMew backend production"
             echo
             echo "- Worker: homemew-backend-production"
+            echo "- LifeSpace release baseline: verified before deploy"
             echo "- Public front door ownership: unchanged (homemew-web-production)"
             echo "- Mini Program provider route: verified through the Web front door"
             echo "- Member activity: SQLite-backed Durable Object"
