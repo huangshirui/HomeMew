@@ -17,7 +17,7 @@
     "typecheck:web": "pnpm --filter @homemew/web typecheck",
     "build": "pnpm build:web",
     "build:web": "pnpm --filter @homemew/web build",
-    "check": "node --check apps/backend/worker.mjs && pnpm test && pnpm typecheck && pnpm build",
+    "check": "node --check apps/backend/worker.mjs && node --check apps/backend/front-door.mjs && node --check apps/backend/external-system-catalog.mjs && pnpm test && pnpm typecheck && pnpm build",
     "test:backend": "node --test apps/backend/*.test.mjs"
   },
   "devDependencies": {
