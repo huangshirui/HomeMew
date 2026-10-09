@@ -115,7 +115,7 @@ function SecretReveal({ credential, systemName, spaceId, onClose }: {
                 {copied === 'token' ? '已复制' : '复制 Service API Token'}
               </Button>
             )}
-            <p className="mt-2 text-xs leading-5 text-emerald-900/60">LifeSpace n8n Community Node 使用 Connection Base URL + Service API Token。</p>
+            <p className="mt-2 text-xs leading-5 text-emerald-900/60">Service API Token 是通用 LifeSpace 机器凭据，可供自动化平台、脚本、后端服务等客户端通过 LifeSpace API 访问已授权数据。</p>
           </div>
         ) : (
           <>
@@ -340,7 +340,7 @@ export function ServiceAccessSection({
         <span className="grid size-9 place-items-center rounded-xl bg-emerald-100 text-emerald-800"><Server className="size-4" /></span>
         <div>
           <h2 className="text-xl font-semibold text-stone-900">Service Access</h2>
-          <p className="mt-0.5 text-sm text-stone-500">给自动化流程、脚本等机器调用创建独立 Service Principal、凭据和 Data Grant。</p>
+          <p className="mt-0.5 text-sm text-stone-500">给自动化流程、脚本、后端服务等机器客户端创建独立 Service Principal、凭据和 Data Grant。</p>
         </div>
       </div>
 
@@ -367,9 +367,10 @@ export function ServiceAccessSection({
                   value={credentialMode}
                   onChange={(event) => setCredentialMode(event.target.value as CredentialMode)}
                 >
-                  <option value="api_token">API Token · 适合 LifeSpace n8n Node</option>
-                  <option value="oauth_client_credentials">OAuth Client Credentials</option>
+                  <option value="api_token">Service API Token · Bearer 认证</option>
+                  <option value="oauth_client_credentials">OAuth Client Credentials · OAuth 2.0</option>
                 </select>
+                <span className="mt-2 block text-xs leading-5 text-stone-400">两种方式都是通用 LifeSpace 机器接入能力。Service API Token 适合能安全保存长期 Bearer Token 的客户端；OAuth Client Credentials 适合支持标准 OAuth 2.0 客户端凭据流程的系统。</span>
               </label>
               {!readOnly && (
                 <div className="flex justify-end border-t border-stone-100 pt-4">
@@ -403,7 +404,7 @@ export function ServiceAccessSection({
                         value={rotationMode}
                         onChange={(event) => setRotationMode(event.target.value as CredentialMode)}
                       >
-                        <option value="api_token">API Token</option>
+                        <option value="api_token">Service API Token</option>
                         <option value="oauth_client_credentials">OAuth Client Credentials</option>
                       </select>
                     </label>
@@ -465,6 +466,7 @@ export function ServiceAccessSection({
                   <div className="text-sm leading-6 text-stone-600">
                     <p className="font-semibold text-stone-900">LifeSpace Connection</p>
                     <code className="mt-2 block break-all text-xs">{familyApiBaseUrl(spaceId)}</code>
+                    <p className="mt-2 text-xs leading-5 text-stone-500">机器客户端使用自己的 Service 凭据访问 LifeSpace；这里的地址只是当前家庭 API 的便捷入口。</p>
                   </div>
                 </div>
               </div>
