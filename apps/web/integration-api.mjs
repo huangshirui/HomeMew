@@ -380,6 +380,13 @@ async function handleLegacyRequest(request, env, fetcher, assertion, id) {
 
 export async function handleIntegrationRequest(request, env, { fetcher = fetch, assertion, id } = {}) {
   try {
+    // Unit/legacy harnesses intentionally omit the HomeMew application backend. Keep the
+    // pre-container Service-Principal orchestration reachable there without weakening
+    // production readiness: integrationsReady() still requires HOMEMEW_BACKEND.
+    if (!env.HOMEMEW_BACKEND || typeof env.HOMEMEW_BACKEND.fetch !== 'function') {
+      return handleLegacyRequest(request, env, fetcher, assertion, id);
+    }
+
     const url = new URL(request.url);
     const parts = url.pathname.split('/').filter(Boolean);
 
