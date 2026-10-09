@@ -158,7 +158,7 @@ export function IntegrationsPage() {
                 <input
                   className="mt-2 h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                   maxLength={100}
-                  placeholder="例如：家庭 n8n"
+                  placeholder="例如：家庭自动化平台"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                 />
@@ -196,7 +196,7 @@ export function IntegrationsPage() {
       ) : manager ? (
         <Card className="p-8 text-center">
           <p className="font-medium text-stone-800">还没有外部系统</p>
-          <p className="mt-2 text-sm text-stone-500">可以先创建 n8n、家庭自动化、Agent Runtime 等系统，再逐项开启需要的接入能力。</p>
+          <p className="mt-2 text-sm text-stone-500">可以先创建自动化平台、后端服务、Agent Runtime 等系统，再逐项开启需要的接入能力。</p>
         </Card>
       ) : null}
     </div>

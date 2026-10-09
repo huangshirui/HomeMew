@@ -146,7 +146,7 @@ function AgentCredentialReveal({ token, spaceId, onClose }: {
           </Button>
         </div>
       </div>
-      <p className="mt-3 text-xs leading-5 text-emerald-900/60">在 n8n 的 LifeSpace Agent Credential 中填写 Connection Base URL + Agent API Token。关闭后 Token 明文无法恢复，遗失时请重新签发。</p>
+      <p className="mt-3 text-xs leading-5 text-emerald-900/60">Agent API Token 是通用 LifeSpace Agent 凭据。Agent Runtime 使用 Connection Base URL + Agent API Token 调用授权范围内的能力；关闭后 Token 明文无法恢复，遗失时请重新签发。</p>
       <Button className="mt-3" onClick={onClose}>我已保存，关闭</Button>
     </div>
   );
@@ -473,7 +473,7 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
               <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
                 <div className="flex items-start gap-3">
                   <KeyRound className="mt-0.5 size-4 shrink-0 text-sky-700" />
-                  <p className="text-sm leading-6 text-stone-600">n8n 的 <strong>LifeSpace Agent Credential</strong> 使用当前家庭的 Connection Base URL + <code>lsp_agt_*</code>。Agent Token 不绑定单个 Space；HomeMew这里只配置当前家庭的直接权限。</p>
+                  <p className="text-sm leading-6 text-stone-600"><strong>Agent Connection</strong> 使用当前家庭的 Connection Base URL + <code>lsp_agt_*</code>。Agent API Token 是通用 Agent 凭据，不绑定单个 Space；HomeMew 这里只配置当前家庭的直接权限。</p>
                 </div>
               </div>
 

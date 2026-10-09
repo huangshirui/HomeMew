@@ -615,7 +615,7 @@ export function EventSubscriptionsSection({
               <input
                 className="mt-2 h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                 type="url"
-                placeholder="https://n8n.example.com/webhook/homemew"
+                placeholder="https://example.com/webhooks/homemew"
                 value={webhookUrl}
                 onChange={(event) => setWebhookUrl(event.target.value)}
               />

@@ -56,13 +56,13 @@ export function IntegrationDetailPage() {
 
   const manager = currentFamily?.role === 'owner' || currentFamily?.role === 'admin';
 
-  async function load() {
+  async function load({ preserveContent = false }: { preserveContent?: boolean } = {}) {
     if (!currentFamily || !manager || !integrationId) {
       setSystem(null);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!preserveContent) setLoading(true);
     setError(null);
     try {
       const value = await apiRequest<ExternalSystem>(
@@ -73,9 +73,9 @@ export function IntegrationDetailPage() {
       setDescription(value.description ?? '');
     } catch (cause) {
       setError(displayIntegrationError(cause, '加载外部系统失败'));
-      setSystem(null);
+      if (!preserveContent) setSystem(null);
     } finally {
-      setLoading(false);
+      if (!preserveContent) setLoading(false);
     }
   }
 
@@ -179,7 +179,7 @@ export function IntegrationDetailPage() {
             externalSystemId={system.id}
             systemName={system.displayName}
             readOnly={!manager}
-            onBindingChanged={load}
+            onBindingChanged={() => load({ preserveContent: true })}
           />
 
           <AgentAccessSection

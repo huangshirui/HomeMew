@@ -1,9 +1,23 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import test from 'node:test';
 
 function source(relativePath) {
   return readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+}
+
+function sourceFiles(relativePath) {
+  const root = new URL(relativePath, import.meta.url);
+  const files = [];
+  for (const entry of readdirSync(root)) {
+    const url = new URL(entry, root.href.endsWith('/') ? root.href : `${root.href}/`);
+    if (statSync(url).isDirectory()) {
+      files.push(...sourceFiles(`${relativePath.replace(/\/$/u, '')}/${entry}/`));
+    } else if (/\.(?:ts|tsx)$/u.test(entry)) {
+      files.push({ path: url.pathname, content: readFileSync(url, 'utf8') });
+    }
+  }
+  return files;
 }
 
 test('external system creation only creates HomeMew metadata', () => {
@@ -32,6 +46,24 @@ test('Service Access, Agent Access and Event Push are separate capability module
   assert.match(service, /创建 Service Access/u);
   assert.match(agent, /bindExternalSystemAgent/u);
   assert.doesNotMatch(agent, /patchServiceBinding/u);
+});
+
+test('generic Web integration copy does not hard-code one consumer product', () => {
+  for (const file of sourceFiles('./src/')) {
+    assert.doesNotMatch(file.content, /n8n/iu, `${file.path} must keep generic integration copy vendor-neutral`);
+  }
+});
+
+test('Service credential one-time reveal survives the parent binding refresh', () => {
+  const detail = source('./src/pages/integration-detail-page.tsx');
+  const service = source('./src/pages/service-access-section.tsx');
+
+  assert.match(detail, /load\(\{ preserveContent: true \}\)/u);
+  assert.match(detail, /if \(!preserveContent\) setLoading\(true\)/u);
+  assert.ok(
+    service.indexOf('setRevealedCredential(result.credential)') < service.indexOf('await onBindingChanged()'),
+    'the one-time secret must be stored before the parent binding summary refreshes',
+  );
 });
 
 test('retired 喵一下 shell card is absent', () => {
