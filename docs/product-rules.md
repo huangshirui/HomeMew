@@ -167,7 +167,7 @@ The first version has one task-level completion state. It does not track complet
 ### 6.5 Updates and deletion
 
 - Updates require the current version.
-- Core increments version after successful writes.
+- Core increments version after every successful write.
 - A stale write is rejected with a conflict error.
 - Deletion is soft deletion.
 
@@ -255,28 +255,51 @@ The first version has one task-level completion state. It does not track complet
 
 ## 13. External systems
 
-- Only a current family administrator may manage HomeMew external integrations. The client role check is UX only; the Web BFF must obtain an on-demand LifeSpace user token with `grants:manage`, and LifeSpace Core must verify current `manage` authority on the selected HomeMew family Space before any integration-management operation proceeds.
-- One HomeMew external system maps to one LifeSpace Service Principal and one explicit owning family Space. The service is not a Space member and receives no user/member/invitation/family-settings/avatar administration authority by default.
+- Only a current family administrator may manage HomeMew external systems. Client role checks are UX only; HomeMew Web must obtain the narrow LifeSpace manager authority required for each operation, and LifeSpace remains authoritative for Space/model authorization.
+- A HomeMew External System is an application-owned capability container with an opaque `ext_*` ID and exactly one owning HomeMew family / LifeSpace Space. Creating it records only `displayName`, optional `description`, owning Space and audit metadata; it does **not** create any LifeSpace identity, credential, Data Grant or Webhook.
+- External System container metadata is stored in the HomeMew backend Durable Object layer. HomeMew may persist LifeSpace identity references such as `servicePrincipalId` and `agentId`, but must not persist credential plaintext, LifeSpace user bearers, Data Grant copies, Webhook signing secrets or a duplicate authorization table.
+- Binding/unbinding `servicePrincipalId` and `agentId` uses compare-and-swap semantics so concurrent capability setup/removal cannot silently overwrite a newer binding.
+- The current capability areas are **Service Access**, **Agent Access**, and **Event Push**. Service Access and Agent Access are independent: either may exist without the other, and creating one must not create the other.
+
+### 13.1 Service Access
+
+- Enabling Service Access creates one LifeSpace Service Principal owned by the canonical HomeMew Application, one selected authentication mode at steady state, and model-scoped Data Grants for the current family.
 - Credential scope names are stable platform scopes, currently `resources:read` and `resources:write`. Model permission is not encoded as legacy scopes such as `events:write`, `tasks:read`, or `day-records:write`.
-- The first HomeMew Web integration editor exposes `none`, `read`, or `write` for LifeSpace models `event`, `task`, and `day_record`. Effective data access remains Service Principal ∩ credential scope ∩ Application × Model Access ∩ current model-scoped Data Grant.
-- `write` permission implies that the issued credential also carries `resources:read`; Data Grants still independently determine which model collection may be read or written in the target Space.
-- HomeMew does not create a whole-Space Grant for a new external system. A migrated whole-Space `read`, `write`, or `manage` Grant is broader fallback authority and must be shown explicitly; the UI must not claim model-level `none` is effective while that broad Grant remains active.
-- A Data Grant proves what a service may access; it does **not** prove which Space owns the Service Principal or may rotate its globally usable credentials. Every HomeMew-created Principal therefore carries an explicit owning-Space binding stored as HomeMew-namespaced application metadata on the authoritative LifeSpace Principal. With the current LifeSpace schema this is encoded in the description as `homemew:v1:space=<spc_*>` and stripped from the user-facing description by the BFF.
-- Another Space receiving a Data Grant to the same `svc_*` does not gain Token creation/revocation, Principal editing, or disable rights. A Principal explicitly bound to another Space is not surfaced as manageable merely because the current Space has granted it data access.
-- A migrated Principal without the HomeMew owning-Space binding may be shown read-only when the current family has a current or historical Grant to it, but HomeMew must not expose its Token metadata, rotate/revoke its credentials, edit it, disable it, or automatically claim it. Ownership migration requires a controlled process that can prove the intended one-family ownership invariant.
-- Service Principal and Token lifecycle operations run only on the server with a dedicated HomeMew integrations LifeSpace application credential. Browser code never receives either `lsa_*` application credential or LifeSpace user Bearer tokens.
-- `lsp_pat_*` plaintext is returned only when created. HomeMew may render it once in current in-memory UI state but must not persist it in localStorage, sessionStorage, a HomeMew database, logs, analytics, or telemetry. Multiple active Tokens may coexist to support create-new-then-revoke-old rotation; revocation is immediate.
-- Disabling an integration disables its Service Principal first, then attempts to revoke active Tokens and current-family Data Grants. If cleanup partially fails, the Principal remains disabled so the fail-safe state removes effective service access until cleanup is repaired.
-- Systems use the same LifeSpace event, task, and day-record resources as users. User-relative aliases such as `attendeeId=me`, `assigneeId=me`, or `subjectUserId=me` are invalid for service principals where the active LifeSpace contract does not define them.
-- `wish` is not exposed to service principals in the first HomeMew Web external-integration slice.
-- HomeMew Eventing configuration uses one Webhook Endpoint per external system in the current product UI. The Endpoint owns the shared callback URL and signing secret; selecting 日程 or 待办 only creates/enables a model/event filter under that Endpoint and never creates another secret.
-- Endpoint test, enable/disable, signing-secret rotation and delivery history are configured once for the external system, not repeated per model.
-- An Event Subscription filter grants no data authority; the Service Principal must retain the corresponding current model Data Grant and LifeSpace re-checks current authority before delivery.
-- Disabling or deleting an integration does not delete historical events, tasks, or day records it created. Audit fields preserve the true service principal as actor where the LifeSpace model supports actor audit.
+- HomeMew exposes `none`, `read`, or `write` for LifeSpace models `event`, `task`, and `day_record`. Effective service data access remains Service Principal ∩ credential scope ∩ Application × Model Access ∩ current model-scoped Data Grant.
+- `write` implies `resources:read` + `resources:write` at the credential ceiling; Data Grants independently determine which model collections may actually be read or written.
+- HomeMew does not create a whole-Space Grant for new Service Access. A migrated whole-Space `read`, `write`, or `manage` Grant is broader fallback authority and must be shown explicitly before model-level permissions can be represented as authoritative.
+- LifeSpace Service Principal ownership metadata still uses the existing HomeMew namespaced description marker (`homemew:v1:space=<spc_*>`) for the bounded legacy Service orchestration path. This marker proves which family may manage that globally usable `svc_*`; it does not make the Service Principal the External System container.
+- One selected authentication mode is active at steady state: Service API Token or OAuth Client Credentials. Rotation may temporarily create a second credential, then explicitly completes by revoking the old credential or cancels by revoking the candidate.
+- Credential plaintext is returned only at creation. HomeMew may render it once in current in-memory UI state but must not persist it in localStorage, sessionStorage, HomeMew storage, logs, analytics, telemetry or URLs.
+- Removing Service Access disables the Service Principal first, then revokes current-family Data Grants and active service credentials. It also removes Event Push resources bound to that Service Principal before the External System clears its `servicePrincipalId` reference. Agent Access is unaffected.
+
+### 13.2 Agent Access
+
+- Enabling Agent Access creates one LifeSpace Agent identity (`agt_*`) owned by the canonical HomeMew Application, an Agent API credential (`lsp_agt_*`) and optional direct model-scoped Agent Data Grants for the current family.
+- Agent API credential scope is only the technical read/write ceiling. Direct Agent Data Grants determine what `Principal=Agent / Actor=Agent` may access without a user delegation; all direct permissions may be `none` when the Agent is intended to operate only through explicit User Delegation.
+- Agent Access is bound directly by the External System container (`ext_* -> agt_*`). HomeMew must not store the Agent ID inside a Service Principal description and must not require a Service Principal in order to create an Agent.
+- Agent credential plaintext is returned only at creation/rotation and follows the same no-persistence rule as service credential plaintext.
+- Removing Agent Access revokes current-family Agent Data Grants and active Agent API credentials before clearing `agentId`. Service Access and Event Push are unaffected. Historical Agent identity rows may remain in LifeSpace for audit.
+
+### 13.3 Event Push
+
+- Event Push is a separate HomeMew capability, not another name for Service Access. It uses LifeSpace Webhook Endpoint + Event Subscription resources and HomeMew does not persist the Webhook signing secret.
+- The current LifeSpace Eventing contract requires a Webhook Endpoint to reference a subscriber Service Principal whose current model-read authority is re-checked before delivery. Therefore HomeMew currently requires Service Access before Event Push can be configured. This is an explicit platform dependency; HomeMew must not create a hidden `svc_*` merely to make Event Push look independent.
+- HomeMew currently exposes one Webhook Endpoint per External System/Service Access pair: one callback URL, one signing secret, one endpoint-level enable/disable state, one test action and one combined delivery history.
+- 日程 and 待办 are selectable Event Subscription filters under that Endpoint. Selecting a model does not create another Webhook or another signing secret.
+- An Event Subscription grants no data authority. The subscriber Service Principal must retain the corresponding current model-read Data Grant and LifeSpace re-checks current Application × Model Access and current Grant state before delivery.
+
+### 13.4 Compatibility and history
+
+- The older implementation where the Service Principal ID itself was used as the HomeMew External System ID is a bounded compatibility path only. New UI and new production setup use `ext_*` containers.
+- Disabling/removing an access capability does not delete historical household records it created. LifeSpace audit/history preserves the actual actor identity where supported.
+- The External System container itself is retained when individual capabilities are removed; physical deletion of the container is not part of this slice.
+
+Detailed decision: `docs/decisions/2026-10-09-external-system-capability-container.md`.
 
 ## 14. 喵一下 / AI creation drafts
 
-- “喵一下”当前下线：Mini 不注册该页面，也不展示任何入口；现存页面与 LifeSpace Creation Draft 客户端代码是不可达的历史实现，不是当前运行契约。
+- “喵一下”当前下线：Mini 不注册该页面，Web/Mini 都不展示入口或占位卡片；现存历史页面与 LifeSpace Creation Draft 客户端代码不是当前运行契约。
 - 未来若重新启用，文本解释、模型/provider 编排、限流与临时 draft-job 生命周期由有界 HomeMew BFF 能力负责，不再使用或扩展 LifeSpace Registry Creation Draft capability。
 - 重新启用前必须有独立的 Accepted Decision 和 Mini-facing contract，明确稳定 DTO、任务生命周期/存储、provider trust、滥用防护、可观测性、成员解析、时间语义和失败处理；不得从休眠代码反推新契约。
 - AI 草稿只属于应用编排，不是家庭业务事实。用户必须先审阅；确认后的 Event、Task、Day Record 或 Wish 仍通过各自的 HomeMew Mini BFF 产品路由写入 LifeSpace，并由 LifeSpace 执行最终授权、校验与持久化。
