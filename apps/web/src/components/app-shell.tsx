@@ -9,7 +9,6 @@ import {
   Home,
   RefreshCw,
   Settings,
-  Sparkles,
   Users,
 } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
@@ -133,10 +132,6 @@ function DesktopNav() {
           </div>
         </div>
       </nav>
-      <div className="mt-auto rounded-3xl bg-emerald-950 p-4 text-emerald-50">
-        <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4" /> 喵一下</div>
-        <p className="mt-2 text-xs leading-5 text-emerald-100/70">日程、待办、日子和愿望已经接入 LifeSpace；Web 的智能创建入口后续单独收敛。</p>
-      </div>
     </aside>
   );
 }
