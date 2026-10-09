@@ -1,6 +1,6 @@
 # HomeMew Web
 
-HomeMew Web is the primary browser application for HomeMew. It is a LifeSpace client, not a second business Core.
+HomeMew Web is the primary browser application for HomeMew. It is a LifeSpace client and HomeMew application-orchestration surface, not a second business Core.
 
 ## Current stack
 
@@ -18,7 +18,7 @@ Cloudflare Workers + Static Assets
 pnpm workspace
 ```
 
-The foundation already includes the responsive App Shell, Today and the real household routes. Do not introduce Next.js, SSR/RSC or another framework layer for the signed-in household app.
+The foundation includes the responsive App Shell, Today and the real household routes. Do not introduce Next.js, SSR/RSC or another framework layer for the signed-in household app.
 
 Keep dependencies demand-driven:
 
@@ -35,14 +35,14 @@ Keep dependencies demand-driven:
 - `/wishes`
 - `/family`
 - `/settings`
-- `/settings/integrations` — external-system summary list
-- `/settings/integrations/:integrationId` — one external system's authentication, event subscriptions and future integration capabilities
+- `/settings/integrations` — HomeMew External System (`ext_*`) summary list
+- `/settings/integrations/:integrationId` — one External System's basic metadata plus Service Access, Agent Access and Event Push capabilities
 
 Desktop uses a sidebar. Mobile uses bottom navigation. Tablet adapts within the same codebase. The visual direction is warm, calm and household-oriented rather than enterprise-admin/ERP styled.
 
 `apps/display/` is a separate future household-display runtime and is not implemented as a mode inside the normal signed-in Web app.
 
-External-system administration is intentionally Web-only. The accepted product boundary is recorded in `docs/decisions/2026-08-24-external-integrations-web-only.md` and the list/detail + event-subscription structure is recorded in `docs/decisions/2026-08-25-lifespace-event-subscriptions.md`.
+External-system administration is intentionally Web-only. The Web-only product boundary remains recorded in `docs/decisions/2026-08-24-external-integrations-web-only.md`; the current capability-container semantics are authoritative in `docs/decisions/2026-10-09-external-system-capability-container.md`.
 
 HomeMew onboarding is intentionally asymmetric across clients. The Mini Program is the base client and first-use/account-entry client; HomeMew Web is an advanced client for an existing HomeMew user. The accepted policy is recorded in `docs/decisions/2026-08-25-web-existing-user-link-only.md`.
 
@@ -65,9 +65,11 @@ The Worker hosts two deliberately separate application boundaries:
 Both boundaries must not:
 
 - create a HomeMew `/families/...` business contract;
-- persist Spaces, events, tasks, day records, wishes or other household data;
+- persist Spaces, events, tasks, day records, wishes or other household business truth;
 - duplicate LifeSpace authorization/model validation;
 - become another business Core.
+
+HomeMew application metadata such as Family Catalog classification and External System `ext_*` containers belongs to `apps/backend/` Durable Objects and is reached from Web through the `HOMEMEW_BACKEND` Service Binding.
 
 ## Authentication boundary
 
@@ -79,10 +81,10 @@ Browser
   -> HomeMew Web Worker
        reads Cf-Access-Jwt-Assertion
        never trusts browser-supplied sub/email/userId
-       -> LifeSpace Identity /internal/v1/access/* with dedicated server-only lsa_*
+       -> LifeSpace Identity /internal/v1/access/* with server-only HomeMew lsa_*
        -> Identity independently verifies Access JWT + audience
        -> Identity resolves (iss, sub) -> global usr_*
-       -> short-lived HomeMew-Web-scoped LifeSpace user token
+       -> short-lived HomeMew-scoped LifeSpace user token
   -> signed host-only HttpOnly HomeMew session
   -> same-origin BFF -> LifeSpace Identity/Core
 ```
@@ -101,7 +103,7 @@ State-changing BFF/proxy requests require an exact same-origin `Origin` header. 
 - `GET /api/session`
 - `POST /api/session/logout`
 - `POST /api/access/link-challenge`
-- `/api/integrations*` bounded external-system orchestration
+- `/api/integrations*` bounded External System/capability orchestration
 - `/api/lifespace/core/v1/*`
 - `/api/lifespace/identity/v1/*`
 
@@ -110,8 +112,6 @@ An unknown Access principal is never silently merged by email and HomeMew Web do
 Identity derives the target `usr_*`; Web never submits a target user ID. LifeSpace may retain Access registration as a platform capability for other applications, but HomeMew Web does not expose or proxy it.
 
 ### Existing-account linking UX
-
-The initial production UX intentionally keeps the security contract visible and simple:
 
 ```text
 HomeMew Web
@@ -135,86 +135,98 @@ Manual copy/paste is the initial confirmation UX. A later QR code or Mini Progra
 
 If a person has never used HomeMew, the Web UI directs them to complete first use in the Mini Program and return to link the Web login. This avoids creating a second global LifeSpace user as a normal HomeMew onboarding outcome. Future LifeSpace user-merge capability remains a platform concern rather than a prerequisite for normal HomeMew Web onboarding.
 
-## External integrations boundary
+## External System boundary
 
-`/settings/integrations` is a low-frequency external-system **list**. It shows compact operational summaries and is not a wall of editable credentials and Grants. Selecting a system opens `/settings/integrations/:integrationId`, which is the extensible detail container for all capabilities belonging to that external system.
+`/settings/integrations` is a low-frequency list of HomeMew-owned External System containers. Selecting one opens `/settings/integrations/:integrationId`.
 
-The first detail modules are:
-
-```text
-External system = one LifeSpace Service Principal
-  -> Authentication
-       -> credential mode / current credential
-       -> credential rotation or mode switch
-       -> model-scoped family Data Grants
-       -> direct LifeSpace API connection information
-  -> Event push
-       -> one shared Webhook Endpoint bound to this Service Principal
-       -> selectable model/event subscription filters
-  -> future external-system-specific capabilities
-```
-
-Future synchronization rules, notification channels, MCP/Agent configuration or similar integration features should be added to this detail surface instead of becoming new top-level Settings entries.
-
-HomeMew uses LifeSpace Service Principals, API Tokens / OAuth Client Credentials and model-scoped Data Grants directly; HomeMew does not own a credential store or permission table.
-
-Two separate LifeSpace application contexts are involved:
+An External System is **not** a LifeSpace Service Principal. Creating it records only application metadata:
 
 ```text
-HomeMew Web application
-  lsa_* -> Access exchange for the current human
-  normal session scopes do not include grants:manage
-
-HomeMew integrations application
-  separate lsa_* held only by the Worker
-  -> create/update Service Principals
-  -> create/list/revoke service credentials
+External System ext_*
+├── display name / description
+├── owning HomeMew family Space
+├── Service Access (optional)
+├── Agent Access (optional)
+└── Event Push (optional)
 ```
 
-For every integration-management request the Worker performs a fresh Access exchange for only `profile:read grants:manage`, obtains the current `usr_*`, and calls `GET /api/v1/spaces/{spaceId}/grants?includeRevoked=true`. Core therefore proves both the `grants:manage` credential scope and the user's current `manage` authority on the selected Space before the BFF performs any service-principal operation.
+HomeMew backend persists the `ext_*` container and optional `servicePrincipalId` / `agentId` references. It does not persist credential plaintext, LifeSpace user bearers, Data Grant copies, Webhook signing secrets or an effective-authority table. LifeSpace remains authoritative for all identities, credentials, Grants and Eventing resources.
 
-The UI exposes model collection permissions for `event`, `task`, and `day_record`. Stable service credential scopes remain `resources:read` / `resources:write`; model identity belongs to Application × Model Access and Data Grants.
+Creating `ext_*` does not create any LifeSpace identity or authority. Capability creation is explicit and independent so an external system can use only what it needs.
 
-One HomeMew external system has exactly one selected authentication mode and one active credential at steady state:
+### Service Access
 
-- `api_token` -> long-lived opaque `lsp_pat_*` bearer;
-- `oauth_client_credentials` -> OAuth 2.0 Client Credentials.
+Service Access is optional machine/service access:
 
-LifeSpace may hold multiple credential rows, but HomeMew does not expose arbitrary multi-key management. Rotation is a controlled temporary exception: create a candidate, update and verify the external system, then explicitly complete by revoking the previous credential(s). Cancel revokes the candidate and keeps the previous credential. Switching authentication mode uses the same controlled flow.
+```text
+ext_*
+  -> svc_*
+      -> Service API Token or OAuth Client Credentials
+      -> model-scoped family Data Grants
+      -> LifeSpace Core
+```
 
-New integrations do not receive whole-Space Grants. Migrated principals that still have a whole-Space `read/write/manage` Grant are surfaced as broad legacy authority and are not falsely represented as model-restricted.
+The UI exposes `none`, `read`, or `write` for `event`, `task`, and `day_record`. Stable service credential scopes remain `resources:read` / `resources:write`; effective authority remains the intersection of credential scope, Application × Model Access and current Data Grants.
 
-Credential plaintext is returned once by LifeSpace and rendered only in current React/module memory. API Tokens and OAuth Client Secrets are not written to URLs, React Router history state, localStorage/sessionStorage or a HomeMew database.
+One Service Access has one selected authentication mode and one active credential at steady state. Rotation is a controlled temporary exception: create the replacement, update and verify the external runtime, then complete by revoking old credentials; cancel revokes the candidate and keeps the previous credential.
 
-The external-system detail page shows the household Core API Base URL including the current `spaceId`. Machine clients call LifeSpace Core directly with the service credential; they do not call the Cloudflare Access-protected HomeMew Web hostname.
+Credential plaintext is returned once by LifeSpace and rendered only in current React/module memory. Service API Tokens and OAuth Client Secrets are never written to URLs, React Router history state, localStorage/sessionStorage, HomeMew storage, logs or analytics.
 
-### Event push and subscriptions
+The detail page shows the selected family's LifeSpace Core Connection Base URL. Machine clients call LifeSpace Core directly with the service credential; they do not call the Cloudflare Access-protected HomeMew Web hostname.
 
-Event push is not a standalone HomeMew setting. It is configured inside one external system and uses the LifeSpace Core Kernel 0.15.0+ Endpoint/filter split.
+Removing Service Access disables the Service Principal first, revokes active service credentials/current-family Data Grants, cleans Event Push endpoints bound to that Service Principal, and only then clears the `ext_*` reference. Agent Access is independent and is not removed.
 
-The current HomeMew product exposes one Webhook Endpoint per external system: one callback URL, one signing secret, one endpoint-level enable/disable switch, one test action and one combined delivery history. The signing secret is returned only when the Endpoint is created or explicitly rotated and is never persisted by HomeMew.
+### Agent Access
 
-Under that Endpoint, HomeMew exposes `event` (日程) and `task` (待办) as selectable Event Subscription filters. Selecting a model does not create another Webhook or another secret; it only attaches the selected model plus `record.created` / `record.updated` / `record.deleted` choices to the existing Endpoint.
+Agent Access is optional and independent from Service Access:
 
-LifeSpace requires the Endpoint subscriber Service Principal to retain a current Data Grant that can read every selected model. It re-checks current Application × Model Access and subscriber Grant state before matching and queued delivery. Revoking/expiring a model Grant therefore stops that model's new events without HomeMew maintaining a second authority table.
+```text
+ext_*
+  -> agt_*
+      -> lsp_agt_* Agent API credential
+      -> optional direct model Data Grants
+      -> direct Principal=Agent / Actor=Agent execution
+      -> optional User Delegation for represented execution
+```
 
-Payloads remain reference-only and contain no full business record or actor identity. Endpoint-level delivery history includes `modelKey` so shared-destination diagnostics remain clear.
+The Agent API credential scope is a technical read/write ceiling. Direct model Data Grants determine what the Agent may do without user delegation; all direct permissions may be `none` when the Agent is intended to operate only through explicit User Delegation.
 
-With both 日程 and 待办 wired through this shared Endpoint, the current event-subscription milestone is complete for now. `day_record` and future models remain explicit later product decisions rather than being automatically exposed because the LifeSpace Eventing layer is generic.
+The External System catalog directly binds `ext_* -> agt_*`. Agent identity is not encoded inside a Service Principal description and creating Agent Access does not create a Service Principal.
+
+Agent credential plaintext follows the same one-time/no-persistence rule. Removing Agent Access revokes current-family Agent Grants and active Agent API credentials before clearing `agentId`; Service Access and Event Push remain untouched.
+
+### Event Push
+
+Event Push is a separate HomeMew capability, but the current LifeSpace Eventing contract requires each Webhook Endpoint to reference a `subscriberServicePrincipalId` and re-check that Service Principal's current model-read authority before delivery.
+
+Therefore HomeMew currently requires Service Access before Event Push can be configured. This dependency is explicit in the UI; HomeMew must not create a hidden Service Principal merely to make Webhook configuration appear independent.
+
+The current product exposes one Webhook Endpoint per External System/Service Access pair: one callback URL, one signing secret, one endpoint-level enable/disable switch, one test action and one combined delivery history.
+
+Under that Endpoint, `event` (日程) and `task` (待办) are selectable Event Subscription filters. Selecting a model does not create another Webhook or secret; it only attaches selected model/event types. Subscription filters grant no data authority. LifeSpace requires the subscriber Service Principal to retain current model-read authority and re-checks it before matching/delivery.
+
+Webhook payloads remain reference-only and contain no full business record or actor identity. The external runtime uses its current Service Access to read full data when needed.
+
+### Lifecycle and compatibility
+
+External System `servicePrincipalId` and `agentId` binding changes use compare-and-swap semantics so concurrent capability setup/removal cannot silently overwrite a newer binding.
+
+Capability setup is a cross-system Saga: HomeMew creates the required LifeSpace identity/resources, binds the resulting identity to `ext_*` only after successful setup, and compensates partial authority if binding fails.
+
+The previous implementation where `svc_*` itself acted as the HomeMew External System ID is retained only as a bounded compatibility path for historical cleanup and old orchestration tests. New UI and new production setup use `ext_*` containers.
+
+Future synchronization rules, notification channels, MCP configuration or similar system-specific capabilities should be added to the External System detail surface rather than becoming new top-level Settings entries.
 
 ## Required configuration
 
 Server-only Worker secrets:
 
-- `LIFESPACE_APPLICATION_CREDENTIAL` — dedicated trusted **HomeMew Web** LifeSpace application credential (`lsa_*`), not the Mini Program credential;
-- `WEB_SESSION_SECRET` — at least 32 characters;
-- `LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` — separate trusted LifeSpace application credential used only for HomeMew-managed service principals and credentials.
+- `LIFESPACE_APPLICATION_CREDENTIAL` — trusted canonical **HomeMew Application** backend credential (`lsa_*`) used for Web Access exchange and integration orchestration;
+- `WEB_SESSION_SECRET` — at least 32 characters.
 
-The HomeMew Web LifeSpace application must allow `grants:manage` so the BFF can request the narrow on-demand manager token. The normal ambient Web session intentionally does not request that scope.
+`LIFESPACE_INTEGRATIONS_APPLICATION_CREDENTIAL` survives only as an internal compatibility alias populated from `LIFESPACE_APPLICATION_CREDENTIAL` by the HomeMew front door. It is **not** a separately provisioned production secret and must not be interpreted as another LifeSpace Application.
 
-The integrations LifeSpace application has only the stable service scope ceiling needed by the product (`resources:read` / `resources:write`) and Core Application × Model Access for the explicitly supported HomeMew models.
-
-All three Worker secrets above are required production runtime prerequisites. Deployment checks binding names without printing secret values.
+The canonical HomeMew LifeSpace Application must allow the management scope ceilings and Application × Model Access required by enabled HomeMew capabilities. The normal ambient Web session intentionally does not request elevated integration-management scopes; integration operations perform fresh privilege-on-demand Access exchanges and LifeSpace Core re-checks current Space authority.
 
 Non-secret configuration:
 
@@ -224,15 +236,17 @@ Non-secret configuration:
 
 Production Service Bindings:
 
-- `HOMEMEW_BACKEND` -> `homemew-backend-production` for Mini login/activity provider routes;
+- `HOMEMEW_BACKEND` -> `homemew-backend-production` for WeChat provider/login, activity, Family Catalog and External System application metadata;
 - `LIFESPACE_CORE` -> `lifespace-core` for fixed Mini domain/media adapters;
 - `LIFESPACE_IDENTITY` -> `lifespace-identity` for fixed Mini profile/avatar/access-link adapters.
 
-The public LifeSpace URL variables remain for the server-controlled Web session BFF. Mini BFF adapters must use the fixed Service Bindings and must not fall back to those public URLs.
+The backend deployment must include the `EXTERNAL_SYSTEM_CATALOG` Durable Object binding before or together with a Web release that enables `ext_*` External Systems.
+
+The public LifeSpace URL variables remain for the server-controlled Web session/integration BFF. Mini BFF adapters must use the fixed Service Bindings and must not fall back to those public URLs.
 
 The Worker must sit behind the intended Cloudflare Access application. The original assertion comes from `Cf-Access-Jwt-Assertion`; browser JSON must never be accepted as an assertion source.
 
-`/health` reports base `ready` and separate `integrationsReady`; production smoke verification expects both to be ready.
+`/health` reports base `ready` and separate `integrationsReady`; `integrationsReady` requires both LifeSpace integration prerequisites and the `HOMEMEW_BACKEND` binding that owns the External System catalog.
 
 ## Production release
 
@@ -244,14 +258,16 @@ The user-facing domain is:
 homemew.aisr.online
 ```
 
-Since the accepted production cutover on 2026-08-24, it is owned by `homemew-web-production`. Browser Web traffic remains behind Cloudflare Access. The exact Mini login route `POST /api/v1/login/wechat` uses its narrow Access bypass and delegates through the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. The stable Mini BFF surface uses only its explicit bypass/routes, requires the LifeSpace user bearer where applicable, and delegates only to fixed internal operations.
+Since the accepted production cutover on 2026-08-24, that hostname is owned by `homemew-web-production`. Browser Web traffic remains behind Cloudflare Access. The exact Mini login route `POST /api/v1/login/wechat` uses its narrow Access bypass and delegates through the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. The stable Mini BFF surface uses only explicit routes, requires the LifeSpace user bearer where applicable, and delegates only to fixed internal operations.
 
 Release path:
 
 ```text
-local tests / typecheck / build
+repository tests / typecheck / build
 -> CI
--> explicit production deployment
+-> deploy HomeMew backend first when a new Durable Object migration is required
+-> verify backend health/migration
+-> deploy HomeMew Web
 -> production smoke verification
 ```
 
@@ -267,6 +283,6 @@ pnpm test:web
 pnpm check
 ```
 
-`pnpm test:web` runs dependency-free Worker/BFF tests for both the normal Access session boundary and the external-integration orchestration boundary, including credential mode/rotation behavior. It also asserts that HomeMew Web does not expose the LifeSpace Access registration flow.
+`pnpm test:web` runs dependency-free Worker/BFF tests for the normal Access session boundary, legacy Service orchestration compatibility and the new External System capability-container boundary. It also asserts that HomeMew Web does not expose the LifeSpace Access registration flow.
 
-The root check validates the active HomeMew application surfaces: backend syntax, Mini Program tests/typecheck, and Web BFF tests/typecheck/build. The retired legacy HomeMew Core is not part of the active workspace.
+The root check validates the active HomeMew application surfaces: backend syntax/tests, Mini Program tests/typecheck, and Web BFF tests/typecheck/build. The retired legacy HomeMew Core is not part of the active workspace.
