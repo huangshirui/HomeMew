@@ -15,7 +15,6 @@ import {
   getErrorMessage,
   isVersionConflict,
   formatDate,
-  timeAgo,
   parseDateOnly,
   formatDateOnly,
   addDaysToDateOnly,
@@ -142,8 +141,8 @@ Page({
       createdBySystem: event.createdBy?.type === 'system',
       updatedByText: event.updatedBy?.name || '',
       updatedBySystem: event.updatedBy?.type === 'system',
-      createdAtText: `${formatDate(event.createdAt, 'datetime')} · ${timeAgo(event.createdAt)}`,
-      updatedAtText: `${formatDate(event.updatedAt, 'datetime')} · ${timeAgo(event.updatedAt)}`,
+      createdAtText: formatDate(event.createdAt, 'datetime'),
+      updatedAtText: formatDate(event.updatedAt, 'datetime'),
       loaded: true,
     });
   },
