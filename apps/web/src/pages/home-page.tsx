@@ -95,8 +95,8 @@ export function HomePage() {
   const memberName = (personId: string) => members.find((member) => member.personId === personId)?.displayName;
 
   return <div className="space-y-6">
-    <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div><p className="text-sm font-medium text-stone-400">{dateLabel} · {currentFamily.name}</p><h1 className="mt-1 text-3xl font-semibold tracking-tight text-stone-950 sm:text-4xl">{greeting}{user?.displayName ? `，${user.displayName}` : ''}。</h1><p className="mt-2 text-sm text-stone-500">今天家里有这些事。</p></div>
+    <section className="flex items-start justify-between gap-3">
+      <div><p className="text-sm font-medium text-stone-400">{dateLabel}</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-950 sm:text-4xl">{greeting}{user?.displayName ? `，${user.displayName}` : ''}。</h1><p className="mt-2 text-sm text-stone-500">今天家里有这些事。</p></div>
       <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefresh((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
     </section>
     {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}

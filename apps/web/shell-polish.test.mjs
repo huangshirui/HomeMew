@@ -10,7 +10,8 @@ function source(relativePath) {
 test('mobile shell exposes household context and real avatars', () => {
   const shell = source('./src/components/app-shell.tsx');
 
-  assert.match(shell, /aria-label="移动端切换家庭"/u);
+  assert.match(shell, /aria-label=\{mobile \? '移动端切换家庭' : '切换家庭'\}/u);
+  assert.match(shell, /<FamilyIdentity mobile \/>/u);
   assert.match(shell, /currentFamily\?\.avatarUrl/u);
   assert.match(shell, /user\?\.avatarUrl/u);
   assert.match(shell, /safe-area-inset-bottom/u);

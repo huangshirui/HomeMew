@@ -29,8 +29,8 @@ Keep dependencies demand-driven:
 ## Product routes
 
 - `/` — Today / household overview
-- `/calendar`
-- `/tasks`
+- `/calendar` — 月/周日历，家庭全域日程搜索，按参与成员/全天类型筛选，以及密集日期的完整日程查看
+- `/tasks` — 未完成/已完成状态、任务搜索、按负责人和截止日期（逾期/今天/未来 7 天/无日期）组合筛选
 - `/days`
 - `/wishes`
 - `/family`
@@ -39,6 +39,8 @@ Keep dependencies demand-driven:
 - `/settings/integrations/:integrationId` — one External System's basic metadata plus Service Access, Agent Access and Event Push capabilities
 
 Desktop uses a sidebar. Mobile uses bottom navigation. Tablet adapts within the same codebase. The visual direction is warm, calm and household-oriented rather than enterprise-admin/ERP styled.
+
+Global family/Space context is selected through an unframed logo-style family identity at the top of the desktop sidebar (subtle hover/focus affordance) or in the compact mobile/tablet top bar (touch-visible chevron and member count). Mobile page headers are compact, and the month calendar uses a selected-day agenda rather than squeezing event titles into seven narrow columns. The desktop shell intentionally has no duplicate persistent horizontal header: business pages own their own heading and actions, and the user avatar sits in the sidebar footer. `/family` always operates on this selected family rather than exposing a separate selector. Family switching remounts family-scoped routed page state and protects member loads from out-of-order responses. See `docs/decisions/2026-10-19-web-global-family-navigation.md`.
 
 `apps/display/` is a separate future household-display runtime and is not implemented as a mode inside the normal signed-in Web app.
 

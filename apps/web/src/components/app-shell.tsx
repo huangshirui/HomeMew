@@ -52,50 +52,56 @@ function Avatar({ src, alt, fallback, className }: { src: string | null | undefi
   );
 }
 
-function Brand() {
+function FamilyIdentity({ mobile = false }: { mobile?: boolean }) {
+  const { families, currentFamily, members, setCurrentFamilyId } = useHousehold();
+  const canSwitch = families.length > 1;
+
   return (
-    <div className="flex items-center gap-3">
-      <div className="grid size-10 place-items-center rounded-2xl bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
-        <span className="text-lg" aria-hidden="true">猫</span>
+    <div className={cn(
+      'group relative flex min-w-0 items-center gap-3 rounded-xl px-2 py-2 transition-colors',
+      canSwitch && 'cursor-pointer hover:bg-stone-100/80 focus-within:bg-stone-100/80 focus-within:ring-2 focus-within:ring-emerald-500/40',
+      mobile && 'gap-2.5 px-0 py-1 hover:bg-transparent focus-within:bg-transparent',
+    )}>
+      <Avatar
+        src={currentFamily?.avatarUrl}
+        alt={currentFamily ? `${currentFamily.name}家庭头像` : '家庭头像'}
+        fallback={currentFamily?.name || '家'}
+        className={cn('size-10 rounded-2xl bg-amber-100 text-amber-800', mobile && 'size-9')}
+      />
+      <div className="min-w-0 flex-1">
+        <p className={cn('truncate font-semibold tracking-tight text-stone-900', mobile ? 'text-sm' : 'text-base')}>
+          {currentFamily?.name || '暂无家庭'}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-stone-400">
+          {currentFamily ? (members.length ? `${members.length} 位成员` : '正在加载成员…') : '请先创建或加入家庭'}
+        </p>
       </div>
-      <div>
-        <p className="font-semibold tracking-tight text-stone-900">家事喵</p>
-        <p className="text-xs font-medium tracking-[0.16em] text-stone-400">HOMEMEW</p>
-      </div>
+      {canSwitch ? (
+        <>
+          <ChevronDown aria-hidden="true" className={cn(
+            'size-4 shrink-0 text-stone-500 transition-opacity',
+            mobile ? 'opacity-75' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+          )} />
+          <select
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            value={currentFamily?.id || ''}
+            onChange={(event) => setCurrentFamilyId(event.target.value)}
+            aria-label={mobile ? '移动端切换家庭' : '切换家庭'}
+            title="切换家庭"
+          >
+            {families.map((family) => <option key={family.id} value={family.id}>{family.name}</option>)}
+          </select>
+        </>
+      ) : null}
     </div>
   );
 }
 
 function DesktopNav() {
-  const { families, currentFamily, members, setCurrentFamilyId } = useHousehold();
+  const { user } = useHousehold();
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-stone-200/80 bg-[#fbfcfa] px-4 py-5 lg:flex lg:flex-col">
-      <div className="px-2"><Brand /></div>
-      <div className="mt-7 rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-stone-200/80">
-        <div className="flex min-w-0 items-center gap-3">
-          <Avatar
-            src={currentFamily?.avatarUrl}
-            alt={currentFamily ? `${currentFamily.name}家庭头像` : '家庭头像'}
-            fallback={currentFamily?.name || '家'}
-            className="size-9 bg-amber-100 text-amber-800"
-          />
-          <span className="min-w-0 flex-1">
-            {families.length > 1 ? (
-              <select
-                className="block w-full bg-transparent text-sm font-semibold text-stone-800 outline-none"
-                value={currentFamily?.id || ''}
-                onChange={(event) => setCurrentFamilyId(event.target.value)}
-                aria-label="切换家庭"
-              >
-                {families.map((family) => <option key={family.id} value={family.id}>{family.name}</option>)}
-              </select>
-            ) : (
-              <span className="block truncate text-sm font-semibold text-stone-800">{currentFamily?.name || '暂无家庭'}</span>
-            )}
-            <span className="block truncate text-xs text-stone-400">{currentFamily ? `${members.length} 位成员` : '请先创建或加入家庭'}</span>
-          </span>
-        </div>
-      </div>
+      <FamilyIdentity />
       <nav className="mt-6">
         <div className="space-y-1">
           {dailyNavigation.map(({ to, label, icon: Icon, end }) => (
@@ -132,39 +138,16 @@ function DesktopNav() {
           </div>
         </div>
       </nav>
-    </aside>
-  );
-}
-
-function MobileFamilyContext() {
-  const { families, currentFamily, setCurrentFamilyId } = useHousehold();
-  return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      <Avatar
-        src={currentFamily?.avatarUrl}
-        alt={currentFamily ? `${currentFamily.name}家庭头像` : '家事喵'}
-        fallback={currentFamily?.name || '猫'}
-        className="size-9 bg-amber-100 text-amber-800 ring-2 ring-white"
-      />
-      <div className="min-w-0">
-        <p className="text-[10px] font-semibold tracking-[0.14em] text-stone-400">家事喵</p>
-        {families.length > 1 ? (
-          <span className="relative block min-w-0">
-            <select
-              className="block max-w-[46vw] appearance-none truncate bg-transparent pr-5 text-sm font-semibold text-stone-800 outline-none"
-              value={currentFamily?.id || ''}
-              onChange={(event) => setCurrentFamilyId(event.target.value)}
-              aria-label="移动端切换家庭"
-            >
-              {families.map((family) => <option key={family.id} value={family.id}>{family.name}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-0 top-1/2 size-3 -translate-y-1/2 text-stone-400" />
-          </span>
-        ) : (
-          <p className="max-w-[46vw] truncate text-sm font-semibold text-stone-800">{currentFamily?.name || '暂无家庭'}</p>
-        )}
+      <div className="mt-auto flex items-center gap-3 border-t border-stone-200/80 px-2 pt-4">
+        <Avatar
+          src={user?.avatarUrl}
+          alt={user?.displayName ? `${user.displayName}的头像` : '我的头像'}
+          fallback={user?.displayName || '我'}
+          className="size-9 ring-2 ring-white"
+        />
+        <p className="min-w-0 truncate text-sm font-medium text-stone-700">{user?.displayName || '我的账号'}</p>
       </div>
-    </div>
+    </aside>
   );
 }
 
@@ -220,13 +203,9 @@ export function AppShell() {
     <div className="min-h-screen bg-[#f6f8f4] text-stone-900">
       <DesktopNav />
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 border-b border-stone-200/70 bg-[#f6f8f4]/90 backdrop-blur-xl">
-          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-            <div className="min-w-0 lg:hidden"><MobileFamilyContext /></div>
-            <div className="hidden lg:block">
-              <p className="text-xs font-medium text-stone-400">家庭空间</p>
-              <p className="text-sm font-semibold text-stone-800">{currentFamily?.name || '暂无家庭'}</p>
-            </div>
+        <header className="sticky top-0 z-20 border-b border-stone-200/70 bg-[#f6f8f4]/90 backdrop-blur-xl lg:hidden">
+          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+            <div className="min-w-0 flex-1"><FamilyIdentity mobile /></div>
             <Avatar
               src={user?.avatarUrl}
               alt={user?.displayName ? `${user.displayName}的头像` : '我的头像'}
@@ -237,7 +216,7 @@ export function AppShell() {
         </header>
         <HouseholdErrorBanner />
         <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8">
-          <Outlet />
+          <Outlet key={currentFamily?.id ?? 'no-family'} />
         </main>
       </div>
       <MobileBottomNav />

@@ -189,10 +189,12 @@ export function WishesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:items-end">
         <div>
-          <span className="grid size-11 place-items-center rounded-2xl bg-pink-100 text-pink-700"><Heart className="size-5" /></span>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-stone-950">许愿池</h1>
+          <div className="flex items-center gap-3 sm:block">
+          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-pink-100 text-pink-700"><Heart className="size-5" /></span>
+          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight text-stone-950">许愿池</h1>
+        </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">写下想实现的事；愿望成真时，任何有写权限的家庭成员都可以把它点亮。</p>
         </div>
         <Button variant="primary" disabled={!canWrite} onClick={openCreate}><Plus className="size-4" /> 写下愿望</Button>

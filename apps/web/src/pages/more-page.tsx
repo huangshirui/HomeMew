@@ -30,7 +30,7 @@ export function MorePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-stone-950">更多</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-stone-950 sm:text-3xl">更多</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">把低频入口收在这里，底部导航只保留日常最常用的家庭功能。</p>
       </div>
 

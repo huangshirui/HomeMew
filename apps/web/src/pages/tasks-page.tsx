@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Check, CheckSquare2, Circle, Clock3, Plus, RefreshCw, RotateCcw, Search, Trash2, Users, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
-import { queryModelRecords, type CanonicalQueryPage } from '../lib/canonical-query';
+import { queryModelRecords, type CanonicalQueryFilter, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type TaskRecord = {
   id: string;
@@ -27,6 +27,7 @@ type TaskRecord = {
 
 type TaskDraft = { name: string; description: string; dueDate: string; assigneePersonIds: string[] };
 type Tab = 'pending' | 'completed';
+type DueFilter = 'all' | 'overdue' | 'today' | 'next7' | 'none';
 
 const inputClass = 'h-10 w-full rounded-2xl border border-stone-200 bg-white px-3 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 const textareaClass = 'min-h-24 w-full resize-y rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
@@ -35,6 +36,12 @@ function dateInZone(timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? '';
   return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function addDateDays(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function messageOf(cause: unknown, fallback: string) {
@@ -78,6 +85,9 @@ export function TasksPage() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [queryInput, setQueryInput] = useState('');
   const [query, setQuery] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [dueFilter, setDueFilter] = useState<DueFilter>('all');
+  const requestGeneration = useRef(0);
   const [editing, setEditing] = useState<TaskRecord | null>(null);
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -86,10 +96,38 @@ export function TasksPage() {
   const today = currentFamily ? dateInZone(currentFamily.timezone) : '';
 
   const loadTasks = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     if (!currentFamily) {
       setTasks([]);
       return;
     }
+
+    const filters: CanonicalQueryFilter[] = [
+      { field: 'status', op: 'eq', value: tab },
+    ];
+    if (assigneeFilter) {
+      filters.push({ field: 'assigneePersonIds', op: 'contains', value: assigneeFilter });
+    }
+    if (dueFilter === 'overdue' && tab === 'pending') {
+      filters.push({ field: 'dueDate', op: 'lt', value: today });
+    } else if (dueFilter === 'today') {
+      filters.push({ field: 'dueDate', op: 'eq', value: today });
+    } else if (dueFilter === 'next7') {
+      filters.push({
+        field: 'dueDate',
+        op: 'within',
+        value: {
+          kind: 'local_date_window',
+          startDate: today,
+          endDateExclusive: addDateDays(today, 7),
+          timezone: currentFamily.timezone,
+        },
+      });
+    } else if (dueFilter === 'none') {
+      filters.push({ field: 'dueDate', op: 'isNull' });
+    }
+
+    setTasks([]);
     setLoading(true);
     setError(null);
     try {
@@ -98,28 +136,32 @@ export function TasksPage() {
       do {
         const page: CanonicalQueryPage<TaskRecord> = await queryModelRecords<TaskRecord>(currentFamily.id, 'task', {
           ...(query ? { search: { text: query } } : {}),
-          filter: { field: 'status', op: 'eq', value: tab },
+          filter: { and: filters },
           sort: [{
             field: tab === 'pending' ? 'dueDate' : 'updatedAt',
             direction: tab === 'pending' ? 'asc' : 'desc',
           }],
           page: { limit: 200, cursor },
         });
+        if (generation !== requestGeneration.current) return;
         items.push(...page.items);
         cursor = page.nextCursor;
       } while (cursor);
-      setTasks(items);
+      if (generation === requestGeneration.current) setTasks(items);
     } catch (cause) {
-      setTasks([]);
-      setError(messageOf(cause, '无法加载家庭待办'));
+      if (generation === requestGeneration.current) {
+        setTasks([]);
+        setError(messageOf(cause, '无法加载家庭待办'));
+      }
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [currentFamily, query, tab]);
+  }, [currentFamily, query, tab, assigneeFilter, dueFilter, today]);
 
   useEffect(() => {
     void refreshToken;
     void loadTasks();
+    return () => { requestGeneration.current += 1; };
   }, [loadTasks, refreshToken]);
 
   useEffect(() => {
@@ -127,6 +169,8 @@ export function TasksPage() {
     setDraft(null);
     setQuery('');
     setQueryInput('');
+    setAssigneeFilter('');
+    setDueFilter('all');
   }, [currentFamily?.id]);
 
   const sections = useMemo(() => {
@@ -243,31 +287,79 @@ export function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:items-end">
         <div>
-          <span className="grid size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><CheckSquare2 className="size-5" /></span>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-stone-950">家庭待办</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">直接使用 LifeSpace task 模型和 complete / reopen Actions。</p>
+          <div className="flex items-center gap-3 sm:block">
+          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><CheckSquare2 className="size-5" /></span>
+          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight text-stone-950">家庭待办</h1>
+        </div>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">安排家庭任务、查看截止日期，按负责人和日期快速筛选。</p>
         </div>
         <Button variant="primary" disabled={!currentFamily || !canWrite} onClick={openCreate}><Plus className="size-4" /> 新建待办</Button>
       </div>
 
       {!currentFamily ? <Card className="grid min-h-72 place-items-center p-8 text-sm text-stone-500">请先创建或加入一个家庭。</Card> : (
         <>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="inline-flex rounded-2xl bg-stone-100 p-1">
-              <button type="button" className={`rounded-xl px-4 py-2 text-sm font-medium ${tab === 'pending' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`} onClick={() => setTab('pending')}>未完成</button>
-              <button type="button" className={`rounded-xl px-4 py-2 text-sm font-medium ${tab === 'completed' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`} onClick={() => setTab('completed')}>已完成</button>
-            </div>
-            <div className="flex gap-2">
-              <form onSubmit={submitSearch} className="flex min-w-0 flex-1 items-center gap-2 sm:w-72">
-                <div className="relative min-w-0 flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
-                  <input className={`${inputClass} pl-9`} value={queryInput} maxLength={100} placeholder="搜索待办" onChange={(event) => setQueryInput(event.target.value)} />
-                </div>
-                <Button variant="secondary" type="submit">搜索</Button>
-              </form>
+          <div className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="inline-flex rounded-xl bg-stone-100 p-1" role="group" aria-label="待办状态">
+                <button type="button" aria-pressed={tab === 'pending'} className={`rounded-lg px-4 py-2 text-sm font-medium ${tab === 'pending' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`} onClick={() => setTab('pending')}>未完成</button>
+                <button type="button" aria-pressed={tab === 'completed'} className={`rounded-lg px-4 py-2 text-sm font-medium ${tab === 'completed' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`} onClick={() => { setTab('completed'); if (dueFilter === 'overdue') setDueFilter('all'); }}>已完成</button>
+              </div>
               <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefreshToken((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
+            </div>
+            <form onSubmit={submitSearch} className="flex min-w-0 items-center gap-2" role="search">
+              <label className="relative min-w-0 flex-1">
+                <span className="sr-only">搜索家庭待办</span>
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="search"
+                  className={`${inputClass} min-w-0 bg-stone-50 pl-9`}
+                  value={queryInput}
+                  maxLength={100}
+                  placeholder="搜索任务名称或说明"
+                  onChange={(event) => setQueryInput(event.target.value)}
+                />
+              </label>
+              <Button variant="primary" type="submit">搜索</Button>
+              {query ? <Button variant="ghost" aria-label="清除任务搜索" onClick={() => { setQueryInput(''); setQuery(''); }}>清除</Button> : null}
+            </form>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="shrink-0 text-xs font-medium text-stone-500">筛选</span>
+              <label className="min-w-0 flex-1 sm:flex-none">
+                <span className="sr-only">按负责人筛选</span>
+                <select
+                  aria-label="按负责人筛选"
+                  className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-700 outline-none focus:border-emerald-400 sm:min-w-36"
+                  value={assigneeFilter}
+                  onChange={(event) => setAssigneeFilter(event.target.value)}
+                >
+                  <option value="">全部负责人</option>
+                  {members.filter((member) => member.personId).map((member) => (
+                    <option key={member.personId} value={member.personId}>{member.displayName || member.userId}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="min-w-0 flex-1 sm:flex-none">
+                <span className="sr-only">按截止日期筛选</span>
+                <select
+                  aria-label="按截止日期筛选"
+                  className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-700 outline-none focus:border-emerald-400 sm:min-w-36"
+                  value={dueFilter}
+                  onChange={(event) => setDueFilter(event.target.value as DueFilter)}
+                >
+                  <option value="all">全部日期</option>
+                  {tab === 'pending' ? <option value="overdue">已逾期</option> : null}
+                  <option value="today">今天截止</option>
+                  <option value="next7">未来 7 天</option>
+                  <option value="none">无截止日期</option>
+                </select>
+              </label>
+              {(assigneeFilter || dueFilter !== 'all') ? (
+                <button type="button" className="h-10 shrink-0 rounded-xl px-2 text-xs font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-900" onClick={() => { setAssigneeFilter(''); setDueFilter('all'); }}>
+                  重置筛选
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -277,10 +369,10 @@ export function TasksPage() {
           {!loading && !tasks.length ? (
             <EmptyState
               icon={<CheckSquare2 className="size-5" />}
-              title={query ? '没有找到匹配的待办' : tab === 'pending' ? '暂时没有未完成待办' : '暂时没有已完成待办'}
-              description={query ? '换个关键词试试，或者清除当前搜索。' : tab === 'pending' ? '现在没有需要处理的家庭待办。' : '完成过的待办会出现在这里。'}
-              actionLabel={query ? '清除搜索' : tab === 'pending' && canWrite ? '新建待办' : undefined}
-              onAction={query ? () => { setQueryInput(''); setQuery(''); } : tab === 'pending' && canWrite ? openCreate : undefined}
+              title={query || assigneeFilter || dueFilter !== 'all' ? '没有找到匹配的待办' : tab === 'pending' ? '暂时没有未完成待办' : '暂时没有已完成待办'}
+              description={query || assigneeFilter || dueFilter !== 'all' ? '可以调整关键词、负责人或截止日期筛选条件。' : tab === 'pending' ? '现在没有需要处理的家庭待办。' : '完成过的待办会出现在这里。'}
+              actionLabel={query || assigneeFilter || dueFilter !== 'all' ? '清除搜索与筛选' : tab === 'pending' && canWrite ? '新建待办' : undefined}
+              onAction={query || assigneeFilter || dueFilter !== 'all' ? () => { setQueryInput(''); setQuery(''); setAssigneeFilter(''); setDueFilter('all'); } : tab === 'pending' && canWrite ? openCreate : undefined}
             />
           ) : null}
 
