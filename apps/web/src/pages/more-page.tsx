@@ -1,4 +1,5 @@
 import { Heart, Settings, Users } from 'lucide-react';
+import { PageHeader } from '../components/ui/page-header';
 import { Link } from 'react-router-dom';
 import { Card } from '../components/ui/card';
 
@@ -28,11 +29,8 @@ const entries = [
 
 export function MorePage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-stone-950 sm:text-3xl">更多</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">把低频入口收在这里，底部导航只保留日常最常用的家庭功能。</p>
-      </div>
+    <div className="space-y-4 sm:space-y-5">
+      <PageHeader title="更多" />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {entries.map(({ to, title, description, icon: Icon, tone }) => (
