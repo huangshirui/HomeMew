@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Trash2, Users, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -68,6 +68,10 @@ function addMonths(value: string, amount: number) {
 function monthRange(month: string): CalendarRange {
   const startDate = `${month}-01`;
   return { startDate, endDateExclusive: `${addMonths(month, 1)}-01` };
+}
+
+function startOfWeek(date: string) {
+  return addDays(date, -((dateFromKey(date).getUTCDay() + 6) % 7));
 }
 
 function monthGrid(month: string) {
@@ -227,6 +231,16 @@ export function CalendarPage() {
   const { currentFamily, members, loading: householdLoading } = useHousehold();
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [view, setView] = useState<'month' | 'week'>('month');
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(dateKey(new Date())));
+  const [searchInput, setSearchInput] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [attendeeFilter, setAttendeeFilter] = useState('');
+  const [kindFilter, setKindFilter] = useState<'all' | 'date' | 'instant'>('all');
+  const [nextSearchCursor, setNextSearchCursor] = useState<string | null>(null);
+  const [moreLoading, setMoreLoading] = useState(false);
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -236,60 +250,104 @@ export function CalendarPage() {
   const [saving, setSaving] = useState(false);
   const canWrite = currentFamily ? currentFamily.role !== 'viewer' : false;
 
-  const gridDays = useMemo(() => monthGrid(month), [month]);
+  const gridDays = useMemo(
+    () => view === 'month' ? monthGrid(month) : Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
+    [month, view, weekStart],
+  );
   const gridStart = gridDays[0];
   const gridEndExclusive = addDays(gridDays[gridDays.length - 1], 1);
+  const searchActive = Boolean(appliedSearch);
+
+  const queryEvents = useCallback((cursor: string | null = null) => {
+    if (!currentFamily) throw new Error('请先选择家庭');
+    const filters = [
+      { field: 'status', op: 'eq' as const, value: 'active' },
+      ...(searchActive ? [] : [{
+        field: 'when',
+        op: 'overlaps' as const,
+        value: {
+          kind: 'local_date_window',
+          startDate: gridStart,
+          endDateExclusive: gridEndExclusive,
+          timezone: currentFamily.timezone,
+        },
+      }]),
+      ...(attendeeFilter ? [{ field: 'attendeePersonIds', op: 'contains' as const, value: attendeeFilter }] : []),
+      ...(kindFilter !== 'all' ? [{ field: 'when', op: 'kindIs' as const, value: kindFilter }] : []),
+    ];
+    return queryModelRecords<EventRecord>(currentFamily.id, 'event', {
+      ...(searchActive ? { search: { text: appliedSearch } } : {}),
+      filter: { and: filters },
+      sort: [{ field: 'when', direction: searchActive ? 'desc' : 'asc' }],
+      page: { limit: searchActive ? 80 : 200, ...(cursor ? { cursor } : {}) },
+      context: { viewingTimezone: currentFamily.timezone },
+    });
+  }, [currentFamily, gridEndExclusive, gridStart, searchActive, appliedSearch, attendeeFilter, kindFilter]);
 
   const loadEvents = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     if (!currentFamily) {
       setEvents([]);
+      setNextSearchCursor(null);
       return;
     }
     setLoading(true);
     setError(null);
+    setNextSearchCursor(null);
+    setMoreLoading(false);
     try {
       const collected: EventRecord[] = [];
       let cursor: string | null = null;
       do {
-        const filters = [
-          {
-            field: 'when',
-            op: 'overlaps' as const,
-            value: {
-              kind: 'local_date_window',
-              startDate: gridStart,
-              endDateExclusive: gridEndExclusive,
-              timezone: currentFamily.timezone,
-            },
-          },
-          { field: 'status', op: 'eq' as const, value: 'active' },
-        ];
-        const resultPage: { items: EventRecord[]; nextCursor: string | null } = await queryModelRecords<EventRecord>(currentFamily.id, 'event', {
-          filter: { and: filters },
-          sort: [{ field: 'when', direction: 'asc' }],
-          page: { limit: 200, ...(cursor ? { cursor } : {}) },
-          context: { viewingTimezone: currentFamily.timezone },
-        });
-        collected.push(...resultPage.items);
-        cursor = resultPage.nextCursor;
+        const page = await queryEvents(cursor);
+        if (generation !== requestGeneration.current) return;
+        collected.push(...page.items);
+        cursor = page.nextCursor;
+        if (searchActive) break;
       } while (cursor);
-      setEvents(collected);
+      if (generation === requestGeneration.current) {
+        setEvents(collected);
+        setNextSearchCursor(searchActive ? cursor : null);
+      }
     } catch (cause) {
-      setEvents([]);
-      setError(messageOf(cause, '无法加载家庭日程'));
+      if (generation === requestGeneration.current) {
+        setEvents([]);
+        setError(messageOf(cause, '无法加载家庭日程'));
+      }
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [currentFamily, gridEndExclusive, gridStart]);
+  }, [currentFamily, queryEvents, searchActive]);
 
   useEffect(() => {
     void refreshToken;
     void loadEvents();
+    return () => { requestGeneration.current += 1; };
   }, [loadEvents, refreshToken]);
+
+  async function loadMoreSearch() {
+    if (!searchActive || !nextSearchCursor || loading || moreLoading) return;
+    const generation = requestGeneration.current;
+    setMoreLoading(true);
+    try {
+      const page = await queryEvents(nextSearchCursor);
+      if (generation !== requestGeneration.current) return;
+      setEvents((previous) => [...previous, ...page.items]);
+      setNextSearchCursor(page.nextCursor);
+    } catch (cause) {
+      if (generation === requestGeneration.current) setError(messageOf(cause, '加载更多搜索结果失败'));
+    } finally {
+      if (generation === requestGeneration.current) setMoreLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!currentFamily) return;
-    setMonth(currentDateInZone(currentFamily.timezone).slice(0, 7));
+    const today = currentDateInZone(currentFamily.timezone);
+    setMonth(today.slice(0, 7));
+    setWeekStart(startOfWeek(today));
+    setSelectedDay(null);
+    setExpandedDay(null);
     setEditing(null);
     setDraft(null);
   }, [currentFamily?.id, currentFamily?.timezone]);
@@ -379,7 +437,43 @@ export function CalendarPage() {
     }
   }
 
-  const monthToday = currentFamily ? currentDateInZone(currentFamily.timezone).slice(0, 7) : new Date().toISOString().slice(0, 7);
+  const todayInFamily = currentFamily ? currentDateInZone(currentFamily.timezone) : dateKey(new Date());
+  const monthToday = todayInFamily.slice(0, 7);
+
+  function switchView(next: 'month' | 'week') {
+    if (next === view) return;
+    setExpandedDay(null);
+    if (next === 'week') {
+      const focusDay = selectedDay && gridDays.includes(selectedDay)
+        ? selectedDay : todayInFamily.startsWith(month) ? todayInFamily : `${month}-01`;
+      setWeekStart(startOfWeek(focusDay));
+      setSelectedDay(focusDay);
+    } else {
+      const focusDay = selectedDay && gridDays.includes(selectedDay) ? selectedDay : weekStart;
+      setMonth(focusDay.slice(0, 7));
+      setSelectedDay(focusDay);
+    }
+    setView(next);
+  }
+
+  function navigatePeriod(offset: number) {
+    setExpandedDay(null);
+    setSelectedDay(null);
+    if (view === 'month') setMonth((previous) => addMonths(previous, offset));
+    else setWeekStart((previous) => addDays(previous, offset * 7));
+  }
+
+  function jumpToday() {
+    setExpandedDay(null);
+    setSelectedDay(todayInFamily);
+    setMonth(monthToday);
+    setWeekStart(startOfWeek(todayInFamily));
+  }
+
+  function clearSearch() {
+    setSearchInput('');
+    setAppliedSearch('');
+  }
 
   if (householdLoading) {
     return <Card className="grid min-h-72 place-items-center p-8 text-sm text-stone-500">正在加载家庭日历…</Card>;
@@ -394,10 +488,9 @@ export function CalendarPage() {
     );
   }
 
-  const todayInFamily = currentDateInZone(currentFamily.timezone);
   const activeDay = selectedDay && gridDays.includes(selectedDay)
     ? selectedDay
-    : todayInFamily.startsWith(month) ? todayInFamily : `${month}-01`;
+    : gridDays.includes(todayInFamily) ? todayInFamily : view === 'week' ? weekStart : `${month}-01`;
   const activeEvents = eventsByDay.get(activeDay) ?? [];
 
   return (
