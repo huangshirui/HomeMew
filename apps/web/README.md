@@ -29,7 +29,7 @@ Keep dependencies demand-driven:
 ## Product routes
 
 - `/` — Today / household overview
-- `/calendar`
+- `/calendar` — 月/周日历，家庭全域日程搜索，按参与成员/全天类型筛选，以及密集日期的完整日程查看
 - `/tasks`
 - `/days`
 - `/wishes`
