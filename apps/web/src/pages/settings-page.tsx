@@ -1,4 +1,4 @@
-import { ExternalLink, Settings2, ShieldCheck, Users } from 'lucide-react';
+import { ExternalLink, ShieldCheck, Users } from 'lucide-react';
 import { PageHeader } from '../components/ui/page-header';
 import { Link } from 'react-router-dom';
 import { Card } from '../components/ui/card';
