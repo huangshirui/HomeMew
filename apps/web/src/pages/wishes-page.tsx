@@ -3,6 +3,7 @@ import { Gift, Heart, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, UserRound, X
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
+import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
@@ -302,7 +303,8 @@ function WishEditor({ draft, editing, currentPersonId, canWrite, saving, onChang
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/30 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true">
-      <form onSubmit={onSave} className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+      <ModalScrollLock />
+      <form onScroll={showScrollbarWhileScrolling} onSubmit={onSave} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div><p className="text-lg font-semibold text-stone-950">{editing ? (editable ? '编辑愿望' : '愿望详情') : '写下愿望'}</p>{editing ? <p className="mt-1 text-xs text-stone-500">{editing.status === 'fulfilled' ? '愿望成真' : '等待实现'} · 版本 {editing.version}</p> : null}</div>
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
