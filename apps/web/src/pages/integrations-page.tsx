@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
+import { PageHeader } from '../components/ui/page-header';
 import { Card, CardContent } from '../components/ui/card';
 import { apiRequest } from '../lib/api-client';
 import { displayIntegrationError, type ExternalSystem } from '../lib/integrations';
@@ -115,24 +116,8 @@ export function IntegrationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:items-end">
-        <div>
-          <div className="flex items-center gap-3 sm:block">
-          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-amber-100 text-amber-800"><ExternalLink className="size-5" /></span>
-          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight">外部系统</h1>
-        </div>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-            先登记一个外部系统，再按需要分别配置 Service Access、Agent Access 和事件推送。外部系统本身不等于某一种 LifeSpace 身份。
-          </p>
-        </div>
-        {manager && (
-          <Button variant="primary" onClick={() => setShowCreate((value) => !value)}>
-            <Plus className="size-4" />
-            新建外部系统
-          </Button>
-        )}
-      </div>
+    <div className="space-y-4 sm:space-y-5">
+      <PageHeader title="外部系统">{manager ? <Button variant="primary" onClick={() => setShowCreate((value) => !value)}><Plus className="size-4" /> 新建外部系统</Button> : null}</PageHeader>
 
       {!manager && (
         <Card className="p-6">

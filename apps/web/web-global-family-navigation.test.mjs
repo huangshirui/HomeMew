@@ -47,16 +47,19 @@ test('mobile calendar offers spacious date selection and a per-day agenda', () =
   assert.match(calendar, /onClick=\{\(\) => setSelectedDay\(day\)\}/u);
   assert.match(calendar, /aria-pressed=\{isSelected\}/u);
   assert.match(calendar, /min-h-12 w-full flex-col/u);
-  assert.match(calendar, /className="space-y-3 sm:hidden"/u);
+  assert.match(calendar, /view === 'month' \? <section className="space-y-3 sm:hidden"/u);
   assert.match(calendar, /<CalendarAgenda events=\{activeEvents\}/u);
   assert.match(calendar, /onClick=\{\(\) => openCreate\(activeDay\)\}/u);
   assert.match(calendar, /gridDays\.includes\(selectedDay\)/u);
 });
 
-test('main family pages use compact mobile headings and retain larger desktop titles', () => {
-  for (const name of ['calendar', 'tasks', 'days', 'wishes', 'family', 'integrations', 'settings']) {
+test('main household pages share a compact icon-free header', () => {
+  const header = source('./src/components/ui/page-header.tsx');
+  assert.match(header, /<header className="flex flex-wrap items-center justify-between gap-3"/u);
+  assert.match(header, /sm:text-3xl/u);
+  for (const name of ['calendar', 'tasks', 'days', 'wishes', 'family', 'integrations', 'settings', 'more']) {
     const page = source(`./src/pages/${name}-page.tsx`);
-    assert.match(page, /flex items-center gap-3 sm:block/u, `${name} title should align with its icon on mobile`);
-    assert.match(page, /text-2xl sm:mt-4 sm:text-3xl/u, `${name} desktop typography should remain`);
+    assert.match(page, /<PageHeader/u, `${name} should use shared compact heading`);
   }
+  assert.match(source('./src/pages/integration-detail-page.tsx'), /<PageHeader title=\{system\.displayName\}>/u);
 });

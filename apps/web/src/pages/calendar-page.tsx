@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
+import { PageHeader } from '../components/ui/page-header';
+import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
+import { WeekTimeGrid } from '../components/week-time-grid';
+import { useModalScrollLock } from '../lib/modal-scroll';
 import { Card } from '../components/ui/card';
 import { ApiError, apiRequest } from '../lib/api-client';
 import { queryModelRecords } from '../lib/canonical-query';
@@ -237,6 +241,7 @@ export function CalendarPage() {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [attendeeFilter, setAttendeeFilter] = useState('');
   const [kindFilter, setKindFilter] = useState<'all' | 'date' | 'instant'>('all');
+  const [filterOpen, setFilterOpen] = useState(false);
   const [nextSearchCursor, setNextSearchCursor] = useState<string | null>(null);
   const [moreLoading, setMoreLoading] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -249,6 +254,7 @@ export function CalendarPage() {
   const [draft, setDraft] = useState<EventDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const canWrite = currentFamily ? currentFamily.role !== 'viewer' : false;
+  useModalScrollLock(Boolean(draft || expandedDay));
 
   const gridDays = useMemo(
     () => view === 'month' ? monthGrid(month) : Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
@@ -386,6 +392,19 @@ export function CalendarPage() {
     setError(null);
   }
 
+  function openCreateAt(date: string, time: string) {
+    if (!currentFamily || !canWrite) return;
+    const minutes = Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5)) + 60;
+    const nextDay = minutes >= 1440;
+    setEditing(null);
+    setDraft({
+      ...defaultDraft(currentFamily.timezone, date),
+      startTime: time,
+      endDate: nextDay ? addDays(date, 1) : date,
+      endTime: `${String(Math.floor((minutes % 1440) / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`,
+    });
+    setError(null);
+  }
   function openEdit(event: EventRecord) {
     if (!currentFamily) return;
     setEditing(event);
@@ -492,7 +511,7 @@ export function CalendarPage() {
   if (!currentFamily) {
     return (
       <div className="space-y-6">
-        <CalendarHeader onCreate={() => undefined} canWrite={false} />
+        <CalendarHeader onCreate={() => undefined} canWrite={false} onToggleFilters={() => undefined} filtersExpanded={false} filtersActive={false} />
         <Card className="grid min-h-72 place-items-center p-8 text-center text-sm text-stone-500">请先创建或加入一个家庭。</Card>
       </div>
     );
@@ -504,16 +523,17 @@ export function CalendarPage() {
   const activeEvents = eventsByDay.get(activeDay) ?? [];
 
   return (
-    <div className="space-y-6">
-      <CalendarHeader onCreate={() => openCreate()} canWrite={canWrite} />
+    <div className="space-y-3 sm:space-y-4">
+      <CalendarHeader onCreate={() => openCreate()} canWrite={canWrite} onToggleFilters={() => setFilterOpen((value) => !value)} filtersExpanded={filterOpen} filtersActive={Boolean(appliedSearch || attendeeFilter || kindFilter !== 'all')} />
 
-      <div className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
+      {filterOpen ? <div id="calendar-search-filters" className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
         <form
           className="flex min-w-0 items-center gap-2"
           role="search"
           onSubmit={(event) => {
             event.preventDefault();
             setAppliedSearch(searchInput.trim());
+            setFilterOpen(false);
             setRefreshToken((value) => value + 1);
           }}
         >
@@ -570,7 +590,7 @@ export function CalendarPage() {
             </button>
           ) : null}
         </div>
-      </div>
+      </div> : null}
 
       {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100" role="alert">{error}</div> : null}
 
@@ -647,10 +667,17 @@ export function CalendarPage() {
                   const isToday = day === todayInFamily;
                   const isSelected = day === activeDay;
                   return (
-                    <div key={day} className={`min-w-0 border-b border-r border-stone-100 p-0.5 sm:min-h-36 sm:p-2 ${inMonth ? 'bg-white' : 'bg-stone-50/60'}`}>
+                    <div key={day} className={`group relative min-w-0 border-b border-r border-stone-100 p-0.5 sm:min-h-36 sm:p-2 ${inMonth ? 'bg-white' : 'bg-stone-50/60'}`}>
+                      {canWrite ? <button
+                        type="button"
+                        aria-label={`${day}，在空白处新建日程`}
+                        title="点击空白处新建日程"
+                        onClick={() => openCreate(day)}
+                        className="absolute inset-0 z-0 hidden cursor-crosshair hover:bg-emerald-50/30 focus-visible:bg-emerald-50/30 focus-visible:outline-2 focus-visible:outline-emerald-500 sm:block"
+                      /> : null}
                       <button
                         type="button"
-                        className={`flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:hidden ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200' : inMonth ? 'text-stone-700' : 'text-stone-400'}`}
+                        className={`relative z-10 flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:hidden ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200' : inMonth ? 'text-stone-700' : 'text-stone-400'}`}
                         onClick={() => setSelectedDay(day)}
                         aria-pressed={isSelected}
                         aria-label={`${day}，${dayEvents.length} 项日程`}
@@ -660,13 +687,13 @@ export function CalendarPage() {
                       </button>
                       <button
                         type="button"
-                        className={`hidden size-7 place-items-center rounded-full text-xs font-medium sm:grid ${isToday ? 'bg-emerald-600 text-white' : inMonth ? 'text-stone-700 hover:bg-stone-100' : 'text-stone-400'}`}
+                        className={`relative z-10 hidden size-7 place-items-center rounded-full text-xs font-medium sm:grid ${isToday ? 'bg-emerald-600 text-white' : inMonth ? 'text-stone-700 hover:bg-stone-100' : 'text-stone-400'}`}
                         onClick={() => setExpandedDay(day)}
                         aria-label={`${day}，查看全部 ${dayEvents.length} 项日程`}
                       >
                         {Number(day.slice(-2))}
                       </button>
-                      <div className="mt-1.5 hidden space-y-1 sm:block">
+                      <div className="relative z-10 mt-1.5 hidden space-y-1 sm:block">
                         {dayEvents.slice(0, 4).map((event) => (
                           <button
                             key={`${day}-${event.id}`}
@@ -686,66 +713,39 @@ export function CalendarPage() {
                           </button>
                         ) : null}
                       </div>
+                      {canWrite && !dayEvents.length ? <span aria-hidden="true" className="pointer-events-none absolute inset-x-1 bottom-3 hidden items-center justify-center gap-1 text-[11px] text-emerald-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:flex"><Plus className="size-3" /> 新建日程</span> : null}
                     </div>
                   );
                 })}
               </div>
             </Card>
           ) : (
-            <Card className="overflow-hidden">
-              <div className="grid grid-cols-7 border-b border-stone-100 bg-stone-50/70">
-                {gridDays.map((day, index) => {
-                  const count = eventsByDay.get(day)?.length ?? 0;
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => setSelectedDay(day)}
-                      aria-pressed={activeDay === day}
-                      aria-label={`${day} 周${WEEKDAYS[index]}，${count} 项日程`}
-                      className={`flex min-h-16 flex-col items-center justify-center gap-1 border-r border-stone-100 text-xs font-medium hover:bg-emerald-50 ${activeDay === day ? 'bg-emerald-50 text-emerald-800' : 'text-stone-600'}`}
-                    >
-                      <span>周{WEEKDAYS[index]}</span>
-                      <span className={`grid size-7 place-items-center rounded-full text-sm ${day === todayInFamily ? 'bg-emerald-600 text-white' : ''}`}>{Number(day.slice(-2))}</span>
-                      <span className="text-[10px] text-stone-400 sm:hidden">{count || '·'}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="hidden grid-cols-7 divide-x divide-stone-100 sm:grid">
-                {gridDays.map((day) => (
-                  <div key={day} className="min-w-0 space-y-1 p-2 sm:min-h-72">
-                    {(eventsByDay.get(day) ?? []).map((event) => (
-                      <button
-                        key={event.id}
-                        type="button"
-                        onClick={() => openEdit(event)}
-                        className="block w-full rounded-xl bg-emerald-50 px-2 py-2 text-left text-xs text-emerald-950 transition hover:bg-emerald-100"
-                        title={event.summary}
-                      >
-                        <span className="block text-[11px] font-medium text-emerald-700">{timeLabel(event, currentFamily.timezone)}</span>
-                        <span className="mt-1 block break-words font-semibold">{event.summary}</span>
-                      </button>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <WeekTimeGrid
+              days={gridDays}
+              selectedDay={activeDay}
+              eventsByDay={eventsByDay}
+              timezone={currentFamily.timezone}
+              members={members}
+              canWrite={canWrite}
+              onSelectDay={setSelectedDay}
+              onOpen={(event) => { const record = events.find((item) => item.id === event.id); if (record) openEdit(record); }}
+              onCreate={openCreateAt}
+            />
           )}
 
-          <section className="space-y-3 sm:hidden" aria-label={`${activeDay}的日程`}>
+          {view === 'month' ? <section className="space-y-3 sm:hidden" aria-label={`${activeDay}的日程`}>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-stone-900">{Number(activeDay.slice(5, 7))}月{Number(activeDay.slice(8))}日 · 日程</h2>
               {canWrite ? <Button variant="secondary" className="shrink-0" onClick={() => openCreate(activeDay)}><Plus className="size-4" /> 新建</Button> : null}
             </div>
             <CalendarAgenda events={activeEvents} timeZone={currentFamily.timezone} onOpen={openEdit} />
-          </section>
+          </section> : null}
         </>
       )}
 
       {expandedDay && !searchActive && view === 'month' ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpandedDay(null); }}>
-          <div role="dialog" aria-modal="true" aria-label={`${expandedDay}的全部日程`} className="max-h-[85dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-[#f6f8f4] p-4 shadow-2xl sm:rounded-3xl sm:p-6">
+          <div role="dialog" aria-modal="true" aria-label={`${expandedDay}的全部日程`} onScroll={showScrollbarWhileScrolling} className="max-h-[85dvh] w-full max-w-xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-[#f6f8f4] p-4 shadow-2xl sm:rounded-3xl sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-stone-900">{Number(expandedDay.slice(5, 7))}月{Number(expandedDay.slice(8))}日 · 全部日程</h2>
@@ -797,18 +797,21 @@ function CalendarAgenda({ events, timeZone, onOpen }: {
   ) : <Card className="p-6 text-center text-sm text-stone-500">这一天还没有日程。</Card>;
 }
 
-function CalendarHeader({ onCreate, canWrite }: { onCreate: () => void; canWrite: boolean }) {
+function CalendarHeader({ onCreate, canWrite, onToggleFilters, filtersExpanded, filtersActive }: {
+  onCreate: () => void;
+  canWrite: boolean;
+  onToggleFilters: () => void;
+  filtersExpanded: boolean;
+  filtersActive: boolean;
+}) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:items-end">
-      <div>
-        <div className="flex items-center gap-3 sm:block">
-          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><CalendarDays className="size-5" /></span>
-          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight text-stone-950">家庭日程</h1>
-        </div>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">安排一家人的活动与课程，可以搜索、筛选，并切换月历或周历。</p>
-      </div>
+    <PageHeader title="家庭日程">
+      <Button variant="secondary" onClick={onToggleFilters} aria-expanded={filtersExpanded}
+        aria-controls="calendar-search-filters" className={filtersActive ? "text-emerald-800 ring-emerald-300" : ""}>
+        <SlidersHorizontal className="size-4" /> 搜索与筛选{filtersActive ? " · 已启用" : ""}
+      </Button>
       <Button variant="primary" disabled={!canWrite} onClick={onCreate}><Plus className="size-4" /> 新建日程</Button>
-    </div>
+    </PageHeader>
   );
 }
 
@@ -845,7 +848,7 @@ function EventEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={editing ? '编辑日程' : '新建日程'}>
-      <form onSubmit={onSave} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+      <form onScroll={showScrollbarWhileScrolling} onSubmit={onSave} className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '日程详情' : '编辑日程') : '新建日程'}</p>

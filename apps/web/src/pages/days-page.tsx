@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Archive, CalendarClock, Clock3, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, Users, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
+import { PageHeader } from '../components/ui/page-header';
+import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
@@ -332,17 +334,8 @@ export function DaysPage() {
   if (householdLoading) return <Card className="grid min-h-72 place-items-center p-8 text-sm text-stone-500">正在加载日子…</Card>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:items-end">
-        <div>
-          <div className="flex items-center gap-3 sm:block">
-          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-amber-100 text-amber-700"><CalendarClock className="size-5" /></span>
-          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight text-stone-950">日子</h1>
-        </div>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">已经多久、还有多久和周期记录，直接使用 LifeSpace Temporal capability。</p>
-        </div>
-        <Button variant="primary" disabled={!currentFamily || !canWrite} onClick={openCreate}><Plus className="size-4" /> 新建</Button>
-      </div>
+    <div className="space-y-4 sm:space-y-5">
+      <PageHeader title="日子"><Button variant="primary" disabled={!currentFamily || !canWrite} onClick={openCreate}><Plus className="size-4" /> 新建</Button></PageHeader>
 
       {!currentFamily ? <Card className="grid min-h-72 place-items-center p-8 text-sm text-stone-500">请先创建或加入一个家庭。</Card> : (
         <>
@@ -420,6 +413,7 @@ function OccurrenceEditor({ value, saving, onChange, onClose, onSave }: {
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/30 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`记录 ${value.record.name} 的发生日期`}>
+      <ModalScrollLock />
       <form onSubmit={onSave} className="w-full max-w-md rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex gap-3">
@@ -461,7 +455,8 @@ function DayEditor({ draft, editing, members, canWrite, saving, onChange, onClos
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/30 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true">
-      <form onSubmit={onSave} className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+      <ModalScrollLock />
+      <form onScroll={showScrollbarWhileScrolling} onSubmit={onSave} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div><p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '日子详情' : '编辑日子') : '新建日子'}</p>{editing ? <p className="mt-1 text-xs text-stone-500">版本 {editing.version}</p> : null}</div>
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>

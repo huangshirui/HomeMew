@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Check, CheckSquare2, Circle, Clock3, Plus, RefreshCw, RotateCcw, Search, Trash2, Users, X } from 'lucide-react';
+import { Check, CheckSquare2, Circle, Clock3, Plus, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
+import { PageHeader } from '../components/ui/page-header';
+import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { ApiError, apiRequest } from '../lib/api-client';
 import { queryModelRecords, type CanonicalQueryFilter, type CanonicalQueryPage } from '../lib/canonical-query';
 
@@ -87,6 +89,7 @@ export function TasksPage() {
   const [query, setQuery] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [dueFilter, setDueFilter] = useState<DueFilter>('all');
+  const [filterOpen, setFilterOpen] = useState(false);
   const requestGeneration = useRef(0);
   const [editing, setEditing] = useState<TaskRecord | null>(null);
   const [draft, setDraft] = useState<TaskDraft | null>(null);
@@ -279,6 +282,7 @@ export function TasksPage() {
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     setQuery(queryInput.trim());
+    setFilterOpen(false);
   }
 
   if (householdLoading) {
@@ -286,21 +290,19 @@ export function TasksPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:items-end">
-        <div>
-          <div className="flex items-center gap-3 sm:block">
-          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><CheckSquare2 className="size-5" /></span>
-          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight text-stone-950">家庭待办</h1>
-        </div>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">安排家庭任务、查看截止日期，按负责人和日期快速筛选。</p>
-        </div>
+    <div className="space-y-3 sm:space-y-4">
+      <PageHeader title="家庭待办">
+        <Button variant="secondary" onClick={() => setFilterOpen((value) => !value)}
+          aria-expanded={filterOpen} aria-controls="task-search-filters"
+          className={query || assigneeFilter || dueFilter !== "all" ? "text-emerald-800 ring-emerald-300" : ""}>
+          <SlidersHorizontal className="size-4" /> 搜索与筛选{query || assigneeFilter || dueFilter !== "all" ? " · 已启用" : ""}
+        </Button>
         <Button variant="primary" disabled={!currentFamily || !canWrite} onClick={openCreate}><Plus className="size-4" /> 新建待办</Button>
-      </div>
+      </PageHeader>
 
       {!currentFamily ? <Card className="grid min-h-72 place-items-center p-8 text-sm text-stone-500">请先创建或加入一个家庭。</Card> : (
         <>
-          <div className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="inline-flex rounded-xl bg-stone-100 p-1" role="group" aria-label="待办状态">
                 <button type="button" aria-pressed={tab === 'pending'} className={`rounded-lg px-4 py-2 text-sm font-medium ${tab === 'pending' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`} onClick={() => setTab('pending')}>未完成</button>
@@ -308,6 +310,7 @@ export function TasksPage() {
               </div>
               <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefreshToken((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
             </div>
+            {filterOpen ? <div id="task-search-filters" className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
             <form onSubmit={submitSearch} className="flex min-w-0 items-center gap-2" role="search">
               <label className="relative min-w-0 flex-1">
                 <span className="sr-only">搜索家庭待办</span>
@@ -361,6 +364,7 @@ export function TasksPage() {
                 </button>
               ) : null}
             </div>
+            </div> : null}
           </div>
 
           {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">{error}</div> : null}
@@ -498,7 +502,8 @@ function TaskEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={editing ? '编辑待办' : '新建待办'}>
-      <form onSubmit={onSave} className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+      <ModalScrollLock />
+      <form onScroll={showScrollbarWhileScrolling} onSubmit={onSave} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '待办详情' : '编辑待办') : '新建待办'}</p>
