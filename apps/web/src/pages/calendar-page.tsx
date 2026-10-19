@@ -497,96 +497,255 @@ export function CalendarPage() {
     <div className="space-y-6">
       <CalendarHeader onCreate={() => openCreate()} canWrite={canWrite} />
 
-      <div className="flex flex-col gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-stone-200/80 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="font-semibold text-stone-900">{displayMonth(month)}</p>
-          <p className="mt-1 text-xs text-stone-500">{currentFamily.timezone}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="icon" aria-label="上个月" onClick={() => { setSelectedDay(null); setMonth((value) => addMonths(value, -1)); }}><ChevronLeft className="size-4" /></Button>
-          <Button variant="secondary" onClick={() => { setSelectedDay(null); setMonth(monthToday); }}>今天</Button>
-          <Button variant="secondary" size="icon" aria-label="下个月" onClick={() => { setSelectedDay(null); setMonth((value) => addMonths(value, 1)); }}><ChevronRight className="size-4" /></Button>
-          <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefreshToken((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
+      <div className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
+        <form
+          className="flex min-w-0 items-center gap-2"
+          role="search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setAppliedSearch(searchInput.trim());
+            setRefreshToken((value) => value + 1);
+          }}
+        >
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">搜索家庭日程</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="搜索名称、说明或地点"
+              className="h-10 w-full min-w-0 rounded-xl border border-stone-200 bg-stone-50 pl-9 pr-3 text-sm text-stone-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+          <Button type="submit" variant="primary">搜索</Button>
+          {searchActive ? <Button onClick={clearSearch} variant="ghost" aria-label="退出搜索">清除</Button> : null}
+        </form>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="shrink-0 text-xs font-medium text-stone-500">筛选</span>
+          <label className="min-w-0 flex-1 sm:flex-none">
+            <span className="sr-only">按参与成员筛选</span>
+            <select
+              className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-700 outline-none focus:border-emerald-400 sm:min-w-36"
+              value={attendeeFilter}
+              onChange={(event) => setAttendeeFilter(event.target.value)}
+              aria-label="按参与成员筛选"
+            >
+              <option value="">全部成员</option>
+              {members.filter((member) => member.personId).map((member) => (
+                <option key={member.personId} value={member.personId}>{member.displayName || member.userId}</option>
+              ))}
+            </select>
+          </label>
+          <label className="min-w-0 flex-1 sm:flex-none">
+            <span className="sr-only">按日程类型筛选</span>
+            <select
+              className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-700 outline-none focus:border-emerald-400 sm:min-w-32"
+              value={kindFilter}
+              onChange={(event) => setKindFilter(event.target.value as 'all' | 'date' | 'instant')}
+              aria-label="按日程类型筛选"
+            >
+              <option value="all">全部类型</option>
+              <option value="date">全天日程</option>
+              <option value="instant">定时日程</option>
+            </select>
+          </label>
+          {(attendeeFilter || kindFilter !== 'all') ? (
+            <button
+              type="button"
+              onClick={() => { setAttendeeFilter(''); setKindFilter('all'); }}
+              className="h-10 shrink-0 rounded-xl px-2 text-xs font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+            >
+              重置筛选
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">{error}</div> : null}
+      {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100" role="alert">{error}</div> : null}
 
-      <Card className="overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-stone-100 bg-stone-50/70">
-          {WEEKDAYS.map((day) => (
-            <div key={day} className="py-2 text-center text-xs font-medium text-stone-500 sm:px-2 sm:py-3">
-              <span className="sm:hidden">{day}</span><span className="hidden sm:inline">周{day}</span>
+      {searchActive ? (
+        <section className="space-y-3" aria-label="家庭日程搜索结果">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-stone-900">搜索结果 · {appliedSearch}</h2>
+              <p className="mt-1 text-xs text-stone-500">全家庭范围 · 已显示 {events.length} 项{nextSearchCursor ? '，还有更多结果' : ''}</p>
             </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7">
-          {gridDays.map((day) => {
-            const dayEvents = eventsByDay.get(day) ?? [];
-            const inMonth = day.startsWith(month);
-            const isToday = day === todayInFamily;
-            const isSelected = day === activeDay;
-            return (
-              <div key={day} className={`min-w-0 border-b border-r border-stone-100 p-0.5 sm:min-h-36 sm:p-2 ${inMonth ? 'bg-white' : 'bg-stone-50/60'}`}>
-                <button
-                  type="button"
-                  className={`flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:hidden ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200' : inMonth ? 'text-stone-700' : 'text-stone-400'}`}
-                  onClick={() => setSelectedDay(day)}
-                  aria-pressed={isSelected}
-                  aria-label={`${day}，${dayEvents.length} 项日程`}
-                >
-                  <span className={`grid size-6 place-items-center rounded-full ${isToday ? 'bg-emerald-600 text-white' : ''}`}>{Number(day.slice(-2))}</span>
-                  {dayEvents.length ? <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald-500" /> : <span aria-hidden="true" className="size-1.5" />}
-                </button>
-                <button
-                  type="button"
-                  className={`hidden size-7 place-items-center rounded-full text-xs font-medium sm:grid ${isToday ? 'bg-emerald-600 text-white' : inMonth ? 'text-stone-700 hover:bg-stone-100' : 'text-stone-400'}`}
-                  onClick={() => canWrite && openCreate(day)}
-                  aria-label={`${day} 新建日程`}
-                  disabled={!canWrite}
-                >
-                  {Number(day.slice(-2))}
-                </button>
-                <div className="mt-1.5 hidden space-y-1 sm:block">
-                  {dayEvents.slice(0, 4).map((event) => (
-                    <button
-                      key={`${day}-${event.id}`}
-                      type="button"
-                      onClick={() => openEdit(event)}
-                      className="block w-full truncate rounded-lg bg-emerald-50 px-1.5 py-1 text-left text-[11px] leading-4 text-emerald-900 transition hover:bg-emerald-100 sm:px-2 sm:text-xs"
-                      title={`${timeLabel(event, currentFamily.timezone)} ${event.summary}`}
-                    >
-                      <span className="mr-1 font-medium text-emerald-700">{timeLabel(event, currentFamily.timezone)}</span>{event.summary}
-                    </button>
-                  ))}
-                  {dayEvents.length > 4 ? <p className="px-1 text-[10px] text-stone-400">还有 {dayEvents.length - 4} 项</p> : null}
-                </div>
+            <Button variant="ghost" onClick={clearSearch}>返回日历</Button>
+          </div>
+          {loading ? <Card className="p-8 text-center text-sm text-stone-500">正在搜索日程…</Card> : events.length ? (
+            <Card className="divide-y divide-stone-100 overflow-hidden">
+              {events.map((event) => {
+                const span = eventSpan(event, currentFamily.timezone);
+                return (
+                  <button key={event.id} type="button" onClick={() => openEdit(event)} className="flex w-full min-w-0 items-start gap-3 px-4 py-4 text-left hover:bg-stone-50">
+                    <span className="w-24 shrink-0 text-xs font-medium tabular-nums text-stone-500">{span.start}<span className="mt-1 block">{timeLabel(event, currentFamily.timezone)}</span></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block break-words text-sm font-semibold text-stone-900">{event.summary}</span>
+                      {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{event.location}</span> : null}
+                      {span.endInclusive > span.start ? <span className="mt-1 block text-xs text-stone-400">持续至 {span.endInclusive}</span> : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </Card>
+          ) : <Card className="p-8 text-center text-sm text-stone-500">没有找到匹配的日程，试试其他关键词或筛选条件。</Card>}
+          {nextSearchCursor ? (
+            <div className="text-center">
+              <Button variant="secondary" disabled={moreLoading || loading} onClick={() => void loadMoreSearch()}>
+                {moreLoading ? '正在加载…' : '加载更多结果'}
+              </Button>
+            </div>
+          ) : null}
+        </section>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
+            <div className="min-w-0">
+              <p className="font-semibold text-stone-900">
+                {view === 'month' ? displayMonth(month) : `${Number(weekStart.slice(5, 7))}月${Number(weekStart.slice(8))}日 — ${Number(addDays(weekStart, 6).slice(5, 7))}月${Number(addDays(weekStart, 6).slice(8))}日`}
+              </p>
+              <p className="mt-1 text-xs text-stone-500">{currentFamily.timezone}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-xl bg-stone-100 p-1" role="group" aria-label="日历视图">
+                <button type="button" onClick={() => switchView('month')} aria-pressed={view === 'month'} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${view === 'month' ? 'bg-white text-emerald-800 shadow-sm' : 'text-stone-500 hover:text-stone-900'}`}>月</button>
+                <button type="button" onClick={() => switchView('week')} aria-pressed={view === 'week'} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${view === 'week' ? 'bg-white text-emerald-800 shadow-sm' : 'text-stone-500 hover:text-stone-900'}`}>周</button>
               </div>
-            );
-          })}
-        </div>
-      </Card>
+              <Button variant="secondary" size="icon" aria-label={view === 'month' ? '上个月' : '上一周'} onClick={() => navigatePeriod(-1)}><ChevronLeft className="size-4" /></Button>
+              <Button variant="secondary" onClick={jumpToday}>今天</Button>
+              <Button variant="secondary" size="icon" aria-label={view === 'month' ? '下个月' : '下一周'} onClick={() => navigatePeriod(1)}><ChevronRight className="size-4" /></Button>
+              <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefreshToken((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
+            </div>
+          </div>
 
-      <section className="space-y-3 sm:hidden" aria-label={`${activeDay}的日程`}>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-stone-900">{Number(activeDay.slice(5, 7))}月{Number(activeDay.slice(8))}日 · 日程</h2>
-          {canWrite ? <Button variant="secondary" className="shrink-0" onClick={() => openCreate(activeDay)}><Plus className="size-4" /> 新建</Button> : null}
+          {loading ? <p className="text-center text-xs text-stone-500" role="status">正在更新日程…</p> : null}
+
+          {view === 'month' ? (
+            <Card className="overflow-hidden">
+              <div className="grid grid-cols-7 border-b border-stone-100 bg-stone-50/70">
+                {WEEKDAYS.map((day) => (
+                  <div key={day} className="py-2 text-center text-xs font-medium text-stone-500 sm:px-2 sm:py-3">
+                    <span className="sm:hidden">{day}</span><span className="hidden sm:inline">周{day}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7">
+                {gridDays.map((day) => {
+                  const dayEvents = eventsByDay.get(day) ?? [];
+                  const inMonth = day.startsWith(month);
+                  const isToday = day === todayInFamily;
+                  const isSelected = day === activeDay;
+                  return (
+                    <div key={day} className={`min-w-0 border-b border-r border-stone-100 p-0.5 sm:min-h-36 sm:p-2 ${inMonth ? 'bg-white' : 'bg-stone-50/60'}`}>
+                      <button
+                        type="button"
+                        className={`flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:hidden ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200' : inMonth ? 'text-stone-700' : 'text-stone-400'}`}
+                        onClick={() => setSelectedDay(day)}
+                        aria-pressed={isSelected}
+                        aria-label={`${day}，${dayEvents.length} 项日程`}
+                      >
+                        <span className={`grid size-6 place-items-center rounded-full ${isToday ? 'bg-emerald-600 text-white' : ''}`}>{Number(day.slice(-2))}</span>
+                        {dayEvents.length ? <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald-500" /> : <span aria-hidden="true" className="size-1.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        className={`hidden size-7 place-items-center rounded-full text-xs font-medium sm:grid ${isToday ? 'bg-emerald-600 text-white' : inMonth ? 'text-stone-700 hover:bg-stone-100' : 'text-stone-400'}`}
+                        onClick={() => setExpandedDay(day)}
+                        aria-label={`${day}，查看全部 ${dayEvents.length} 项日程`}
+                      >
+                        {Number(day.slice(-2))}
+                      </button>
+                      <div className="mt-1.5 hidden space-y-1 sm:block">
+                        {dayEvents.slice(0, 4).map((event) => (
+                          <button
+                            key={`${day}-${event.id}`}
+                            type="button"
+                            onClick={() => openEdit(event)}
+                            className="block w-full truncate rounded-lg bg-emerald-50 px-1.5 py-1 text-left text-[11px] leading-4 text-emerald-900 transition hover:bg-emerald-100 sm:px-2 sm:text-xs"
+                            title={`${timeLabel(event, currentFamily.timezone)} ${event.summary}`}
+                          >
+                            <span className="mr-1 font-medium text-emerald-700">{timeLabel(event, currentFamily.timezone)}</span>{event.summary}
+                          </button>
+                        ))}
+                        {dayEvents.length > 4 ? (
+                          <button type="button" className="w-full rounded-lg px-1 py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:ring-2 focus-visible:ring-emerald-500" onClick={() => setExpandedDay(day)}>
+                            查看全部 {dayEvents.length} 项（还有 {dayEvents.length - 4} 项）
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="grid grid-cols-7 border-b border-stone-100 bg-stone-50/70">
+                {gridDays.map((day, index) => {
+                  const count = eventsByDay.get(day)?.length ?? 0;
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => setSelectedDay(day)}
+                      aria-pressed={activeDay === day}
+                      aria-label={`${day} 周${WEEKDAYS[index]}，${count} 项日程`}
+                      className={`flex min-h-16 flex-col items-center justify-center gap-1 border-r border-stone-100 text-xs font-medium hover:bg-emerald-50 ${activeDay === day ? 'bg-emerald-50 text-emerald-800' : 'text-stone-600'}`}
+                    >
+                      <span>周{WEEKDAYS[index]}</span>
+                      <span className={`grid size-7 place-items-center rounded-full text-sm ${day === todayInFamily ? 'bg-emerald-600 text-white' : ''}`}>{Number(day.slice(-2))}</span>
+                      <span className="text-[10px] text-stone-400 sm:hidden">{count || '·'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="hidden grid-cols-7 divide-x divide-stone-100 sm:grid">
+                {gridDays.map((day) => (
+                  <div key={day} className="min-w-0 space-y-1 p-2 sm:min-h-72">
+                    {(eventsByDay.get(day) ?? []).map((event) => (
+                      <button
+                        key={event.id}
+                        type="button"
+                        onClick={() => openEdit(event)}
+                        className="block w-full rounded-xl bg-emerald-50 px-2 py-2 text-left text-xs text-emerald-950 transition hover:bg-emerald-100"
+                        title={event.summary}
+                      >
+                        <span className="block text-[11px] font-medium text-emerald-700">{timeLabel(event, currentFamily.timezone)}</span>
+                        <span className="mt-1 block break-words font-semibold">{event.summary}</span>
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          <section className="space-y-3 sm:hidden" aria-label={`${activeDay}的日程`}>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-stone-900">{Number(activeDay.slice(5, 7))}月{Number(activeDay.slice(8))}日 · 日程</h2>
+              {canWrite ? <Button variant="secondary" className="shrink-0" onClick={() => openCreate(activeDay)}><Plus className="size-4" /> 新建</Button> : null}
+            </div>
+            <CalendarAgenda events={activeEvents} timeZone={currentFamily.timezone} onOpen={openEdit} />
+          </section>
+        </>
+      )}
+
+      {expandedDay && !searchActive && view === 'month' ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpandedDay(null); }}>
+          <div role="dialog" aria-modal="true" aria-label={`${expandedDay}的全部日程`} className="max-h-[85dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-[#f6f8f4] p-4 shadow-2xl sm:rounded-3xl sm:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-stone-900">{Number(expandedDay.slice(5, 7))}月{Number(expandedDay.slice(8))}日 · 全部日程</h2>
+                <p className="mt-1 text-xs text-stone-500">{(eventsByDay.get(expandedDay) ?? []).length} 项日程</p>
+              </div>
+              <Button variant="ghost" size="icon" aria-label="关闭日程列表" onClick={() => setExpandedDay(null)}><X className="size-4" /></Button>
+            </div>
+            <CalendarAgenda events={eventsByDay.get(expandedDay) ?? []} timeZone={currentFamily.timezone} onOpen={(event) => { setExpandedDay(null); openEdit(event); }} />
+            {canWrite ? <Button variant="primary" className="mt-4 w-full" onClick={() => { const date = expandedDay; setExpandedDay(null); openCreate(date); }}><Plus className="size-4" /> 新建当天日程</Button> : null}
+          </div>
         </div>
-        {activeEvents.length ? (
-          <Card className="divide-y divide-stone-100 overflow-hidden">
-            {activeEvents.map((event) => (
-              <button key={event.id} type="button" onClick={() => openEdit(event)} className="flex w-full items-start gap-3 px-4 py-4 text-left hover:bg-stone-50">
-                <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-stone-500">{timeLabel(event, currentFamily.timezone)}</span>
-                <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className="block break-words text-sm font-semibold text-stone-900">{event.summary}</span>
-                  {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{event.location}</span> : null}
-                </span>
-              </button>
-            ))}
-          </Card>
-        ) : <Card className="p-6 text-center text-sm text-stone-500">这一天还没有日程。</Card>}
-      </section>
+      ) : null}
 
       {draft ? (
         <EventEditor
@@ -603,6 +762,27 @@ export function CalendarPage() {
       ) : null}
     </div>
   );
+}
+
+function CalendarAgenda({ events, timeZone, onOpen }: {
+  events: EventRecord[];
+  timeZone: string;
+  onOpen: (event: EventRecord) => void;
+}) {
+  return events.length ? (
+    <Card className="divide-y divide-stone-100 overflow-hidden">
+      {events.map((event) => (
+        <button key={event.id} type="button" onClick={() => onOpen(event)} className="flex w-full items-start gap-3 px-4 py-4 text-left hover:bg-stone-50">
+          <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-stone-500">{timeLabel(event, timeZone)}</span>
+          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block break-words text-sm font-semibold text-stone-900">{event.summary}</span>
+            {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{event.location}</span> : null}
+          </span>
+        </button>
+      ))}
+    </Card>
+  ) : <Card className="p-6 text-center text-sm text-stone-500">这一天还没有日程。</Card>;
 }
 
 function CalendarHeader({ onCreate, canWrite }: { onCreate: () => void; canWrite: boolean }) {
