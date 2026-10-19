@@ -17,8 +17,10 @@ export function SettingsPage({ section }: { section?: 'integrations' }) {
   return (
     <div className="space-y-6">
       <div>
-        <span className="grid size-11 place-items-center rounded-2xl bg-stone-200 text-stone-700"><Settings2 className="size-5" /></span>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight">设置</h1>
+        <div className="flex items-center gap-3 sm:block">
+          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-stone-200 text-stone-700"><Settings2 className="size-5" /></span>
+          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight">设置</h1>
+        </div>
         <p className="mt-2 text-sm text-stone-500">家庭管理和 HomeMew 应用设置放在同一个产品里，不另建管理员站点。</p>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
