@@ -45,7 +45,7 @@ function lifecycleError(cause: unknown, fallback: string) {
 
 export function FamilyPage() {
   const navigate = useNavigate();
-  const { user, families, currentFamily, members, loading, error, setCurrentFamilyId, refresh, refreshMembers } = useHousehold();
+  const { user, currentFamily, members, loading, error, refresh, refreshMembers } = useHousehold();
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
@@ -316,20 +316,9 @@ export function FamilyPage() {
         <div>
           <span className="grid size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><Users className="size-5" /></span>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight">家庭与成员</h1>
-          <p className="mt-2 text-sm text-stone-500">真实数据来自 LifeSpace Space；页面上的角色控制只负责交互，最终权限仍由 LifeSpace 校验。</p>
+          <p className="mt-2 text-sm text-stone-500">管理当前家庭的资料、成员和权限；需要切换家庭时，请使用全局家庭选择器。</p>
         </div>
-        {families.length > 1 && (
-          <label className="text-sm text-stone-500">
-            当前家庭
-            <select
-              className="ml-2 h-10 rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-800"
-              value={currentFamily.id}
-              onChange={(event) => setCurrentFamilyId(event.target.value)}
-            >
-              {families.map((family) => <option key={family.id} value={family.id}>{family.name}</option>)}
-            </select>
-          </label>
-        )}
+
       </div>
 
       {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
