@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
+import { PageHeader } from '../components/ui/page-header';
+import { WeekTimeGrid } from '../components/week-time-grid';
+import { useModalScrollLock } from '../lib/modal-scroll';
 import { Card } from '../components/ui/card';
 import { ApiError, apiRequest } from '../lib/api-client';
 import { queryModelRecords } from '../lib/canonical-query';
@@ -237,6 +240,7 @@ export function CalendarPage() {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [attendeeFilter, setAttendeeFilter] = useState('');
   const [kindFilter, setKindFilter] = useState<'all' | 'date' | 'instant'>('all');
+  const [filterOpen, setFilterOpen] = useState(false);
   const [nextSearchCursor, setNextSearchCursor] = useState<string | null>(null);
   const [moreLoading, setMoreLoading] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -249,6 +253,7 @@ export function CalendarPage() {
   const [draft, setDraft] = useState<EventDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const canWrite = currentFamily ? currentFamily.role !== 'viewer' : false;
+  useModalScrollLock(Boolean(draft || expandedDay));
 
   const gridDays = useMemo(
     () => view === 'month' ? monthGrid(month) : Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
@@ -492,7 +497,7 @@ export function CalendarPage() {
   if (!currentFamily) {
     return (
       <div className="space-y-6">
-        <CalendarHeader onCreate={() => undefined} canWrite={false} />
+        <CalendarHeader onCreate={() => undefined} canWrite={false} onToggleFilters={() => undefined} filtersExpanded={false} filtersActive={false} />
         <Card className="grid min-h-72 place-items-center p-8 text-center text-sm text-stone-500">请先创建或加入一个家庭。</Card>
       </div>
     );
@@ -504,16 +509,17 @@ export function CalendarPage() {
   const activeEvents = eventsByDay.get(activeDay) ?? [];
 
   return (
-    <div className="space-y-6">
-      <CalendarHeader onCreate={() => openCreate()} canWrite={canWrite} />
+    <div className="space-y-3 sm:space-y-4">
+      <CalendarHeader onCreate={() => openCreate()} canWrite={canWrite} onToggleFilters={() => setFilterOpen((value) => !value)} filtersExpanded={filterOpen} filtersActive={Boolean(appliedSearch || attendeeFilter || kindFilter !== 'all')} />
 
-      <div className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
+      {filterOpen ? <div id="calendar-search-filters" className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
         <form
           className="flex min-w-0 items-center gap-2"
           role="search"
           onSubmit={(event) => {
             event.preventDefault();
             setAppliedSearch(searchInput.trim());
+            setFilterOpen(false);
             setRefreshToken((value) => value + 1);
           }}
         >
@@ -570,7 +576,7 @@ export function CalendarPage() {
             </button>
           ) : null}
         </div>
-      </div>
+      </div> : null}
 
       {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100" role="alert">{error}</div> : null}
 
@@ -797,18 +803,21 @@ function CalendarAgenda({ events, timeZone, onOpen }: {
   ) : <Card className="p-6 text-center text-sm text-stone-500">这一天还没有日程。</Card>;
 }
 
-function CalendarHeader({ onCreate, canWrite }: { onCreate: () => void; canWrite: boolean }) {
+function CalendarHeader({ onCreate, canWrite, onToggleFilters, filtersExpanded, filtersActive }: {
+  onCreate: () => void;
+  canWrite: boolean;
+  onToggleFilters: () => void;
+  filtersExpanded: boolean;
+  filtersActive: boolean;
+}) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:items-end">
-      <div>
-        <div className="flex items-center gap-3 sm:block">
-          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><CalendarDays className="size-5" /></span>
-          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight text-stone-950">家庭日程</h1>
-        </div>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">安排一家人的活动与课程，可以搜索、筛选，并切换月历或周历。</p>
-      </div>
+    <PageHeader title="家庭日程">
+      <Button variant="secondary" onClick={onToggleFilters} aria-expanded={filtersExpanded}
+        aria-controls="calendar-search-filters" className={filtersActive ? "text-emerald-800 ring-emerald-300" : ""}>
+        <SlidersHorizontal className="size-4" /> 搜索与筛选{filtersActive ? " · 已启用" : ""}
+      </Button>
       <Button variant="primary" disabled={!canWrite} onClick={onCreate}><Plus className="size-4" /> 新建日程</Button>
-    </div>
+    </PageHeader>
   );
 }
 
