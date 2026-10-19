@@ -34,7 +34,7 @@ test('month and week views query different half-open local date windows', () => 
   assert.match(source, /navigatePeriod\(1\)/u);
   assert.match(source, /switchView\('week'\)/u);
   assert.match(source, /aria-pressed=\{view === 'week'\}/u);
-  assert.match(source, /grid-cols-7 divide-x divide-stone-100 sm:grid/u);
+  assert.match(source, /<WeekTimeGrid/u);
 });
 
 test('month overflow opens a complete daily list and phone uses touch-friendly agenda', () => {
