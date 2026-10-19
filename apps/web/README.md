@@ -30,7 +30,7 @@ Keep dependencies demand-driven:
 
 - `/` — Today / household overview
 - `/calendar` — 月/周日历，家庭全域日程搜索，按参与成员/全天类型筛选，以及密集日期的完整日程查看
-- `/tasks`
+- `/tasks` — 未完成/已完成状态、任务搜索、按负责人和截止日期（逾期/今天/未来 7 天/无日期）组合筛选
 - `/days`
 - `/wishes`
 - `/family`
