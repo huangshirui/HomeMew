@@ -38,7 +38,7 @@ test('week has time axis, all-day lane, deterministic member palette, and mobile
   assert.match(grid, /attendeePersonIds/u);
   assert.match(grid, /未指定/u);
   assert.match(grid, /kind === 'date'/u);
-  assert.match(grid, /sm:hidden/u);
+  assert.match(grid, /lg:hidden/u);
   assert.match(grid, /onCreate\(day,/u);
   assert.match(calendar, /<WeekTimeGrid/u);
   assert.match(calendar, /onCreate=\{openCreateAt\}/u);
