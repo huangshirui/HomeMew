@@ -11,8 +11,11 @@ test('desktop family selector replaces duplicated branding and family card', () 
   const shell = source('./src/components/app-shell.tsx');
   assert.doesNotMatch(shell, /function Brand\(/u);
   assert.doesNotMatch(shell, /<Brand\s*\/>/u);
-  assert.equal((shell.match(/aria-label="切换家庭"/gu) || []).length, 1);
-  assert.match(shell, /aria-label="移动端切换家庭"/u);
+  assert.match(shell, /aria-label=\{mobile \? '移动端切换家庭' : '切换家庭'\}/u);
+  assert.match(shell, /group-hover:opacity-100/u);
+  assert.match(shell, /focus-within:ring-2/u);
+  assert.match(shell, /absolute inset-0 h-full w-full cursor-pointer opacity-0/u);
+  assert.doesNotMatch(shell, /rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-stone-200/u);
   assert.match(shell, /members\.length/u);
 });
 
@@ -37,4 +40,23 @@ test('rapid switching cannot overwrite new family members with a stale response'
   assert.match(provider, /const membersRequestId = useRef\(0\)/u);
   assert.match(provider, /if \(requestId === membersRequestId\.current\) setMembers\(result\)/u);
   assert.match(provider, /setCurrentFamilyIdState\(familyId\);\s*setMembers\(\[\]\);/u);
+});
+
+test('mobile calendar offers spacious date selection and a per-day agenda', () => {
+  const calendar = source('./src/pages/calendar-page.tsx');
+  assert.match(calendar, /onClick=\{\(\) => setSelectedDay\(day\)\}/u);
+  assert.match(calendar, /aria-pressed=\{isSelected\}/u);
+  assert.match(calendar, /min-h-12 w-full flex-col/u);
+  assert.match(calendar, /className="space-y-3 sm:hidden"/u);
+  assert.match(calendar, /activeEvents\.map\(\(event\)/u);
+  assert.match(calendar, /onClick=\{\(\) => openCreate\(activeDay\)\}/u);
+  assert.match(calendar, /gridDays\.includes\(selectedDay\)/u);
+});
+
+test('main family pages use compact mobile headings and retain larger desktop titles', () => {
+  for (const name of ['calendar', 'tasks', 'days', 'wishes', 'family', 'integrations', 'settings']) {
+    const page = source(`./src/pages/${name}-page.tsx`);
+    assert.match(page, /flex items-center gap-3 sm:block/u, `${name} title should align with its icon on mobile`);
+    assert.match(page, /text-2xl sm:mt-4 sm:text-3xl/u, `${name} desktop typography should remain`);
+  }
 });
