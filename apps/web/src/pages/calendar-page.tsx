@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Search, Sli
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
+import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { WeekTimeGrid } from '../components/week-time-grid';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { Card } from '../components/ui/card';
@@ -744,7 +745,7 @@ export function CalendarPage() {
 
       {expandedDay && !searchActive && view === 'month' ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpandedDay(null); }}>
-          <div role="dialog" aria-modal="true" aria-label={`${expandedDay}的全部日程`} className="max-h-[85dvh] w-full max-w-xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-[#f6f8f4] p-4 shadow-2xl sm:rounded-3xl sm:p-6">
+          <div role="dialog" aria-modal="true" aria-label={`${expandedDay}的全部日程`} onScroll={showScrollbarWhileScrolling} className="max-h-[85dvh] w-full max-w-xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-[#f6f8f4] p-4 shadow-2xl sm:rounded-3xl sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-stone-900">{Number(expandedDay.slice(5, 7))}月{Number(expandedDay.slice(8))}日 · 全部日程</h2>
@@ -847,7 +848,7 @@ function EventEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={editing ? '编辑日程' : '新建日程'}>
-      <form onSubmit={onSave} className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+      <form onScroll={showScrollbarWhileScrolling} onSubmit={onSave} className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '日程详情' : '编辑日程') : '新建日程'}</p>
