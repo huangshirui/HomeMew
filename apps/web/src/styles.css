@@ -48,3 +48,27 @@ button {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Overlay scrollbars are deliberately subtle, visible while scrolling only. */
+.scrollbar-overlay {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: contain;
+}
+.scrollbar-overlay.is-scrolling {
+  scrollbar-color: rgb(168 162 158 / 0.58) transparent;
+}
+.scrollbar-overlay::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-overlay::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-overlay::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: transparent;
+}
+.scrollbar-overlay.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgb(168 162 158 / 0.58);
+}
