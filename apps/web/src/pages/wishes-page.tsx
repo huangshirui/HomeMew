@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Gift, Heart, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, UserRound, X } from 'lucide-react';
+import { Gift, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, UserRound, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
