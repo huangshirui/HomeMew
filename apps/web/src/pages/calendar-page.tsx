@@ -679,8 +679,10 @@ export function CalendarPage() {
                           </button>
                         ))}
                         {dayEvents.length > 4 ? (
-                          <button type="button" className="w-full rounded-lg px-1 py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:ring-2 focus-visible:ring-emerald-500" onClick={() => setExpandedDay(day)}>
-                            查看全部 {dayEvents.length} 项（还有 {dayEvents.length - 4} 项）
+                          <button type="button" className="w-full rounded-lg px-1 py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:ring-2 focus-visible:ring-emerald-500"
+                            aria-label={`${day} 还有 ${dayEvents.length - 4} 项，查看全部 ${dayEvents.length} 项日程`}
+                            onClick={() => setExpandedDay(day)}>
+                            +{dayEvents.length - 4} 项 · 查看全部
                           </button>
                         ) : null}
                       </div>
