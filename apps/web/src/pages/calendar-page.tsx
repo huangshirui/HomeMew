@@ -292,6 +292,7 @@ export function CalendarPage() {
       return;
     }
     setLoading(true);
+    setEvents([]);
     setError(null);
     setNextSearchCursor(null);
     setMoreLoading(false);
@@ -351,6 +352,15 @@ export function CalendarPage() {
     setEditing(null);
     setDraft(null);
   }, [currentFamily?.id, currentFamily?.timezone]);
+
+  useEffect(() => {
+    if (!expandedDay) return;
+    function closeWithEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setExpandedDay(null);
+    }
+    window.addEventListener('keydown', closeWithEscape);
+    return () => window.removeEventListener('keydown', closeWithEscape);
+  }, [expandedDay]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, EventRecord[]>();
@@ -739,7 +749,7 @@ export function CalendarPage() {
                 <h2 className="text-xl font-semibold text-stone-900">{Number(expandedDay.slice(5, 7))}月{Number(expandedDay.slice(8))}日 · 全部日程</h2>
                 <p className="mt-1 text-xs text-stone-500">{(eventsByDay.get(expandedDay) ?? []).length} 项日程</p>
               </div>
-              <Button variant="ghost" size="icon" aria-label="关闭日程列表" onClick={() => setExpandedDay(null)}><X className="size-4" /></Button>
+              <Button variant="ghost" size="icon" aria-label="关闭日程列表" autoFocus onClick={() => setExpandedDay(null)}><X className="size-4" /></Button>
             </div>
             <CalendarAgenda events={eventsByDay.get(expandedDay) ?? []} timeZone={currentFamily.timezone} onOpen={(event) => { setExpandedDay(null); openEdit(event); }} />
             {canWrite ? <Button variant="primary" className="mt-4 w-full" onClick={() => { const date = expandedDay; setExpandedDay(null); openCreate(date); }}><Plus className="size-4" /> 新建当天日程</Button> : null}
@@ -793,7 +803,7 @@ function CalendarHeader({ onCreate, canWrite }: { onCreate: () => void; canWrite
           <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><CalendarDays className="size-5" /></span>
           <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight text-stone-950">家庭日程</h1>
         </div>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">直接使用 LifeSpace Event / TemporalRange 数据，家庭切换后日历同步切换。</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">安排一家人的活动与课程，可以搜索、筛选，并切换月历或周历。</p>
       </div>
       <Button variant="primary" disabled={!canWrite} onClick={onCreate}><Plus className="size-4" /> 新建日程</Button>
     </div>
