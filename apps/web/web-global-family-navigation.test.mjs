@@ -61,4 +61,5 @@ test('main household pages share a compact icon-free header', () => {
     const page = source(`./src/pages/${name}-page.tsx`);
     assert.match(page, /<PageHeader/u, `${name} should use shared compact heading`);
   }
+  assert.match(source('./src/pages/integration-detail-page.tsx'), /<PageHeader title=\{system\.displayName\}>/u);
 });
