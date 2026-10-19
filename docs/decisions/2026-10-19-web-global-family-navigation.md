@@ -12,7 +12,8 @@ HomeMew Web desktop, tablet, and mobile navigation. No LifeSpace platform or Hom
 - Family/Space selection is a **global application context** owned by the existing `HouseholdProvider`; every family-scoped page reads the same current family.
 - Desktop sidebar top area is the **unframed family identity**, with avatar, bold family name and secondary member count arranged like the former HomeMew wordmark. It must not look like a permanent button/card: for multiple-family users, show a subtle background and chevron on hover/focus and expose an accessible full-row native selector. Single-family users see identity only.
 - Desktop has **no persistent horizontal shell header**. Each business page owns its one context-specific page heading and actions. Keep the account/avatar context at the bottom of the desktop sidebar.
-- Mobile and tablet (below `lg`) retain a compact top bar containing the family switcher and user avatar because the sidebar is not persistent. Mobile's bottom navigation remains.
+- Mobile and tablet (below `lg`) retain a compact top bar containing the same family identity, member count, always-visible switch chevron (touch has no hover), and user avatar. Long names truncate safely; bottom navigation remains safe-area-aware.
+- Mobile page headings place icon and title on one line with smaller type, retaining desktop title hierarchy and primary actions. Mobile monthly calendar uses date-selection cells plus a focused daily agenda below; desktop retains event details inside the full month grid.
 - Family administration displays/edits the **already selected** family. Do not expose a second family selector there.
 - The Today heading shows the current date and personalized greeting without repeating the family name already visible in the navigation.
 
