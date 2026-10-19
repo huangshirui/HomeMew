@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   Bot,
-  ExternalLink,
   LoaderCircle,
   Pencil,
   Save,
@@ -12,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
+import { PageHeader } from '../components/ui/page-header';
 import { Card, CardContent } from '../components/ui/card';
 import { apiRequest } from '../lib/api-client';
 import { displayIntegrationError, type ExternalSystem } from '../lib/integrations';
@@ -111,7 +111,7 @@ export function IntegrationDetailPage() {
   if (!manager) return <Card className="p-8 text-center text-sm text-stone-500">只有家庭所有者或管理员可以管理外部系统。</Card>;
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-4 sm:space-y-5">
       <Link to="/settings/integrations" className="inline-flex items-center gap-2 text-sm font-medium text-stone-500 hover:text-stone-800">
         <ArrowLeft className="size-4" />返回外部系统
       </Link>
@@ -124,16 +124,14 @@ export function IntegrationDetailPage() {
         <Card className="p-8 text-center text-sm text-stone-500">找不到这个外部系统，或者它已经不属于当前家庭。</Card>
       ) : (
         <>
+          <PageHeader title={system.displayName}>
+            {!editing ? <Button onClick={() => setEditing(true)}><Pencil className="size-4" /> 编辑基本信息</Button> : null}
+          </PageHeader>
           <Card>
             <CardContent className="space-y-5 pt-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <span className="grid size-11 place-items-center rounded-2xl bg-amber-100 text-amber-800"><ExternalLink className="size-5" /></span>
-                  <h1 className="mt-4 text-3xl font-semibold tracking-tight text-stone-900">{system.displayName}</h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">{system.description || '没有说明'}</p>
-                  <code className="mt-2 block text-xs text-stone-400">{system.id}</code>
-                </div>
-                {!editing && <Button onClick={() => setEditing(true)}><Pencil className="size-4" />编辑基本信息</Button>}
+              <div className="min-w-0">
+                {system.description ? <p className="break-words text-sm leading-6 text-stone-600">{system.description}</p> : null}
+                <code className="mt-1 block break-all text-xs text-stone-400">{system.id}</code>
               </div>
 
               {editing && (
