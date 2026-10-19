@@ -31,6 +31,14 @@ HomeMew Web desktop, tablet, and mobile navigation. No LifeSpace platform or Hom
 - Verify desktop/mobile layout, switching among two families, quick repeated switches, switching while on the family management page, single-family and no-family states.
 - HomeMew Web has no persistent staging environment; deploy to production only after PR review and CI validation. Preserve the existing Mini BFF/front-door deployment contract.
 
+## Tasks filters (2026-10-19 follow-up)
+
+- **Task-specific filters:** Preserve existing Pending/Completed tabs and free-text search. Add assignee (any Space Person from the active family, or all) and due-date presets: all, overdue, today, next seven calendar days, or no due date.
+- **Contract:** Combine status, assignee membership (`assigneePersonIds contains <Space Person ID>`) and nullable `dueDate` scalar predicates in one LifeSpace Canonical Query. Overdue is `pending AND dueDate < family-local today`; “next 7 days” uses a half-open `local_date_window` `[today, today+7)` in the family's IANA timezone. `dueDate isNull` identifies undated work. No client-only filtering of a partial page, new backend route or schema change.
+- **Interaction:** Place status tabs, search and filter selects in a single responsive toolbar, matching Calendar's lightweight controls. Reset searches and filters on family change. The overdue option only appears in Pending, so completed work is never misleadingly labeled overdue. Empty states provide an action to clear search and filters.
+- **Correctness:** Guard paginated async queries by request generation, so rapid family/filter/status changes cannot show stale records. Retain existing per-task grouping and the LifeSpace write/actions contract.
+- **Validation:** `apps/web/task-filters-ui.test.mjs`, Web CI, and mobile/desktop tests for combinations, family switching, near-midnight timezone behavior, due-date window boundaries, and null dates. No LifeSpace or BFF change; PR #128 remains pending review.
+
 ## Calendar search, filters and week exploration (2026-10-19 follow-up)
 
 - **Search scope:** Submitting a keyword switches to a paginated **whole-current-family search result list**. The existing LifeSpace Event Canonical Query searches `summary`, `description`, and `location`; search mode intentionally omits the displayed month/week temporal restriction, but retains the active-status and selected member/type filters. Results use the current family viewing timezone and support `nextCursor`/load more. Clearing the keyword returns to the calendar.
