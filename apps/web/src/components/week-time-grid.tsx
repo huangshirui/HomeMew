@@ -143,22 +143,22 @@ export function WeekTimeGrid({ days, selectedDay, eventsByDay, timezone, members
             </button>
           ))}
         </div>
-        <div className="hidden grid-cols-[48px_repeat(7,minmax(0,1fr))] border-b border-stone-100 py-1 sm:grid">
+        <div className="hidden grid-cols-[48px_repeat(7,minmax(0,1fr))] border-b border-stone-100 py-1 lg:grid">
           <span className="self-center text-center text-[10px] text-stone-400">全天</span>
           {days.map((day) => <div key={day} className="min-w-0 space-y-0.5 border-l border-stone-100 px-1">{renderAllDay(day)}</div>)}
         </div>
-        <div className="grid grid-cols-[48px_minmax(0,1fr)] border-b border-stone-100 py-1 sm:hidden">
+        <div className="grid grid-cols-[48px_minmax(0,1fr)] border-b border-stone-100 py-1 lg:hidden">
           <span className="self-center text-center text-[10px] text-stone-400">全天</span>
           <div className="min-w-0 space-y-1 px-2">{renderAllDay(selectedDay)}</div>
         </div>
         <div ref={scrollRef} className="max-h-[68dvh] overflow-y-auto overscroll-contain scrollbar-overlay">
-          <div className="hidden grid-cols-[48px_repeat(7,minmax(0,1fr))] sm:grid">
+          <div className="hidden grid-cols-[48px_repeat(7,minmax(0,1fr))] lg:grid">
             <div className="relative" style={{ height: HOUR_HEIGHT * 24 }}>
               {HOURS.map((hour) => <span key={hour} className="absolute -translate-y-1/2 pr-1 text-right text-[10px] text-stone-400" style={{ top: hour * HOUR_HEIGHT + 1, right: 3 }}>{String(hour).padStart(2, '0')}:00</span>)}
             </div>
             {days.map((day) => <EventLane key={day} day={day} timezone={timezone} events={eventsByDay.get(day) ?? []} getPalette={getPalette} onOpen={onOpen} canWrite={canWrite} onCreate={onCreate} />)}
           </div>
-          <div className="grid grid-cols-[48px_minmax(0,1fr)] sm:hidden">
+          <div className="grid grid-cols-[48px_minmax(0,1fr)] lg:hidden">
             <div className="relative" style={{ height: HOUR_HEIGHT * 24 }}>
               {HOURS.map((hour) => <span key={hour} className="absolute -translate-y-1/2 pr-1 text-right text-[10px] text-stone-400" style={{ top: hour * HOUR_HEIGHT + 1, right: 3 }}>{String(hour).padStart(2, '0')}:00</span>)}
             </div>
