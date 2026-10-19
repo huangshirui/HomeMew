@@ -18,6 +18,8 @@ const PALETTES = [
   { bg: 'bg-violet-100', edge: 'border-violet-500', text: 'text-violet-950', dot: 'bg-violet-500', hover: 'hover:bg-violet-200' },
   { bg: 'bg-amber-100', edge: 'border-amber-500', text: 'text-amber-950', dot: 'bg-amber-500', hover: 'hover:bg-amber-200' },
   { bg: 'bg-teal-100', edge: 'border-teal-500', text: 'text-teal-950', dot: 'bg-teal-500', hover: 'hover:bg-teal-200' },
+  { bg: 'bg-indigo-100', edge: 'border-indigo-500', text: 'text-indigo-950', dot: 'bg-indigo-500', hover: 'hover:bg-indigo-200' },
+  { bg: 'bg-orange-100', edge: 'border-orange-500', text: 'text-orange-950', dot: 'bg-orange-500', hover: 'hover:bg-orange-200' },
 ] as const;
 const NEUTRAL = { bg: 'bg-stone-100', edge: 'border-stone-400', text: 'text-stone-900', dot: 'bg-stone-400', hover: 'hover:bg-stone-200' };
 
@@ -141,9 +143,13 @@ export function WeekTimeGrid({ days, selectedDay, eventsByDay, timezone, members
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-[48px_repeat(7,minmax(0,1fr))] border-b border-stone-100 py-1">
+        <div className="hidden grid-cols-[48px_repeat(7,minmax(0,1fr))] border-b border-stone-100 py-1 sm:grid">
           <span className="self-center text-center text-[10px] text-stone-400">全天</span>
           {days.map((day) => <div key={day} className="min-w-0 space-y-0.5 border-l border-stone-100 px-1">{renderAllDay(day)}</div>)}
+        </div>
+        <div className="grid grid-cols-[48px_minmax(0,1fr)] border-b border-stone-100 py-1 sm:hidden">
+          <span className="self-center text-center text-[10px] text-stone-400">全天</span>
+          <div className="min-w-0 space-y-1 px-2">{renderAllDay(selectedDay)}</div>
         </div>
         <div ref={scrollRef} className="max-h-[68dvh] overflow-y-auto overscroll-contain scrollbar-overlay">
           <div className="hidden grid-cols-[48px_repeat(7,minmax(0,1fr))] sm:grid">
