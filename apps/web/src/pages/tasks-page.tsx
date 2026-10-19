@@ -282,6 +282,7 @@ export function TasksPage() {
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     setQuery(queryInput.trim());
+    setFilterOpen(false);
   }
 
   if (householdLoading) {
