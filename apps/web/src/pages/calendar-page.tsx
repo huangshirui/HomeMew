@@ -391,6 +391,19 @@ export function CalendarPage() {
     setError(null);
   }
 
+  function openCreateAt(date: string, time: string) {
+    if (!currentFamily || !canWrite) return;
+    const minutes = Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5)) + 60;
+    const nextDay = minutes >= 1440;
+    setEditing(null);
+    setDraft({
+      ...defaultDraft(currentFamily.timezone, date),
+      startTime: time,
+      endDate: nextDay ? addDays(date, 1) : date,
+      endTime: `${String(Math.floor((minutes % 1440) / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`,
+    });
+    setError(null);
+  }
   function openEdit(event: EventRecord) {
     if (!currentFamily) return;
     setEditing(event);
@@ -698,60 +711,32 @@ export function CalendarPage() {
               </div>
             </Card>
           ) : (
-            <Card className="overflow-hidden">
-              <div className="grid grid-cols-7 border-b border-stone-100 bg-stone-50/70">
-                {gridDays.map((day, index) => {
-                  const count = eventsByDay.get(day)?.length ?? 0;
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => setSelectedDay(day)}
-                      aria-pressed={activeDay === day}
-                      aria-label={`${day} 周${WEEKDAYS[index]}，${count} 项日程`}
-                      className={`flex min-h-16 flex-col items-center justify-center gap-1 border-r border-stone-100 text-xs font-medium hover:bg-emerald-50 ${activeDay === day ? 'bg-emerald-50 text-emerald-800' : 'text-stone-600'}`}
-                    >
-                      <span>周{WEEKDAYS[index]}</span>
-                      <span className={`grid size-7 place-items-center rounded-full text-sm ${day === todayInFamily ? 'bg-emerald-600 text-white' : ''}`}>{Number(day.slice(-2))}</span>
-                      <span className="text-[10px] text-stone-400 sm:hidden">{count || '·'}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="hidden grid-cols-7 divide-x divide-stone-100 sm:grid">
-                {gridDays.map((day) => (
-                  <div key={day} className="min-w-0 space-y-1 p-2 sm:min-h-72">
-                    {(eventsByDay.get(day) ?? []).map((event) => (
-                      <button
-                        key={event.id}
-                        type="button"
-                        onClick={() => openEdit(event)}
-                        className="block w-full rounded-xl bg-emerald-50 px-2 py-2 text-left text-xs text-emerald-950 transition hover:bg-emerald-100"
-                        title={event.summary}
-                      >
-                        <span className="block text-[11px] font-medium text-emerald-700">{timeLabel(event, currentFamily.timezone)}</span>
-                        <span className="mt-1 block break-words font-semibold">{event.summary}</span>
-                      </button>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <WeekTimeGrid
+              days={gridDays}
+              selectedDay={activeDay}
+              eventsByDay={eventsByDay}
+              timezone={currentFamily.timezone}
+              members={members}
+              canWrite={canWrite}
+              onSelectDay={setSelectedDay}
+              onOpen={(event) => { const record = events.find((item) => item.id === event.id); if (record) openEdit(record); }}
+              onCreate={openCreateAt}
+            />
           )}
 
-          <section className="space-y-3 sm:hidden" aria-label={`${activeDay}的日程`}>
+          {view === 'month' ? <section className="space-y-3 sm:hidden" aria-label={`${activeDay}的日程`}>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-stone-900">{Number(activeDay.slice(5, 7))}月{Number(activeDay.slice(8))}日 · 日程</h2>
               {canWrite ? <Button variant="secondary" className="shrink-0" onClick={() => openCreate(activeDay)}><Plus className="size-4" /> 新建</Button> : null}
             </div>
             <CalendarAgenda events={activeEvents} timeZone={currentFamily.timezone} onOpen={openEdit} />
-          </section>
+          </section> : null}
         </>
       )}
 
       {expandedDay && !searchActive && view === 'month' ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpandedDay(null); }}>
-          <div role="dialog" aria-modal="true" aria-label={`${expandedDay}的全部日程`} className="max-h-[85dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-[#f6f8f4] p-4 shadow-2xl sm:rounded-3xl sm:p-6">
+          <div role="dialog" aria-modal="true" aria-label={`${expandedDay}的全部日程`} className="max-h-[85dvh] w-full max-w-xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-[#f6f8f4] p-4 shadow-2xl sm:rounded-3xl sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-stone-900">{Number(expandedDay.slice(5, 7))}月{Number(expandedDay.slice(8))}日 · 全部日程</h2>
@@ -854,7 +839,7 @@ function EventEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={editing ? '编辑日程' : '新建日程'}>
-      <form onSubmit={onSave} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+      <form onSubmit={onSave} className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '日程详情' : '编辑日程') : '新建日程'}</p>
