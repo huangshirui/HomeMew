@@ -7,7 +7,11 @@ export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
     minimumSchemaVersion: 10,
   }),
   core: Object.freeze({
-    contractVersion: '0.48.0',
+    contractVersion: '0.49.0',
+    // Approved production 0.49 adds configuration-time discovery; the existing
+    // HomeMew CRUD/query/authorization contracts and active models are unchanged.
+    // Keep 0.48 for older staging; unreviewed Kernel versions fail closed.
+    compatibleContractVersions: Object.freeze(['0.48.0', '0.49.0']),
     minimumSchemaVersion: 53,
   }),
 });
@@ -32,9 +36,10 @@ export function assertLifeSpaceStatus(payload, service, environment) {
     throw new Error(`${service} schemaVersion must be an integer, got ${String(data.schemaVersion ?? 'unknown')}`);
   }
 
-  if (data.contractVersion !== expected.contractVersion) {
+  const compatibleContractVersions = expected.compatibleContractVersions ?? [expected.contractVersion];
+  if (!compatibleContractVersions.includes(data.contractVersion)) {
     throw new Error(
-      `${service} contract mismatch: HomeMew requires ${expected.contractVersion}, got ${String(data.contractVersion ?? 'unknown')}`,
+      `${service} contract mismatch: HomeMew accepts ${compatibleContractVersions.join(', ')}, got ${String(data.contractVersion ?? 'unknown')}`,
     );
   }
   if (schemaVersion < expected.minimumSchemaVersion) {
