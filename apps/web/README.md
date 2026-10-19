@@ -40,6 +40,8 @@ Keep dependencies demand-driven:
 
 Desktop uses a sidebar. Mobile uses bottom navigation. Tablet adapts within the same codebase. The visual direction is warm, calm and household-oriented rather than enterprise-admin/ERP styled.
 
+Global family/Space context is selected at the top of the desktop sidebar or in the compact mobile/tablet top bar. The desktop shell intentionally has no duplicate persistent horizontal header: business pages own their own heading and actions, and the user avatar sits in the sidebar footer. `/family` always operates on this selected family rather than exposing a separate selector. Family switching remounts family-scoped routed page state and protects member loads from out-of-order responses. See `docs/decisions/2026-10-19-web-global-family-navigation.md`.
+
 `apps/display/` is a separate future household-display runtime and is not implemented as a mode inside the normal signed-in Web app.
 
 External-system administration is intentionally Web-only. The Web-only product boundary remains recorded in `docs/decisions/2026-08-24-external-integrations-web-only.md`; the current capability-container semantics are authoritative in `docs/decisions/2026-10-09-external-system-capability-container.md`.
