@@ -48,7 +48,7 @@ test('mobile calendar offers spacious date selection and a per-day agenda', () =
   assert.match(calendar, /aria-pressed=\{isSelected\}/u);
   assert.match(calendar, /min-h-12 w-full flex-col/u);
   assert.match(calendar, /className="space-y-3 sm:hidden"/u);
-  assert.match(calendar, /activeEvents\.map\(\(event\)/u);
+  assert.match(calendar, /<CalendarAgenda events=\{activeEvents\}/u);
   assert.match(calendar, /onClick=\{\(\) => openCreate\(activeDay\)\}/u);
   assert.match(calendar, /gridDays\.includes\(selectedDay\)/u);
 });
