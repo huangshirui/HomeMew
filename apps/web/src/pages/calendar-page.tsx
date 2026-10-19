@@ -666,10 +666,17 @@ export function CalendarPage() {
                   const isToday = day === todayInFamily;
                   const isSelected = day === activeDay;
                   return (
-                    <div key={day} className={`min-w-0 border-b border-r border-stone-100 p-0.5 sm:min-h-36 sm:p-2 ${inMonth ? 'bg-white' : 'bg-stone-50/60'}`}>
+                    <div key={day} className={`group relative min-w-0 border-b border-r border-stone-100 p-0.5 sm:min-h-36 sm:p-2 ${inMonth ? 'bg-white' : 'bg-stone-50/60'}`}>
+                      {canWrite ? <button
+                        type="button"
+                        aria-label={`${day}，在空白处新建日程`}
+                        title="点击空白处新建日程"
+                        onClick={() => openCreate(day)}
+                        className="absolute inset-0 z-0 hidden cursor-crosshair hover:bg-emerald-50/30 focus-visible:bg-emerald-50/30 focus-visible:outline-2 focus-visible:outline-emerald-500 sm:block"
+                      /> : null}
                       <button
                         type="button"
-                        className={`flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:hidden ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200' : inMonth ? 'text-stone-700' : 'text-stone-400'}`}
+                        className={`relative z-10 flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:hidden ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200' : inMonth ? 'text-stone-700' : 'text-stone-400'}`}
                         onClick={() => setSelectedDay(day)}
                         aria-pressed={isSelected}
                         aria-label={`${day}，${dayEvents.length} 项日程`}
@@ -679,13 +686,13 @@ export function CalendarPage() {
                       </button>
                       <button
                         type="button"
-                        className={`hidden size-7 place-items-center rounded-full text-xs font-medium sm:grid ${isToday ? 'bg-emerald-600 text-white' : inMonth ? 'text-stone-700 hover:bg-stone-100' : 'text-stone-400'}`}
+                        className={`relative z-10 hidden size-7 place-items-center rounded-full text-xs font-medium sm:grid ${isToday ? 'bg-emerald-600 text-white' : inMonth ? 'text-stone-700 hover:bg-stone-100' : 'text-stone-400'}`}
                         onClick={() => setExpandedDay(day)}
                         aria-label={`${day}，查看全部 ${dayEvents.length} 项日程`}
                       >
                         {Number(day.slice(-2))}
                       </button>
-                      <div className="mt-1.5 hidden space-y-1 sm:block">
+                      <div className="relative z-10 mt-1.5 hidden space-y-1 sm:block">
                         {dayEvents.slice(0, 4).map((event) => (
                           <button
                             key={`${day}-${event.id}`}
@@ -705,6 +712,7 @@ export function CalendarPage() {
                           </button>
                         ) : null}
                       </div>
+                      {canWrite && !dayEvents.length ? <span aria-hidden="true" className="pointer-events-none absolute inset-x-1 bottom-3 hidden items-center justify-center gap-1 text-[11px] text-emerald-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:flex"><Plus className="size-3" /> 新建日程</span> : null}
                     </div>
                   );
                 })}
