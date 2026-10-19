@@ -7,7 +7,7 @@ export type WeekEvent = {
   when: { kind: 'date' | 'instant'; start: string; endExclusive: string };
   attendeePersonIds: string[];
 };
-export type WeekMember = { personId: string | null; displayName?: string | null; userId: string };
+export type WeekMember = { personId?: string | null; displayName?: string | null; userId: string };
 
 const HOUR_HEIGHT = 56;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
