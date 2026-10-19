@@ -243,10 +243,12 @@ export function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:items-end">
         <div>
-          <span className="grid size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><CheckSquare2 className="size-5" /></span>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-stone-950">家庭待办</h1>
+          <div className="flex items-center gap-3 sm:block">
+          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><CheckSquare2 className="size-5" /></span>
+          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight text-stone-950">家庭待办</h1>
+        </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">直接使用 LifeSpace task 模型和 complete / reopen Actions。</p>
         </div>
         <Button variant="primary" disabled={!currentFamily || !canWrite} onClick={openCreate}><Plus className="size-4" /> 新建待办</Button>
