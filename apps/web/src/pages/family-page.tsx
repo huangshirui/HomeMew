@@ -312,10 +312,12 @@ export function FamilyPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:items-end">
         <div>
-          <span className="grid size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><Users className="size-5" /></span>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight">家庭与成员</h1>
+          <div className="flex items-center gap-3 sm:block">
+          <span className="grid size-10 shrink-0 sm:size-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><Users className="size-5" /></span>
+          <h1 className="text-2xl sm:mt-4 sm:text-3xl font-semibold tracking-tight">家庭与成员</h1>
+        </div>
           <p className="mt-2 text-sm text-stone-500">管理当前家庭的资料、成员和权限；需要切换家庭时，请使用全局家庭选择器。</p>
         </div>
 
