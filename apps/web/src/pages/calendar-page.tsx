@@ -226,6 +226,7 @@ function messageOf(cause: unknown, fallback: string) {
 export function CalendarPage() {
   const { currentFamily, members, loading: householdLoading } = useHousehold();
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -393,6 +394,12 @@ export function CalendarPage() {
     );
   }
 
+  const todayInFamily = currentDateInZone(currentFamily.timezone);
+  const activeDay = selectedDay?.startsWith(month)
+    ? selectedDay
+    : todayInFamily.startsWith(month) ? todayInFamily : `${month}-01`;
+  const activeEvents = eventsByDay.get(activeDay) ?? [];
+
   return (
     <div className="space-y-6">
       <CalendarHeader onCreate={() => openCreate()} canWrite={canWrite} />
@@ -400,7 +407,7 @@ export function CalendarPage() {
       <div className="flex flex-col gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-stone-200/80 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-semibold text-stone-900">{displayMonth(month)}</p>
-          <p className="mt-1 text-xs text-stone-500">{currentFamily.name} · {currentFamily.timezone}</p>
+          <p className="mt-1 text-xs text-stone-500">{currentFamily.timezone}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="icon" aria-label="上个月" onClick={() => setMonth((value) => addMonths(value, -1))}><ChevronLeft className="size-4" /></Button>
@@ -414,24 +421,40 @@ export function CalendarPage() {
 
       <Card className="overflow-hidden">
         <div className="grid grid-cols-7 border-b border-stone-100 bg-stone-50/70">
-          {WEEKDAYS.map((day) => <div key={day} className="px-2 py-3 text-center text-xs font-medium text-stone-500">周{day}</div>)}
+          {WEEKDAYS.map((day) => (
+            <div key={day} className="py-2 text-center text-xs font-medium text-stone-500 sm:px-2 sm:py-3">
+              <span className="sm:hidden">{day}</span><span className="hidden sm:inline">周{day}</span>
+            </div>
+          ))}
         </div>
         <div className="grid grid-cols-7">
           {gridDays.map((day) => {
             const dayEvents = eventsByDay.get(day) ?? [];
             const inMonth = day.startsWith(month);
-            const isToday = day === currentDateInZone(currentFamily.timezone);
+            const isToday = day === todayInFamily;
+            const isSelected = day === activeDay;
             return (
-              <div key={day} className={`min-h-28 border-b border-r border-stone-100 p-1.5 sm:min-h-36 sm:p-2 ${inMonth ? 'bg-white' : 'bg-stone-50/60'}`}>
+              <div key={day} className={`min-w-0 border-b border-r border-stone-100 p-0.5 sm:min-h-36 sm:p-2 ${inMonth ? 'bg-white' : 'bg-stone-50/60'}`}>
                 <button
                   type="button"
-                  className={`grid size-7 place-items-center rounded-full text-xs font-medium ${isToday ? 'bg-emerald-600 text-white' : inMonth ? 'text-stone-700 hover:bg-stone-100' : 'text-stone-400'}`}
+                  className={`flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:hidden ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200' : inMonth ? 'text-stone-700' : 'text-stone-400'}`}
+                  onClick={() => setSelectedDay(day)}
+                  aria-pressed={isSelected}
+                  aria-label={`${day}，${dayEvents.length} 项日程`}
+                >
+                  <span className={`grid size-6 place-items-center rounded-full ${isToday ? 'bg-emerald-600 text-white' : ''}`}>{Number(day.slice(-2))}</span>
+                  {dayEvents.length ? <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald-500" /> : <span aria-hidden="true" className="size-1.5" />}
+                </button>
+                <button
+                  type="button"
+                  className={`hidden size-7 place-items-center rounded-full text-xs font-medium sm:grid ${isToday ? 'bg-emerald-600 text-white' : inMonth ? 'text-stone-700 hover:bg-stone-100' : 'text-stone-400'}`}
                   onClick={() => canWrite && openCreate(day)}
                   aria-label={`${day} 新建日程`}
+                  disabled={!canWrite}
                 >
                   {Number(day.slice(-2))}
                 </button>
-                <div className="mt-1.5 space-y-1">
+                <div className="mt-1.5 hidden space-y-1 sm:block">
                   {dayEvents.slice(0, 4).map((event) => (
                     <button
                       key={`${day}-${event.id}`}
@@ -450,6 +473,27 @@ export function CalendarPage() {
           })}
         </div>
       </Card>
+
+      <section className="space-y-3 sm:hidden" aria-label={`${activeDay}的日程`}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-stone-900">{Number(activeDay.slice(5, 7))}月{Number(activeDay.slice(8))}日 · 日程</h2>
+          {canWrite ? <Button variant="secondary" className="shrink-0" onClick={() => openCreate(activeDay)}><Plus className="size-4" /> 新建</Button> : null}
+        </div>
+        {activeEvents.length ? (
+          <Card className="divide-y divide-stone-100 overflow-hidden">
+            {activeEvents.map((event) => (
+              <button key={event.id} type="button" onClick={() => openEdit(event)} className="flex w-full items-start gap-3 px-4 py-4 text-left hover:bg-stone-50">
+                <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-stone-500">{timeLabel(event, currentFamily.timezone)}</span>
+                <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block break-words text-sm font-semibold text-stone-900">{event.summary}</span>
+                  {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{event.location}</span> : null}
+                </span>
+              </button>
+            ))}
+          </Card>
+        ) : <Card className="p-6 text-center text-sm text-stone-500">这一天还没有日程。</Card>}
+      </section>
 
       {draft ? (
         <EventEditor
