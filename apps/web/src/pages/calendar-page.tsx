@@ -395,7 +395,7 @@ export function CalendarPage() {
   }
 
   const todayInFamily = currentDateInZone(currentFamily.timezone);
-  const activeDay = selectedDay?.startsWith(month)
+  const activeDay = selectedDay && gridDays.includes(selectedDay)
     ? selectedDay
     : todayInFamily.startsWith(month) ? todayInFamily : `${month}-01`;
   const activeEvents = eventsByDay.get(activeDay) ?? [];
@@ -410,9 +410,9 @@ export function CalendarPage() {
           <p className="mt-1 text-xs text-stone-500">{currentFamily.timezone}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="icon" aria-label="上个月" onClick={() => setMonth((value) => addMonths(value, -1))}><ChevronLeft className="size-4" /></Button>
-          <Button variant="secondary" onClick={() => setMonth(monthToday)}>今天</Button>
-          <Button variant="secondary" size="icon" aria-label="下个月" onClick={() => setMonth((value) => addMonths(value, 1))}><ChevronRight className="size-4" /></Button>
+          <Button variant="secondary" size="icon" aria-label="上个月" onClick={() => { setSelectedDay(null); setMonth((value) => addMonths(value, -1)); }}><ChevronLeft className="size-4" /></Button>
+          <Button variant="secondary" onClick={() => { setSelectedDay(null); setMonth(monthToday); }}>今天</Button>
+          <Button variant="secondary" size="icon" aria-label="下个月" onClick={() => { setSelectedDay(null); setMonth((value) => addMonths(value, 1)); }}><ChevronRight className="size-4" /></Button>
           <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefreshToken((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
         </div>
       </div>
