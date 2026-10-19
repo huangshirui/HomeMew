@@ -19,8 +19,9 @@ test('Tasks empty states offer the useful next step', () => {
   const tasks = source('./src/pages/tasks-page.tsx');
 
   assert.match(tasks, /<EmptyState/u);
-  assert.match(tasks, /actionLabel=\{query \? '清除搜索'/u);
+  assert.match(tasks, /actionLabel=\{query \|\| assigneeFilter \|\| dueFilter !== 'all' \? '清除搜索与筛选'/u);
   assert.match(tasks, /setQueryInput\(''\); setQuery\(''\);/u);
+  assert.match(tasks, /setAssigneeFilter\(''\); setDueFilter\('all'\);/u);
   assert.match(tasks, /'新建待办'/u);
 });
 
