@@ -79,7 +79,7 @@
         <!-- 任务内容 -->
         <view class="task-body">
           <view class="task-name-row">
-            <text class="task-name {{item.isOverdue ? 'name-overdue' : ''}}">{{item.name}}</text>
+            <image wx:if="{{item.iconImagePath}}" src="{{item.iconImagePath}}" mode="aspectFit" style="width:42rpx;height:42rpx;margin-right:10rpx" /><text wx:elif="{{item.iconEmoji}}" style="font-size:34rpx;margin-right:10rpx">{{item.iconEmoji}}</text><text class="task-name {{item.isOverdue ? 'name-overdue' : ''}}">{{item.name}}</text>
           </view>
           <view wx:if="{{item.assigneeText || item.dueText}}" class="task-meta">
             <text wx:if="{{item.assigneeText}}" class="assignee-tag">{{item.assigneeText}}</text>
