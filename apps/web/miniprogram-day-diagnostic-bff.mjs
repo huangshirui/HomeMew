@@ -24,10 +24,16 @@ function decodeId(value, pattern) {
 
 export function matchMiniProgramDayDiagnosticRoute(pathname) {
   if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/icon-image$`, 'u').exec(pathname);
+  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/record-icons/(day_record|event|task|wish)/image$`, 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
-    return familyId ? { kind: 'icon-upload', familyId } : null;
+    return familyId ? { kind: 'icon-upload', familyId, modelKey: match[2] } : null;
+  }
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/record-icons/(day_record|event|task|wish)/records/([^/]+)/image$`, 'u').exec(pathname);
+  if (match) {
+    const familyId = decodeId(match[1], FAMILY_ID);
+    const recordId = decodeId(match[3], RECORD_ID);
+    return familyId && recordId ? { kind: 'icon-image', familyId, modelKey: match[2], recordId } : null;
   }
   match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records$`, 'u').exec(pathname);
   if (match) {
@@ -39,12 +45,6 @@ export function matchMiniProgramDayDiagnosticRoute(pathname) {
     const familyId = decodeId(match[1], FAMILY_ID);
     const recordId = decodeId(match[2], RECORD_ID);
     return familyId && recordId ? { kind: 'day-record', familyId, recordId } : null;
-  }
-  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+)/(icon-image)$`, 'u').exec(pathname);
-  if (match) {
-    const familyId = decodeId(match[1], FAMILY_ID);
-    const recordId = decodeId(match[2], RECORD_ID);
-    return familyId && recordId ? { kind: match[3], familyId, recordId } : null;
   }
   match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+)/(occurrences|archive|restore)$`, 'u').exec(pathname);
   if (match) {
@@ -434,7 +434,7 @@ async function uploadIconImage(request, env, route) {
   const base = `/api/v1/spaces/${encodeURIComponent(route.familyId)}`;
   const initiate = await callJson(request, env, `${base}/file-uploads`, {
     method: 'POST',
-    data: { modelKey: 'day_record', fieldKey: '__record_icon', ...(route.recordId ? { recordId: route.recordId } : {}),
+    data: { modelKey: route.modelKey, fieldKey: '__record_icon',
       size: bytes.byteLength, name: 'record-icon', contentType },
   });
   if (!initiate.ok) return initiate.response;
@@ -462,7 +462,7 @@ async function uploadIconImage(request, env, route) {
 }
 
 async function downloadIconImage(request, env, route) {
-  const record = await callJson(request, env, modelRecord(route.familyId, route.recordId));
+  const record = await callJson(request, env, `/api/v1/spaces/${encodeURIComponent(route.familyId)}/models/${route.modelKey}/records/${encodeURIComponent(route.recordId)}`);
   if (!record.ok) return record.response;
   const icon = record.data?.presentation?.icon;
   if (icon?.type !== 'image' || !/^fil_[0-9a-f]{32}$/u.test(icon.fileId)) {
@@ -470,7 +470,7 @@ async function downloadIconImage(request, env, route) {
   }
   const base = `/api/v1/spaces/${encodeURIComponent(route.familyId)}`;
   const download = await callJson(request, env, `${base}/file-downloads`, {
-    method: 'POST', data: { modelKey: 'day_record', recordId: route.recordId,
+    method: 'POST', data: { modelKey: route.modelKey, recordId: route.recordId,
       fieldKey: '__record_icon', fileId: icon.fileId },
   });
   if (!download.ok) return download.response;
