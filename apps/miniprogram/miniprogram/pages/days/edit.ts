@@ -17,7 +17,10 @@ import {
   getDayRecord,
   createDayRecord,
   updateDayRecord,
+  updateDayRecordIcon,
 } from '../../services/day-records';
+import { uploadRecordIconImage, downloadRecordIconImage } from '../../services/record-icons';
+import type { RecordIcon } from '../../types/index';
 import { listFamilyMembers } from '../../services/families';
 import { currentFamilyStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
@@ -113,6 +116,8 @@ Page({
     name: '',
     description: '',
     icon: '',
+    iconImagePath: '',
+    iconFileId: '',
     subjectUserId: '' as string,
     subjectText: '全家',
     members: [] as SubjectOption[],
@@ -222,7 +227,10 @@ Page({
       version: record.version,
       name: record.name,
       description: record.description || '',
-      icon: record.icon || '',
+      icon: record.presentation?.icon?.type === 'emoji' ? record.presentation.icon.value : '',
+      iconFileId: record.presentation?.icon?.type === 'image' ? record.presentation.icon.fileId : '',
+      iconImagePath: '',
+
       subjectUserId,
       subjectText: subjectName(memberOptions, subjectUserId, record.subject?.displayName),
       members: memberOptions,
@@ -240,6 +248,12 @@ Page({
       loaded: true,
       step: 'form',
     });
+    if (record.presentation?.icon?.type === 'image') {
+      const { fileId } = record.presentation.icon;
+      void downloadRecordIconImage(this.data.familyId, record.id, fileId)
+        .then(path => this.setData({ iconImagePath: path }))
+        .catch(() => undefined);
+    }
   },
 
   /* ----------------- 类型选择（仅创建模式） ----------------- */
@@ -281,10 +295,21 @@ Page({
   /** 图标只能从内置 Emoji 中选择，禁止提交任意图片 URL */
   onIconSelect(e: WechatMiniprogram.TouchEvent): void {
     const icon = e.currentTarget.dataset.icon as string;
-    this.setData({ icon: this.data.icon === icon ? '' : icon });
+    this.setData({ icon: this.data.icon === icon ? '' : icon, iconImagePath: '', iconFileId: '' });
   },
 
-  onSubjectTap(): void {
+  onChooseIconImage(): void {
+    wx.chooseMedia({
+      count: 1, mediaType: ['image'], sourceType: ['album', 'camera'],
+      success: result => {
+        const path = result.tempFiles?.[0]?.tempFilePath || '';
+        if (path) this.setData({ icon: '', iconImagePath: path, iconFileId: '' });
+      },
+      fail: () => undefined,
+    });
+  },
+
+    onSubjectTap(): void {
     const options = ['全家', ...this.data.members.map((m) => m.displayName)];
     wx.showActionSheet({
       itemList: options,
@@ -385,7 +410,6 @@ Page({
       description: this.data.description.trim() || null,
       anchorDate: this.data.anchorDate,
       subjectUserId: this.data.subjectUserId || null,
-      icon: this.data.icon || null,
     };
 
     let payload: CreateDayRecordRequest;
@@ -409,7 +433,8 @@ Page({
         attentionBeforeDays: optionalNumber(this.data.attentionBeforeDays),
       };
     }
-    await createDayRecord(this.data.familyId, payload);
+    const created = await createDayRecord(this.data.familyId, payload);
+    await this.saveIcon(created.id, created.version);
   },
 
   /**
@@ -439,7 +464,20 @@ Page({
       ...fields,
       version: this.data.version,
     } as unknown as UpdateDayRecordRequest;
-    await updateDayRecord(this.data.familyId, this.data.dayRecordId, payload);
+    const updated = await updateDayRecord(this.data.familyId, this.data.dayRecordId, payload);
+    await this.saveIcon(updated.id, updated.version);
+  },
+
+  async saveIcon(recordId: string, version: number): Promise<void> {
+    let icon: RecordIcon | null = this.data.icon
+      ? { type: 'emoji', value: this.data.icon }
+      : null;
+    if (this.data.iconFileId) icon = { type: 'image', fileId: this.data.iconFileId };
+    else if (this.data.iconImagePath) {
+      const fileId = await uploadRecordIconImage(this.data.familyId, recordId, this.data.iconImagePath);
+      icon = { type: 'image', fileId };
+    }
+    await updateDayRecordIcon(this.data.familyId, recordId, version, icon);
   },
 
   onCancel(): void {
