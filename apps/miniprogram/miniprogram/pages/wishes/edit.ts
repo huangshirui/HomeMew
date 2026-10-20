@@ -18,6 +18,8 @@ import {
   formatInstantInTimeZone,
 } from '../../utils/index';
 import { CreateWishRequest, UpdateWishRequest } from '../../types/index';
+import { downloadRecordIconImage } from '../../services/record-icons';
+import { RECORD_ICON_EMOJIS, originalIconState, prepareRecordIcon } from '../../utils/record-icon-edit';
 
 type Mode = 'create' | 'edit';
 
@@ -32,6 +34,11 @@ Page({
     submitting: false,
     wishCreated: false,
     title: '',
+    iconChoices: RECORD_ICON_EMOJIS,
+    iconEmoji: '',
+    iconFileId: '',
+    iconImagePath: '',
+    iconTouched: false,
     description: '',
     desiredDate: '',
     familyToday: '',
@@ -81,11 +88,17 @@ Page({
       hideLoading();
       this.setData({
         title: wish.title,
+        ...originalIconState(wish.presentation?.icon),
         description: wish.description || '',
         desiredDate: wish.desiredDate || '',
         version: wish.version,
         loaded: true,
       });
+      if (wish.presentation?.icon?.type === 'image') {
+        void downloadRecordIconImage(this.data.familyId, 'wish', wish.id, wish.presentation.icon.fileId)
+          .then(iconImagePath => this.setData({ iconImagePath }))
+          .catch(() => undefined);
+      }
     } catch (error: unknown) {
       hideLoading();
       console.error('[WishEdit] Load failed:', error);
@@ -99,6 +112,20 @@ Page({
     if (this.data.mode === 'edit') this.loadWish();
   },
 
+  onIconSelect(e: WechatMiniprogram.TouchEvent): void {
+    this.setData({ iconEmoji: String(e.currentTarget.dataset.icon || ''), iconFileId: '', iconImagePath: '', iconTouched: true });
+  },
+  onIconClear(): void {
+    this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: '', iconTouched: true });
+  },
+  onIconImageChoose(): void {
+    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'],
+      success: result => {
+        const path = result.tempFiles?.[0]?.tempFilePath;
+        if (path) this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: path, iconTouched: true });
+      },
+    });
+  },
   onTitleInput(e: WechatMiniprogram.Input): void { this.setData({ title: e.detail.value }); },
   onDescriptionInput(e: WechatMiniprogram.Input): void { this.setData({ description: e.detail.value }); },
   onDesiredDateChange(e: WechatMiniprogram.PickerChange): void {
@@ -121,8 +148,9 @@ Page({
 
     this.setData({ submitting: true });
     try {
+      const presentation = await prepareRecordIcon(this.data.familyId, 'wish', this.data.mode, this.data);
       if (this.data.mode === 'edit') {
-        const body = { ...payload, version: this.data.version } as UpdateWishRequest;
+        const body = { ...payload, ...(presentation ? { presentation } : {}), version: this.data.version } as UpdateWishRequest;
         await updateWish(this.data.familyId, this.data.wishId, body);
         markDirty('wishes');
         this.setData({ submitting: false });
@@ -131,7 +159,7 @@ Page({
         return;
       }
 
-      await createWish(this.data.familyId, payload as CreateWishRequest);
+      await createWish(this.data.familyId, { ...payload, ...(presentation ? { presentation } : {}) } as CreateWishRequest);
       markDirty('wishes');
       this.setData({ submitting: false, wishCreated: true });
       wx.vibrateShort({ type: 'light' });
