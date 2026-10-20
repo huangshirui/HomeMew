@@ -709,7 +709,9 @@ export function CalendarPage() {
                             className="block w-full truncate rounded-lg bg-emerald-50 px-1.5 py-1 text-left text-[11px] leading-4 text-emerald-900 transition hover:bg-emerald-100 sm:px-2 sm:text-xs"
                             title={`${timeLabel(event, currentFamily.timezone)} ${event.summary}`}
                           >
-                            <span className="mr-1 font-medium text-emerald-700">{timeLabel(event, currentFamily.timezone)}</span>{event.summary}
+                            <span className="mr-1 font-medium text-emerald-700">{timeLabel(event, currentFamily.timezone)}</span><RecordIconMark
+                              icon={event.presentation?.icon} spaceId={event.spaceId} modelKey="event" recordId={event.id}
+                              className="mr-1" />{event.summary}
                           </button>
                         ))}
                         {dayEvents.length > 4 ? (
@@ -796,7 +798,9 @@ function CalendarAgenda({ events, timeZone, onOpen }: {
           <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-stone-500">{timeLabel(event, timeZone)}</span>
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block break-words text-sm font-semibold text-stone-900">{event.summary}</span>
+            <span className="block break-words text-sm font-semibold text-stone-900"><RecordIconMark
+              icon={event.presentation?.icon} spaceId={event.spaceId} modelKey="event" recordId={event.id}
+              className="mr-1" />{event.summary}</span>
             {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{event.location}</span> : null}
           </span>
         </button>
