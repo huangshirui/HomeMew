@@ -337,11 +337,11 @@ test('DayRecord optional presentation uses a single normal create/update request
   };
   const path = '/api/v1/miniprogram/families/spc_home/day-records/rec_day';
   assert.equal(matchMiniProgramDayDiagnosticRoute(`${path}/icon`), null);
-  assert.deepEqual(matchMiniProgramDayDiagnosticRoute('/api/v1/miniprogram/families/spc_home/day-records/icon-image'), {
-    kind: 'icon-upload', familyId: 'spc_home',
+  assert.deepEqual(matchMiniProgramDayDiagnosticRoute('/api/v1/miniprogram/families/spc_home/record-icons/day_record/image'), {
+    kind: 'icon-upload', familyId: 'spc_home', modelKey: 'day_record',
   });
-  assert.deepEqual(matchMiniProgramDayDiagnosticRoute(`${path}/icon-image`), {
-    kind: 'icon-image', familyId: 'spc_home', recordId: 'rec_day',
+  assert.deepEqual(matchMiniProgramDayDiagnosticRoute('/api/v1/miniprogram/families/spc_home/record-icons/day_record/records/rec_day/image'), {
+    kind: 'icon-image', familyId: 'spc_home', modelKey: 'day_record', recordId: 'rec_day',
   });
   const response = await handleMiniProgramDayDiagnosticBff(request(path), env(core));
   assert.equal(response.status, 200);
@@ -369,7 +369,7 @@ test('DayRecord optional presentation uses a single normal create/update request
 });
 
 test('DayRecord Icon pre-upload route rejects unsupported types and oversized bytes before transfer', async () => {
-  const path = '/api/v1/miniprogram/families/spc_home/day-records/icon-image';
+  const path = '/api/v1/miniprogram/families/spc_home/record-icons/day_record/image';
   let forwards = 0;
   const app = env(async () => { forwards++; return assert.fail('no Core File call permitted'); });
   const invalidType = await handleMiniProgramDayDiagnosticBff(
