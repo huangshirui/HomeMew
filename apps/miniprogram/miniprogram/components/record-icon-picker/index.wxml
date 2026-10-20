@@ -1,0 +1,58 @@
+<!-- One reusable inline trigger + Notion-style bottom sheet. -->
+<view class="icon-trigger {{disabled ? 'icon-disabled' : ''}}" role="button" aria-label="选择记录图标" bindtap="onOpen">
+  <image wx:if="{{imagePath}}" class="trigger-image" src="{{imagePath}}" mode="aspectFit" />
+  <view wx:elif="{{imageFileId}}" class="trigger-image-placeholder">
+    <text>▧</text>
+  </view>
+  <text wx:elif="{{emoji}}" class="trigger-emoji">{{emoji}}</text>
+  <view wx:else class="trigger-empty">
+    <text class="trigger-plus">＋</text>
+  </view>
+</view>
+<view wx:if="{{visible}}" class="icon-mask" catchtap="onClose">
+  <view class="icon-sheet safe-area-bottom" catchtap="onNoop">
+    <view class="sheet-grabber"></view>
+    <view class="sheet-header">
+      <view class="sheet-title-wrap">
+        <text class="sheet-title">选择图标</text>
+        <text class="sheet-subtitle">Emoji 或图片 · 可不设置</text>
+      </view>
+      <view class="sheet-close" bindtap="onClose" role="button" aria-label="关闭">✕</view>
+    </view>
+    <scroll-view scroll-x="true" show-scrollbar="{{false}}" enhanced="true" class="group-tabs">
+      <view class="tabs-inner">
+        <view wx:for="{{categories}}" wx:key="key" class="group-tab {{activeCategory === item.key && !search ? 'group-tab-active' : ''}}"
+          data-key="{{item.key}}" bindtap="onCategoryTap">{{item.title}}</view>
+      </view>
+    </scroll-view>
+    <view class="search-wrap">
+      <text class="search-icon">⌕</text>
+      <input class="search-input" value="{{search}}" placeholder="搜索 Emoji，例如 soccer / 足球" confirm-type="search" bindinput="onSearchInput" />
+    </view>
+    <view class="result-bar">
+      <text>{{currentCategoryTitle}}</text>
+      <text class="result-count">{{shown}} / {{total}}</text>
+    </view>
+    <scroll-view scroll-y="true" enhanced="true" show-scrollbar="{{false}}" class="emoji-scroll" bindscrolltolower="onLoadMore" lower-threshold="140">
+      <view class="emoji-grid">
+        <view wx:for="{{displayed}}" wx:key="emoji"
+          class="emoji-cell {{item.selected ? 'emoji-cell-selected' : ''}}"
+          role="button" aria-label="选择 {{item.emoji}}"
+          data-emoji="{{item.emoji}}" bindtap="onSelectEmoji">{{item.emoji}}</view>
+      </view>
+      <view wx:if="{{!total}}" class="empty-results">没有找到匹配的 Emoji</view>
+      <view wx:if="{{shown < total}}" class="load-more" bindtap="onLoadMore">显示更多表情（{{total - shown}}）</view>
+    </scroll-view>
+    <view class="sheet-actions">
+      <view class="action-upload" role="button" bindtap="onChooseImage">
+        <text class="action-picture">▧</text>
+        <view class="action-text">
+          <text class="action-title">上传图片</text>
+          <text class="action-hint">相册或相机 · 不超过 256 KiB / 512×512</text>
+        </view>
+        <text class="action-arrow">›</text>
+      </view>
+      <view class="action-clear" role="button" bindtap="onClear">移除图标</view>
+    </view>
+  </view>
+</view>
