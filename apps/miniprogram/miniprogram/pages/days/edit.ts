@@ -33,7 +33,7 @@ import {
   isVersionConflict,
   formatInstantInTimeZone,
 } from '../../utils/index';
-import { ICON_CHOICES } from '../../utils/day-record-view';
+import { pickerChangeState, type RecordIconPickerChange } from '../../utils/record-icon-edit';
 import {
   DayRecord,
   DayRecordKind,
@@ -76,31 +76,11 @@ const KIND_CHOICES: { kind: DayRecordKind; icon: string; title: string; desc: st
 const DEFAULT_COUNTDOWN_BEFORE_DAYS = 30;
 const DEFAULT_CYCLE_BEFORE_DAYS = 7;
 
-/** 图标选择区固定 3 行，超出的列横向滑动 */
-const ICON_ROW_COUNT = 3;
-
-type IconRow = { key: number; icons: string[] };
-
-/**
- * 把图标按「列优先」分配成固定 3 行：
- * 第 0~2 个填第 1 列，第 3~5 个填第 2 列……
- * 行数恒定，列数随图标总数增长，超出屏宽由 scroll-view 横向滚动。
- * 不依赖 flex 列换行（column + wrap 在部分小程序内核不可靠）。
- */
-function buildIconRows(icons: string[], rowCount: number = ICON_ROW_COUNT): IconRow[] {
-  const rows: IconRow[] = Array.from({ length: rowCount }, (_, i) => ({ key: i, icons: [] }));
-  icons.forEach((icon, index) => {
-    rows[index % rowCount].icons.push(icon);
-  });
-  return rows;
-}
-
 Page({
   data: {
     mode: 'create' as Mode,
     step: 'kind' as Step,
     kindChoices: KIND_CHOICES,
-    iconRows: buildIconRows(ICON_CHOICES),
 
     familyId: '',
     dayRecordId: '',
@@ -293,24 +273,17 @@ Page({
     this.setData({ description: e.detail.value });
   },
 
-  /** 图标只能从内置 Emoji 中选择，禁止提交任意图片 URL */
-  onIconSelect(e: WechatMiniprogram.TouchEvent): void {
-    const icon = e.currentTarget.dataset.icon as string;
-    this.setData({ icon: this.data.icon === icon ? '' : icon, iconImagePath: '', iconFileId: '', iconTouched: true });
-  },
-
-  onChooseIconImage(): void {
-    wx.chooseMedia({
-      count: 1, mediaType: ['image'], sourceType: ['album', 'camera'],
-      success: result => {
-        const path = result.tempFiles?.[0]?.tempFilePath || '';
-        if (path) this.setData({ icon: '', iconImagePath: path, iconFileId: '', iconTouched: true });
-      },
-      fail: () => undefined,
+  onRecordIconChange(e: WechatMiniprogram.CustomEvent<RecordIconPickerChange>): void {
+    const state = pickerChangeState(e.detail);
+    this.setData({
+      icon: state.iconEmoji,
+      iconImagePath: state.iconImagePath,
+      iconFileId: state.iconFileId,
+      iconTouched: state.iconTouched,
     });
   },
 
-    onSubjectTap(): void {
+  onSubjectTap(): void {
     const options = ['全家', ...this.data.members.map((m) => m.displayName)];
     wx.showActionSheet({
       itemList: options,
