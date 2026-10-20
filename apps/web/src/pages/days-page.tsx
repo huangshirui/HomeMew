@@ -8,6 +8,7 @@ import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
 
+type RecordIcon = { type: 'emoji'; value: string } | { type: 'image'; fileId: string };
 type DayKind = 'elapsed' | 'countdown' | 'cycle';
 type DayStatus = 'active' | 'archived';
 type DayRecord = {
@@ -20,7 +21,7 @@ type DayRecord = {
   kind: DayKind;
   anchorDate: string;
   subjectPersonId: string | null;
-  icon: string | null;
+  presentation: { icon: RecordIcon | null };
   attentionAfterDays: number | null;
   attentionBeforeDays: number | null;
   cycleDays: number | null;
@@ -50,6 +51,8 @@ type DayDraft = {
   anchorDate: string;
   subjectPersonId: string;
   icon: string;
+  imageFileId: string;
+  imageFile: File | null;
   attentionDays: string;
   cycleDays: string;
 };
@@ -78,8 +81,27 @@ function messageOf(cause: unknown, fallback: string) {
   return cause instanceof Error ? cause.message : fallback;
 }
 
+const iconImagePath = (spaceId: string, recordId: string, fileId: string) =>
+  `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/records/${encodeURIComponent(recordId)}/image?fileId=${encodeURIComponent(fileId)}`;
+
+async function uploadIconImage(spaceId: string, recordId: string, file: File): Promise<string> {
+  if (file.size <= 0 || file.size > 256 * 1024) throw new Error('图标图片不能超过 256 KiB，请压缩后重试');
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('只允许 PNG、JPEG、WebP 图片');
+  const response = await fetch(iconImagePath(spaceId, recordId, '' ).split('?')[0], {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'content-type': file.type }, body: file,
+  });
+  const payload = await response.json().catch(() => ({})) as { data?: { fileId?: string }; error?: { message?: string } };
+  if (!response.ok || !payload.data?.fileId) throw new Error(payload.error?.message || '上传图标失败');
+  return payload.data.fileId;
+}
+
+function recordIconEmoji(icon: RecordIcon | null | undefined): string {
+  return icon?.type === 'emoji' ? icon.value : '';
+}
+
 function defaultDraft(today: string): DayDraft {
-  return { name: '', description: '', kind: 'elapsed', anchorDate: today, subjectPersonId: '', icon: '', attentionDays: '', cycleDays: '' };
+  return { name: '', description: '', kind: 'elapsed', anchorDate: today, subjectPersonId: '', icon: '', imageFileId: '', imageFile: null, attentionDays: '', cycleDays: '' };
 }
 
 function draftFromRecord(record: DayRecord): DayDraft {
@@ -89,7 +111,9 @@ function draftFromRecord(record: DayRecord): DayDraft {
     kind: record.kind,
     anchorDate: record.anchorDate,
     subjectPersonId: record.subjectPersonId ?? '',
-    icon: record.icon ?? '',
+    icon: record.presentation?.icon?.type === 'emoji' ? record.presentation.icon.value : '',
+    imageFileId: record.presentation?.icon?.type === 'image' ? record.presentation.icon.fileId : '',
+    imageFile: null,
     attentionDays: String(record.kind === 'elapsed' ? record.attentionAfterDays ?? '' : record.attentionBeforeDays ?? ''),
     cycleDays: String(record.cycleDays ?? ''),
   };
@@ -112,7 +136,6 @@ function createPayload(draft: DayDraft): Record<string, unknown> {
     kind: draft.kind,
     anchorDate: draft.anchorDate,
     subjectPersonId: draft.subjectPersonId || null,
-    icon: draft.icon.trim() || null,
   };
   if (draft.kind === 'elapsed') return { ...common, attentionAfterDays: parseOptionalInteger(draft.attentionDays, 1, '提醒天数') };
   if (draft.kind === 'countdown') return { ...common, attentionBeforeDays: parseOptionalInteger(draft.attentionDays, 0, '提前提醒天数') };
@@ -249,6 +272,16 @@ export function DaysPage() {
     setOccurrence(null);
   }
 
+  async function persistIcon(recordId: string, version: number) {
+    if (!currentFamily || !draft) return;
+    let icon: RecordIcon | null = draft.icon.trim() ? { type: 'emoji', value: draft.icon.trim() } : null;
+    if (draft.imageFileId) icon = { type: 'image', fileId: draft.imageFileId };
+    if (draft.imageFile) icon = { type: 'image', fileId: await uploadIconImage(currentFamily.id, recordId, draft.imageFile) };
+    await apiRequest(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(recordId)}/icon`, {
+      method: 'PATCH', body: JSON.stringify({ version, icon }),
+    });
+  }
+
   async function saveRecord(event: FormEvent) {
     event.preventDefault();
     if (!currentFamily || !draft || !canWrite) return;
@@ -256,16 +289,18 @@ export function DaysPage() {
     setError(null);
     try {
       if (editing) {
-        await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(editing.id)}`, {
+        const saved = await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
           body: JSON.stringify({ ...updatePayload(editing, draft), version: editing.version }),
         });
+        await persistIcon(saved.id, saved.version);
       } else {
         const payload = createPayload(draft);
         if (draft.kind === 'cycle' && payload.cycleDays === null) throw new Error('周期类型必须填写周期天数');
-        await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records`, {
+        const saved = await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records`, {
           method: 'POST', body: JSON.stringify(payload),
         });
+        await persistIcon(saved.id, saved.version);
       }
       setEditing(null);
       setDraft(null);
@@ -371,7 +406,9 @@ export function DaysPage() {
                   <button type="button" className="block w-full text-left" onClick={() => openEdit(record)}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-stone-900">{record.icon ? `${record.icon} ` : ''}{record.name}</p>
+                        <p className="truncate font-semibold text-stone-900">{record.presentation.icon?.type === 'image'
+                            ? <img alt="" src={iconImagePath(record.spaceId, record.id, record.presentation.icon.fileId)} className="mr-2 inline size-6 rounded-md object-contain" />
+                            : recordIconEmoji(record.presentation.icon) ? `${recordIconEmoji(record.presentation.icon)} ` : ''}{record.name}</p>
                         <p className="mt-1 text-xs text-stone-400">{KIND_COPY[record.kind].label} · {record.anchorDate}</p>
                       </div>
                       {attention ? <Sparkles className="size-4 shrink-0 text-amber-500" /> : null}
@@ -420,7 +457,7 @@ function OccurrenceEditor({ value, saving, onChange, onClose, onSave }: {
             <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700"><Clock3 className="size-5" /></span>
             <div>
               <p className="text-lg font-semibold text-stone-950">记录一次</p>
-              <p className="mt-1 text-sm text-stone-500">{value.record.icon ? `${value.record.icon} ` : ''}{value.record.name}</p>
+              <p className="mt-1 text-sm text-stone-500">{recordIconEmoji(value.record.presentation.icon) ? `${recordIconEmoji(value.record.presentation.icon)} ` : ''}{value.record.name}</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" aria-label="关闭" disabled={saving} onClick={onClose}><X className="size-4" /></Button>
@@ -469,7 +506,22 @@ function DayEditor({ draft, editing, members, canWrite, saving, onChange, onClos
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">基准日期<input type="date" className={inputClass} disabled={readOnly || anchorReadOnly} value={draft.anchorDate} onChange={(event) => set('anchorDate', event.target.value)} /></label>
           {draft.kind === 'cycle' ? <label className="grid gap-1.5 text-sm font-medium text-stone-700">周期天数<input type="number" min="1" className={inputClass} disabled={readOnly} value={draft.cycleDays} onChange={(event) => set('cycleDays', event.target.value)} /></label> : null}
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">{draft.kind === 'elapsed' ? '经过多少天后提醒（可空）' : '提前多少天提醒（可空）'}<input type="number" min={draft.kind === 'elapsed' ? 1 : 0} className={inputClass} disabled={readOnly} value={draft.attentionDays} onChange={(event) => set('attentionDays', event.target.value)} /></label>
-          <label className="grid gap-1.5 text-sm font-medium text-stone-700">图标<input className={inputClass} maxLength={50} disabled={readOnly} value={draft.icon} onChange={(event) => set('icon', event.target.value)} placeholder="例如 🎂" /></label>
+          <div className="grid gap-2 text-sm font-medium text-stone-700">
+            图标（Emoji 或图片，可选）
+            <input className={inputClass} maxLength={40} disabled={readOnly} value={draft.icon}
+              onChange={(event) => onChange({ ...draft, icon: event.target.value, imageFileId: '', imageFile: null })}
+              placeholder="例如 🎂" />
+            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={readOnly} className="text-xs text-stone-500"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0] ?? null;
+                onChange({ ...draft, imageFile: file, imageFileId: '', icon: file ? '' : draft.icon });
+              }} />
+            {draft.imageFileId && editing ? <img alt="当前图标" className="size-12 rounded-lg object-contain" src={iconImagePath(editing.spaceId, editing.id, draft.imageFileId)} /> : null}
+            {draft.imageFile ? <span className="text-xs font-normal text-stone-500">已选择 {draft.imageFile.name}（不超过 256 KiB / 512×512）</span> : null}
+            {(draft.icon || draft.imageFile || draft.imageFileId) && !readOnly
+              ? <button type="button" className="self-start text-xs text-stone-500 underline" onClick={() => onChange({ ...draft, icon: '', imageFile: null, imageFileId: '' })}>移除图标</button>
+              : null}
+          </div>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">关联成员<select className={inputClass} disabled={readOnly} value={draft.subjectPersonId} onChange={(event) => set('subjectPersonId', event.target.value)}><option value="">不关联成员</option>{members.map((member) => <option key={member.personId} value={member.personId}>{member.displayName || member.userId}</option>)}</select></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">说明<textarea className={textareaClass} maxLength={5000} disabled={readOnly} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
         </div>
