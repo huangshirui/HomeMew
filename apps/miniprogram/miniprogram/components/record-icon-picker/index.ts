@@ -55,7 +55,7 @@ Component({
     onNoop(): void { /* prevent sheet taps from closing the dialog */ },
     onCategoryTap(e: WechatMiniprogram.TouchEvent): void {
       const key = String(e.currentTarget.dataset.key ?? '');
-      if (key && key !== this.data.activeCategory) {
+      if (key && (key !== this.data.activeCategory || this.data.search.trim())) {
         this.setData({ activeCategory: key, search: '' });
         this.refresh();
       }
