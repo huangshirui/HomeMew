@@ -271,8 +271,8 @@ Page({
               this._imagePaths[key] = path;
               this.applyRecords();
             })
-            .catch(() => undefined)
-            .finally(() => this._loadingImages.delete(key));
+            .then(() => { this._loadingImages.delete(key); })
+            .catch(() => { this._loadingImages.delete(key); });
         }
       }
       return view;
