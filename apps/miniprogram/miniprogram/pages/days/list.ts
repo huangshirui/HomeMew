@@ -18,6 +18,7 @@ import { consumeDirty, subscribe } from '../../stores/dirty';
 import { showError, getErrorMessage } from '../../utils/index';
 import { mapDayRecordView, DayRecordView } from '../../utils/day-record-view';
 import { DayRecord } from '../../types/index';
+import { downloadRecordIconImage } from '../../services/record-icons';
 
 type FilterKey = 'all' | 'attention' | 'countdown' | 'life' | 'archived';
 
@@ -77,6 +78,8 @@ Page({
 
   /** 原始数据，用于分组与追加 */
   _records: [] as DayRecord[],
+  _imagePaths: {} as Record<string, string>,
+  _loadingImages: new Set<string>(),
   _cursor: null as string | null,
   /** 请求序号：丢弃家庭切换 / 筛选切换造成的过期响应 */
   _reqSeq: 0,
@@ -253,7 +256,27 @@ Page({
    * 「全部」模式按客户端分组；同一条记录只归入优先级最高的一组。
    */
   applyRecords(): void {
-    const views = this._records.map(mapDayRecordView);
+    const familyId = this.data.familyId;
+    const views = this._records.map(record => {
+      const view = mapDayRecordView(record);
+      if (record.presentation?.icon?.type === 'image') {
+        const fileId = record.presentation.icon.fileId;
+        const key = `${familyId}:${record.id}:${fileId}`;
+        view.iconImagePath = this._imagePaths[key] || '';
+        if (!view.iconImagePath && !this._loadingImages.has(key)) {
+          this._loadingImages.add(key);
+          void downloadRecordIconImage(familyId, record.id, fileId)
+            .then(path => {
+              if (this.data.familyId !== familyId || !this._records.some(r => r.id === record.id && r.presentation?.icon?.type === 'image' && r.presentation.icon.fileId === fileId)) return;
+              this._imagePaths[key] = path;
+              this.applyRecords();
+            })
+            .catch(() => undefined)
+            .finally(() => this._loadingImages.delete(key));
+        }
+      }
+      return view;
+    });
     if (this.data.activeFilter !== 'all') {
       this.setData({ items: views, groups: [], useGroups: false });
       return;
