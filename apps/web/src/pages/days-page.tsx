@@ -404,8 +404,8 @@ export function DaysPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-stone-900">{record.presentation?.icon?.type === 'image'
-                            ? <img alt="" src={iconImagePath(record.spaceId, record.id, record.presentation.icon.fileId)} className="mr-2 inline size-6 rounded-md object-contain" />
-                            : recordIconEmoji(record.presentation.icon) ? `${recordIconEmoji(record.presentation.icon)} ` : ''}{record.name}</p>
+                            ? <img alt="" src={iconImagePath(record.spaceId, record.id, record.presentation!.icon!.fileId)} className="mr-2 inline size-6 rounded-md object-contain" />
+                            : recordIconEmoji(record.presentation?.icon) ? `${recordIconEmoji(record.presentation?.icon)} ` : ''}{record.name}</p>
                         <p className="mt-1 text-xs text-stone-400">{KIND_COPY[record.kind].label} · {record.anchorDate}</p>
                       </div>
                       {attention ? <Sparkles className="size-4 shrink-0 text-amber-500" /> : null}
@@ -454,7 +454,7 @@ function OccurrenceEditor({ value, saving, onChange, onClose, onSave }: {
             <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700"><Clock3 className="size-5" /></span>
             <div>
               <p className="text-lg font-semibold text-stone-950">记录一次</p>
-              <p className="mt-1 text-sm text-stone-500">{recordIconEmoji(value.record.presentation.icon) ? `${recordIconEmoji(value.record.presentation.icon)} ` : ''}{value.record.name}</p>
+              <p className="mt-1 text-sm text-stone-500">{recordIconEmoji(value.record.presentation?.icon) ? `${recordIconEmoji(value.record.presentation?.icon)} ` : ''}{value.record.name}</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" aria-label="关闭" disabled={saving} onClick={onClose}><X className="size-4" /></Button>
