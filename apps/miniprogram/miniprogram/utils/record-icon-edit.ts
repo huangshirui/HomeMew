@@ -3,8 +3,6 @@ import { uploadRecordIconImage } from '../services/record-icons';
 import type { RecordIcon } from '../types/index';
 
 /** One selector shared by Event / Task / Wish editors; all sources are optional. */
-export const RECORD_ICON_EMOJIS = ['📅', '🎉', '📚', '⚽', '🏠', '✈️', '🎁', '💡', '❤️', '⭐', '🍀', '✅'];
-
 export type RecordIconEditState = {
   iconEmoji: string;
   iconFileId: string;
@@ -37,4 +35,15 @@ export async function prepareRecordIcon(
     icon = { type: 'image', fileId };
   }
   return { icon };
+}
+
+export type RecordIconPickerChange =
+  | { type: 'emoji'; emoji: string }
+  | { type: 'image'; path: string }
+  | { type: 'clear' };
+
+export function pickerChangeState(change: RecordIconPickerChange): RecordIconEditState {
+  if (change.type === 'emoji') return { iconEmoji: change.emoji, iconImagePath: '', iconFileId: '', iconTouched: true };
+  if (change.type === 'image') return { iconEmoji: '', iconImagePath: change.path, iconFileId: '', iconTouched: true };
+  return { iconEmoji: '', iconImagePath: '', iconFileId: '', iconTouched: true };
 }
