@@ -413,7 +413,7 @@ export interface DayRecordCommon {
   description: string | null;
   /** 关联对象；null 表示全家 */
   subject: PersonRef | null;
-  presentation: { icon: RecordIcon | null };
+  presentation?: { icon: RecordIcon | null };
   status: DayRecordStatus;
   version: number;
   createdBy: Actor;
@@ -455,6 +455,7 @@ export interface DayRecordResponse extends ApiEnvelope<DayRecord> {}
 export interface DayRecordListResponse extends PaginatedResponse<DayRecord> {}
 
 interface CreateDayRecordCommon {
+  presentation?: { icon: RecordIcon | null };
   name: string;
   description?: string | null;
   anchorDate: string;
@@ -491,6 +492,7 @@ export type CreateDayRecordRequest =
  * - attentionAfterDays 仅适用于 elapsed。
  */
 interface DayRecordUpdateFields {
+  presentation?: { icon: RecordIcon | null };
   name?: string;
   description?: string | null;
   subjectUserId?: string | null;
