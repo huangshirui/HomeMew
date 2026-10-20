@@ -7,7 +7,7 @@ const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
 const LIST_KEYS = new Set(['startDate', 'endDateExclusive', 'timezone', 'attendeeId', 'status', 'q', 'cursor', 'limit']);
-const WRITE_FIELDS = ['summary', 'description', 'location', 'attendeeIds', 'isAllDay', 'startAt', 'endAt', 'startTimezone', 'endTimezone', 'startDate', 'endDateExclusive'];
+const WRITE_FIELDS = ['presentation', 'summary', 'description', 'location', 'attendeeIds', 'isAllDay', 'startAt', 'endAt', 'startTimezone', 'endTimezone', 'startDate', 'endDateExclusive'];
 const TIME_FIELDS = ['isAllDay', 'startAt', 'endAt', 'startTimezone', 'endTimezone', 'startDate', 'endDateExclusive'];
 
 function decodeId(value, pattern) {
@@ -139,6 +139,7 @@ function actor(raw) {
 export function eventDto(request, raw, list) {
   const common = {
     id: raw.id, familyId: raw.spaceId, summary: raw.summary,
+    ...(raw.presentation?.icon ? { presentation: raw.presentation } : {}),
     description: raw.description ?? null, location: raw.location ?? null, status: raw.status,
     attendees: (raw.attendeePersonIds ?? []).map(personId => list.find(item => item.personId === personId))
       .filter(Boolean).map(member => ({
