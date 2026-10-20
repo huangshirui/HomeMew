@@ -19,7 +19,7 @@ import {
 } from '../../utils/index';
 import { CreateWishRequest, UpdateWishRequest } from '../../types/index';
 import { downloadRecordIconImage } from '../../services/record-icons';
-import { RECORD_ICON_EMOJIS, originalIconState, prepareRecordIcon } from '../../utils/record-icon-edit';
+import { originalIconState, prepareRecordIcon, pickerChangeState, type RecordIconPickerChange } from '../../utils/record-icon-edit';
 
 type Mode = 'create' | 'edit';
 
@@ -34,7 +34,6 @@ Page({
     submitting: false,
     wishCreated: false,
     title: '',
-    iconChoices: RECORD_ICON_EMOJIS,
     iconEmoji: '',
     iconFileId: '',
     iconImagePath: '',
@@ -112,20 +111,10 @@ Page({
     if (this.data.mode === 'edit') this.loadWish();
   },
 
-  onIconSelect(e: WechatMiniprogram.TouchEvent): void {
-    this.setData({ iconEmoji: String(e.currentTarget.dataset.icon || ''), iconFileId: '', iconImagePath: '', iconTouched: true });
+  onRecordIconChange(e: WechatMiniprogram.CustomEvent<RecordIconPickerChange>): void {
+    this.setData(pickerChangeState(e.detail));
   },
-  onIconClear(): void {
-    this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: '', iconTouched: true });
-  },
-  onIconImageChoose(): void {
-    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'],
-      success: result => {
-        const path = result.tempFiles?.[0]?.tempFilePath;
-        if (path) this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: path, iconTouched: true });
-      },
-    });
-  },
+
   onTitleInput(e: WechatMiniprogram.Input): void { this.setData({ title: e.detail.value }); },
   onDescriptionInput(e: WechatMiniprogram.Input): void { this.setData({ description: e.detail.value }); },
   onDesiredDateChange(e: WechatMiniprogram.PickerChange): void {
