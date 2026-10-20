@@ -24,7 +24,64 @@ function decodeId(value, pattern) {
 
 export function matchMiniProgramDayDiagnosticRoute(pathname) {
   if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records$`, 'u').exec(pathname);
+  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/icon-imageimport { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
+
+const MINI_PREFIX = '/api/v1/miniprogram';
+const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
+const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
+const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
+const DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const DAY_SORTS = Object.freeze({
+  attention: 'attention:desc',
+  date_asc: 'effectiveDate:asc',
+  date_desc: 'effectiveDate:desc',
+  created_desc: 'createdAt:desc',
+  updated_desc: 'updatedAt:desc',
+});
+
+function decodeId(value, pattern) {
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+export function matchMiniProgramDayDiagnosticRoute(pathname) {
+  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
+, 'u').exec(pathname);
+  if (match) {
+    const familyId = decodeId(match[1], FAMILY_ID);
+    return familyId ? { kind: 'icon-upload', familyId } : null;
+  }
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-recordsimport { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
+
+const MINI_PREFIX = '/api/v1/miniprogram';
+const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
+const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
+const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
+const DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const DAY_SORTS = Object.freeze({
+  attention: 'attention:desc',
+  date_asc: 'effectiveDate:asc',
+  date_desc: 'effectiveDate:desc',
+  created_desc: 'createdAt:desc',
+  updated_desc: 'updatedAt:desc',
+});
+
+function decodeId(value, pattern) {
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+export function matchMiniProgramDayDiagnosticRoute(pathname) {
+  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
+, 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
     return familyId ? { kind: 'day-records', familyId } : null;
@@ -35,7 +92,101 @@ export function matchMiniProgramDayDiagnosticRoute(pathname) {
     const recordId = decodeId(match[2], RECORD_ID);
     return familyId && recordId ? { kind: 'day-record', familyId, recordId } : null;
   }
-  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+)/(icon|icon-image)$`, 'u').exec(pathname);
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+)/(icon-image)import { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
+
+const MINI_PREFIX = '/api/v1/miniprogram';
+const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
+const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
+const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
+const DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const DAY_SORTS = Object.freeze({
+  attention: 'attention:desc',
+  date_asc: 'effectiveDate:asc',
+  date_desc: 'effectiveDate:desc',
+  created_desc: 'createdAt:desc',
+  updated_desc: 'updatedAt:desc',
+});
+
+function decodeId(value, pattern) {
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+export function matchMiniProgramDayDiagnosticRoute(pathname) {
+  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
+  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/icon-imageimport { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
+
+const MINI_PREFIX = '/api/v1/miniprogram';
+const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
+const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
+const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
+const DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const DAY_SORTS = Object.freeze({
+  attention: 'attention:desc',
+  date_asc: 'effectiveDate:asc',
+  date_desc: 'effectiveDate:desc',
+  created_desc: 'createdAt:desc',
+  updated_desc: 'updatedAt:desc',
+});
+
+function decodeId(value, pattern) {
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+export function matchMiniProgramDayDiagnosticRoute(pathname) {
+  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
+, 'u').exec(pathname);
+  if (match) {
+    const familyId = decodeId(match[1], FAMILY_ID);
+    return familyId ? { kind: 'icon-upload', familyId } : null;
+  }
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-recordsimport { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
+
+const MINI_PREFIX = '/api/v1/miniprogram';
+const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
+const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
+const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
+const DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const DAY_SORTS = Object.freeze({
+  attention: 'attention:desc',
+  date_asc: 'effectiveDate:asc',
+  date_desc: 'effectiveDate:desc',
+  created_desc: 'createdAt:desc',
+  updated_desc: 'updatedAt:desc',
+});
+
+function decodeId(value, pattern) {
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+export function matchMiniProgramDayDiagnosticRoute(pathname) {
+  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
+, 'u').exec(pathname);
+  if (match) {
+    const familyId = decodeId(match[1], FAMILY_ID);
+    return familyId ? { kind: 'day-records', familyId } : null;
+  }
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+)$`, 'u').exec(pathname);
+  if (match) {
+    const familyId = decodeId(match[1], FAMILY_ID);
+    const recordId = decodeId(match[2], RECORD_ID);
+    return familyId && recordId ? { kind: 'day-record', familyId, recordId } : null;
+  }
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+), 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
     const recordId = decodeId(match[2], RECORD_ID);
@@ -188,7 +339,7 @@ function dayDto(request, raw, list) {
     name: raw.name,
     description: raw.description ?? null,
     subject: personRef(request, raw.subjectPersonId, list),
-    presentation: { icon: raw.presentation?.icon ?? null },
+    ...(raw.presentation?.icon ? { presentation: raw.presentation } : {}),
     status: raw.status,
     version: raw.version,
     createdBy: actor(raw.createdBy),
@@ -300,7 +451,7 @@ async function getDay(request, env, route) {
   return json({ data: dayDto(request, record.data, memberResult.data) }, 200, record.requestId);
 }
 
-const DAY_FIELDS = ['kind', 'name', 'description', 'anchorDate', 'subjectUserId', 'attentionAfterDays', 'attentionBeforeDays', 'cycleDays'];
+const DAY_FIELDS = ['kind', 'name', 'description', 'anchorDate', 'subjectUserId', 'attentionAfterDays', 'attentionBeforeDays', 'cycleDays', 'presentation'];
 
 function validNullableString(value) {
   return value === undefined || value === null || typeof value === 'string';
@@ -421,34 +572,6 @@ async function createOccurrence(request, env, route) {
 const ICON_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const ICON_MAX_BYTES = 256 * 1024;
 
-async function changeIcon(request, env, route) {
-  const input = await readBody(request, ['version', 'icon']);
-  if (!input.ok) return input.response;
-  if (!Number.isInteger(input.data.version) || input.data.version < 1
-    || !Object.hasOwn(input.data, 'icon')) {
-    return errorResponse(422, 'VALIDATION_ERROR', 'Icon and record version are required');
-  }
-  const icon = input.data.icon;
-  const emoji = icon?.type === 'emoji' && typeof icon.value === 'string'
-    && icon.value.length > 0 && icon.value.length <= 40 && Object.keys(icon).length === 2;
-  const image = icon?.type === 'image' && /^fil_[0-9a-f]{32}$/u.test(icon.fileId)
-    && Object.keys(icon).length === 2;
-  if (icon !== null && !emoji && !image) return errorResponse(422, 'VALIDATION_ERROR', 'Invalid Record Icon');
-  const result = await callJson(request, env, `${modelRecord(route.familyId, route.recordId)}/icon`, {
-    method: 'PATCH', data: input.data,
-  });
-  if (!result.ok) return result.response;
-  // The stable HomeMew Mini DTO is the same on reads and mutations.
-  const [record, memberResult] = await Promise.all([
-    callJson(request, env, modelRecord(route.familyId, route.recordId)),
-    members(request, env, route.familyId),
-  ]);
-  if (!record.ok) return record.response;
-  if (!memberResult.ok) return memberResult.response;
-  return json({ data: dayDto(request, record.data, memberResult.data) }, 200, record.requestId);
-}
-
-// A fixed HomeMew product route; do not expose arbitrary LifeSpace proxy targets.
 async function uploadIconImage(request, env, route) {
   const contentType = request.headers.get('content-type')?.split(';')[0]?.trim()?.toLowerCase() || '';
   if (!ICON_CONTENT_TYPES.has(contentType)) return errorResponse(415, 'INVALID_ICON_IMAGE', 'Only PNG, JPEG, WebP icons are supported');
@@ -457,7 +580,7 @@ async function uploadIconImage(request, env, route) {
   const base = `/api/v1/spaces/${encodeURIComponent(route.familyId)}`;
   const initiate = await callJson(request, env, `${base}/file-uploads`, {
     method: 'POST',
-    data: { modelKey: 'day_record', fieldKey: '__record_icon', recordId: route.recordId,
+    data: { modelKey: 'day_record', fieldKey: '__record_icon', ...(route.recordId ? { recordId: route.recordId } : {}),
       size: bytes.byteLength, name: 'record-icon', contentType },
   });
   if (!initiate.ok) return initiate.response;
@@ -567,12 +690,11 @@ export async function handleMiniProgramDayDiagnosticBff(request, env) {
     || (route.kind === 'occurrences' && request.method === 'GET');
   if (!queryAllowed && [...url.searchParams.keys()].length > 0) return errorResponse(400, 'INVALID_QUERY', 'Query parameters are not supported');
 
-  if (route.kind === 'icon') {
-    if (request.method === 'PATCH') return changeIcon(request, env, route);
+  if (route.kind === 'icon-upload') {
+    if (request.method === 'POST') return uploadIconImage(request, env, route);
     return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
   }
   if (route.kind === 'icon-image') {
-    if (request.method === 'POST') return uploadIconImage(request, env, route);
     if (request.method === 'GET') return downloadIconImage(request, env, route);
     return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
   }
