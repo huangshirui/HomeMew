@@ -69,7 +69,7 @@
             <text class="wish-status status-{{item.status}}">{{item.statusLabel}}</text>
           </view>
 
-          <text class="wish-title">{{item.title}}</text>
+          <image wx:if="{{item.iconImagePath}}" src="{{item.iconImagePath}}" mode="aspectFit" style="width:48rpx;height:48rpx;margin-right:10rpx" /><text wx:elif="{{item.iconEmoji}}" style="font-size:34rpx;margin-right:10rpx">{{item.iconEmoji}}</text><text class="wish-title">{{item.title}}</text>
           <text wx:if="{{item.descriptionBrief}}" class="wish-desc">{{item.descriptionBrief}}</text>
           <view wx:if="{{item.desiredDateText}}" class="wish-meta">
             <text class="wish-date">{{item.desiredDateText}}</text>
