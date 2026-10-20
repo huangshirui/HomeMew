@@ -171,3 +171,11 @@ test('rejects client-controlled transport knobs and invalid temporal ranges', as
   }), { LIFESPACE_CORE: { fetch: async incoming => new URL(incoming.url).pathname.endsWith('/members') ? response(members) : assert.fail() } });
   assert.equal(badCreate.status, 422);
 });
+
+
+test('Event icon metadata is optional and never required for existing clients', async () => {
+  const without = await list([temporalItems[0]]);
+  assert.equal(Object.hasOwn(without.payload.data.items[0], 'presentation'), false);
+  const withIcon = await list([common({ ...temporalItems[0], presentation: { icon: { type: 'emoji', value: '⚽' } } })]);
+  assert.deepEqual(withIcon.payload.data.items[0].presentation, { icon: { type: 'emoji', value: '⚽' } });
+});
