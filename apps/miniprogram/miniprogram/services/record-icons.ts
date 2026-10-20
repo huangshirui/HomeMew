@@ -5,8 +5,8 @@ import { getApplicationBaseUrl, generateRequestId, UPLOAD_TIMEOUT } from './conf
 
 const MAX_BYTES = 256 * 1024;
 const cache = new Map<string, string>();
-const base = (familyId: string, recordId: string) =>
-  `${getApplicationBaseUrl()}/api/v1/miniprogram/families/${encodeURIComponent(familyId)}/day-records/${encodeURIComponent(recordId)}/icon-image`;
+const base = (familyId: string, recordId?: string) =>
+  `${getApplicationBaseUrl()}/api/v1/miniprogram/families/${encodeURIComponent(familyId)}/day-records/${recordId ? `${encodeURIComponent(recordId)}/` : ''}icon-image`;
 
 function readFile(path: string): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
@@ -52,12 +52,12 @@ function requestBinary(url: string, method: 'GET' | 'POST', token: string, body?
 }
 
 /** A pending image is uploaded only after the enclosing Record exists. */
-export async function uploadRecordIconImage(familyId: string, recordId: string, localPath: string): Promise<string> {
+export async function uploadRecordIconImage(familyId: string, localPath: string): Promise<string> {
   const compressed = await compress(localPath);
   const bytes = await readFile(compressed);
   if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) throw new AppError('FILE_TOO_LARGE', '图标图片必须小于 256 KiB，请裁剪或压缩后重试');
   let token = await ensureAccessToken();
-  let res = await requestBinary(base(familyId, recordId), 'POST', token, bytes, mimeFromPath(compressed));
+  let res = await requestBinary(base(familyId), 'POST', token, bytes, mimeFromPath(compressed));
   if (res.statusCode === 401) {
     token = await ensureAccessToken({ forceRefresh: true });
     res = await requestBinary(base(familyId, recordId), 'POST', token, bytes, mimeFromPath(compressed));
