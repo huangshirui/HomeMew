@@ -173,7 +173,7 @@ Page({
     });
     if (record.presentation?.icon?.type === 'image') {
       const image = record.presentation.icon;
-      void downloadRecordIconImage(this.data.familyId, record.id, image.fileId)
+      void downloadRecordIconImage(this.data.familyId, 'day_record', record.id, image.fileId)
         .then(iconImagePath => this.setData({ iconImagePath }))
         .catch(() => undefined);
     }
