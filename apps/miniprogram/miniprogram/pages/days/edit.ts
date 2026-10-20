@@ -251,7 +251,7 @@ Page({
     });
     if (record.presentation?.icon?.type === 'image') {
       const { fileId } = record.presentation.icon;
-      void downloadRecordIconImage(this.data.familyId, record.id, fileId)
+      void downloadRecordIconImage(this.data.familyId, 'day_record', record.id, fileId)
         .then(path => this.setData({ iconImagePath: path }))
         .catch(() => undefined);
     }
@@ -477,7 +477,7 @@ Page({
     let icon: RecordIcon | null = this.data.icon ? { type: 'emoji', value: this.data.icon } : null;
     if (this.data.iconFileId) icon = { type: 'image', fileId: this.data.iconFileId };
     else if (this.data.iconImagePath) {
-      const fileId = await uploadRecordIconImage(this.data.familyId, this.data.iconImagePath);
+      const fileId = await uploadRecordIconImage(this.data.familyId, 'day_record', this.data.iconImagePath);
       icon = { type: 'image', fileId };
     }
     return { icon };
