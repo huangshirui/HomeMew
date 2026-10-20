@@ -265,7 +265,7 @@ Page({
         view.iconImagePath = this._imagePaths[key] || '';
         if (!view.iconImagePath && !this._loadingImages.has(key)) {
           this._loadingImages.add(key);
-          void downloadRecordIconImage(familyId, record.id, fileId)
+          void downloadRecordIconImage(familyId, 'day_record', record.id, fileId)
             .then(path => {
               if (this.data.familyId !== familyId || !this._records.some(r => r.id === record.id && r.presentation?.icon?.type === 'image' && r.presentation.icon.fileId === fileId)) return;
               this._imagePaths[key] = path;
