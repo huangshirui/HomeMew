@@ -22,10 +22,13 @@ import {
   formatDate,
 } from '../../utils/index';
 import { Task, FamilyMember } from '../../types/index';
+import { downloadRecordIconImage } from '../../services/record-icons';
 
 type TaskView = {
   id: string;
   name: string;
+  iconEmoji: string;
+  iconImagePath: string;
   completedText: string;
   assigneeText: string;
   version: number;
@@ -145,6 +148,14 @@ Page({
       if (reqSeq !== this._reqSeq || familyId !== this.data.familyId) return;
       const views = tasks.map(mapTask);
       this.setData({ tasks: views, total: views.length, loaded: true, listError: false });
+      for (const task of tasks) {
+        if (task.presentation?.icon?.type !== 'image') continue;
+        void downloadRecordIconImage(familyId, 'task', task.id, task.presentation.icon.fileId)
+          .then(iconImagePath => {
+            if (familyId !== this.data.familyId || reqSeq !== this._reqSeq) return;
+            this.setData({ tasks: this.data.tasks.map(item => item.id === task.id ? { ...item, iconImagePath } : item) });
+          }).catch(() => undefined);
+      }
     } catch (error: unknown) {
       if (reqSeq !== this._reqSeq || familyId !== this.data.familyId) return;
       console.error('[TasksCompleted] Load failed:', error);
@@ -224,6 +235,8 @@ function mapTask(t: Task): TaskView {
   return {
     id: t.id,
     name: t.name,
+    iconEmoji: t.presentation?.icon?.type === 'emoji' ? t.presentation.icon.value : '',
+    iconImagePath: '',
     completedText: t.completedAt ? `${formatDate(t.completedAt, 'datetime')} 完成` : '已完成',
     assigneeText: formatAssignees((t.assignees || []).map(a => a.displayName)),
     version: t.version,
