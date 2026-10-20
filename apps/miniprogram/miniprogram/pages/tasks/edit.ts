@@ -23,6 +23,8 @@ import {
 } from '../../utils/index';
 import { Task, FamilyMember, CreateTaskRequest, UpdateTaskRequest } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
+import { downloadRecordIconImage } from '../../services/record-icons';
+import { RECORD_ICON_EMOJIS, originalIconState, prepareRecordIcon } from '../../utils/record-icon-edit';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 
 type MemberOption = {
@@ -46,6 +48,11 @@ Page({
     members: [] as MemberOption[],
     name: '',
     description: '',
+    iconChoices: RECORD_ICON_EMOJIS,
+    iconEmoji: '',
+    iconFileId: '',
+    iconImagePath: '',
+    iconTouched: false,
     dueDate: '',
     /** 视图用派生 */
     dueText: '请选择截止日期',
@@ -143,6 +150,7 @@ Page({
     this.setData({
       name: task.name,
       description: task.description || '',
+      ...originalIconState(task.presentation?.icon),
       dueDate: task.dueDate || '',
       version: task.version,
       members: members.map(m => ({
@@ -154,9 +162,30 @@ Page({
       loaded: true,
     });
     this.refreshDerived();
+    if (task.presentation?.icon?.type === 'image') {
+      void downloadRecordIconImage(this.data.familyId, 'task', task.id, task.presentation.icon.fileId)
+        .then(iconImagePath => this.setData({ iconImagePath }))
+        .catch(() => undefined);
+    }
   },
 
   /* ----------------- 表单输入 ----------------- */
+
+  onIconSelect(e: WechatMiniprogram.TouchEvent): void {
+    const value = String(e.currentTarget.dataset.icon || '');
+    this.setData({ iconEmoji: value, iconFileId: '', iconImagePath: '', iconTouched: true });
+  },
+  onIconClear(): void {
+    this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: '', iconTouched: true });
+  },
+  onIconImageChoose(): void {
+    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'],
+      success: result => {
+        const path = result.tempFiles?.[0]?.tempFilePath;
+        if (path) this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: path, iconTouched: true });
+      },
+    });
+  },
 
   onNameInput(e: WechatMiniprogram.Input): void {
     this.setData({ name: e.detail.value });
@@ -234,11 +263,12 @@ Page({
     this.setData({ submitting: true });
     showLoading(this.data.mode === 'edit' ? '保存中...' : '创建中...');
     try {
+      const presentation = await prepareRecordIcon(this.data.familyId, 'task', this.data.mode, this.data);
       if (this.data.mode === 'edit') {
-        const updatePayload: UpdateTaskRequest = { ...payload, version: this.data.version };
+        const updatePayload: UpdateTaskRequest = { ...payload, ...(presentation ? { presentation } : {}), version: this.data.version };
         await updateTask(this.data.familyId, this.data.taskId, updatePayload);
       } else {
-        await createTask(this.data.familyId, payload);
+        await createTask(this.data.familyId, { ...payload, ...(presentation ? { presentation } : {}) });
       }
       hideLoading();
       showSuccess(this.data.mode === 'edit' ? '已保存' : '已创建');
