@@ -24,7 +24,7 @@
     <!-- 头部：名称 + 主状态 -->
     <view class="hero attention-{{attentionLevel}}">
       <view class="hero-top">
-        <view class="hero-icon">{{icon}}</view>
+        <view class="hero-icon"><image wx:if="{{iconImagePath}}" src="{{iconImagePath}}" mode="aspectFit" style="width:100%;height:100%" /><text wx:else>{{icon}}</text></view>
         <view class="hero-title-box">
           <text class="hero-name">{{name}}</text>
           <text wx:if="{{status === 'archived'}}" class="hero-archived">已归档</text>
