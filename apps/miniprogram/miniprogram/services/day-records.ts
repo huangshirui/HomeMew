@@ -2,7 +2,7 @@
 import { request } from './api';
 import { familyCollection, productQuery } from './product-routes';
 import {
-  DayRecord, DayRecordKind, DayRecordOccurrence, CreateDayRecordRequest,
+  DayRecord, DayRecordKind, DayRecordOccurrence, RecordIcon, CreateDayRecordRequest,
   UpdateDayRecordRequest, CreateDayRecordOccurrenceRequest, CreateDayRecordOccurrenceResult,
 } from '../types/index';
 
@@ -56,4 +56,9 @@ export function archiveDayRecord(familyId: string, dayRecordId: string, version:
 }
 export function restoreDayRecord(familyId: string, dayRecordId: string, version: number): Promise<DayRecord> {
   return request(`${record(familyId, dayRecordId)}/restore`, { method: 'POST', data: { version }, skipRetry: true });
+}
+
+/** Public optional Record presentation metadata; old DayRecord data.icon is retired. */
+export function updateDayRecordIcon(familyId: string, dayRecordId: string, version: number, icon: RecordIcon | null): Promise<DayRecord> {
+  return request(`${record(familyId, dayRecordId)}/icon`, { method: 'PATCH', data: { version, icon }, skipRetry: true });
 }
