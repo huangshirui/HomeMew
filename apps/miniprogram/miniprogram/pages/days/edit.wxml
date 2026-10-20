@@ -35,7 +35,9 @@
   <block wx:else>
     <!-- 名称 -->
     <view class="card">
-      <view class="field-row">
+      <view style="display:flex;align-items:center">
+        <record-icon-picker emoji="{{icon}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" bind:change="onRecordIconChange" />
+        <view class="field-row" style="flex:1;min-width:0">
         <text class="field-label">名称</text>
         <input
           class="field-input"
@@ -44,6 +46,7 @@
           placeholder="{{kind === 'countdown' ? '例如：英国旅行' : '例如：清理滤水器'}}"
           maxlength="100"
         />
+        </view>
       </view>
     </view>
 
@@ -150,31 +153,6 @@
       </view>
       <view class="field-hint">
         <text class="hint-text">不选择成员则视为全家</text>
-      </view>
-    </view>
-
-    <!-- 图标（Emoji / 图片） -->
-    <view class="card">
-      <text class="field-label">图标</text>
-      <view style="display:flex;gap:18rpx;align-items:center;margin:12rpx 0">
-        <button size="mini" bindtap="onChooseIconImage">上传图片</button>
-        <image wx:if="{{iconImagePath}}" src="{{iconImagePath}}" mode="aspectFit" style="width:64rpx;height:64rpx" />
-      </view>
-      <scroll-view class="icon-scroll" scroll-x="true" enhanced="true" show-scrollbar="false">
-        <view class="icon-rows">
-          <view wx:for="{{iconRows}}" wx:for-item="row" wx:key="key" class="icon-row">
-            <view
-              wx:for="{{row.icons}}"
-              wx:key="*this"
-              class="icon-cell {{icon === item ? 'icon-selected' : ''}}"
-              data-icon="{{item}}"
-              bindtap="onIconSelect"
-            >{{item}}</view>
-          </view>
-        </view>
-      </scroll-view>
-      <view class="field-hint">
-        <text class="hint-text">选填，可选 Emoji 或图片（不超过 256 KiB、512×512 像素）</text>
       </view>
     </view>
 
