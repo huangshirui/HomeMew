@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Gift, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, UserRound, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
+import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
 import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
@@ -14,6 +15,7 @@ type WishRecord = {
   id: string;
   spaceId: string;
   modelKey: 'wish';
+  presentation?: { icon: RecordIcon | null };
   modelVersion: number;
   title: string;
   description: string | null;
@@ -26,7 +28,7 @@ type WishRecord = {
   updatedAt: string;
 };
 
-type WishDraft = { title: string; description: string; desiredDate: string };
+type WishDraft = { title: string; description: string; desiredDate: string; icon: RecordIconDraft };
 type Tab = 'open' | 'fulfilled';
 
 const inputClass = 'h-10 w-full rounded-2xl border border-stone-200 bg-white px-3 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
@@ -38,7 +40,7 @@ function messageOf(cause: unknown, fallback: string) {
 }
 
 function draftFromWish(wish: WishRecord): WishDraft {
-  return { title: wish.title, description: wish.description ?? '', desiredDate: wish.desiredDate ?? '' };
+  return { title: wish.title, description: wish.description ?? '', desiredDate: wish.desiredDate ?? '', icon: iconDraftFor(wish.presentation?.icon) };
 }
 
 function payload(draft: WishDraft) {
@@ -111,7 +113,7 @@ export function WishesPage() {
   function openCreate() {
     if (!canWrite) return;
     setEditing(null);
-    setDraft({ title: '', description: '', desiredDate: '' });
+    setDraft({ title: '', description: '', desiredDate: '', icon: emptyIconDraft() });
     setError(null);
   }
 
@@ -133,7 +135,7 @@ export function WishesPage() {
     setSaving(true);
     setError(null);
     try {
-      const fields = payload(draft);
+      const fields = { ...payload(draft), ...await presentationToSave(currentFamily.id, 'wish', draft.icon, editing?.presentation?.icon) };
       if (editing) {
         await apiRequest<WishRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/wish/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH', body: JSON.stringify({ ...fields, version: editing.version }),
@@ -235,6 +237,7 @@ export function WishesPage() {
       {draft ? (
         <WishEditor
           draft={draft}
+          spaceId={currentFamily?.id || ''}
           editing={editing}
           currentPersonId={currentPersonId}
           canWrite={canWrite}
@@ -266,7 +269,8 @@ function WishCard({ wish, currentPersonId, canWrite, acting, ownerName, onOpen, 
     <Card className={`p-5 ${fulfilled ? 'border-amber-100 bg-gradient-to-br from-white to-amber-50/70' : ''}`}>
       <button type="button" className="block w-full text-left" onClick={onOpen}>
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0"><p className="truncate font-semibold text-stone-900">{wish.title}</p><p className="mt-1 text-xs text-stone-400"><UserRound className="mr-1 inline size-3" />{ownerName}</p></div>
+          <div className="min-w-0"><p className="truncate font-semibold text-stone-900"><RecordIconMark icon={wish.presentation?.icon}
+              spaceId={wish.spaceId} modelKey="wish" recordId={wish.id} className="mr-1" />{wish.title}</p><p className="mt-1 text-xs text-stone-400"><UserRound className="mr-1 inline size-3" />{ownerName}</p></div>
           {fulfilled ? <Sparkles className="size-5 shrink-0 text-amber-500" /> : <Gift className="size-5 shrink-0 text-pink-400" />}
         </div>
         {wish.description ? <p className="mt-4 line-clamp-3 text-sm leading-6 text-stone-500">{wish.description}</p> : null}
@@ -286,8 +290,9 @@ function WishCard({ wish, currentPersonId, canWrite, acting, ownerName, onOpen, 
   );
 }
 
-function WishEditor({ draft, editing, currentPersonId, canWrite, saving, onChange, onClose, onSave, onDelete }: {
+function WishEditor({ draft, spaceId, editing, currentPersonId, canWrite, saving, onChange, onClose, onSave, onDelete }: {
   draft: WishDraft;
+  spaceId: string;
   editing: WishRecord | null;
   currentPersonId: string | null;
   canWrite: boolean;
@@ -310,6 +315,8 @@ function WishEditor({ draft, editing, currentPersonId, canWrite, saving, onChang
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="mt-5 grid gap-4">
+          <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={!editable}
+            original={editing?.presentation?.icon} spaceId={spaceId} modelKey="wish" recordId={editing?.id} />
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">愿望<input className={inputClass} maxLength={100} disabled={!editable} value={draft.title} onChange={(event) => set('title', event.target.value)} autoFocus={!editing} /></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">希望日期（可空）<input type="date" className={inputClass} disabled={!editable} value={draft.desiredDate} onChange={(event) => set('desiredDate', event.target.value)} /></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">说明<textarea className={textareaClass} maxLength={5000} disabled={!editable} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
