@@ -8,6 +8,7 @@
  * - 所有动作提交当前 version，遇冲突重新拉取详情，绝不覆盖他人修改。
  */
 
+import { downloadRecordIconImage } from '../../services/record-icons';
 import {
   getDayRecord,
   deleteDayRecord,
@@ -57,6 +58,7 @@ Page({
     /** 展示字段 */
     name: '',
     icon: '',
+    iconImagePath: '',
     kind: '' as DayRecord['kind'] | '',
     status: 'active' as 'active' | 'archived',
     attentionLevel: 'none' as DayAttentionLevel,
@@ -155,6 +157,7 @@ Page({
     this.setData({
       name: record.name,
       icon: dayRecordIcon(record),
+      iconImagePath: '',
       kind: record.kind,
       status: record.status,
       attentionLevel: record.computed.attentionLevel,
@@ -168,6 +171,12 @@ Page({
       loaded: true,
       loadError: false,
     });
+    if (record.presentation?.icon?.type === 'image') {
+      const image = record.presentation.icon;
+      void downloadRecordIconImage(this.data.familyId, record.id, image.fileId)
+        .then(iconImagePath => this.setData({ iconImagePath }))
+        .catch(() => undefined);
+    }
   },
 
   onRetry(): void {
