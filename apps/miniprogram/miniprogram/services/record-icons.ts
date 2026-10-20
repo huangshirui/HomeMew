@@ -51,7 +51,7 @@ function requestBinary(url: string, method: 'GET' | 'POST', token: string, body?
   });
 }
 
-/** A pending image is uploaded only after the enclosing Record exists. */
+/** Pre-upload is scoped to the Space and later atomically assigned on Record Create/Update. */
 export async function uploadRecordIconImage(familyId: string, localPath: string): Promise<string> {
   const compressed = await compress(localPath);
   const bytes = await readFile(compressed);
@@ -60,7 +60,7 @@ export async function uploadRecordIconImage(familyId: string, localPath: string)
   let res = await requestBinary(base(familyId), 'POST', token, bytes, mimeFromPath(compressed));
   if (res.statusCode === 401) {
     token = await ensureAccessToken({ forceRefresh: true });
-    res = await requestBinary(base(familyId, recordId), 'POST', token, bytes, mimeFromPath(compressed));
+    res = await requestBinary(base(familyId), 'POST', token, bytes, mimeFromPath(compressed));
   }
   const response = typeof res.data === 'string' ? JSON.parse(res.data) as { data?: { fileId?: string }; error?: { message?: string } } : res.data as { data?: { fileId?: string }; error?: { message?: string } };
   if (res.statusCode !== 200 || !response?.data?.fileId) throw new AppError('ICON_UPLOAD_FAILED', response?.error?.message || '上传图标失败');
