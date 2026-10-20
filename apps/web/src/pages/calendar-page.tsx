@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ChevronLeft, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
+import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
 import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
@@ -18,6 +19,7 @@ type EventRecord = {
   id: string;
   spaceId: string;
   modelKey: 'event';
+  presentation?: { icon: RecordIcon | null };
   modelVersion: number;
   summary: string;
   description: string | null;
@@ -31,6 +33,7 @@ type EventRecord = {
 };
 
 type EventDraft = {
+  icon: RecordIconDraft;
   summary: string;
   description: string;
   location: string;
@@ -138,6 +141,7 @@ function defaultDraft(timeZone: string, date?: string): EventDraft {
   const startDate = date ?? currentDateInZone(timeZone);
   return {
     summary: '',
+    icon: emptyIconDraft(),
     description: '',
     location: '',
     isAllDay: false,
@@ -154,6 +158,7 @@ function draftFromEvent(event: EventRecord, viewingTimezone: string): EventDraft
   if (event.when.kind === 'date') {
     return {
       summary: event.summary,
+      icon: iconDraftFor(event.presentation?.icon),
       description: event.description ?? '',
       location: event.location ?? '',
       isAllDay: true,
@@ -169,6 +174,7 @@ function draftFromEvent(event: EventRecord, viewingTimezone: string): EventDraft
   const end = localDateParts(new Date(event.when.endExclusive), viewingTimezone);
   return {
     summary: event.summary,
+    icon: iconDraftFor(event.presentation?.icon),
     description: event.description ?? '',
     location: event.location ?? '',
     isAllDay: false,
@@ -424,7 +430,7 @@ export function CalendarPage() {
     setSaving(true);
     setError(null);
     try {
-      const payload = eventPayload(draft);
+      const payload = { ...eventPayload(draft), ...await presentationToSave(currentFamily.id, 'event', draft.icon, editing?.presentation?.icon) };
       if (editing) {
         await apiRequest<EventRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/event/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
@@ -611,7 +617,8 @@ export function CalendarPage() {
                   <button key={event.id} type="button" onClick={() => openEdit(event)} className="flex w-full min-w-0 items-start gap-3 px-4 py-4 text-left hover:bg-stone-50">
                     <span className="w-24 shrink-0 text-xs font-medium tabular-nums text-stone-500">{span.start}<span className="mt-1 block">{timeLabel(event, currentFamily.timezone)}</span></span>
                     <span className="min-w-0 flex-1">
-                      <span className="block break-words text-sm font-semibold text-stone-900">{event.summary}</span>
+                      <span className="block break-words text-sm font-semibold text-stone-900"><RecordIconMark
+              icon={event.presentation?.icon} spaceId={event.spaceId} modelKey="event" recordId={event.id} className="mr-1" />{event.summary}</span>
                       {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{event.location}</span> : null}
                       {span.endInclusive > span.start ? <span className="mt-1 block text-xs text-stone-400">持续至 {span.endInclusive}</span> : null}
                     </span>
@@ -762,6 +769,7 @@ export function CalendarPage() {
       {draft ? (
         <EventEditor
           draft={draft}
+          spaceId={currentFamily?.id || ''}
           editing={editing}
           members={members.filter((member) => member.personId)}
           canWrite={canWrite}
@@ -817,6 +825,7 @@ function CalendarHeader({ onCreate, canWrite, onToggleFilters, filtersExpanded, 
 
 function EventEditor({
   draft,
+  spaceId,
   editing,
   members,
   canWrite,
@@ -827,6 +836,7 @@ function EventEditor({
   onDelete,
 }: {
   draft: EventDraft;
+  spaceId: string;
   editing: EventRecord | null;
   members: ReturnType<typeof useHousehold>['members'];
   canWrite: boolean;
@@ -858,6 +868,8 @@ function EventEditor({
         </div>
 
         <div className="mt-5 grid gap-4">
+          <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly}
+            original={editing?.presentation?.icon} spaceId={spaceId} modelKey="event" recordId={editing?.id} />
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">
             日程名称
             <input className={inputClass} disabled={readOnly} maxLength={100} value={draft.summary} onChange={(event) => set('summary', event.target.value)} autoFocus={!editing} />
