@@ -526,6 +526,66 @@ async function proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, servi
   });
 }
 
+
+const RECORD_ICON_IMAGE = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/records\/(rec_[A-Za-z0-9_-]+)\/image$/u;
+const RECORD_ICON_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const RECORD_ICON_MAX_BYTES = 256 * 1024;
+
+async function recordIconImage(request, env, fetcher, assertion, id, nowMs, match) {
+  const [, spaceId, recordId] = match;
+  if (request.method !== 'POST' && request.method !== 'GET') {
+    throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Unsupported icon image method');
+  }
+  if (request.method === 'POST') requireSameOrigin(request);
+  const session = await ensureSession(request, env, fetcher, assertion, id, nowMs);
+  const spaceBase = `/api/v1/spaces/${encodeURIComponent(spaceId)}`;
+  const recordPath = `${spaceBase}/models/day_record/records/${encodeURIComponent(recordId)}`;
+  const imageDomain = (value) => {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || !url.hostname.endsWith('.r2.cloudflarestorage.com')) {
+      throw new HttpError(502, 'INVALID_UPSTREAM_RESPONSE', 'Unsafe Icon image target');
+    }
+    return url;
+  };
+  if (request.method === 'POST') {
+    const contentType = request.headers.get('content-type')?.split(';')[0].toLowerCase().trim() || '';
+    if (!RECORD_ICON_CONTENT_TYPES.has(contentType)) throw new HttpError(415, 'INVALID_ICON_IMAGE', 'Only PNG/JPEG/WebP are supported');
+    const bytes = await request.arrayBuffer();
+    if (!bytes.byteLength || bytes.byteLength > RECORD_ICON_MAX_BYTES) throw new HttpError(413, 'FILE_TOO_LARGE', 'Icon exceeds 256 KiB');
+    const sessionUpload = await coreUserRequest(env, fetcher, `${spaceBase}/file-uploads`, session.accessToken, id, {
+      method: 'POST',
+      body: { modelKey: 'day_record', fieldKey: '__record_icon', recordId, contentType, name: 'record-icon', size: bytes.byteLength },
+    });
+    const signed = imageDomain(sessionUpload?.upload?.url);
+    const put = await fetcher(signed, {
+      method: 'PUT', headers: { 'content-type': contentType },
+      body: bytes, redirect: 'manual',
+    });
+    if (!put.ok) throw new HttpError(502, 'ICON_UPLOAD_FAILED', 'Image transfer failed');
+    const complete = await coreUserRequest(env, fetcher,
+      `${spaceBase}/file-uploads/${encodeURIComponent(sessionUpload.id)}/complete`,
+      session.accessToken, id, { method: 'POST', body: {} });
+    return json({ data: { fileId: complete.id } }, 200, session.cookie ? { 'set-cookie': session.cookie } : {}, id);
+  }
+  const record = await coreUserRequest(env, fetcher, recordPath, session.accessToken, id);
+  if (record?.presentation?.icon?.type !== 'image') throw new HttpError(404, 'FILE_NOT_FOUND', 'Record has no image Icon');
+  const download = await coreUserRequest(env, fetcher, `${spaceBase}/file-downloads`, session.accessToken, id, {
+    method: 'POST', body: { modelKey: 'day_record', recordId, fieldKey: '__record_icon', fileId: record.presentation.icon.fileId },
+  });
+  const signed = imageDomain(download?.url);
+  const response = await fetcher(signed, { method: 'GET', redirect: 'manual' });
+  const contentType = response.headers.get('content-type')?.toLowerCase();
+  if (!response.ok || !RECORD_ICON_CONTENT_TYPES.has(contentType)) throw new HttpError(502, 'INVALID_UPSTREAM_RESPONSE', 'Invalid Icon response');
+  const bytes = await response.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > RECORD_ICON_MAX_BYTES) throw new HttpError(502, 'INVALID_UPSTREAM_RESPONSE', 'Invalid Icon size');
+  return new Response(bytes, { status: 200, headers: {
+    'content-type': contentType,
+    'cache-control': 'private, no-store',
+    'x-content-type-options': 'nosniff',
+    ...(session.cookie ? { 'set-cookie': session.cookie } : {}),
+  } });
+}
+
 export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {}) {
   return {
     async fetch(request, env) {
@@ -578,6 +638,10 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         }
         if (url.pathname === '/api/integrations' || url.pathname.startsWith('/api/integrations/')) {
           return await handleIntegrationRequest(request, env, { fetcher, assertion, id });
+        }
+        const iconImageRoute = RECORD_ICON_IMAGE.exec(url.pathname);
+        if (iconImageRoute) {
+          return await recordIconImage(request, env, fetcher, assertion, id, nowMs, iconImageRoute);
         }
         if (url.pathname.startsWith('/api/lifespace/core/')) {
           return await proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, 'core');
