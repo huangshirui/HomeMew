@@ -45,6 +45,8 @@ import {
 } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 import { consumeCloneSource } from '../../stores/clone-buffer';
+import { downloadRecordIconImage } from '../../services/record-icons';
+import { RECORD_ICON_EMOJIS, originalIconState, prepareRecordIcon } from '../../utils/record-icon-edit';
 
 /** 新增日程（非全天）的默认时间：开始取当前时间的下一个整点，结束 +1 小时；跨天则顺延日期 */
 function nextWholeHourDefaults(now: Date): { startTime: string; endTime: string; dayOffset: number } {
@@ -95,6 +97,11 @@ Page({
     showTimezoneSheet: false,
     members: [] as MemberOption[],
     summary: '',
+    iconChoices: RECORD_ICON_EMOJIS,
+    iconEmoji: '',
+    iconFileId: '',
+    iconImagePath: '',
+    iconTouched: false,
     description: '',
     isAllDay: true,
     startDate: '',
@@ -310,6 +317,7 @@ Page({
     ]);
     this.setData({
       summary: event.summary,
+      ...originalIconState(event.presentation?.icon),
       description: event.description || '',
       isAllDay: event.isAllDay,
       startDate: startDateStr,
@@ -335,9 +343,29 @@ Page({
       loaded: true,
     });
     this.refreshDerived();
+    if (event.presentation?.icon?.type === 'image') {
+      void downloadRecordIconImage(this.data.familyId, 'event', event.id, event.presentation.icon.fileId)
+        .then(iconImagePath => this.setData({ iconImagePath }))
+        .catch(() => undefined);
+    }
   },
 
   /* ----------------- 表单输入 ----------------- */
+
+  onIconSelect(e: WechatMiniprogram.TouchEvent): void {
+    this.setData({ iconEmoji: String(e.currentTarget.dataset.icon || ''), iconFileId: '', iconImagePath: '', iconTouched: true });
+  },
+  onIconClear(): void {
+    this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: '', iconTouched: true });
+  },
+  onIconImageChoose(): void {
+    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'],
+      success: result => {
+        const path = result.tempFiles?.[0]?.tempFilePath;
+        if (path) this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: path, iconTouched: true });
+      },
+    });
+  },
 
   onSummaryInput(e: WechatMiniprogram.Input): void {
     this.setData({ summary: e.detail.value });
@@ -636,11 +664,13 @@ Page({
       this.setData({ submitting: true });
       showLoading(this.data.mode === 'edit' ? '保存中...' : '创建中...');
       try {
+        const presentation = await prepareRecordIcon(this.data.familyId, 'event', this.data.mode, this.data);
+        const payloadWithIcon = { ...basePayload, ...(presentation ? { presentation } : {}) };
         if (this.data.mode === 'edit') {
-          const updatePayload: UpdateEventRequest = { ...basePayload, version: this.data.version };
+          const updatePayload: UpdateEventRequest = { ...payloadWithIcon, version: this.data.version };
           await updateEvent(this.data.familyId, this.data.eventId, updatePayload);
         } else {
-          await createEvent(this.data.familyId, basePayload);
+          await createEvent(this.data.familyId, payloadWithIcon);
         }
         hideLoading();
         showSuccess(this.data.mode === 'edit' ? '已保存' : '已创建');
@@ -665,6 +695,13 @@ Page({
     this.setData({ submitting: true });
     showLoading(`创建中 0/${payloads.length}`);
     try {
+      // Each Event receives its own R2 File identity. Emoji needs no upload.
+      // Pre-uploads happen before each atomic Record Create; a failed Create
+      // remains retryable with the previously prepared File identity.
+      for (let i = 0; i < payloads.length; i++) {
+        const presentation = await prepareRecordIcon(this.data.familyId, 'event', 'create', this.data);
+        if (presentation) payloads[i] = { ...payloads[i], presentation };
+      }
       const result = await createEventsBatch(this.data.familyId, payloads, {
         concurrency: 3,
         onProgress: (done, total) => showLoading(`创建中 ${done}/${total}`),
