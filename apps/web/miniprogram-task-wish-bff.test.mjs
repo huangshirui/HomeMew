@@ -330,3 +330,25 @@ test('LifeSpace concurrency and authorization errors are preserved', async () =>
   assert.equal(response.headers.get('x-request-id'), 'req_conflict');
   assert.deepEqual(await response.json(), { error: { code: 'VERSION_CONFLICT', message: 'stale version' } });
 });
+
+
+test('Task and Wish DTOs project icon only when supplied, existing fields remain intact', async () => {
+  const cases = [
+    ['tasks', 'task', task],
+    ['wishes', 'wish', wish],
+  ];
+  for (const [route, name, fixture] of cases) {
+    for (const withIcon of [false, true]) {
+      const raw = fixture(withIcon ? { presentation: { icon: { type: 'emoji', value: '🎁' } } } : {});
+      const result = await handleMiniProgramTaskWishBff(
+        request(`/api/v1/miniprogram/families/spc_home/${route}/rec_${name}`),
+        env(async incoming => new URL(incoming.url).pathname.endsWith('/members') ? ok(MEMBERS) : ok(raw)),
+      );
+      assert.equal(result.status, 200);
+      const dto = (await result.json()).data;
+      assert.equal(Object.hasOwn(dto, 'presentation'), withIcon);
+      if (withIcon) assert.deepEqual(dto.presentation.icon, { type: 'emoji', value: '🎁' });
+      assert.equal(dto.id, `rec_${name}`);
+    }
+  }
+});
