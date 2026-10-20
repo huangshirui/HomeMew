@@ -322,22 +322,23 @@ test('LifeSpace authorization and optimistic-concurrency errors propagate unchan
   assert.deepEqual(await response.json(), { error: { code: 'VERSION_CONFLICT', message: 'stale' } });
 });
 
-test('DayRecord DTO uses only shared presentation Icon; legacy icon writes are rejected', async () => {
+test('DayRecord optional presentation uses a single normal create/update request', async () => {
   const calls = [];
   const core = async incoming => {
     const path = new URL(incoming.url).pathname;
     calls.push({ path, method: incoming.method });
     if (path.endsWith('/members')) return ok(MEMBERS);
-    if (path.endsWith('/icon')) {
+    if (incoming.method === 'PATCH') {
       const body = await incoming.json();
-      assert.deepEqual(body, { icon: { type: 'emoji', value: '📚' }, version: 2 });
-      return ok({ id: 'rec_day', version: 3, presentation: { icon: body.icon } });
+      assert.deepEqual(body, { version: 2, presentation: { icon: { type: 'emoji', value: '📚' } } });
+      return ok(day({ version: 3, presentation: body.presentation }));
     }
     return ok(day({ presentation: { icon: { type: 'emoji', value: '📚' } } }));
   };
   const path = '/api/v1/miniprogram/families/spc_home/day-records/rec_day';
-  assert.deepEqual(matchMiniProgramDayDiagnosticRoute(`${path}/icon`), {
-    kind: 'icon', familyId: 'spc_home', recordId: 'rec_day',
+  assert.equal(matchMiniProgramDayDiagnosticRoute(`${path}/icon`), null);
+  assert.deepEqual(matchMiniProgramDayDiagnosticRoute('/api/v1/miniprogram/families/spc_home/day-records/icon-image'), {
+    kind: 'icon-upload', familyId: 'spc_home',
   });
   assert.deepEqual(matchMiniProgramDayDiagnosticRoute(`${path}/icon-image`), {
     kind: 'icon-image', familyId: 'spc_home', recordId: 'rec_day',
@@ -353,12 +354,18 @@ test('DayRecord DTO uses only shared presentation Icon; legacy icon writes are r
   }), env(core));
   assert.equal(legacy.status, 400);
 
-  const changed = await handleMiniProgramDayDiagnosticBff(request(`${path}/icon`, {
-    method: 'PATCH', body: { version: 2, icon: { type: 'emoji', value: '📚' } },
+  const changed = await handleMiniProgramDayDiagnosticBff(request(path, {
+    method: 'PATCH', body: { version: 2, presentation: { icon: { type: 'emoji', value: '📚' } } },
   }), env(core));
   assert.equal(changed.status, 200);
   assert.deepEqual((await changed.json()).data.presentation.icon, { type: 'emoji', value: '📚' });
-  assert.equal(calls.filter(call => call.path.endsWith('/icon')).length, 1);
+  assert.equal(calls.filter(call => call.method === 'PATCH').length, 1);
+
+  const missing = await handleMiniProgramDayDiagnosticBff(request(path), env(async incoming => {
+    if (new URL(incoming.url).pathname.endsWith('/members')) return ok(MEMBERS);
+    return ok(day({ icon: undefined, presentation: undefined }));
+  }));
+  assert.equal(Object.hasOwn((await missing.json()).data, 'presentation'), false);
 });
 
 test('DayRecord Icon image route rejects unsupported types and oversized bytes before transfer', async () => {
