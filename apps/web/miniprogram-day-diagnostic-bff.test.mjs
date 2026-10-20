@@ -368,8 +368,8 @@ test('DayRecord optional presentation uses a single normal create/update request
   assert.equal(Object.hasOwn((await missing.json()).data, 'presentation'), false);
 });
 
-test('DayRecord Icon image route rejects unsupported types and oversized bytes before transfer', async () => {
-  const path = '/api/v1/miniprogram/families/spc_home/day-records/rec_day/icon-image';
+test('DayRecord Icon pre-upload route rejects unsupported types and oversized bytes before transfer', async () => {
+  const path = '/api/v1/miniprogram/families/spc_home/day-records/icon-image';
   let forwards = 0;
   const app = env(async () => { forwards++; return assert.fail('no Core File call permitted'); });
   const invalidType = await handleMiniProgramDayDiagnosticBff(
