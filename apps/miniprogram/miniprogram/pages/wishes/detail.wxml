@@ -23,7 +23,7 @@
     <view class="hero status-{{status}}">
       <view class="hero-light"></view>
       <view class="hero-top">
-        <text class="hero-title">{{title}}</text>
+        <image wx:if="{{iconImagePath}}" src="{{iconImagePath}}" mode="aspectFit" style="width:56rpx;height:56rpx;border-radius:10rpx;margin-right:12rpx;vertical-align:middle" /><text wx:elif="{{iconEmoji}}" style="font-size:38rpx;margin-right:12rpx">{{iconEmoji}}</text><text class="hero-title">{{title}}</text>
         <text class="hero-status">{{statusLabel}}</text>
       </view>
       <text wx:if="{{status === 'fulfilled'}}" class="fulfilled-note">这个愿望已经成为一段真实的家庭记忆 ✨</text>
