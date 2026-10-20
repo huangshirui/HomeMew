@@ -46,7 +46,7 @@ import {
 import { markDirty } from '../../stores/dirty';
 import { consumeCloneSource } from '../../stores/clone-buffer';
 import { downloadRecordIconImage } from '../../services/record-icons';
-import { RECORD_ICON_EMOJIS, originalIconState, prepareRecordIcon } from '../../utils/record-icon-edit';
+import { originalIconState, prepareRecordIcon, pickerChangeState, type RecordIconPickerChange } from '../../utils/record-icon-edit';
 
 /** 新增日程（非全天）的默认时间：开始取当前时间的下一个整点，结束 +1 小时；跨天则顺延日期 */
 function nextWholeHourDefaults(now: Date): { startTime: string; endTime: string; dayOffset: number } {
@@ -97,7 +97,6 @@ Page({
     showTimezoneSheet: false,
     members: [] as MemberOption[],
     summary: '',
-    iconChoices: RECORD_ICON_EMOJIS,
     iconEmoji: '',
     iconFileId: '',
     iconImagePath: '',
@@ -352,19 +351,8 @@ Page({
 
   /* ----------------- 表单输入 ----------------- */
 
-  onIconSelect(e: WechatMiniprogram.TouchEvent): void {
-    this.setData({ iconEmoji: String(e.currentTarget.dataset.icon || ''), iconFileId: '', iconImagePath: '', iconTouched: true });
-  },
-  onIconClear(): void {
-    this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: '', iconTouched: true });
-  },
-  onIconImageChoose(): void {
-    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'],
-      success: result => {
-        const path = result.tempFiles?.[0]?.tempFilePath;
-        if (path) this.setData({ iconEmoji: '', iconFileId: '', iconImagePath: path, iconTouched: true });
-      },
-    });
+  onRecordIconChange(e: WechatMiniprogram.CustomEvent<RecordIconPickerChange>): void {
+    this.setData(pickerChangeState(e.detail));
   },
 
   onSummaryInput(e: WechatMiniprogram.Input): void {
