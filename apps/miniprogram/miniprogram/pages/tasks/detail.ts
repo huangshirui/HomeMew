@@ -20,6 +20,7 @@ import {
 import { Task } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { downloadRecordIconImage } from '../../services/record-icons';
 
 Page({
   data: {
@@ -28,6 +29,8 @@ Page({
     task: null as Task | null,
     /** 视图层使用的派生字段 */
     name: '',
+    iconEmoji: '',
+    iconImagePath: '',
     description: '',
     dueDate: '' as string | null,
     dueText: '无',
@@ -107,6 +110,8 @@ Page({
     this.setData({
       task,
       name: task.name,
+      iconEmoji: task.presentation?.icon?.type === 'emoji' ? task.presentation.icon.value : '',
+      iconImagePath: '',
       description: task.description || '',
       dueDate: task.dueDate,
       dueText: task.dueDate ? formatDate(task.dueDate, 'date') : '无',
@@ -127,6 +132,14 @@ Page({
       toggling: false,
       deleting: false,
     });
+    if (task.presentation?.icon?.type === 'image') {
+      const fileId = task.presentation.icon.fileId;
+      void downloadRecordIconImage(this.data.familyId, 'task', task.id, fileId)
+        .then(iconImagePath => {
+          if (this.data.task?.id === task.id && this.data.task?.presentation?.icon?.type === 'image'
+            && this.data.task.presentation.icon.fileId === fileId) this.setData({ iconImagePath });
+        }).catch(() => undefined);
+    }
   },
 
   onEdit(): void {
