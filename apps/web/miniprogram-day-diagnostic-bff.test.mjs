@@ -104,6 +104,65 @@ test('Day list lowers the compatibility query exactly and preserves Temporal com
   assert.equal(result.items[0].nextDueDate, '2026-09-11');
 });
 
+test('Mini 生活记录 filter accepts elapsed,cycle with stable cursor pagination and Temporal DTOs', async () => {
+  const calls = [];
+  let pageCount = 0;
+  const core = async incoming => {
+    const url = new URL(incoming.url);
+    if (url.pathname.endsWith('/members')) return ok(MEMBERS);
+    calls.push({ method: incoming.method, path: url.pathname + url.search });
+    pageCount += 1;
+    return ok({
+      items: [day({
+        id: pageCount === 1 ? 'rec_elapsed' : 'rec_cycle',
+        name: pageCount === 1 ? 'Life elapsed' : 'Life cycle',
+        kind: pageCount === 1 ? 'elapsed' : 'cycle',
+      })],
+      nextCursor: pageCount === 1 ? 'cur_life_2' : null,
+    });
+  };
+  const path = '/api/v1/miniprogram/families/spc_home/day-records?status=active&kind=elapsed%2Ccycle&limit=20';
+  const first = await handleMiniProgramDayDiagnosticBff(request(path), env(core));
+  assert.equal(first.status, 200);
+  const firstPage = (await first.json()).data;
+  assert.equal(firstPage.nextCursor, 'cur_life_2');
+  assert.deepEqual(firstPage.items.map(item => item.kind), ['elapsed']);
+  assert.deepEqual(firstPage.items[0].computed, day().computed.temporal);
+  assert.equal(firstPage.items[0].subject.userId, 'usr_kid');
+
+  const second = await handleMiniProgramDayDiagnosticBff(request(path + '&cursor=cur_life_2'), env(core));
+  assert.equal(second.status, 200);
+  const secondPage = (await second.json()).data;
+  assert.equal(secondPage.nextCursor, null);
+  assert.deepEqual(secondPage.items.map(item => item.kind), ['cycle']);
+  assert.equal(secondPage.items[0].nextDueDate, '2026-09-11');
+  assert.deepEqual(calls, [
+    { method: 'GET', path: '/api/v1/spaces/spc_home/models/day_record/records?kind=elapsed%2Ccycle&status=active&limit=20' },
+    { method: 'GET', path: '/api/v1/spaces/spc_home/models/day_record/records?kind=elapsed%2Ccycle&status=active&limit=20&cursor=cur_life_2' },
+  ]);
+});
+
+test('Mini life filter rejects unsupported multi-kinds and Temporal-only combinations', async () => {
+  const never = env(async () => assert.fail('invalid Day filter must not reach upstream'));
+  const invalidQueries = [
+    'kind=elapsed%2Ccycle%2Ccountdown',
+    'kind=cycle%2Celapsed',
+    'kind=elapsed%2Ccycle&attentionOnly=true',
+    'kind=elapsed%2Ccycle&attentionOnly=false',
+    'kind=elapsed%2Ccycle&sort=attention',
+    'kind=elapsed%2Ccycle&sort=date_asc',
+    'kind=elapsed%2Ccycle&sort=date_desc',
+  ];
+  for (const query of invalidQueries) {
+    const response = await handleMiniProgramDayDiagnosticBff(
+      request('/api/v1/miniprogram/families/spc_home/day-records?' + query),
+      never,
+    );
+    assert.equal(response.status, 400, query);
+    assert.equal((await response.json()).error.code, 'INVALID_QUERY', query);
+  }
+});
+
 test('Day subject me resolves through the current principal', async () => {
   const calls = [];
   const response = await handleMiniProgramDayDiagnosticBff(request(
