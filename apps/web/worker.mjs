@@ -528,6 +528,7 @@ async function proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, servi
 
 
 const RECORD_ICON_IMAGE = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/records\/(rec_[A-Za-z0-9_-]+)\/image$/u;
+const RECORD_ICON_UPLOAD = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/image$/u;
 const RECORD_ICON_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const RECORD_ICON_MAX_BYTES = 256 * 1024;
 
@@ -554,7 +555,7 @@ async function recordIconImage(request, env, fetcher, assertion, id, nowMs, matc
     if (!bytes.byteLength || bytes.byteLength > RECORD_ICON_MAX_BYTES) throw new HttpError(413, 'FILE_TOO_LARGE', 'Icon exceeds 256 KiB');
     const sessionUpload = await coreUserRequest(env, fetcher, `${spaceBase}/file-uploads`, session.accessToken, id, {
       method: 'POST',
-      body: { modelKey: 'day_record', fieldKey: '__record_icon', recordId, contentType, name: 'record-icon', size: bytes.byteLength },
+      body: { modelKey: 'day_record', fieldKey: '__record_icon', ...(recordId ? { recordId } : {}), contentType, name: 'record-icon', size: bytes.byteLength },
     });
     const signed = imageDomain(sessionUpload?.upload?.url);
     const put = await fetcher(signed, {
@@ -639,8 +640,11 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         if (url.pathname === '/api/integrations' || url.pathname.startsWith('/api/integrations/')) {
           return await handleIntegrationRequest(request, env, { fetcher, assertion, id });
         }
-        const iconImageRoute = RECORD_ICON_IMAGE.exec(url.pathname);
+        const iconImageRoute = RECORD_ICON_IMAGE.exec(url.pathname) || RECORD_ICON_UPLOAD.exec(url.pathname);
         if (iconImageRoute) {
+          if (RECORD_ICON_UPLOAD.test(url.pathname) && request.method !== 'POST') {
+            throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Unsupported Icon image method');
+          }
           return await recordIconImage(request, env, fetcher, assertion, id, nowMs, iconImageRoute);
         }
         if (url.pathname.startsWith('/api/lifespace/core/')) {
