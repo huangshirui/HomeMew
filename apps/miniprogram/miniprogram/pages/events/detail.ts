@@ -27,6 +27,7 @@ import { markDirty } from '../../stores/dirty';
 import { currentFamilyStore, familiesStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { setCloneSource } from '../../stores/clone-buffer';
+import { downloadRecordIconImage } from '../../services/record-icons';
 
 Page({
   data: {
@@ -35,6 +36,8 @@ Page({
     event: null as Event | null,
     /** 视图层使用的派生字段 */
     summary: '',
+    iconEmoji: '',
+    iconImagePath: '',
     description: '',
     isAllDay: false,
     dateText: '',
@@ -130,6 +133,8 @@ Page({
     this.setData({
       event,
       summary: event.summary,
+      iconEmoji: event.presentation?.icon?.type === 'emoji' ? event.presentation.icon.value : '',
+      iconImagePath: '',
       description: event.description || '',
       isAllDay,
       dateText,
@@ -145,6 +150,14 @@ Page({
       updatedAtText: formatDate(event.updatedAt, 'datetime'),
       loaded: true,
     });
+    if (event.presentation?.icon?.type === 'image') {
+      const fileId = event.presentation.icon.fileId;
+      void downloadRecordIconImage(this.data.familyId, 'event', event.id, fileId)
+        .then(iconImagePath => {
+          if (this.data.event?.id === event.id && this.data.event?.presentation?.icon?.type === 'image'
+            && this.data.event.presentation.icon.fileId === fileId) this.setData({ iconImagePath });
+        }).catch(() => undefined);
+    }
   },
 
   onEdit(): void {
