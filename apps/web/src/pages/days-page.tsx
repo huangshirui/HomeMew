@@ -21,7 +21,7 @@ type DayRecord = {
   kind: DayKind;
   anchorDate: string;
   subjectPersonId: string | null;
-  presentation: { icon: RecordIcon | null };
+  presentation?: { icon: RecordIcon | null };
   attentionAfterDays: number | null;
   attentionBeforeDays: number | null;
   cycleDays: number | null;
@@ -84,10 +84,10 @@ function messageOf(cause: unknown, fallback: string) {
 const iconImagePath = (spaceId: string, recordId: string, fileId: string) =>
   `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/records/${encodeURIComponent(recordId)}/image?fileId=${encodeURIComponent(fileId)}`;
 
-async function uploadIconImage(spaceId: string, recordId: string, file: File): Promise<string> {
+async function uploadIconImage(spaceId: string, file: File): Promise<string> {
   if (file.size <= 0 || file.size > 256 * 1024) throw new Error('图标图片不能超过 256 KiB，请压缩后重试');
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('只允许 PNG、JPEG、WebP 图片');
-  const response = await fetch(iconImagePath(spaceId, recordId, '' ).split('?')[0], {
+  const response = await fetch(`/api/record-icons/spaces/${encodeURIComponent(spaceId)}/image`, {
     method: 'POST', credentials: 'same-origin',
     headers: { 'content-type': file.type }, body: file,
   });
@@ -112,7 +112,7 @@ function draftFromRecord(record: DayRecord): DayDraft {
     anchorDate: record.anchorDate,
     subjectPersonId: record.subjectPersonId ?? '',
     icon: record.presentation?.icon?.type === 'emoji' ? record.presentation.icon.value : '',
-    imageFileId: record.presentation?.icon?.type === 'image' ? record.presentation.icon.fileId : '',
+    imageFileId: record.presentation?.icon?.type === 'image' ? record.presentation!.icon!.fileId : '',
     imageFile: null,
     attentionDays: String(record.kind === 'elapsed' ? record.attentionAfterDays ?? '' : record.attentionBeforeDays ?? ''),
     cycleDays: String(record.cycleDays ?? ''),
@@ -153,7 +153,6 @@ function updatePayload(record: DayRecord, draft: DayDraft) {
     name,
     description: draft.description.trim() || null,
     subjectPersonId: draft.subjectPersonId || null,
-    icon: draft.icon.trim() || null,
   };
   if (record.kind === 'elapsed') common.attentionAfterDays = parseOptionalInteger(draft.attentionDays, 1, '提醒天数');
   if (record.kind === 'countdown') {
@@ -272,35 +271,33 @@ export function DaysPage() {
     setOccurrence(null);
   }
 
-  async function persistIcon(recordId: string, version: number) {
-    if (!currentFamily || !draft) return;
-    let icon: RecordIcon | null = draft.icon.trim() ? { type: 'emoji', value: draft.icon.trim() } : null;
-    if (draft.imageFileId) icon = { type: 'image', fileId: draft.imageFileId };
-    if (draft.imageFile) icon = { type: 'image', fileId: await uploadIconImage(currentFamily.id, recordId, draft.imageFile) };
-    await apiRequest(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(recordId)}/icon`, {
-      method: 'PATCH', body: JSON.stringify({ version, icon }),
-    });
-  }
-
   async function saveRecord(event: FormEvent) {
     event.preventDefault();
     if (!currentFamily || !draft || !canWrite) return;
     setSaving(true);
     setError(null);
     try {
+      // Image bytes may require a pre-upload, but business fields and File identity
+      // are committed in exactly one governed Record mutation.
+      let icon: RecordIcon | null = draft.icon.trim() ? { type: 'emoji', value: draft.icon.trim() } : null;
+      if (draft.imageFileId) icon = { type: 'image', fileId: draft.imageFileId };
+      if (draft.imageFile) icon = { type: 'image', fileId: await uploadIconImage(currentFamily.id, draft.imageFile) };
+      const before = editing?.presentation?.icon ?? null;
+      const includeIcon = editing
+        ? JSON.stringify(before) !== JSON.stringify(icon)
+        : icon !== null;
+      const presentation = includeIcon ? { presentation: { icon } } : {};
       if (editing) {
-        const saved = await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(editing.id)}`, {
+        await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
-          body: JSON.stringify({ ...updatePayload(editing, draft), version: editing.version }),
+          body: JSON.stringify({ ...updatePayload(editing, draft), ...presentation, version: editing.version }),
         });
-        await persistIcon(saved.id, saved.version);
       } else {
         const payload = createPayload(draft);
         if (draft.kind === 'cycle' && payload.cycleDays === null) throw new Error('周期类型必须填写周期天数');
-        const saved = await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records`, {
-          method: 'POST', body: JSON.stringify(payload),
+        await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records`, {
+          method: 'POST', body: JSON.stringify({ ...payload, ...presentation }),
         });
-        await persistIcon(saved.id, saved.version);
       }
       setEditing(null);
       setDraft(null);
@@ -406,7 +403,7 @@ export function DaysPage() {
                   <button type="button" className="block w-full text-left" onClick={() => openEdit(record)}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-stone-900">{record.presentation.icon?.type === 'image'
+                        <p className="truncate font-semibold text-stone-900">{record.presentation?.icon?.type === 'image'
                             ? <img alt="" src={iconImagePath(record.spaceId, record.id, record.presentation.icon.fileId)} className="mr-2 inline size-6 rounded-md object-contain" />
                             : recordIconEmoji(record.presentation.icon) ? `${recordIconEmoji(record.presentation.icon)} ` : ''}{record.name}</p>
                         <p className="mt-1 text-xs text-stone-400">{KIND_COPY[record.kind].label} · {record.anchorDate}</p>
