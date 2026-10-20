@@ -5,8 +5,9 @@ import { getApplicationBaseUrl, generateRequestId, UPLOAD_TIMEOUT } from './conf
 
 const MAX_BYTES = 256 * 1024;
 const cache = new Map<string, string>();
-const base = (familyId: string, recordId?: string) =>
-  `${getApplicationBaseUrl()}/api/v1/miniprogram/families/${encodeURIComponent(familyId)}/day-records/${recordId ? `${encodeURIComponent(recordId)}/` : ''}icon-image`;
+export type IconModel = 'day_record' | 'event' | 'task' | 'wish';
+const base = (familyId: string, modelKey: IconModel, recordId?: string) =>
+  `${getApplicationBaseUrl()}/api/v1/miniprogram/families/${encodeURIComponent(familyId)}/record-icons/${modelKey}/${recordId ? `records/${encodeURIComponent(recordId)}/` : ''}image`;
 
 function readFile(path: string): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
@@ -52,15 +53,15 @@ function requestBinary(url: string, method: 'GET' | 'POST', token: string, body?
 }
 
 /** Pre-upload is scoped to the Space and later atomically assigned on Record Create/Update. */
-export async function uploadRecordIconImage(familyId: string, localPath: string): Promise<string> {
+export async function uploadRecordIconImage(familyId: string, modelKey: IconModel, localPath: string): Promise<string> {
   const compressed = await compress(localPath);
   const bytes = await readFile(compressed);
   if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) throw new AppError('FILE_TOO_LARGE', '图标图片必须小于 256 KiB，请裁剪或压缩后重试');
   let token = await ensureAccessToken();
-  let res = await requestBinary(base(familyId), 'POST', token, bytes, mimeFromPath(compressed));
+  let res = await requestBinary(base(familyId, modelKey), 'POST', token, bytes, mimeFromPath(compressed));
   if (res.statusCode === 401) {
     token = await ensureAccessToken({ forceRefresh: true });
-    res = await requestBinary(base(familyId), 'POST', token, bytes, mimeFromPath(compressed));
+    res = await requestBinary(base(familyId, modelKey), 'POST', token, bytes, mimeFromPath(compressed));
   }
   const response = typeof res.data === 'string' ? JSON.parse(res.data) as { data?: { fileId?: string }; error?: { message?: string } } : res.data as { data?: { fileId?: string }; error?: { message?: string } };
   if (res.statusCode !== 200 || !response?.data?.fileId) throw new AppError('ICON_UPLOAD_FAILED', response?.error?.message || '上传图标失败');
@@ -68,15 +69,15 @@ export async function uploadRecordIconImage(familyId: string, localPath: string)
 }
 
 /** WeChat <image> cannot forward Bearer headers; save the authorized bytes to a temporary local path. */
-export async function downloadRecordIconImage(familyId: string, recordId: string, fileId: string): Promise<string> {
-  const key = `${familyId}:${recordId}:${fileId}`;
+export async function downloadRecordIconImage(familyId: string, modelKey: IconModel, recordId: string, fileId: string): Promise<string> {
+  const key = `${familyId}:${modelKey}:${recordId}:${fileId}`;
   const saved = cache.get(key);
   if (saved) return saved;
   let token = await ensureAccessToken();
-  let res = await requestBinary(base(familyId, recordId), 'GET', token);
+  let res = await requestBinary(base(familyId, modelKey, recordId), 'GET', token);
   if (res.statusCode === 401) {
     token = await ensureAccessToken({ forceRefresh: true });
-    res = await requestBinary(base(familyId, recordId), 'GET', token);
+    res = await requestBinary(base(familyId, modelKey, recordId), 'GET', token);
   }
   if (res.statusCode !== 200 || !(res.data instanceof ArrayBuffer)) throw new AppError('ICON_DOWNLOAD_FAILED', '无法读取图片图标');
   const bytes = res.data as ArrayBuffer;
