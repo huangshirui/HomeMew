@@ -41,7 +41,7 @@ const DEFAULT_ICONS: Record<DayRecordKind, string> = {
 };
 
 export function dayRecordIcon(record: DayRecord): string {
-  return record.icon || DEFAULT_ICONS[record.kind];
+  return record.presentation?.icon?.type === 'emoji' ? record.presentation.icon.value : DEFAULT_ICONS[record.kind];
 }
 
 /** 生活化的种类标签 */
