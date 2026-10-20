@@ -243,13 +243,18 @@ async function listDays(request, env, familyId, url) {
   const page = parsePage(url);
   if (!page.ok) return page.response;
   const kind = url.searchParams.get('kind');
-  if (kind !== null && !['elapsed', 'countdown', 'cycle'].includes(kind)) return errorResponse(400, 'INVALID_QUERY', 'kind is invalid');
+  // The Mini life tab uses the two-value enum filter already supported by LifeSpace's canonical-backed GET.
+  if (kind !== null && !['elapsed', 'countdown', 'cycle', 'elapsed,cycle'].includes(kind)) return errorResponse(400, 'INVALID_QUERY', 'kind is invalid');
   const status = url.searchParams.get('status');
   if (status !== null && !['active', 'archived'].includes(status)) return errorResponse(400, 'INVALID_QUERY', 'status is invalid');
   const attentionRaw = url.searchParams.get('attentionOnly');
   if (attentionRaw !== null && !['true', 'false'].includes(attentionRaw)) return errorResponse(400, 'INVALID_QUERY', 'attentionOnly is invalid');
   const sortName = url.searchParams.get('sort');
   if (sortName !== null && !Object.hasOwn(DAY_SORTS, sortName)) return errorResponse(400, 'INVALID_QUERY', 'sort is invalid');
+  if (kind === 'elapsed,cycle' && (attentionRaw !== null || ['attention', 'date_asc', 'date_desc'].includes(sortName))) {
+    // Temporal-only GET paths do not support multi-kind filtering; never return a silently incomplete list.
+    return errorResponse(400, 'INVALID_QUERY', 'multi-kind cannot be combined with Temporal-only filters or sorts');
+  }
   const subjectUserId = url.searchParams.get('subjectUserId');
   if (subjectUserId !== null && !USER_ID.test(subjectUserId)) return errorResponse(400, 'INVALID_QUERY', 'subjectUserId is invalid');
 
