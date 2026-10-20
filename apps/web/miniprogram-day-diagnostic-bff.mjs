@@ -24,64 +24,12 @@ function decodeId(value, pattern) {
 
 export function matchMiniProgramDayDiagnosticRoute(pathname) {
   if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/icon-imageimport { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
-
-const MINI_PREFIX = '/api/v1/miniprogram';
-const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
-const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
-const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
-const DATE = /^\d{4}-\d{2}-\d{2}$/u;
-const DAY_SORTS = Object.freeze({
-  attention: 'attention:desc',
-  date_asc: 'effectiveDate:asc',
-  date_desc: 'effectiveDate:desc',
-  created_desc: 'createdAt:desc',
-  updated_desc: 'updatedAt:desc',
-});
-
-function decodeId(value, pattern) {
-  try {
-    const decoded = decodeURIComponent(value);
-    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
-}
-
-export function matchMiniProgramDayDiagnosticRoute(pathname) {
-  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-, 'u').exec(pathname);
+  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/icon-image$`, 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
     return familyId ? { kind: 'icon-upload', familyId } : null;
   }
-  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-recordsimport { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
-
-const MINI_PREFIX = '/api/v1/miniprogram';
-const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
-const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
-const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
-const DATE = /^\d{4}-\d{2}-\d{2}$/u;
-const DAY_SORTS = Object.freeze({
-  attention: 'attention:desc',
-  date_asc: 'effectiveDate:asc',
-  date_desc: 'effectiveDate:desc',
-  created_desc: 'createdAt:desc',
-  updated_desc: 'updatedAt:desc',
-});
-
-function decodeId(value, pattern) {
-  try {
-    const decoded = decodeURIComponent(value);
-    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
-}
-
-export function matchMiniProgramDayDiagnosticRoute(pathname) {
-  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-, 'u').exec(pathname);
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records$`, 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
     return familyId ? { kind: 'day-records', familyId } : null;
@@ -92,101 +40,7 @@ export function matchMiniProgramDayDiagnosticRoute(pathname) {
     const recordId = decodeId(match[2], RECORD_ID);
     return familyId && recordId ? { kind: 'day-record', familyId, recordId } : null;
   }
-  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+)/(icon-image)import { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
-
-const MINI_PREFIX = '/api/v1/miniprogram';
-const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
-const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
-const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
-const DATE = /^\d{4}-\d{2}-\d{2}$/u;
-const DAY_SORTS = Object.freeze({
-  attention: 'attention:desc',
-  date_asc: 'effectiveDate:asc',
-  date_desc: 'effectiveDate:desc',
-  created_desc: 'createdAt:desc',
-  updated_desc: 'updatedAt:desc',
-});
-
-function decodeId(value, pattern) {
-  try {
-    const decoded = decodeURIComponent(value);
-    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
-}
-
-export function matchMiniProgramDayDiagnosticRoute(pathname) {
-  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/icon-imageimport { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
-
-const MINI_PREFIX = '/api/v1/miniprogram';
-const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
-const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
-const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
-const DATE = /^\d{4}-\d{2}-\d{2}$/u;
-const DAY_SORTS = Object.freeze({
-  attention: 'attention:desc',
-  date_asc: 'effectiveDate:asc',
-  date_desc: 'effectiveDate:desc',
-  created_desc: 'createdAt:desc',
-  updated_desc: 'updatedAt:desc',
-});
-
-function decodeId(value, pattern) {
-  try {
-    const decoded = decodeURIComponent(value);
-    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
-}
-
-export function matchMiniProgramDayDiagnosticRoute(pathname) {
-  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-, 'u').exec(pathname);
-  if (match) {
-    const familyId = decodeId(match[1], FAMILY_ID);
-    return familyId ? { kind: 'icon-upload', familyId } : null;
-  }
-  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-recordsimport { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
-
-const MINI_PREFIX = '/api/v1/miniprogram';
-const FAMILY_ID = /^spc_[A-Za-z0-9_-]+$/u;
-const RECORD_ID = /^rec_[A-Za-z0-9_-]+$/u;
-const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
-const DATE = /^\d{4}-\d{2}-\d{2}$/u;
-const DAY_SORTS = Object.freeze({
-  attention: 'attention:desc',
-  date_asc: 'effectiveDate:asc',
-  date_desc: 'effectiveDate:desc',
-  created_desc: 'createdAt:desc',
-  updated_desc: 'updatedAt:desc',
-});
-
-function decodeId(value, pattern) {
-  try {
-    const decoded = decodeURIComponent(value);
-    return decoded.length <= 200 && pattern.test(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
-}
-
-export function matchMiniProgramDayDiagnosticRoute(pathname) {
-  if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-, 'u').exec(pathname);
-  if (match) {
-    const familyId = decodeId(match[1], FAMILY_ID);
-    return familyId ? { kind: 'day-records', familyId } : null;
-  }
-  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+)$`, 'u').exec(pathname);
-  if (match) {
-    const familyId = decodeId(match[1], FAMILY_ID);
-    const recordId = decodeId(match[2], RECORD_ID);
-    return familyId && recordId ? { kind: 'day-record', familyId, recordId } : null;
-  }
-  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+), 'u').exec(pathname);
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records/([^/]+)/(icon-image)$`, 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
     const recordId = decodeId(match[2], RECORD_ID);
