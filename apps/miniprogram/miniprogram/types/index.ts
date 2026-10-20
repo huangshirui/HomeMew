@@ -404,6 +404,8 @@ export interface CycleDayComputed extends DayComputedCommon {
   progressRatio: number;
 }
 
+export type RecordIcon = { type: 'emoji'; value: string } | { type: 'image'; fileId: string };
+
 export interface DayRecordCommon {
   id: string;
   familyId: string;
@@ -411,7 +413,7 @@ export interface DayRecordCommon {
   description: string | null;
   /** 关联对象；null 表示全家 */
   subject: PersonRef | null;
-  icon: string | null;
+  presentation: { icon: RecordIcon | null };
   status: DayRecordStatus;
   version: number;
   createdBy: Actor;
@@ -457,7 +459,6 @@ interface CreateDayRecordCommon {
   description?: string | null;
   anchorDate: string;
   subjectUserId?: string | null;
-  icon?: string | null;
 }
 
 export interface CreateElapsedDayRecordRequest extends CreateDayRecordCommon {
@@ -492,7 +493,6 @@ export type CreateDayRecordRequest =
 interface DayRecordUpdateFields {
   name?: string;
   description?: string | null;
-  icon?: string | null;
   subjectUserId?: string | null;
   anchorDate?: string;
   cycleDays?: number;
