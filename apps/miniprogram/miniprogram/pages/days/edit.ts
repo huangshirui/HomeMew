@@ -17,7 +17,6 @@ import {
   getDayRecord,
   createDayRecord,
   updateDayRecord,
-  updateDayRecordIcon,
 } from '../../services/day-records';
 import { uploadRecordIconImage, downloadRecordIconImage } from '../../services/record-icons';
 import type { RecordIcon } from '../../types/index';
@@ -118,6 +117,7 @@ Page({
     icon: '',
     iconImagePath: '',
     iconFileId: '',
+    iconTouched: false,
     subjectUserId: '' as string,
     subjectText: '全家',
     members: [] as SubjectOption[],
@@ -230,6 +230,7 @@ Page({
       icon: record.presentation?.icon?.type === 'emoji' ? record.presentation.icon.value : '',
       iconFileId: record.presentation?.icon?.type === 'image' ? record.presentation.icon.fileId : '',
       iconImagePath: '',
+      iconTouched: false,
 
       subjectUserId,
       subjectText: subjectName(memberOptions, subjectUserId, record.subject?.displayName),
@@ -295,7 +296,7 @@ Page({
   /** 图标只能从内置 Emoji 中选择，禁止提交任意图片 URL */
   onIconSelect(e: WechatMiniprogram.TouchEvent): void {
     const icon = e.currentTarget.dataset.icon as string;
-    this.setData({ icon: this.data.icon === icon ? '' : icon, iconImagePath: '', iconFileId: '' });
+    this.setData({ icon: this.data.icon === icon ? '' : icon, iconImagePath: '', iconFileId: '', iconTouched: true });
   },
 
   onChooseIconImage(): void {
@@ -303,7 +304,7 @@ Page({
       count: 1, mediaType: ['image'], sourceType: ['album', 'camera'],
       success: result => {
         const path = result.tempFiles?.[0]?.tempFilePath || '';
-        if (path) this.setData({ icon: '', iconImagePath: path, iconFileId: '' });
+        if (path) this.setData({ icon: '', iconImagePath: path, iconFileId: '', iconTouched: true });
       },
       fail: () => undefined,
     });
@@ -405,7 +406,9 @@ Page({
   },
 
   async submitCreate(name: string, kind: DayRecordKind): Promise<void> {
+    const presentation = await this.prepareIconPresentation();
     const common = {
+      ...(presentation ? { presentation } : {}),
       name,
       description: this.data.description.trim() || null,
       anchorDate: this.data.anchorDate,
@@ -433,8 +436,7 @@ Page({
         attentionBeforeDays: optionalNumber(this.data.attentionBeforeDays),
       };
     }
-    const created = await createDayRecord(this.data.familyId, payload);
-    await this.saveIcon(created.id, created.version);
+    await createDayRecord(this.data.familyId, payload);
   },
 
   /**
@@ -445,7 +447,6 @@ Page({
     const fields: Record<string, unknown> = {
       name,
       description: this.data.description.trim() || null,
-      icon: this.data.icon || null,
       subjectUserId: this.data.subjectUserId || null,
     };
 
@@ -460,24 +461,26 @@ Page({
       fields.attentionBeforeDays = optionalNumber(this.data.attentionBeforeDays);
     }
 
+    const presentation = await this.prepareIconPresentation();
     const payload = {
       ...fields,
+      ...(presentation ? { presentation } : {}),
       version: this.data.version,
     } as unknown as UpdateDayRecordRequest;
-    const updated = await updateDayRecord(this.data.familyId, this.data.dayRecordId, payload);
-    await this.saveIcon(updated.id, updated.version);
+    await updateDayRecord(this.data.familyId, this.data.dayRecordId, payload);
   },
 
-  async saveIcon(recordId: string, version: number): Promise<void> {
-    let icon: RecordIcon | null = this.data.icon
-      ? { type: 'emoji', value: this.data.icon }
-      : null;
+  async prepareIconPresentation(): Promise<{ icon: RecordIcon | null } | undefined> {
+    // No metadata is required. Editing unrelated fields never touches the Icon.
+    if (this.data.mode === 'edit' && !this.data.iconTouched) return undefined;
+    if (this.data.mode === 'create' && !this.data.icon && !this.data.iconFileId && !this.data.iconImagePath) return undefined;
+    let icon: RecordIcon | null = this.data.icon ? { type: 'emoji', value: this.data.icon } : null;
     if (this.data.iconFileId) icon = { type: 'image', fileId: this.data.iconFileId };
     else if (this.data.iconImagePath) {
-      const fileId = await uploadRecordIconImage(this.data.familyId, recordId, this.data.iconImagePath);
+      const fileId = await uploadRecordIconImage(this.data.familyId, this.data.iconImagePath);
       icon = { type: 'image', fileId };
     }
-    await updateDayRecordIcon(this.data.familyId, recordId, version, icon);
+    return { icon };
   },
 
   onCancel(): void {
