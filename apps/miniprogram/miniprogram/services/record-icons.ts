@@ -4,7 +4,6 @@ import { ensureAccessToken } from './auth';
 import { getApplicationBaseUrl, generateRequestId, UPLOAD_TIMEOUT } from './config';
 
 const MAX_BYTES = 256 * 1024;
-const cache = new Map<string, string>();
 export type IconModel = 'day_record' | 'event' | 'task' | 'wish';
 const base = (familyId: string, modelKey: IconModel, recordId?: string) =>
   `${getApplicationBaseUrl()}/api/v1/miniprogram/families/${encodeURIComponent(familyId)}/record-icons/${modelKey}/${recordId ? `records/${encodeURIComponent(recordId)}/` : ''}image`;
@@ -70,9 +69,7 @@ export async function uploadRecordIconImage(familyId: string, modelKey: IconMode
 
 /** WeChat <image> cannot forward Bearer headers; save the authorized bytes to a temporary local path. */
 export async function downloadRecordIconImage(familyId: string, modelKey: IconModel, recordId: string, fileId: string): Promise<string> {
-  const key = `${familyId}:${modelKey}:${recordId}:${fileId}`;
-  const saved = cache.get(key);
-  if (saved) return saved;
+  // Always re-authorize; an in-memory image cache would bypass revoked grants.
   let token = await ensureAccessToken();
   let res = await requestBinary(base(familyId, modelKey, recordId), 'GET', token);
   if (res.statusCode === 401) {
@@ -82,13 +79,14 @@ export async function downloadRecordIconImage(familyId: string, modelKey: IconMo
   if (res.statusCode !== 200 || !(res.data instanceof ArrayBuffer)) throw new AppError('ICON_DOWNLOAD_FAILED', '无法读取图片图标');
   const bytes = res.data as ArrayBuffer;
   if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) throw new AppError('ICON_DOWNLOAD_FAILED', '图标图片无效');
-  const filePath = `${wx.env.USER_DATA_PATH}/record-icon-${fileId}.png`;
+  const type = String((res.header as Record<string, string> | undefined)?.['content-type'] || 'image/png').toLowerCase();
+  const extension = type.includes('webp') ? 'webp' : type.includes('jpeg') ? 'jpg' : 'png';
+  const filePath = `${wx.env.USER_DATA_PATH}/record-icon-${fileId}.${extension}`;
   await new Promise<void>((resolve, reject) => {
     wx.getFileSystemManager().writeFile({
       filePath, data: bytes, success: () => resolve(),
       fail: () => reject(new AppError('ICON_CACHE_FAILED', '保存图片图标失败')),
     });
   });
-  cache.set(key, filePath);
   return filePath;
 }
