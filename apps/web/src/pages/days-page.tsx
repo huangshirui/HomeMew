@@ -82,12 +82,12 @@ function messageOf(cause: unknown, fallback: string) {
 }
 
 const iconImagePath = (spaceId: string, recordId: string, fileId: string) =>
-  `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/records/${encodeURIComponent(recordId)}/image?fileId=${encodeURIComponent(fileId)}`;
+  `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/day_record/records/${encodeURIComponent(recordId)}/image?fileId=${encodeURIComponent(fileId)}`;
 
 async function uploadIconImage(spaceId: string, file: File): Promise<string> {
   if (file.size <= 0 || file.size > 256 * 1024) throw new Error('图标图片不能超过 256 KiB，请压缩后重试');
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('只允许 PNG、JPEG、WebP 图片');
-  const response = await fetch(`/api/record-icons/spaces/${encodeURIComponent(spaceId)}/image`, {
+  const response = await fetch(`/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/day_record/image`, {
     method: 'POST', credentials: 'same-origin',
     headers: { 'content-type': file.type }, body: file,
   });
