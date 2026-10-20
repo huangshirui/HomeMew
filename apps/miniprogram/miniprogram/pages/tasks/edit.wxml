@@ -15,7 +15,9 @@
   <block wx:else>
     <!-- 任务名称 -->
     <view class="card section">
-      <view class="field-row">
+      <view style="display:flex;align-items:center">
+        <record-icon-picker emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" bind:change="onRecordIconChange" />
+        <view class="field-row" style="flex:1;min-width:0">
         <text class="field-label">任务名称</text>
         <input
           class="field-input"
@@ -24,24 +26,7 @@
           placeholder="例如：购买日用品"
           maxlength="60"
         />
-      </view>
-    </view>
-
-    <!-- 公共 Record Icon（选填） -->
-    <view class="card section">
-      <text class="field-label">图标（选填）</text>
-      <scroll-view scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}" style="margin-top:12rpx">
-        <view style="display:flex;gap:14rpx;width:max-content">
-          <view wx:for="{{iconChoices}}" wx:key="*this" data-icon="{{item}}" bindtap="onIconSelect"
-            style="font-size:42rpx;min-width:56rpx;text-align:center;padding:8rpx 0">{{item}}</view>
         </view>
-      </scroll-view>
-      <view style="display:flex;align-items:center;gap:18rpx;margin-top:12rpx">
-        <button size="mini" class="btn-outline" bindtap="onIconImageChoose">上传图片</button>
-        <button size="mini" class="btn-outline" bindtap="onIconClear">清除</button>
-        <image wx:if="{{iconImagePath}}" src="{{iconImagePath}}" mode="aspectFit"
-          style="width:64rpx;height:64rpx;border-radius:12rpx" />
-        <text wx:elif="{{iconEmoji}}" style="font-size:38rpx">{{iconEmoji}}</text>
       </view>
     </view>
 
