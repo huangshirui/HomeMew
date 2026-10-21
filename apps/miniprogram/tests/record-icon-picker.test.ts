@@ -27,6 +27,7 @@ test('all four editors use one compact shared picker, not per-form emoji grids',
     const json = JSON.parse(read('pages/' + model + '/edit.json')) as { usingComponents?: Record<string, string> };
     assert.equal((xml.match(/<record-icon-picker\b/g) || []).length, 1, model);
     assert.match(xml, /bind:change="onRecordIconChange"/, model);
+    assert.match(xml, /disabled="\{\{submitting\}\}"/, model);
     assert.match(ts, /onRecordIconChange\(/, model);
     assert.ok(!xml.includes('iconChoices') && !xml.includes('iconRows'), model);
     assert.equal(json.usingComponents?.['record-icon-picker'], '/components/record-icon-picker/index');
