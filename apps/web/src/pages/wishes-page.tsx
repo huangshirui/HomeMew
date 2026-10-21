@@ -316,7 +316,7 @@ function WishEditor({ draft, spaceId, editing, currentPersonId, canWrite, saving
         </div>
         <div className="mt-5 grid gap-4">
           <div className="flex items-end gap-3">
-            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={!editable}
+            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={!editable || saving}
             original={editing?.presentation?.icon} spaceId={spaceId} modelKey="wish" recordId={editing?.id} />
             <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">愿望<input className={inputClass} maxLength={100} disabled={!editable} value={draft.title} onChange={(event) => set('title', event.target.value)} autoFocus={!editing} /></label>
           </div>
