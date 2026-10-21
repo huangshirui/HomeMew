@@ -94,8 +94,11 @@ Page({
         loaded: true,
       });
       if (wish.presentation?.icon?.type === 'image') {
-        void downloadRecordIconImage(this.data.familyId, 'wish', wish.id, wish.presentation.icon.fileId)
-          .then(iconImagePath => this.setData({ iconImagePath }))
+        const fileId = wish.presentation.icon.fileId;
+      void downloadRecordIconImage(this.data.familyId, 'wish', wish.id, wish.presentation.icon.fileId)
+          .then(iconImagePath => {
+          if (!this.data.iconTouched && this.data.iconFileId === fileId) this.setData({ iconImagePath });
+        })
           .catch(() => undefined);
       }
     } catch (error: unknown) {
