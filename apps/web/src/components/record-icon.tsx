@@ -57,12 +57,50 @@ export function recordIconSrc(spaceId: string, modelKey: IconModel, recordId: st
   return `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/records/${encodeURIComponent(recordId)}/image`;
 }
 
+const MAX_ICON_BYTES = 256 * 1024;
+const MAX_ICON_DIMENSION = 512;
+
+async function prepareIconImage(file: File): Promise<Blob> {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    throw new Error('只支持 PNG、JPEG、WebP 图片');
+  }
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error('无法读取图片，请选择有效的 PNG、JPEG 或 WebP 文件');
+  }
+  try {
+    const longest = Math.max(bitmap.width, bitmap.height);
+    if (!longest) throw new Error('图片尺寸无效');
+    if (longest <= MAX_ICON_DIMENSION && file.size > 0 && file.size <= MAX_ICON_BYTES) return file;
+    const ratio = Math.min(1, MAX_ICON_DIMENSION / longest);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.floor(bitmap.width * ratio));
+    canvas.height = Math.max(1, Math.floor(bitmap.height * ratio));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('当前浏览器无法处理图片');
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    // WebP retains transparency and is within the Core's allowed static formats.
+    for (const quality of [0.82, 0.66, 0.5]) {
+      const blob = await new Promise<Blob | null>(resolve =>
+        canvas.toBlob(resolve, 'image/webp', quality),
+      );
+      if (blob?.type === 'image/webp' && blob.size > 0 && blob.size <= MAX_ICON_BYTES) return blob;
+    }
+    throw new Error('图片压缩后仍超过 256 KiB，请裁剪后重试');
+  } finally {
+    bitmap.close();
+  }
+}
+
 async function uploadIcon(spaceId: string, modelKey: IconModel, file: File): Promise<string> {
-  if (!file.size || file.size > 256 * 1024) throw new Error('图标图片不能超过 256 KiB，请先压缩');
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('只支持 PNG、JPEG 和 WebP');
+  // File upload is separate, but optional presentation is committed with the
+  // business fields in a single governed Record Create/Update.
+  const image = await prepareIconImage(file);
   const response = await fetch(
     `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/image`, {
-      method: 'POST', credentials: 'same-origin', headers: { 'content-type': file.type }, body: file,
+      method: 'POST', credentials: 'same-origin', headers: { 'content-type': image.type }, body: image,
     },
   );
   const result = await response.json().catch(() => ({})) as { data?: { fileId?: string }, error?: { message?: string } };
@@ -234,7 +272,7 @@ export function RecordIconField({ icon, onChange, disabled, original, spaceId, m
               <span className="rounded-lg bg-emerald-50 p-2 text-emerald-700"><ImagePlus className="size-5" /></span>
               <span className="flex-1">
                 <span className="block text-sm font-medium text-stone-800">上传图片</span>
-                <span className="block text-xs text-stone-500">PNG / JPEG / WebP，最大 256 KiB、512×512</span>
+                <span className="block text-xs text-stone-500">PNG / JPEG / WebP，自动缩放至 512×512 以内、最大 256 KiB</span>
               </span>
               <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only"
                 onChange={event => {
