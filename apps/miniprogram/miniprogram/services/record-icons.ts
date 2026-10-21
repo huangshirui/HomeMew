@@ -125,8 +125,10 @@ export async function downloadRecordIconImage(familyId: string, modelKey: IconMo
   if (res.statusCode !== 200 || !(res.data instanceof ArrayBuffer)) throw new AppError('ICON_DOWNLOAD_FAILED', '无法读取图片图标');
   const bytes = res.data as ArrayBuffer;
   if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) throw new AppError('ICON_DOWNLOAD_FAILED', '图标图片无效');
-  const type = String((res.header as Record<string, string> | undefined)?.['content-type'] || 'image/png').toLowerCase();
-  const extension = type.includes('webp') ? 'webp' : type.includes('jpeg') ? 'jpg' : 'png';
+  // Never trust header casing; verify downloaded bytes before writing a local file.
+  const contentType = mimeFromBytes(bytes);
+  const extension = contentType === 'image/webp' ? 'webp'
+    : contentType === 'image/jpeg' ? 'jpg' : 'png';
   const filePath = `${wx.env.USER_DATA_PATH}/record-icon-${fileId}.${extension}`;
   await new Promise<void>((resolve, reject) => {
     wx.getFileSystemManager().writeFile({
