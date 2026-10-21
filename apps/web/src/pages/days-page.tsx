@@ -7,8 +7,8 @@ import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/m
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
+import { RecordIconField, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 
-type RecordIcon = { type: 'emoji'; value: string } | { type: 'image'; fileId: string };
 type DayKind = 'elapsed' | 'countdown' | 'cycle';
 type DayStatus = 'active' | 'archived';
 type DayRecord = {
@@ -50,9 +50,7 @@ type DayDraft = {
   kind: DayKind;
   anchorDate: string;
   subjectPersonId: string;
-  icon: string;
-  imageFileId: string;
-  imageFile: File | null;
+  icon: RecordIconDraft;
   attentionDays: string;
   cycleDays: string;
 };
@@ -84,24 +82,12 @@ function messageOf(cause: unknown, fallback: string) {
 const iconImagePath = (spaceId: string, recordId: string, fileId: string) =>
   `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/day_record/records/${encodeURIComponent(recordId)}/image?fileId=${encodeURIComponent(fileId)}`;
 
-async function uploadIconImage(spaceId: string, file: File): Promise<string> {
-  if (file.size <= 0 || file.size > 256 * 1024) throw new Error('图标图片不能超过 256 KiB，请压缩后重试');
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('只允许 PNG、JPEG、WebP 图片');
-  const response = await fetch(`/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/day_record/image`, {
-    method: 'POST', credentials: 'same-origin',
-    headers: { 'content-type': file.type }, body: file,
-  });
-  const payload = await response.json().catch(() => ({})) as { data?: { fileId?: string }; error?: { message?: string } };
-  if (!response.ok || !payload.data?.fileId) throw new Error(payload.error?.message || '上传图标失败');
-  return payload.data.fileId;
-}
-
 function recordIconEmoji(icon: RecordIcon | null | undefined): string {
   return icon?.type === 'emoji' ? icon.value : '';
 }
 
 function defaultDraft(today: string): DayDraft {
-  return { name: '', description: '', kind: 'elapsed', anchorDate: today, subjectPersonId: '', icon: '', imageFileId: '', imageFile: null, attentionDays: '', cycleDays: '' };
+  return { name: '', description: '', kind: 'elapsed', anchorDate: today, subjectPersonId: '', icon: emptyIconDraft(), attentionDays: '', cycleDays: '' };
 }
 
 function draftFromRecord(record: DayRecord): DayDraft {
@@ -111,9 +97,7 @@ function draftFromRecord(record: DayRecord): DayDraft {
     kind: record.kind,
     anchorDate: record.anchorDate,
     subjectPersonId: record.subjectPersonId ?? '',
-    icon: record.presentation?.icon?.type === 'emoji' ? record.presentation.icon.value : '',
-    imageFileId: record.presentation?.icon?.type === 'image' ? record.presentation!.icon!.fileId : '',
-    imageFile: null,
+    icon: iconDraftFor(record.presentation?.icon),
     attentionDays: String(record.kind === 'elapsed' ? record.attentionAfterDays ?? '' : record.attentionBeforeDays ?? ''),
     cycleDays: String(record.cycleDays ?? ''),
   };
@@ -277,16 +261,8 @@ export function DaysPage() {
     setSaving(true);
     setError(null);
     try {
-      // Image bytes may require a pre-upload, but business fields and File identity
-      // are committed in exactly one governed Record mutation.
-      let icon: RecordIcon | null = draft.icon.trim() ? { type: 'emoji', value: draft.icon.trim() } : null;
-      if (draft.imageFileId) icon = { type: 'image', fileId: draft.imageFileId };
-      if (draft.imageFile) icon = { type: 'image', fileId: await uploadIconImage(currentFamily.id, draft.imageFile) };
-      const before = editing?.presentation?.icon ?? null;
-      const includeIcon = editing
-        ? JSON.stringify(before) !== JSON.stringify(icon)
-        : icon !== null;
-      const presentation = includeIcon ? { presentation: { icon } } : {};
+      // Optional Icon and business fields are committed in one governed Record mutation.
+      const presentation = await presentationToSave(currentFamily.id, 'day_record', draft.icon, editing?.presentation?.icon);
       if (editing) {
         await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
@@ -432,7 +408,7 @@ export function DaysPage() {
         </>
       )}
 
-      {draft ? <DayEditor draft={draft} editing={editing} members={members.filter((member) => member.personId)} canWrite={canWrite} saving={saving} onChange={setDraft} onClose={closeEditor} onSave={saveRecord} onDelete={editing ? deleteRecord : undefined} /> : null}
+      {draft ? <DayEditor draft={draft} spaceId={currentFamily?.id || ''} editing={editing} members={members.filter((member) => member.personId)} canWrite={canWrite} saving={saving} onChange={setDraft} onClose={closeEditor} onSave={saveRecord} onDelete={editing ? deleteRecord : undefined} /> : null}
       {occurrence ? <OccurrenceEditor value={occurrence} saving={actingId === occurrence.record.id} onChange={setOccurrence} onClose={closeOccurrence} onSave={submitOccurrence} /> : null}
     </div>
   );
@@ -472,8 +448,9 @@ function OccurrenceEditor({ value, saving, onChange, onClose, onSave }: {
   );
 }
 
-function DayEditor({ draft, editing, members, canWrite, saving, onChange, onClose, onSave, onDelete }: {
+function DayEditor({ draft, spaceId, editing, members, canWrite, saving, onChange, onClose, onSave, onDelete }: {
   draft: DayDraft;
+  spaceId: string;
   editing: DayRecord | null;
   members: ReturnType<typeof useHousehold>['members'];
   canWrite: boolean;
@@ -496,29 +473,20 @@ function DayEditor({ draft, editing, members, canWrite, saving, onChange, onClos
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="mt-5 grid gap-4">
-          <label className="grid gap-1.5 text-sm font-medium text-stone-700">名称<input className={inputClass} maxLength={100} disabled={readOnly} value={draft.name} onChange={(event) => set('name', event.target.value)} /></label>
+          <div className="flex items-end gap-3">
+            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly || saving}
+              original={editing?.presentation?.icon} spaceId={spaceId} modelKey="day_record" recordId={editing?.id} />
+            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">名称
+              <input className={inputClass} maxLength={100} disabled={readOnly} value={draft.name}
+                onChange={(event) => set('name', event.target.value)} />
+            </label>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(KIND_COPY) as DayKind[]).map((kind) => <button key={kind} type="button" disabled={readOnly || Boolean(editing)} onClick={() => set('kind', kind)} className={`rounded-2xl px-3 py-3 text-left ring-1 ${draft.kind === kind ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : 'bg-white text-stone-600 ring-stone-200'}`}><span className="block text-sm font-medium">{KIND_COPY[kind].label}</span><span className="mt-1 block text-[10px] leading-4 opacity-70">{KIND_COPY[kind].hint}</span></button>)}
           </div>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">基准日期<input type="date" className={inputClass} disabled={readOnly || anchorReadOnly} value={draft.anchorDate} onChange={(event) => set('anchorDate', event.target.value)} /></label>
           {draft.kind === 'cycle' ? <label className="grid gap-1.5 text-sm font-medium text-stone-700">周期天数<input type="number" min="1" className={inputClass} disabled={readOnly} value={draft.cycleDays} onChange={(event) => set('cycleDays', event.target.value)} /></label> : null}
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">{draft.kind === 'elapsed' ? '经过多少天后提醒（可空）' : '提前多少天提醒（可空）'}<input type="number" min={draft.kind === 'elapsed' ? 1 : 0} className={inputClass} disabled={readOnly} value={draft.attentionDays} onChange={(event) => set('attentionDays', event.target.value)} /></label>
-          <div className="grid gap-2 text-sm font-medium text-stone-700">
-            图标（Emoji 或图片，可选）
-            <input className={inputClass} maxLength={40} disabled={readOnly} value={draft.icon}
-              onChange={(event) => onChange({ ...draft, icon: event.target.value, imageFileId: '', imageFile: null })}
-              placeholder="例如 🎂" />
-            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={readOnly} className="text-xs text-stone-500"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0] ?? null;
-                onChange({ ...draft, imageFile: file, imageFileId: '', icon: file ? '' : draft.icon });
-              }} />
-            {draft.imageFileId && editing ? <img alt="当前图标" className="size-12 rounded-lg object-contain" src={iconImagePath(editing.spaceId, editing.id, draft.imageFileId)} /> : null}
-            {draft.imageFile ? <span className="text-xs font-normal text-stone-500">已选择 {draft.imageFile.name}（不超过 256 KiB / 512×512）</span> : null}
-            {(draft.icon || draft.imageFile || draft.imageFileId) && !readOnly
-              ? <button type="button" className="self-start text-xs text-stone-500 underline" onClick={() => onChange({ ...draft, icon: '', imageFile: null, imageFileId: '' })}>移除图标</button>
-              : null}
-          </div>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">关联成员<select className={inputClass} disabled={readOnly} value={draft.subjectPersonId} onChange={(event) => set('subjectPersonId', event.target.value)}><option value="">不关联成员</option>{members.map((member) => <option key={member.personId} value={member.personId}>{member.displayName || member.userId}</option>)}</select></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">说明<textarea className={textareaClass} maxLength={5000} disabled={readOnly} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
         </div>
