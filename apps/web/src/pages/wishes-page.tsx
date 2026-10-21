@@ -315,9 +315,11 @@ function WishEditor({ draft, spaceId, editing, currentPersonId, canWrite, saving
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="mt-5 grid gap-4">
-          <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={!editable}
+          <div className="flex items-end gap-3">
+            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={!editable}
             original={editing?.presentation?.icon} spaceId={spaceId} modelKey="wish" recordId={editing?.id} />
-          <label className="grid gap-1.5 text-sm font-medium text-stone-700">愿望<input className={inputClass} maxLength={100} disabled={!editable} value={draft.title} onChange={(event) => set('title', event.target.value)} autoFocus={!editing} /></label>
+            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">愿望<input className={inputClass} maxLength={100} disabled={!editable} value={draft.title} onChange={(event) => set('title', event.target.value)} autoFocus={!editing} /></label>
+          </div>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">希望日期（可空）<input type="date" className={inputClass} disabled={!editable} value={draft.desiredDate} onChange={(event) => set('desiredDate', event.target.value)} /></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">说明<textarea className={textareaClass} maxLength={5000} disabled={!editable} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
           {editing && !isOwner ? <p className="rounded-2xl bg-stone-100 px-4 py-3 text-xs leading-5 text-stone-500">只有愿望主人可以编辑内容；愿望是否实现由拥有写权限的家庭成员共同维护。</p> : null}
