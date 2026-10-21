@@ -41,3 +41,10 @@ Create without `presentation` persists no Icon; GET/list omits `presentation` fo
 - Async historical image downloads may only populate edit preview while the user has **not** changed the icon and the original `fileId` remains selected.
 - Regression test covers four form bindings, Unicode uniqueness, paging/search operation wiring, image guards and stale preview checks.
 - **Gate unresolved:** the two GitHub Actions jobs repeatedly fail before runner allocation (zero steps, empty runner name, no job log; retry attempt 2 also failed). These failures are infrastructure-level evidence, **not** successful typecheck/build. Keep Draft until the environment recovers and the resulting build is actually green, followed by WeChat Developer Tools and device acceptance. No deployment/merge.
+
+## 2026-10-21 · Web Icon UX 与微信小程序一致（最新产品决策）
+- **用户要求：Web 也必须使用选择器**。Web 和 Mini 都把 Icon 操作收敛为标题左侧的小型空白加号／已有 Emoji／已有图片入口；点击后才弹出共享选择器。四种模型（DayRecord、Event、Task、Wish）不再在表单中铺开固定数量 Emoji 或文件输入框。
+- **实现**：HomeMew Web 四个编辑表单使用同一个 React `RecordIconField`，该组件现在统一承担按钮触发、模态选择器、分类 Emoji、搜索、分页显示、上传、清除、图片预览以及无图标状态。Web 组件直接读取小程序源文件 `apps/miniprogram/miniprogram/components/record-icon-picker/emoji-data.ts` 的 Unicode 17.0 **3,944 个完整 Emoji**，因此 Emoji 数据与分类定义只有一份。Web 与 Mini 使用各自框架下的 UI 组件，但功能语义和基础清单相同。
+- **弹层行为**：移动端从底部出现、桌面居中；支持关闭按钮／点击遮罩／Esc 关闭，Tab 焦点保持在弹层内，关闭返回触发图标。按「常用、表情、人物、动物自然、食物饮品、旅行地点、活动、物品、符号、旗帜」切换；中文常见关键词／Unicode 英文名称搜索，单批 72 个项目渐进加载，避免一次性渲染全集。
+- **图片流程与约束**：Web 选图后以本地临时 URL 预览；在最终保存时，优先保留已符合要求的文件，否则按长边等比缩到 512px 以下，尝试静态 WebP 压缩到 256 KiB 以下，再通过现有授权的 Icon File BFF 预上传。Core 仍独立验证格式、像素和大小。表单业务字段和可选 `presentation.icon` 依旧由**一个 Record POST/PATCH** 保存。
+- **向后兼容与验收**：metadata 在 GET 和写入都可省略；未设置不提交也不显示。已加入 Web 共享选择器和四表单绑定的专项自动化测试。相关代码在 [HomeMew PR #133](https://github.com/huangshirui/HomeMew/pull/133)。CI 成功只证明构建／自动测试通过，仍需在真实浏览器和微信开发工具中验收视觉及操作，不自动部署。
