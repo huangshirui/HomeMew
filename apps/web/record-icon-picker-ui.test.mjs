@@ -54,3 +54,25 @@ test('record metadata is optional and saved alongside business fields once', () 
     assert.match(read(path), /presentationToSave\(/u, path);
   }
 });
+
+test('Web image picker resizes on the longest side and enforces File limits before POST', () => {
+  assert.match(picker, /const MAX_ICON_BYTES = 256 \* 1024/u);
+  assert.match(picker, /const MAX_ICON_DIMENSION = 512/u);
+  assert.match(picker, /createImageBitmap\(file\)/u);
+  assert.match(picker, /Math\.min\(1, MAX_ICON_DIMENSION \/ longest\)/u);
+  assert.match(picker, /canvas\.width = Math\.max\(1/u);
+  assert.match(picker, /canvas\.height = Math\.max\(1/u);
+  assert.match(picker, /canvas\.toBlob\(resolve, 'image\/webp', quality\)/u);
+  assert.match(picker, /blob\.size <= MAX_ICON_BYTES/u);
+  assert.match(picker, /body: image/u);
+});
+
+test('shared picker supports keyboard close, focus restoration and disables during save', () => {
+  assert.match(picker, /event\.key === 'Escape'/u);
+  assert.match(picker, /triggerRef\.current\?\.focus\(\)/u);
+  assert.match(picker, /aria-modal="true"/u);
+  for (const model of ['calendar-page', 'tasks-page', 'wishes-page', 'days-page']) {
+    const source = read(`./src/pages/${model}.tsx`);
+    assert.match(source, /disabled=\{(?:readOnly|!editable) \|\| saving\}/u, model);
+  }
+});
