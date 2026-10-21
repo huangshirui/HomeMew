@@ -343,8 +343,11 @@ Page({
     });
     this.refreshDerived();
     if (event.presentation?.icon?.type === 'image') {
+      const fileId = event.presentation.icon.fileId;
       void downloadRecordIconImage(this.data.familyId, 'event', event.id, event.presentation.icon.fileId)
-        .then(iconImagePath => this.setData({ iconImagePath }))
+        .then(iconImagePath => {
+          if (!this.data.iconTouched && this.data.iconFileId === fileId) this.setData({ iconImagePath });
+        })
         .catch(() => undefined);
     }
   },
