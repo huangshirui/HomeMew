@@ -58,6 +58,16 @@ async function prepareImage(path: string): Promise<{ bytes: ArrayBuffer; content
   const width = Math.max(1, Math.floor(original.width * ratio));
   const height = Math.max(1, Math.floor(original.height * ratio));
 
+  // Preserve already-valid PNG/JPEG/WebP source bytes and avoid unnecessary
+  // recompression/quality loss. The Core still rechecks the real image.
+  if (ratio === 1) {
+    const sourceBytes = await readFile(path);
+    const contentType = mimeFromBytes(sourceBytes);
+    if (sourceBytes.byteLength > 0 && sourceBytes.byteLength <= MAX_BYTES) {
+      return { bytes: sourceBytes, contentType };
+    }
+  }
+
   // Quality retries help with large camera images; do not alter the
   // dimensions after server validation, and never bypass server-side limits.
   for (const quality of [78, 60, 44]) {
