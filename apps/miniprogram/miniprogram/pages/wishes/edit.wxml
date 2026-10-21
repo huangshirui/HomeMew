@@ -19,7 +19,7 @@
 
     <view class="card">
       <view style="display:flex;align-items:center">
-        <record-icon-picker emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" bind:change="onRecordIconChange" />
+        <record-icon-picker emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{submitting}}" bind:change="onRecordIconChange" />
         <view class="field-row" style="flex:1;min-width:0">
         <text class="field-label">愿望标题</text>
         <input
