@@ -33,3 +33,11 @@ Create without `presentation` persists no Icon; GET/list omits `presentation` fo
 - **图片和清除**：同一弹层可从相册/相机选图片，选择时仅保存临时路径并在表单显示预览，真正的压缩与受授权预上传发生在提交时。限制仍是静态 PNG/JPEG/WebP、256 KiB / 512×512，服务端独立检验；清除操作发送显式 `presentation.icon=null`。
 - **元数据始终可选**：无 Icon 不发/不读 presentation，用户不修改已有图标时不会重写它。Emoji/上传文件 ID 与业务内容在一个原子 Record POST/PATCH 里保存；没有独立 Icon 修改请求。
 - **范围**：Mini 共享选择器；Web 仍有自己的 React RecordIconField，但 API / 数据语义完全一致。开发分支 [HomeMew Draft PR #133](https://github.com/huangshirui/HomeMew/pull/133)。目前尚无真实微信设备 UX 验收/生产发布，相关 CI 环境现出现空步骤 runner 启动失败，不能误报为新提交通过。
+
+## 2026-10-21 · Shared Mini Emoji picker verification and image guards
+- Four editors now reference only the same `components/record-icon-picker` WXML Component; old repeated Emoji selection cards are removed. Static review confirmed one picker and balanced WXML `view` tags per form.
+- Local bundled Unicode Emoji 17.0 source covers **3,944 unique fully-qualified Emoji** under nine domain categories plus popular, with a 72-item progressive grid and text search.
+- Pre-upload Mini image preprocessing scales **both width and height** based on the longer side to maximum 512px, checks actual output width, height, byte length (256 KiB) and MIME magic bytes. Already-conforming sources bypass recompression, preserving transparency where possible. Core remains the final authority for validation.
+- Async historical image downloads may only populate edit preview while the user has **not** changed the icon and the original `fileId` remains selected.
+- Regression test covers four form bindings, Unicode uniqueness, paging/search operation wiring, image guards and stale preview checks.
+- **Gate unresolved:** the two GitHub Actions jobs repeatedly fail before runner allocation (zero steps, empty runner name, no job log; retry attempt 2 also failed). These failures are infrastructure-level evidence, **not** successful typecheck/build. Keep Draft until the environment recovers and the resulting build is actually green, followed by WeChat Developer Tools and device acceptance. No deployment/merge.
