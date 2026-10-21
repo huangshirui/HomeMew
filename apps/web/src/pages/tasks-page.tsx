@@ -519,9 +519,11 @@ function TaskEditor({
         </div>
 
         <div className="mt-5 grid gap-4">
-          <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly}
+          <div className="flex items-end gap-3">
+            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly}
             original={editing?.presentation?.icon} spaceId={spaceId} modelKey="task" recordId={editing?.id} />
-          <label className="grid gap-1.5 text-sm font-medium text-stone-700">待办名称<input className={inputClass} disabled={readOnly} maxLength={100} value={draft.name} onChange={(event) => set('name', event.target.value)} autoFocus={!editing} /></label>
+            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">待办名称<input className={inputClass} disabled={readOnly} maxLength={100} value={draft.name} onChange={(event) => set('name', event.target.value)} autoFocus={!editing} /></label>
+          </div>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">截止日期<input type="date" className={inputClass} disabled={readOnly} value={draft.dueDate} onChange={(event) => set('dueDate', event.target.value)} /></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">说明<textarea className={textareaClass} disabled={readOnly} maxLength={5000} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
           <div>
