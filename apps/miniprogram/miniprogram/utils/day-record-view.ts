@@ -20,6 +20,7 @@ export type DayRecordView = {
   name: string;
   kind: DayRecordKind;
   icon: string;
+  iconImagePath: string;
   /** 主文案，如「已使用 86 天」 */
   primaryText: string;
   /** 次文案，如「还有 4 天到期」；无则为空串 */
@@ -41,7 +42,7 @@ const DEFAULT_ICONS: Record<DayRecordKind, string> = {
 };
 
 export function dayRecordIcon(record: DayRecord): string {
-  return record.icon || DEFAULT_ICONS[record.kind];
+  return record.presentation?.icon?.type === 'emoji' ? record.presentation.icon.value : DEFAULT_ICONS[record.kind];
 }
 
 /** 生活化的种类标签 */
@@ -107,6 +108,7 @@ export function mapDayRecordView(record: DayRecord): DayRecordView {
     name: record.name,
     kind: record.kind,
     icon: dayRecordIcon(record),
+    iconImagePath: '',
     primaryText: primary,
     secondaryText: secondary,
     attentionLevel: record.computed.attentionLevel,

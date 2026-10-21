@@ -18,6 +18,8 @@ import {
   createDayRecord,
   updateDayRecord,
 } from '../../services/day-records';
+import { uploadRecordIconImage, downloadRecordIconImage } from '../../services/record-icons';
+import type { RecordIcon } from '../../types/index';
 import { listFamilyMembers } from '../../services/families';
 import { currentFamilyStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
@@ -31,7 +33,7 @@ import {
   isVersionConflict,
   formatInstantInTimeZone,
 } from '../../utils/index';
-import { ICON_CHOICES } from '../../utils/day-record-view';
+import { pickerChangeState, type RecordIconPickerChange } from '../../utils/record-icon-edit';
 import {
   DayRecord,
   DayRecordKind,
@@ -74,31 +76,11 @@ const KIND_CHOICES: { kind: DayRecordKind; icon: string; title: string; desc: st
 const DEFAULT_COUNTDOWN_BEFORE_DAYS = 30;
 const DEFAULT_CYCLE_BEFORE_DAYS = 7;
 
-/** 图标选择区固定 3 行，超出的列横向滑动 */
-const ICON_ROW_COUNT = 3;
-
-type IconRow = { key: number; icons: string[] };
-
-/**
- * 把图标按「列优先」分配成固定 3 行：
- * 第 0~2 个填第 1 列，第 3~5 个填第 2 列……
- * 行数恒定，列数随图标总数增长，超出屏宽由 scroll-view 横向滚动。
- * 不依赖 flex 列换行（column + wrap 在部分小程序内核不可靠）。
- */
-function buildIconRows(icons: string[], rowCount: number = ICON_ROW_COUNT): IconRow[] {
-  const rows: IconRow[] = Array.from({ length: rowCount }, (_, i) => ({ key: i, icons: [] }));
-  icons.forEach((icon, index) => {
-    rows[index % rowCount].icons.push(icon);
-  });
-  return rows;
-}
-
 Page({
   data: {
     mode: 'create' as Mode,
     step: 'kind' as Step,
     kindChoices: KIND_CHOICES,
-    iconRows: buildIconRows(ICON_CHOICES),
 
     familyId: '',
     dayRecordId: '',
@@ -113,6 +95,9 @@ Page({
     name: '',
     description: '',
     icon: '',
+    iconImagePath: '',
+    iconFileId: '',
+    iconTouched: false,
     subjectUserId: '' as string,
     subjectText: '全家',
     members: [] as SubjectOption[],
@@ -222,7 +207,11 @@ Page({
       version: record.version,
       name: record.name,
       description: record.description || '',
-      icon: record.icon || '',
+      icon: record.presentation?.icon?.type === 'emoji' ? record.presentation.icon.value : '',
+      iconFileId: record.presentation?.icon?.type === 'image' ? record.presentation.icon.fileId : '',
+      iconImagePath: '',
+      iconTouched: false,
+
       subjectUserId,
       subjectText: subjectName(memberOptions, subjectUserId, record.subject?.displayName),
       members: memberOptions,
@@ -240,6 +229,14 @@ Page({
       loaded: true,
       step: 'form',
     });
+    if (record.presentation?.icon?.type === 'image') {
+      const { fileId } = record.presentation.icon;
+      void downloadRecordIconImage(this.data.familyId, 'day_record', record.id, fileId)
+        .then(path => {
+          if (!this.data.iconTouched && this.data.iconFileId === fileId) this.setData({ iconImagePath: path });
+        })
+        .catch(() => undefined);
+    }
   },
 
   /* ----------------- 类型选择（仅创建模式） ----------------- */
@@ -278,10 +275,14 @@ Page({
     this.setData({ description: e.detail.value });
   },
 
-  /** 图标只能从内置 Emoji 中选择，禁止提交任意图片 URL */
-  onIconSelect(e: WechatMiniprogram.TouchEvent): void {
-    const icon = e.currentTarget.dataset.icon as string;
-    this.setData({ icon: this.data.icon === icon ? '' : icon });
+  onRecordIconChange(e: WechatMiniprogram.CustomEvent<RecordIconPickerChange>): void {
+    const state = pickerChangeState(e.detail);
+    this.setData({
+      icon: state.iconEmoji,
+      iconImagePath: state.iconImagePath,
+      iconFileId: state.iconFileId,
+      iconTouched: state.iconTouched,
+    });
   },
 
   onSubjectTap(): void {
@@ -380,12 +381,13 @@ Page({
   },
 
   async submitCreate(name: string, kind: DayRecordKind): Promise<void> {
+    const presentation = await this.prepareIconPresentation();
     const common = {
+      ...(presentation ? { presentation } : {}),
       name,
       description: this.data.description.trim() || null,
       anchorDate: this.data.anchorDate,
       subjectUserId: this.data.subjectUserId || null,
-      icon: this.data.icon || null,
     };
 
     let payload: CreateDayRecordRequest;
@@ -420,7 +422,6 @@ Page({
     const fields: Record<string, unknown> = {
       name,
       description: this.data.description.trim() || null,
-      icon: this.data.icon || null,
       subjectUserId: this.data.subjectUserId || null,
     };
 
@@ -435,11 +436,26 @@ Page({
       fields.attentionBeforeDays = optionalNumber(this.data.attentionBeforeDays);
     }
 
+    const presentation = await this.prepareIconPresentation();
     const payload = {
       ...fields,
+      ...(presentation ? { presentation } : {}),
       version: this.data.version,
     } as unknown as UpdateDayRecordRequest;
     await updateDayRecord(this.data.familyId, this.data.dayRecordId, payload);
+  },
+
+  async prepareIconPresentation(): Promise<{ icon: RecordIcon | null } | undefined> {
+    // No metadata is required. Editing unrelated fields never touches the Icon.
+    if (this.data.mode === 'edit' && !this.data.iconTouched) return undefined;
+    if (this.data.mode === 'create' && !this.data.icon && !this.data.iconFileId && !this.data.iconImagePath) return undefined;
+    let icon: RecordIcon | null = this.data.icon ? { type: 'emoji', value: this.data.icon } : null;
+    if (this.data.iconFileId) icon = { type: 'image', fileId: this.data.iconFileId };
+    else if (this.data.iconImagePath) {
+      const fileId = await uploadRecordIconImage(this.data.familyId, 'day_record', this.data.iconImagePath);
+      icon = { type: 'image', fileId };
+    }
+    return { icon };
   },
 
   onCancel(): void {

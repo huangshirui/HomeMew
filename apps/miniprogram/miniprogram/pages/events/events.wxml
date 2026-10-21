@@ -171,7 +171,11 @@
                   <text wx:if="{{ev.isAllDay}}" class="event-allday-tag">全天</text>
                   <text wx:else class="event-time">{{ev.timeText}}</text>
                 </view>
-                <text class="event-title">{{ev.summary}}</text>
+                <view style="display:flex;align-items:center;gap:10rpx">
+                  <image wx:if="{{ev.iconImagePath}}" src="{{ev.iconImagePath}}" mode="aspectFit" style="width:40rpx;height:40rpx;border-radius:8rpx;flex-shrink:0" />
+                  <text wx:elif="{{ev.iconEmoji}}" style="font-size:34rpx;flex-shrink:0">{{ev.iconEmoji}}</text>
+                  <text class="event-title">{{ev.summary}}</text>
+                </view>
                 <text wx:if="{{ev.metaText}}" class="event-meta">{{ev.metaText}}</text>
               </view>
             </view>

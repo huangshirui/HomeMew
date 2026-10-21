@@ -32,10 +32,13 @@ import {
 } from '../../utils/index';
 import { getViewingTimeZone } from '../../services/settings';
 import { Task, FamilyMember } from '../../types/index';
+import { downloadRecordIconImage } from '../../services/record-icons';
 
 type TaskView = {
   id: string;
   name: string;
+  iconEmoji: string;
+  iconImagePath: string;
   status: 'pending' | 'completed';
   dueDate: string | null;
   dueText: string;
@@ -344,6 +347,15 @@ Page({
         loaded: true,
         listError: false,
       });
+      for (const task of tasks) {
+        if (task.presentation?.icon?.type !== 'image') continue;
+        const fileId = task.presentation.icon.fileId;
+        void downloadRecordIconImage(familyId, 'task', task.id, fileId).then(iconImagePath => {
+          if (familyId !== this.data.familyId || reqSeq !== this._reqSeq) return;
+          const pendingTasks = this.data.pendingTasks.map(item => item.id === task.id ? { ...item, iconImagePath } : item);
+          this.setData({ pendingTasks });
+        }).catch(() => undefined);
+      }
     } catch (error: unknown) {
       if (reqSeq !== this._reqSeq || familyId !== this.data.familyId) return;
       console.error('[Tasks] Load failed:', error);
@@ -386,6 +398,8 @@ Page({
       return {
         id: t.id,
         name: t.name,
+        iconEmoji: t.presentation?.icon?.type === 'emoji' ? t.presentation.icon.value : '',
+        iconImagePath: '',
         status: t.status as 'pending' | 'completed',
         dueDate: t.dueDate,
         dueText,

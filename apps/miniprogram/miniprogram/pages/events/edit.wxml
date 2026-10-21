@@ -15,7 +15,9 @@
   <block wx:else>
     <!-- 标题 -->
     <view class="card section">
-      <view class="field-row">
+      <view style="display:flex;align-items:center">
+        <record-icon-picker emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{submitting}}" bind:change="onRecordIconChange" />
+        <view class="field-row" style="flex:1;min-width:0">
         <text class="field-label">标题</text>
         <input
           class="field-input"
@@ -24,6 +26,7 @@
           placeholder="例如：周末家庭聚餐"
           maxlength="60"
         />
+        </view>
       </view>
     </view>
 

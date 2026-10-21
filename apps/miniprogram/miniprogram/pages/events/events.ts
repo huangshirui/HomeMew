@@ -54,6 +54,7 @@ import {
 } from '../../utils/event-timeline';
 import { Event, FamilyMember } from '../../types/index';
 import { isEventEnded } from '../../utils/event-status';
+import { downloadRecordIconImage } from '../../services/record-icons';
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -89,6 +90,8 @@ const POLL_INTERVAL_MS = 60 * 1000;
 type EventItemView = {
   id: string;
   summary: string;
+  iconEmoji: string;
+  iconImagePath: string;
   isAllDay: boolean;
   /** 普通日程 "16:00–18:00"；全天为空（用标签展示） */
   timeText: string;
@@ -167,6 +170,8 @@ Page({
   _initOptions: null as { date?: string; familyId?: string; attendee?: string } | null,
   /** 去重后的全部已加载事件：id -> Event */
   _events: {} as Record<string, Event>,
+  _iconPaths: {} as Record<string, string>,
+  _loadingIcons: new Set<string>(),
   /** 已加载范围 [start, end)，YYYY-MM-DD */
   _rangeStart: '',
   _rangeEnd: '',
@@ -789,9 +794,30 @@ Page({
     if (e.location) parts.push(e.location);
     // 已结束：复用纯函数模块（与首页同一套判据）
     const isEnded = isEventEnded(e, now);
+    let iconImagePath = '';
+    const iconEmoji = e.presentation?.icon?.type === 'emoji' ? e.presentation.icon.value : '';
+    if (e.presentation?.icon?.type === 'image') {
+      const fileId = e.presentation.icon.fileId;
+      const familyId = this.data.familyId;
+      const key = `${familyId}:${e.id}:${fileId}`;
+      iconImagePath = this._iconPaths[key] || '';
+      if (!iconImagePath && !this._loadingIcons.has(key)) {
+        this._loadingIcons.add(key);
+        void downloadRecordIconImage(familyId, 'event', e.id, fileId)
+          .then(path => {
+            const actual = this._events[e.id];
+            if (familyId !== this.data.familyId || actual?.presentation?.icon?.type !== 'image'
+              || actual.presentation.icon.fileId !== fileId) return;
+            this._iconPaths[key] = path;
+            void this._applySections({});
+          }).catch(() => undefined).then(() => { this._loadingIcons.delete(key); });
+      }
+    }
     return {
       id: e.id,
       summary: e.summary,
+      iconEmoji,
+      iconImagePath,
       isAllDay: e.isAllDay,
       timeText,
       metaText: parts.join(' · '),

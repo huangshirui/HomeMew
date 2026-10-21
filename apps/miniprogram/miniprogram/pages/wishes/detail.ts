@@ -17,6 +17,7 @@ import {
   isVersionConflict,
 } from '../../utils/index';
 import { mapWishView } from '../../utils/wish-view';
+import { downloadRecordIconImage } from '../../services/record-icons';
 import { Wish } from '../../types/index';
 
 type MetaRow = { label: string; value: string };
@@ -30,6 +31,8 @@ Page({
     submitting: false,
     celebrating: false,
     title: '',
+    iconEmoji: '',
+    iconImagePath: '',
     description: '',
     desiredDateText: '',
     status: 'open' as Wish['status'],
@@ -112,6 +115,8 @@ Page({
     const view = mapWishView(wish, currentUserId);
     this.setData({
       title: view.title,
+      iconEmoji: wish.presentation?.icon?.type === 'emoji' ? wish.presentation.icon.value : '',
+      iconImagePath: '',
       description: wish.description || '',
       desiredDateText: view.desiredDateText,
       status: wish.status,
@@ -125,6 +130,14 @@ Page({
       loaded: true,
       loadError: false,
     });
+    if (wish.presentation?.icon?.type === 'image') {
+      const fileId = wish.presentation.icon.fileId;
+      void downloadRecordIconImage(this.data.familyId, 'wish', wish.id, fileId)
+        .then(iconImagePath => {
+          if (this._wish?.id === wish.id && this._wish.presentation?.icon?.type === 'image'
+            && this._wish.presentation.icon.fileId === fileId) this.setData({ iconImagePath });
+        }).catch(() => undefined);
+    }
   },
 
   onRetry(): void { this.loadWish(); },

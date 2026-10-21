@@ -2,7 +2,8 @@
   "navigationBarTitleText": "添加日子",
   "backgroundColor": "#F1F8F4",
   "usingComponents": {
-    "date-calendar": "/components/date-calendar/index"
+    "date-calendar": "/components/date-calendar/index",
+    "record-icon-picker": "/components/record-icon-picker/index"
   },
   "navigationStyle": "custom"
 }

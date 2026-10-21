@@ -16,6 +16,8 @@ export const WISH_STATUS_LABELS: Record<WishStatus, string> = {
 export type WishView = {
   id: string;
   title: string;
+  iconEmoji: string;
+  iconImagePath: string;
   descriptionBrief: string;
   desiredDateText: string;
   status: WishStatus;
@@ -41,6 +43,8 @@ export function mapWishView(wish: Wish, currentUserId: string): WishView {
   return {
     id: wish.id,
     title: wish.title,
+    iconEmoji: wish.presentation?.icon?.type === 'emoji' ? wish.presentation.icon.value : '',
+    iconImagePath: '',
     descriptionBrief: brief(wish.description),
     desiredDateText: wish.desiredDate ? `期望：${formatChineseDate(wish.desiredDate)}` : '',
     status: wish.status,

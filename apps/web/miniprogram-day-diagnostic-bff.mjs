@@ -24,7 +24,18 @@ function decodeId(value, pattern) {
 
 export function matchMiniProgramDayDiagnosticRoute(pathname) {
   if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records$`, 'u').exec(pathname);
+  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/record-icons/(day_record|event|task|wish)/image$`, 'u').exec(pathname);
+  if (match) {
+    const familyId = decodeId(match[1], FAMILY_ID);
+    return familyId ? { kind: 'icon-upload', familyId, modelKey: match[2] } : null;
+  }
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/record-icons/(day_record|event|task|wish)/records/([^/]+)/image$`, 'u').exec(pathname);
+  if (match) {
+    const familyId = decodeId(match[1], FAMILY_ID);
+    const recordId = decodeId(match[3], RECORD_ID);
+    return familyId && recordId ? { kind: 'icon-image', familyId, modelKey: match[2], recordId } : null;
+  }
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/day-records$`, 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
     return familyId ? { kind: 'day-records', familyId } : null;
@@ -182,7 +193,7 @@ function dayDto(request, raw, list) {
     name: raw.name,
     description: raw.description ?? null,
     subject: personRef(request, raw.subjectPersonId, list),
-    icon: raw.icon ?? null,
+    ...(raw.presentation?.icon ? { presentation: raw.presentation } : {}),
     status: raw.status,
     version: raw.version,
     createdBy: actor(raw.createdBy),
@@ -294,7 +305,7 @@ async function getDay(request, env, route) {
   return json({ data: dayDto(request, record.data, memberResult.data) }, 200, record.requestId);
 }
 
-const DAY_FIELDS = ['kind', 'name', 'description', 'anchorDate', 'subjectUserId', 'icon', 'attentionAfterDays', 'attentionBeforeDays', 'cycleDays'];
+const DAY_FIELDS = ['kind', 'name', 'description', 'anchorDate', 'subjectUserId', 'attentionAfterDays', 'attentionBeforeDays', 'cycleDays', 'presentation'];
 
 function validNullableString(value) {
   return value === undefined || value === null || typeof value === 'string';
@@ -306,7 +317,6 @@ function validOptionalInteger(value, minimum) {
 
 function validDayFields(data) {
   return validNullableString(data.description)
-    && validNullableString(data.icon)
     && validOptionalInteger(data.attentionAfterDays, 0)
     && validOptionalInteger(data.attentionBeforeDays, 0)
     && validOptionalInteger(data.cycleDays, 1)
@@ -413,6 +423,75 @@ async function createOccurrence(request, env, route) {
   } }, 200, result.requestId);
 }
 
+const ICON_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const ICON_MAX_BYTES = 256 * 1024;
+
+async function uploadIconImage(request, env, route) {
+  const contentType = request.headers.get('content-type')?.split(';')[0]?.trim()?.toLowerCase() || '';
+  if (!ICON_CONTENT_TYPES.has(contentType)) return errorResponse(415, 'INVALID_ICON_IMAGE', 'Only PNG, JPEG, WebP icons are supported');
+  const bytes = await request.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > ICON_MAX_BYTES) return errorResponse(413, 'FILE_TOO_LARGE', 'Icon exceeds 256 KiB');
+  const base = `/api/v1/spaces/${encodeURIComponent(route.familyId)}`;
+  const initiate = await callJson(request, env, `${base}/file-uploads`, {
+    method: 'POST',
+    data: { modelKey: route.modelKey, fieldKey: '__record_icon',
+      size: bytes.byteLength, name: 'record-icon', contentType },
+  });
+  if (!initiate.ok) return initiate.response;
+  const upload = initiate.data?.upload;
+  if (upload?.method !== 'PUT' || typeof upload.url !== 'string') return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'File upload session is invalid');
+  const target = new URL(upload.url);
+  if (target.protocol !== 'https:' || !target.hostname.endsWith('.r2.cloudflarestorage.com')) {
+    return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'File transfer target is invalid');
+  }
+  let put;
+  try {
+    put = await fetch(upload.url, {
+      method: 'PUT', headers: { 'content-type': contentType }, body: bytes,
+      redirect: 'manual',
+    });
+  } catch {
+    return errorResponse(503, 'FILE_TRANSFER_UNAVAILABLE', 'File transfer is unavailable');
+  }
+  if (!put.ok) return errorResponse(502, 'FILE_TRANSFER_FAILED', 'Image upload failed');
+  const complete = await callJson(request, env, `${base}/file-uploads/${encodeURIComponent(initiate.data.id)}/complete`, {
+    method: 'POST', data: {},
+  });
+  if (!complete.ok) return complete.response;
+  return json({ data: { fileId: complete.data.id } }, 200, complete.requestId);
+}
+
+async function downloadIconImage(request, env, route) {
+  const record = await callJson(request, env, `/api/v1/spaces/${encodeURIComponent(route.familyId)}/models/${route.modelKey}/records/${encodeURIComponent(route.recordId)}`);
+  if (!record.ok) return record.response;
+  const icon = record.data?.presentation?.icon;
+  if (icon?.type !== 'image' || !/^fil_[0-9a-f]{32}$/u.test(icon.fileId)) {
+    return errorResponse(404, 'FILE_NOT_FOUND', 'Record does not have an image Icon');
+  }
+  const base = `/api/v1/spaces/${encodeURIComponent(route.familyId)}`;
+  const download = await callJson(request, env, `${base}/file-downloads`, {
+    method: 'POST', data: { modelKey: route.modelKey, recordId: route.recordId,
+      fieldKey: '__record_icon', fileId: icon.fileId },
+  });
+  if (!download.ok) return download.response;
+  const signed = download.data?.url;
+  if (typeof signed !== 'string') return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'Missing image download URL');
+  const url = new URL(signed);
+  if (url.protocol !== 'https:' || !url.hostname.endsWith('.r2.cloudflarestorage.com')) {
+    return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'Unsafe image download URL');
+  }
+  let fetched;
+  try { fetched = await fetch(signed, { redirect: 'manual' }); }
+  catch { return errorResponse(503, 'FILE_TRANSFER_UNAVAILABLE', 'Image download unavailable'); }
+  const ct = fetched.headers.get('content-type')?.toLowerCase();
+  if (!fetched.ok || !ICON_CONTENT_TYPES.has(ct)) return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'Invalid image response');
+  const bytes = await fetched.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > ICON_MAX_BYTES) return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'Invalid Icon size');
+  return new Response(bytes, { status: 200, headers: {
+    'content-type': ct, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff',
+  } });
+}
+
 async function timedProbe(request, env, path, method = 'GET', data) {
   const started = Date.now();
   const response = await forwardLifeSpace(derivedRequest(request, method, data), env, { target: 'core', upstreamPath: path });
@@ -464,6 +543,15 @@ export async function handleMiniProgramDayDiagnosticBff(request, env) {
   const queryAllowed = (route.kind === 'day-records' && request.method === 'GET')
     || (route.kind === 'occurrences' && request.method === 'GET');
   if (!queryAllowed && [...url.searchParams.keys()].length > 0) return errorResponse(400, 'INVALID_QUERY', 'Query parameters are not supported');
+
+  if (route.kind === 'icon-upload') {
+    if (request.method === 'POST') return uploadIconImage(request, env, route);
+    return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
+  }
+  if (route.kind === 'icon-image') {
+    if (request.method === 'GET') return downloadIconImage(request, env, route);
+    return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
+  }
 
   if (route.kind === 'day-records') {
     if (request.method === 'GET') return listDays(request, env, route.familyId, url);

@@ -57,3 +57,4 @@ export function archiveDayRecord(familyId: string, dayRecordId: string, version:
 export function restoreDayRecord(familyId: string, dayRecordId: string, version: number): Promise<DayRecord> {
   return request(`${record(familyId, dayRecordId)}/restore`, { method: 'POST', data: { version }, skipRetry: true });
 }
+

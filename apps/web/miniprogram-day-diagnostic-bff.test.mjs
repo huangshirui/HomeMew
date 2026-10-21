@@ -321,3 +321,70 @@ test('LifeSpace authorization and optimistic-concurrency errors propagate unchan
   assert.equal(response.headers.get('x-request-id'), 'req_conflict');
   assert.deepEqual(await response.json(), { error: { code: 'VERSION_CONFLICT', message: 'stale' } });
 });
+
+test('DayRecord optional presentation uses a single normal create/update request', async () => {
+  const calls = [];
+  const core = async incoming => {
+    const path = new URL(incoming.url).pathname;
+    calls.push({ path, method: incoming.method });
+    if (path.endsWith('/members')) return ok(MEMBERS);
+    if (incoming.method === 'PATCH') {
+      const body = await incoming.json();
+      assert.deepEqual(body, { version: 2, presentation: { icon: { type: 'emoji', value: '📚' } } });
+      return ok(day({ version: 3, presentation: body.presentation }));
+    }
+    return ok(day({ presentation: { icon: { type: 'emoji', value: '📚' } } }));
+  };
+  const path = '/api/v1/miniprogram/families/spc_home/day-records/rec_day';
+  assert.equal(matchMiniProgramDayDiagnosticRoute(`${path}/icon`), null);
+  assert.deepEqual(matchMiniProgramDayDiagnosticRoute('/api/v1/miniprogram/families/spc_home/record-icons/day_record/image'), {
+    kind: 'icon-upload', familyId: 'spc_home', modelKey: 'day_record',
+  });
+  assert.deepEqual(matchMiniProgramDayDiagnosticRoute('/api/v1/miniprogram/families/spc_home/record-icons/day_record/records/rec_day/image'), {
+    kind: 'icon-image', familyId: 'spc_home', modelKey: 'day_record', recordId: 'rec_day',
+  });
+  const response = await handleMiniProgramDayDiagnosticBff(request(path), env(core));
+  assert.equal(response.status, 200);
+  const dto = (await response.json()).data;
+  assert.deepEqual(dto.presentation, { icon: { type: 'emoji', value: '📚' } });
+  assert.equal(Object.hasOwn(dto, 'icon'), false);
+
+  const legacy = await handleMiniProgramDayDiagnosticBff(request(path, {
+    method: 'PATCH', body: { version: 2, icon: null },
+  }), env(core));
+  assert.equal(legacy.status, 400);
+
+  const changed = await handleMiniProgramDayDiagnosticBff(request(path, {
+    method: 'PATCH', body: { version: 2, presentation: { icon: { type: 'emoji', value: '📚' } } },
+  }), env(core));
+  assert.equal(changed.status, 200);
+  assert.deepEqual((await changed.json()).data.presentation.icon, { type: 'emoji', value: '📚' });
+  assert.equal(calls.filter(call => call.method === 'PATCH').length, 1);
+
+  const missing = await handleMiniProgramDayDiagnosticBff(request(path), env(async incoming => {
+    if (new URL(incoming.url).pathname.endsWith('/members')) return ok(MEMBERS);
+    return ok(day({ icon: undefined, presentation: undefined }));
+  }));
+  assert.equal(Object.hasOwn((await missing.json()).data, 'presentation'), false);
+});
+
+test('DayRecord Icon pre-upload route rejects unsupported types and oversized bytes before transfer', async () => {
+  const path = '/api/v1/miniprogram/families/spc_home/record-icons/day_record/image';
+  let forwards = 0;
+  const app = env(async () => { forwards++; return assert.fail('no Core File call permitted'); });
+  const invalidType = await handleMiniProgramDayDiagnosticBff(
+    new Request(`https://homemew.example.test${path}`, {
+      method: 'POST',
+      headers: { authorization: TOKEN, 'content-type': 'image/svg+xml' },
+      body: new Uint8Array([1, 2]),
+    }), app);
+  assert.equal(invalidType.status, 415);
+  const oversized = await handleMiniProgramDayDiagnosticBff(
+    new Request(`https://homemew.example.test${path}`, {
+      method: 'POST',
+      headers: { authorization: TOKEN, 'content-type': 'image/png' },
+      body: new Uint8Array(256 * 1024 + 1),
+    }), app);
+  assert.equal(oversized.status, 413);
+  assert.equal(forwards, 0);
+});

@@ -223,6 +223,7 @@ function taskDto(request, raw, list) {
   return {
     id: raw.id,
     familyId: raw.spaceId,
+    ...(raw.presentation?.icon ? { presentation: raw.presentation } : {}),
     name: raw.name,
     description: raw.description ?? null,
     dueDate: raw.dueDate ?? null,
@@ -242,6 +243,7 @@ function wishDto(request, raw, list) {
   return {
     id: raw.id,
     familyId: raw.spaceId,
+    ...(raw.presentation?.icon ? { presentation: raw.presentation } : {}),
     title: raw.title,
     description: raw.description ?? null,
     desiredDate: raw.desiredDate ?? null,
@@ -398,7 +400,7 @@ async function getRecord(request, env, route, model) {
 }
 
 async function createTask(request, env, familyId) {
-  const input = await readBody(request, ['name', 'description', 'dueDate', 'assigneeIds']);
+  const input = await readBody(request, ['name', 'description', 'dueDate', 'assigneeIds', 'presentation']);
   if (!input.ok) return input.response;
   if (typeof input.data.name !== 'string' || !input.data.name.trim()
     || !validOptionalDate(input.data.dueDate)
@@ -415,6 +417,7 @@ async function createTask(request, env, familyId) {
       description: input.data.description ?? null,
       dueDate: input.data.dueDate ?? null,
       assigneePersonIds: resolved.data,
+      ...(input.data.presentation !== undefined ? { presentation: input.data.presentation } : {}),
     },
   });
   if (!result.ok) return result.response;
@@ -422,9 +425,9 @@ async function createTask(request, env, familyId) {
 }
 
 async function updateTask(request, env, route) {
-  const input = await readBody(request, ['name', 'description', 'dueDate', 'assigneeIds', 'version']);
+  const input = await readBody(request, ['name', 'description', 'dueDate', 'assigneeIds', 'presentation', 'version']);
   if (!input.ok) return input.response;
-  const changed = ['name', 'description', 'dueDate', 'assigneeIds'].some(key => Object.hasOwn(input.data, key));
+  const changed = ['name', 'description', 'dueDate', 'assigneeIds', 'presentation'].some(key => Object.hasOwn(input.data, key));
   if (!validVersion(input.data.version) || !changed || !validOptionalDate(input.data.dueDate)
     || (input.data.assigneeIds !== undefined && !Array.isArray(input.data.assigneeIds))) {
     return errorResponse(422, 'VALIDATION_ERROR', 'Task update payload is invalid');
@@ -438,7 +441,7 @@ async function updateTask(request, env, route) {
     assigneePersonIds = resolved.data;
   }
   const data = { version: input.data.version };
-  for (const key of ['name', 'description', 'dueDate']) {
+  for (const key of ['name', 'description', 'dueDate', 'presentation']) {
     if (Object.hasOwn(input.data, key)) data[key] = input.data[key];
   }
   if (assigneePersonIds !== undefined) data.assigneePersonIds = assigneePersonIds;
@@ -450,7 +453,7 @@ async function updateTask(request, env, route) {
 }
 
 async function createWish(request, env, familyId) {
-  const input = await readBody(request, ['title', 'description', 'desiredDate']);
+  const input = await readBody(request, ['title', 'description', 'desiredDate', 'presentation']);
   if (!input.ok) return input.response;
   if (typeof input.data.title !== 'string' || !input.data.title.trim() || !validOptionalDate(input.data.desiredDate)) {
     return errorResponse(422, 'VALIDATION_ERROR', 'Wish payload is invalid');
@@ -466,6 +469,7 @@ async function createWish(request, env, familyId) {
       description: input.data.description ?? null,
       desiredDate: input.data.desiredDate ?? null,
       ownerPersonId: owner.personId,
+      ...(input.data.presentation !== undefined ? { presentation: input.data.presentation } : {}),
     },
   });
   if (!result.ok) return result.response;
@@ -473,9 +477,9 @@ async function createWish(request, env, familyId) {
 }
 
 async function updateWish(request, env, route) {
-  const input = await readBody(request, ['title', 'description', 'desiredDate', 'version']);
+  const input = await readBody(request, ['title', 'description', 'desiredDate', 'presentation', 'version']);
   if (!input.ok) return input.response;
-  const changed = ['title', 'description', 'desiredDate'].some(key => Object.hasOwn(input.data, key));
+  const changed = ['title', 'description', 'desiredDate', 'presentation'].some(key => Object.hasOwn(input.data, key));
   if (!validVersion(input.data.version) || !changed || !validOptionalDate(input.data.desiredDate)) {
     return errorResponse(422, 'VALIDATION_ERROR', 'Wish update payload is invalid');
   }

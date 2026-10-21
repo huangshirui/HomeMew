@@ -1,5 +1,8 @@
 {
   "navigationBarTitleText": "许愿",
   "backgroundColor": "#F1F8F4",
-  "navigationStyle": "custom"
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "record-icon-picker": "/components/record-icon-picker/index"
+  }
 }

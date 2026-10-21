@@ -7,6 +7,7 @@ import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/m
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { ApiError, apiRequest } from '../lib/api-client';
+import { RecordIconField, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 
 type DayKind = 'elapsed' | 'countdown' | 'cycle';
 type DayStatus = 'active' | 'archived';
@@ -20,7 +21,7 @@ type DayRecord = {
   kind: DayKind;
   anchorDate: string;
   subjectPersonId: string | null;
-  icon: string | null;
+  presentation?: { icon: RecordIcon | null };
   attentionAfterDays: number | null;
   attentionBeforeDays: number | null;
   cycleDays: number | null;
@@ -49,7 +50,7 @@ type DayDraft = {
   kind: DayKind;
   anchorDate: string;
   subjectPersonId: string;
-  icon: string;
+  icon: RecordIconDraft;
   attentionDays: string;
   cycleDays: string;
 };
@@ -78,8 +79,15 @@ function messageOf(cause: unknown, fallback: string) {
   return cause instanceof Error ? cause.message : fallback;
 }
 
+const iconImagePath = (spaceId: string, recordId: string, fileId: string) =>
+  `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/day_record/records/${encodeURIComponent(recordId)}/image?fileId=${encodeURIComponent(fileId)}`;
+
+function recordIconEmoji(icon: RecordIcon | null | undefined): string {
+  return icon?.type === 'emoji' ? icon.value : '';
+}
+
 function defaultDraft(today: string): DayDraft {
-  return { name: '', description: '', kind: 'elapsed', anchorDate: today, subjectPersonId: '', icon: '', attentionDays: '', cycleDays: '' };
+  return { name: '', description: '', kind: 'elapsed', anchorDate: today, subjectPersonId: '', icon: emptyIconDraft(), attentionDays: '', cycleDays: '' };
 }
 
 function draftFromRecord(record: DayRecord): DayDraft {
@@ -89,7 +97,7 @@ function draftFromRecord(record: DayRecord): DayDraft {
     kind: record.kind,
     anchorDate: record.anchorDate,
     subjectPersonId: record.subjectPersonId ?? '',
-    icon: record.icon ?? '',
+    icon: iconDraftFor(record.presentation?.icon),
     attentionDays: String(record.kind === 'elapsed' ? record.attentionAfterDays ?? '' : record.attentionBeforeDays ?? ''),
     cycleDays: String(record.cycleDays ?? ''),
   };
@@ -112,7 +120,6 @@ function createPayload(draft: DayDraft): Record<string, unknown> {
     kind: draft.kind,
     anchorDate: draft.anchorDate,
     subjectPersonId: draft.subjectPersonId || null,
-    icon: draft.icon.trim() || null,
   };
   if (draft.kind === 'elapsed') return { ...common, attentionAfterDays: parseOptionalInteger(draft.attentionDays, 1, '提醒天数') };
   if (draft.kind === 'countdown') return { ...common, attentionBeforeDays: parseOptionalInteger(draft.attentionDays, 0, '提前提醒天数') };
@@ -130,7 +137,6 @@ function updatePayload(record: DayRecord, draft: DayDraft) {
     name,
     description: draft.description.trim() || null,
     subjectPersonId: draft.subjectPersonId || null,
-    icon: draft.icon.trim() || null,
   };
   if (record.kind === 'elapsed') common.attentionAfterDays = parseOptionalInteger(draft.attentionDays, 1, '提醒天数');
   if (record.kind === 'countdown') {
@@ -255,16 +261,18 @@ export function DaysPage() {
     setSaving(true);
     setError(null);
     try {
+      // Optional Icon and business fields are committed in one governed Record mutation.
+      const presentation = await presentationToSave(currentFamily.id, 'day_record', draft.icon, editing?.presentation?.icon);
       if (editing) {
         await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
-          body: JSON.stringify({ ...updatePayload(editing, draft), version: editing.version }),
+          body: JSON.stringify({ ...updatePayload(editing, draft), ...presentation, version: editing.version }),
         });
       } else {
         const payload = createPayload(draft);
         if (draft.kind === 'cycle' && payload.cycleDays === null) throw new Error('周期类型必须填写周期天数');
         await apiRequest<DayRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/day_record/records`, {
-          method: 'POST', body: JSON.stringify(payload),
+          method: 'POST', body: JSON.stringify({ ...payload, ...presentation }),
         });
       }
       setEditing(null);
@@ -371,7 +379,9 @@ export function DaysPage() {
                   <button type="button" className="block w-full text-left" onClick={() => openEdit(record)}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-stone-900">{record.icon ? `${record.icon} ` : ''}{record.name}</p>
+                        <p className="truncate font-semibold text-stone-900">{record.presentation?.icon?.type === 'image'
+                            ? <img alt="" src={iconImagePath(record.spaceId, record.id, record.presentation!.icon!.fileId)} className="mr-2 inline size-6 rounded-md object-contain" />
+                            : recordIconEmoji(record.presentation?.icon) ? `${recordIconEmoji(record.presentation?.icon)} ` : ''}{record.name}</p>
                         <p className="mt-1 text-xs text-stone-400">{KIND_COPY[record.kind].label} · {record.anchorDate}</p>
                       </div>
                       {attention ? <Sparkles className="size-4 shrink-0 text-amber-500" /> : null}
@@ -398,7 +408,7 @@ export function DaysPage() {
         </>
       )}
 
-      {draft ? <DayEditor draft={draft} editing={editing} members={members.filter((member) => member.personId)} canWrite={canWrite} saving={saving} onChange={setDraft} onClose={closeEditor} onSave={saveRecord} onDelete={editing ? deleteRecord : undefined} /> : null}
+      {draft ? <DayEditor draft={draft} spaceId={currentFamily?.id || ''} editing={editing} members={members.filter((member) => member.personId)} canWrite={canWrite} saving={saving} onChange={setDraft} onClose={closeEditor} onSave={saveRecord} onDelete={editing ? deleteRecord : undefined} /> : null}
       {occurrence ? <OccurrenceEditor value={occurrence} saving={actingId === occurrence.record.id} onChange={setOccurrence} onClose={closeOccurrence} onSave={submitOccurrence} /> : null}
     </div>
   );
@@ -420,7 +430,7 @@ function OccurrenceEditor({ value, saving, onChange, onClose, onSave }: {
             <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700"><Clock3 className="size-5" /></span>
             <div>
               <p className="text-lg font-semibold text-stone-950">记录一次</p>
-              <p className="mt-1 text-sm text-stone-500">{value.record.icon ? `${value.record.icon} ` : ''}{value.record.name}</p>
+              <p className="mt-1 text-sm text-stone-500">{recordIconEmoji(value.record.presentation?.icon) ? `${recordIconEmoji(value.record.presentation?.icon)} ` : ''}{value.record.name}</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" aria-label="关闭" disabled={saving} onClick={onClose}><X className="size-4" /></Button>
@@ -438,8 +448,9 @@ function OccurrenceEditor({ value, saving, onChange, onClose, onSave }: {
   );
 }
 
-function DayEditor({ draft, editing, members, canWrite, saving, onChange, onClose, onSave, onDelete }: {
+function DayEditor({ draft, spaceId, editing, members, canWrite, saving, onChange, onClose, onSave, onDelete }: {
   draft: DayDraft;
+  spaceId: string;
   editing: DayRecord | null;
   members: ReturnType<typeof useHousehold>['members'];
   canWrite: boolean;
@@ -462,14 +473,20 @@ function DayEditor({ draft, editing, members, canWrite, saving, onChange, onClos
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="mt-5 grid gap-4">
-          <label className="grid gap-1.5 text-sm font-medium text-stone-700">名称<input className={inputClass} maxLength={100} disabled={readOnly} value={draft.name} onChange={(event) => set('name', event.target.value)} /></label>
+          <div className="flex items-end gap-3">
+            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly || saving}
+              original={editing?.presentation?.icon} spaceId={spaceId} modelKey="day_record" recordId={editing?.id} />
+            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">名称
+              <input className={inputClass} maxLength={100} disabled={readOnly} value={draft.name}
+                onChange={(event) => set('name', event.target.value)} />
+            </label>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(KIND_COPY) as DayKind[]).map((kind) => <button key={kind} type="button" disabled={readOnly || Boolean(editing)} onClick={() => set('kind', kind)} className={`rounded-2xl px-3 py-3 text-left ring-1 ${draft.kind === kind ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : 'bg-white text-stone-600 ring-stone-200'}`}><span className="block text-sm font-medium">{KIND_COPY[kind].label}</span><span className="mt-1 block text-[10px] leading-4 opacity-70">{KIND_COPY[kind].hint}</span></button>)}
           </div>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">基准日期<input type="date" className={inputClass} disabled={readOnly || anchorReadOnly} value={draft.anchorDate} onChange={(event) => set('anchorDate', event.target.value)} /></label>
           {draft.kind === 'cycle' ? <label className="grid gap-1.5 text-sm font-medium text-stone-700">周期天数<input type="number" min="1" className={inputClass} disabled={readOnly} value={draft.cycleDays} onChange={(event) => set('cycleDays', event.target.value)} /></label> : null}
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">{draft.kind === 'elapsed' ? '经过多少天后提醒（可空）' : '提前多少天提醒（可空）'}<input type="number" min={draft.kind === 'elapsed' ? 1 : 0} className={inputClass} disabled={readOnly} value={draft.attentionDays} onChange={(event) => set('attentionDays', event.target.value)} /></label>
-          <label className="grid gap-1.5 text-sm font-medium text-stone-700">图标<input className={inputClass} maxLength={50} disabled={readOnly} value={draft.icon} onChange={(event) => set('icon', event.target.value)} placeholder="例如 🎂" /></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">关联成员<select className={inputClass} disabled={readOnly} value={draft.subjectPersonId} onChange={(event) => set('subjectPersonId', event.target.value)}><option value="">不关联成员</option>{members.map((member) => <option key={member.personId} value={member.personId}>{member.displayName || member.userId}</option>)}</select></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">说明<textarea className={textareaClass} maxLength={5000} disabled={readOnly} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
         </div>

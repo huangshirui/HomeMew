@@ -18,7 +18,9 @@
     </view>
 
     <view class="card">
-      <view class="field-row">
+      <view style="display:flex;align-items:center">
+        <record-icon-picker emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{submitting}}" bind:change="onRecordIconChange" />
+        <view class="field-row" style="flex:1;min-width:0">
         <text class="field-label">愿望标题</text>
         <input
           class="field-input"
@@ -27,6 +29,7 @@
           placeholder="例如：一起去看海"
           maxlength="100"
         />
+        </view>
       </view>
     </view>
 

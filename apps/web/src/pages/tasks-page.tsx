@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Check, CheckSquare2, Circle, Clock3, Plus, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
+import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
@@ -13,6 +14,7 @@ type TaskRecord = {
   id: string;
   spaceId: string;
   modelKey: 'task';
+  presentation?: { icon: RecordIcon | null };
   modelVersion: number;
   name: string;
   description: string | null;
@@ -27,7 +29,7 @@ type TaskRecord = {
   updatedAt: string;
 };
 
-type TaskDraft = { name: string; description: string; dueDate: string; assigneePersonIds: string[] };
+type TaskDraft = { name: string; description: string; dueDate: string; assigneePersonIds: string[]; icon: RecordIconDraft };
 type Tab = 'pending' | 'completed';
 type DueFilter = 'all' | 'overdue' | 'today' | 'next7' | 'none';
 
@@ -54,6 +56,7 @@ function messageOf(cause: unknown, fallback: string) {
 function draftFromTask(task: TaskRecord): TaskDraft {
   return {
     name: task.name,
+    icon: iconDraftFor(task.presentation?.icon),
     description: task.description ?? '',
     dueDate: task.dueDate ?? '',
     assigneePersonIds: task.assigneePersonIds ?? [],
@@ -198,7 +201,7 @@ export function TasksPage() {
 
   function openCreate() {
     setEditing(null);
-    setDraft({ name: '', description: '', dueDate: '', assigneePersonIds: [] });
+    setDraft({ name: '', description: '', dueDate: '', assigneePersonIds: [], icon: emptyIconDraft() });
     setError(null);
   }
 
@@ -220,7 +223,7 @@ export function TasksPage() {
     setSaving(true);
     setError(null);
     try {
-      const payload = taskPayload(draft);
+      const payload = { ...taskPayload(draft), ...await presentationToSave(currentFamily.id, 'task', draft.icon, editing?.presentation?.icon) };
       if (editing) {
         await apiRequest<TaskRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
@@ -410,6 +413,7 @@ export function TasksPage() {
       {draft ? (
         <TaskEditor
           draft={draft}
+          spaceId={currentFamily?.id || ''}
           editing={editing}
           members={members.filter((member) => member.personId)}
           canWrite={canWrite}
@@ -458,7 +462,7 @@ function TaskRow({
         {task.status === 'completed' ? <Check className="size-4" /> : acting ? <RefreshCw className="size-3.5 animate-spin text-stone-400" /> : <Circle className="size-3" />}
       </button>
       <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen}>
-        <p className={`truncate font-medium ${task.status === 'completed' ? 'text-stone-400 line-through' : 'text-stone-900'}`}>{task.name}</p>
+        <p className={`truncate font-medium ${task.status === 'completed' ? 'text-stone-400 line-through' : 'text-stone-900'}`}><RecordIconMark icon={task.presentation?.icon} spaceId={task.spaceId} modelKey="task" recordId={task.id} className="mr-1" />{task.name}</p>
         {task.description ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-500">{task.description}</p> : null}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           <span className={due.tone === 'danger' ? 'font-medium text-red-600' : due.tone === 'today' ? 'font-medium text-amber-700' : 'text-stone-400'}><Clock3 className="mr-1 inline size-3.5" />{due.text}</span>
@@ -472,6 +476,7 @@ function TaskRow({
 
 function TaskEditor({
   draft,
+  spaceId,
   editing,
   members,
   canWrite,
@@ -482,6 +487,7 @@ function TaskEditor({
   onDelete,
 }: {
   draft: TaskDraft;
+  spaceId: string;
   editing: TaskRecord | null;
   members: ReturnType<typeof useHousehold>['members'];
   canWrite: boolean;
@@ -513,7 +519,11 @@ function TaskEditor({
         </div>
 
         <div className="mt-5 grid gap-4">
-          <label className="grid gap-1.5 text-sm font-medium text-stone-700">待办名称<input className={inputClass} disabled={readOnly} maxLength={100} value={draft.name} onChange={(event) => set('name', event.target.value)} autoFocus={!editing} /></label>
+          <div className="flex items-end gap-3">
+            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly || saving}
+            original={editing?.presentation?.icon} spaceId={spaceId} modelKey="task" recordId={editing?.id} />
+            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">待办名称<input className={inputClass} disabled={readOnly} maxLength={100} value={draft.name} onChange={(event) => set('name', event.target.value)} autoFocus={!editing} /></label>
+          </div>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">截止日期<input type="date" className={inputClass} disabled={readOnly} value={draft.dueDate} onChange={(event) => set('dueDate', event.target.value)} /></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">说明<textarea className={textareaClass} disabled={readOnly} maxLength={5000} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
           <div>

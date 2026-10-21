@@ -10,7 +10,7 @@
     <!-- 主信息卡片 -->
     <view class="card hero-card">
       <view class="hero-row">
-        <text class="hero-title">{{summary}}</text>
+        <image wx:if="{{iconImagePath}}" src="{{iconImagePath}}" mode="aspectFit" style="width:56rpx;height:56rpx;border-radius:10rpx;margin-right:12rpx;vertical-align:middle" /><text wx:elif="{{iconEmoji}}" style="font-size:38rpx;margin-right:12rpx">{{iconEmoji}}</text><text class="hero-title">{{summary}}</text>
         <text wx:if="{{event.status === 'cancelled'}}" class="cancelled-tag">已取消</text>
       </view>
       <view class="hero-time">

@@ -18,6 +18,8 @@ import {
   formatInstantInTimeZone,
 } from '../../utils/index';
 import { CreateWishRequest, UpdateWishRequest } from '../../types/index';
+import { downloadRecordIconImage } from '../../services/record-icons';
+import { originalIconState, prepareRecordIcon, pickerChangeState, type RecordIconPickerChange } from '../../utils/record-icon-edit';
 
 type Mode = 'create' | 'edit';
 
@@ -32,6 +34,10 @@ Page({
     submitting: false,
     wishCreated: false,
     title: '',
+    iconEmoji: '',
+    iconFileId: '',
+    iconImagePath: '',
+    iconTouched: false,
     description: '',
     desiredDate: '',
     familyToday: '',
@@ -81,11 +87,20 @@ Page({
       hideLoading();
       this.setData({
         title: wish.title,
+        ...originalIconState(wish.presentation?.icon),
         description: wish.description || '',
         desiredDate: wish.desiredDate || '',
         version: wish.version,
         loaded: true,
       });
+      if (wish.presentation?.icon?.type === 'image') {
+        const fileId = wish.presentation.icon.fileId;
+      void downloadRecordIconImage(this.data.familyId, 'wish', wish.id, wish.presentation.icon.fileId)
+          .then(iconImagePath => {
+          if (!this.data.iconTouched && this.data.iconFileId === fileId) this.setData({ iconImagePath });
+        })
+          .catch(() => undefined);
+      }
     } catch (error: unknown) {
       hideLoading();
       console.error('[WishEdit] Load failed:', error);
@@ -97,6 +112,10 @@ Page({
 
   onRetryLoad(): void {
     if (this.data.mode === 'edit') this.loadWish();
+  },
+
+  onRecordIconChange(e: WechatMiniprogram.CustomEvent<RecordIconPickerChange>): void {
+    this.setData(pickerChangeState(e.detail));
   },
 
   onTitleInput(e: WechatMiniprogram.Input): void { this.setData({ title: e.detail.value }); },
@@ -121,8 +140,9 @@ Page({
 
     this.setData({ submitting: true });
     try {
+      const presentation = await prepareRecordIcon(this.data.familyId, 'wish', this.data.mode, this.data);
       if (this.data.mode === 'edit') {
-        const body = { ...payload, version: this.data.version } as UpdateWishRequest;
+        const body = { ...payload, ...(presentation ? { presentation } : {}), version: this.data.version } as UpdateWishRequest;
         await updateWish(this.data.familyId, this.data.wishId, body);
         markDirty('wishes');
         this.setData({ submitting: false });
@@ -131,7 +151,7 @@ Page({
         return;
       }
 
-      await createWish(this.data.familyId, payload as CreateWishRequest);
+      await createWish(this.data.familyId, { ...payload, ...(presentation ? { presentation } : {}) } as CreateWishRequest);
       markDirty('wishes');
       this.setData({ submitting: false, wishCreated: true });
       wx.vibrateShort({ type: 'light' });

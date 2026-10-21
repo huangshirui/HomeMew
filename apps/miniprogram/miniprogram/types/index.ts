@@ -215,6 +215,7 @@ export interface Actor {
 }
 
 export interface EventCommon {
+  presentation?: { icon: RecordIcon | null };
   id: string;
   familyId: string;
   summary: string;
@@ -249,6 +250,7 @@ export interface EventResponse extends ApiEnvelope<Event> {}
 export interface EventListResponse extends PaginatedResponse<Event> {}
 
 export interface EventWriteCommon {
+  presentation?: { icon: RecordIcon | null };
   summary: string;
   description?: string | null;
   attendeeIds?: string[];
@@ -278,6 +280,7 @@ export interface CreateAllDayEventRequest extends EventWriteCommon {
 export type CreateEventRequest = CreateTimedEventRequest | CreateAllDayEventRequest;
 
 export interface EventUpdateFields {
+  presentation?: { icon: RecordIcon | null };
   summary?: string;
   description?: string | null;
   attendeeIds?: string[];
@@ -317,6 +320,7 @@ export type UpdateEventRequest = UpdateTimedEventRequest | UpdateAllDayEventRequ
 export type TaskStatus = 'pending' | 'completed' | 'cancelled';
 
 export interface Task {
+  presentation?: { icon: RecordIcon | null };
   id: string;
   familyId: string;
   name: string;
@@ -337,6 +341,7 @@ export interface TaskResponse extends ApiEnvelope<Task> {}
 export interface TaskListResponse extends PaginatedResponse<Task> {}
 
 export interface CreateTaskRequest {
+  presentation?: { icon: RecordIcon | null };
   name: string;
   description?: string | null;
   dueDate?: string | null;
@@ -344,6 +349,7 @@ export interface CreateTaskRequest {
 }
 
 interface TaskUpdateFields {
+  presentation?: { icon: RecordIcon | null };
   name?: string;
   description?: string | null;
   dueDate?: string | null;
@@ -404,6 +410,8 @@ export interface CycleDayComputed extends DayComputedCommon {
   progressRatio: number;
 }
 
+export type RecordIcon = { type: 'emoji'; value: string } | { type: 'image'; fileId: string };
+
 export interface DayRecordCommon {
   id: string;
   familyId: string;
@@ -411,7 +419,7 @@ export interface DayRecordCommon {
   description: string | null;
   /** 关联对象；null 表示全家 */
   subject: PersonRef | null;
-  icon: string | null;
+  presentation?: { icon: RecordIcon | null };
   status: DayRecordStatus;
   version: number;
   createdBy: Actor;
@@ -453,11 +461,11 @@ export interface DayRecordResponse extends ApiEnvelope<DayRecord> {}
 export interface DayRecordListResponse extends PaginatedResponse<DayRecord> {}
 
 interface CreateDayRecordCommon {
+  presentation?: { icon: RecordIcon | null };
   name: string;
   description?: string | null;
   anchorDate: string;
   subjectUserId?: string | null;
-  icon?: string | null;
 }
 
 export interface CreateElapsedDayRecordRequest extends CreateDayRecordCommon {
@@ -490,9 +498,9 @@ export type CreateDayRecordRequest =
  * - attentionAfterDays 仅适用于 elapsed。
  */
 interface DayRecordUpdateFields {
+  presentation?: { icon: RecordIcon | null };
   name?: string;
   description?: string | null;
-  icon?: string | null;
   subjectUserId?: string | null;
   anchorDate?: string;
   cycleDays?: number;
@@ -537,6 +545,7 @@ export interface CreateDayRecordOccurrenceResult {
 export type WishStatus = 'open' | 'fulfilled';
 
 export interface Wish {
+  presentation?: { icon: RecordIcon | null };
   id: string;
   familyId: string;
   title: string;
@@ -559,12 +568,14 @@ export interface WishResponse extends ApiEnvelope<Wish> {}
 export interface WishListResponse extends PaginatedResponse<Wish> {}
 
 export interface CreateWishRequest {
+  presentation?: { icon: RecordIcon | null };
   title: string;
   description?: string | null;
   desiredDate?: string | null;
 }
 
 interface WishUpdateFields {
+  presentation?: { icon: RecordIcon | null };
   title?: string;
   description?: string | null;
   desiredDate?: string | null;

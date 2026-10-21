@@ -12,6 +12,7 @@ import { consumeDirty, subscribe } from '../../stores/dirty';
 import { showError, getErrorMessage } from '../../utils/index';
 import { mapWishView, WishView } from '../../utils/wish-view';
 import { Wish } from '../../types/index';
+import { downloadRecordIconImage } from '../../services/record-icons';
 
 type FilterKey = 'all' | 'mine' | 'fulfilled';
 
@@ -51,6 +52,8 @@ Page({
   },
 
   _wishes: [] as Wish[],
+  _iconPaths: {} as Record<string, string>,
+  _loadingIcons: new Set<string>(),
   _cursor: null as string | null,
   _reqSeq: 0,
   /** 缓存 onLoad 入参，供初始化失败后重试复用 */
@@ -197,7 +200,28 @@ Page({
   },
 
   applyWishes(): void {
-    this.setData({ items: this._wishes.map((wish) => mapWishView(wish, this.data.currentUserId)) });
+    const familyId = this.data.familyId;
+    const items = this._wishes.map(wish => {
+      const view = mapWishView(wish, this.data.currentUserId);
+      if (wish.presentation?.icon?.type === 'image') {
+        const fileId = wish.presentation.icon.fileId;
+        const key = `${familyId}:${wish.id}:${fileId}`;
+        view.iconImagePath = this._iconPaths[key] || '';
+        if (!view.iconImagePath && !this._loadingIcons.has(key)) {
+          this._loadingIcons.add(key);
+          void downloadRecordIconImage(familyId, 'wish', wish.id, fileId)
+            .then(path => {
+              if (this.data.familyId !== familyId
+                || !this._wishes.some(w => w.id === wish.id && w.presentation?.icon?.type === 'image'
+                  && w.presentation.icon.fileId === fileId)) return;
+              this._iconPaths[key] = path;
+              this.applyWishes();
+            }).catch(() => undefined).then(() => this._loadingIcons.delete(key));
+        }
+      }
+      return view;
+    });
+    this.setData({ items });
   },
 
   onFilterTap(e: WechatMiniprogram.TouchEvent): void {
