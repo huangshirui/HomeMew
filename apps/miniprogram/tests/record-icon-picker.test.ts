@@ -47,3 +47,21 @@ test('the shared picker limits display work and has close, clear, image and grou
   assert.match(xml, /onChooseImage/);
   assert.match(xml, /onClear/);
 });
+
+test('image pre-upload applies both dimension and byte caps and inspects actual MIME bytes', () => {
+  const source = read('services/record-icons.ts');
+  assert.match(source, /MAX_DIMENSION = 512/);
+  assert.match(source, /Math\.min\(1, MAX_DIMENSION \/ Math\.max\(original\.width, original\.height\)\)/);
+  assert.match(source, /compressedWidth: width/);
+  assert.match(source, /compressedHeight: height/);
+  assert.match(source, /measured\.width > MAX_DIMENSION \|\| measured\.height > MAX_DIMENSION/);
+  assert.match(source, /MAX_BYTES = 256 \* 1024/);
+  assert.match(source, /mimeFromBytes\(bytes\)/);
+});
+
+test('slow image downloads cannot overwrite a newly selected Icon', () => {
+  for (const model of ['days', 'events', 'tasks', 'wishes']) {
+    const source = read('pages/' + model + '/edit.ts');
+    assert.match(source, /!this\.data\.iconTouched && this\.data\.iconFileId === fileId/, model);
+  }
+});
