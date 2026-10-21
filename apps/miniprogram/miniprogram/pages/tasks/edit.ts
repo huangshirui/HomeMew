@@ -162,8 +162,11 @@ Page({
     });
     this.refreshDerived();
     if (task.presentation?.icon?.type === 'image') {
+      const fileId = task.presentation.icon.fileId;
       void downloadRecordIconImage(this.data.familyId, 'task', task.id, task.presentation.icon.fileId)
-        .then(iconImagePath => this.setData({ iconImagePath }))
+        .then(iconImagePath => {
+          if (!this.data.iconTouched && this.data.iconFileId === fileId) this.setData({ iconImagePath });
+        })
         .catch(() => undefined);
     }
   },
