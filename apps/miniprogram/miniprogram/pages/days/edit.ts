@@ -232,7 +232,9 @@ Page({
     if (record.presentation?.icon?.type === 'image') {
       const { fileId } = record.presentation.icon;
       void downloadRecordIconImage(this.data.familyId, 'day_record', record.id, fileId)
-        .then(path => this.setData({ iconImagePath: path }))
+        .then(path => {
+          if (!this.data.iconTouched && this.data.iconFileId === fileId) this.setData({ iconImagePath: path });
+        })
         .catch(() => undefined);
     }
   },
