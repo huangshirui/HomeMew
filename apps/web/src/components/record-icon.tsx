@@ -211,7 +211,23 @@ export function RecordIconField({ icon, onChange, disabled, original, spaceId, m
         onMouseDown={event => { if (event.target === event.currentTarget) setOpen(false); }}>
         <div role="dialog" aria-modal="true" aria-labelledby={titleId}
           className="flex h-[min(78dvh,650px)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
-          onMouseDown={event => event.stopPropagation()}>
+          onMouseDown={event => event.stopPropagation()}
+          onKeyDown={event => {
+            if (event.key !== 'Tab') return;
+            const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+              'button:not([disabled]), input:not([disabled])',
+            ));
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (!first || !last) return;
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first.focus();
+            }
+          }}>
           <div className="flex items-start justify-between border-b border-stone-100 px-5 py-4">
             <div>
               <h2 id={titleId} className="text-base font-semibold text-stone-900">选择图标</h2>
