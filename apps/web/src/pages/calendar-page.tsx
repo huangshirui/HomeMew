@@ -872,12 +872,14 @@ function EventEditor({
         </div>
 
         <div className="mt-5 grid gap-4">
-          <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly}
+          <div className="flex items-end gap-3">
+            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly}
             original={editing?.presentation?.icon} spaceId={spaceId} modelKey="event" recordId={editing?.id} />
-          <label className="grid gap-1.5 text-sm font-medium text-stone-700">
+            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">
             日程名称
             <input className={inputClass} disabled={readOnly} maxLength={100} value={draft.summary} onChange={(event) => set('summary', event.target.value)} autoFocus={!editing} />
           </label>
+          </div>
 
           <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-stone-200">
             <input id="calendar-all-day" type="checkbox" className="size-4 accent-emerald-600" disabled={readOnly} checked={draft.isAllDay} onChange={(event) => set('isAllDay', event.target.checked)} />
