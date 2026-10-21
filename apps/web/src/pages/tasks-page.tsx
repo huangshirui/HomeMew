@@ -520,7 +520,7 @@ function TaskEditor({
 
         <div className="mt-5 grid gap-4">
           <div className="flex items-end gap-3">
-            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly}
+            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly || saving}
             original={editing?.presentation?.icon} spaceId={spaceId} modelKey="task" recordId={editing?.id} />
             <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">待办名称<input className={inputClass} disabled={readOnly} maxLength={100} value={draft.name} onChange={(event) => set('name', event.target.value)} autoFocus={!editing} /></label>
           </div>
