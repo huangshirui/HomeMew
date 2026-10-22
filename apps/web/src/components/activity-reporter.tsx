@@ -1,4 +1,3 @@
-import { environmentApiPath, getRuntimeEnvironment } from '../lib/runtime-environment';
 import { useEffect } from 'react';
 
 const STORAGE_KEY = 'homemew.activity.web.reportedLocalDay';
@@ -15,7 +14,7 @@ function localDayKey(date = new Date()): string {
 
 function storedDay(): string | null {
   try {
-    return window.sessionStorage.getItem(STORAGE_KEY + '.' + getRuntimeEnvironment());
+    return window.sessionStorage.getItem(STORAGE_KEY);
   } catch {
     return null;
   }
@@ -24,7 +23,7 @@ function storedDay(): string | null {
 function rememberDay(day: string): void {
   reportedInMemoryDay = day;
   try {
-    window.sessionStorage.setItem(STORAGE_KEY + '.' + getRuntimeEnvironment(), day);
+    window.sessionStorage.setItem(STORAGE_KEY, day);
   } catch {
     // sessionStorage is only a duplicate-suppression optimization.
   }
@@ -44,7 +43,7 @@ async function reportWebActivityOncePerDay(): Promise<void> {
 
   reportPromiseDay = day;
   reportPromise = (async () => {
-    const response = await fetch(environmentApiPath('/api/activity/me'), {
+    const response = await fetch('/api/activity/me', {
       method: 'POST',
       credentials: 'same-origin',
       cache: 'no-store',
