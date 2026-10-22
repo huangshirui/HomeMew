@@ -6,7 +6,7 @@ Authoritative decision: docs/decisions/2026-10-22-fixed-deployment-environments.
 ## 1. Environment model
 
 - Web Production: https://homemew.aisr.online ; backend homemew-backend-production ; LifeSpace Production.
-- Web Preview: Cloudflare's named staging Preview **inside the same homemew-web-production Worker project** ; backend homemew-backend-staging ; LifeSpace Staging.
+- Web Preview: Cloudflare's named staging Preview **inside the same homemew-web Worker project** ; backend homemew-backend-staging ; LifeSpace Staging.
 - Mini develop/trial/release: all use https://homemew.aisr.online BFF ; backend homemew-backend-production ; LifeSpace Production.
 - No env=staging URL selector or UI warning: arbitrary query parameters do not affect the bound LifeSpace target. /_stage/* BFF paths still fail with 404.
 - Keep **both** backend Workers and their distinct Durable Object namespaces; Service Binding from Web Preview invokes the deployed staging backend Worker, not a backend Preview.
@@ -21,7 +21,7 @@ Authoritative decision: docs/decisions/2026-10-22-fixed-deployment-environments.
 
 ## 3. Cloudflare Worker bindings and variables
 
-Same Cloudflare Worker project: homemew-web-production
+Same Cloudflare Worker project: homemew-web
 
 Production tab:
 - HOMEMEW_BACKEND → homemew-backend-production
@@ -50,7 +50,7 @@ Older STAGING_LIFESPACE_APPLICATION_CREDENTIAL and STAGING_WEB_SESSION_SECRET se
 
 ## 4. Manual deployment sequence — Preview first, Production after acceptance
 
-1. Once CI passes and the feature PR merges to main, enable Worker **Preview URLs** for the existing homemew-web-production Worker in Cloudflare Dashboard → Workers & Pages → Domains, without replacing the current Production code. The production workers.dev route can remain disabled.
+1. Once CI passes and the feature PR merges to main, enable Worker **Preview URLs** for the existing homemew-web Worker in Cloudflare Dashboard → Workers & Pages → Domains, without replacing the current Production code. The production workers.dev route can remain disabled.
 2. **Before publishing a Preview**, protect this Worker's Preview hostnames/wildcard with Cloudflare Access. Register the resulting Access audience in LifeSpace **Staging** for the staging HomeMew Application. Review GitHub preview Environment branch/approver restrictions.
 3. GitHub Actions → Deploy HomeMew Web Preview → choose a reviewed trusted code branch, confirm DEPLOY_HOMEMEW_WEB_PREVIEW. This creates/updates the named staging Preview under the same Worker, **without changing Production code**.
 4. Add TWO Preview-scoped secrets to the named staging Preview from a secure terminal or Preview settings. Wrangler >= 4.135.0 commands from repository root:
