@@ -84,7 +84,7 @@ The existing Cloudflare Worker project, `homemew-web-production`, hosts both **W
 
 - **Web Production** serves `homemew.aisr.online` and always uses LifeSpace Production / `homemew-backend-production`.
 - **Web Preview** is another code version under the same Worker project, with its own staging bindings/Secrets, and always uses LifeSpace Staging / `homemew-backend-staging`.
-- The URL does not select environment. No `?env=staging`, no `/_stage/api/*` proxy, no per-page business switch. Legacy Web URLs with `?env=staging` deliberately refuse to open the application instead of accidentally writing Production.
+- The URL does not select environment. No `?env=staging`, no `/_stage/api/*` proxy, no per-page business switch. The unpublished `?env=staging` selector is not implemented: query parameters do not change the bound environment and no special notice is needed.
 - Mini Program developer, trial and release builds always use the HomeMew production BFF; they never call Web Preview.
 - Backend Workers and their independent Durable Objects remain deployed in both environments.
 
@@ -309,24 +309,10 @@ pnpm check
 
 The root check validates the active HomeMew application surfaces: backend syntax/tests, Mini Program tests/typecheck, and Web BFF tests/typecheck/build. The retired legacy HomeMew Core is not part of the active workspace.
 
-## One-deployment staging selection / 仅切换后端环境
+## Fixed deployment targets / 固定环境
 
-Use the *same* Web deployment and the same React pages/assets. Opening
-`https://homemew.aisr.online/?env=staging` selects LifeSpace staging for this
-browser tab; `?env=production` selects production. This is **not** a page
-feature toggle. The frontend uses fixed same-origin `/_stage/api/*` routes,
-which the Worker binds to distinct staging Identity/Core/application services
-and Web session HMAC secret. No staging Web build/domain is deployed.
+The same HomeMew Web Worker project has two independently deployed code versions: Production always binds the Production LifeSpace and HomeMew backend, and its protected Preview always binds Staging LifeSpace and the independent staging HomeMew backend. The environment is **not** chosen through the URL or client code. In particular, `?env=staging` was never released and requires no special warning or compatibility handling; an unrecognized query parameter is ignored.
 
-The front-door requires staging service bindings and the separately installed
-`STAGING_LIFESPACE_APPLICATION_CREDENTIAL` and `STAGING_WEB_SESSION_SECRET`
-secrets; otherwise stage requests fail with HTTP 503 and never fall back to
-production. Review staging LifeSpace Access audience, app model grants, and
-the Cloudflare Access path-policy exceptions for Mini login/BFF routes before
-manual deployment. See
-`docs/decisions/2026-10-22-one-deployment-staging-routing.md`.
+Mini development/trial/release always use `https://homemew.aisr.online` and the Production Mini BFF. Staging-only Web testing happens on the protected Cloudflare Worker Preview URL, with its own staging credential and Web session secret.
 
-Mini runs in the **same** HomeMew app deployment via the explicit launch path
-`pages/home/home?env=staging`; this selects staging service routing, not a
-second Mini release or an arbitrary LifeSpace URL. Mini user tokens/family
-cache are cleared on changing environment.
+See `docs/decisions/2026-10-22-fixed-deployment-environments.md` and `docs/runbooks/2026-10-22-web-preview-and-environment-routing.md`.
