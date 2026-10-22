@@ -8,7 +8,7 @@ Authoritative decision: docs/decisions/2026-10-22-fixed-deployment-environments.
 - Web Production: https://homemew.aisr.online ; backend homemew-backend-production ; LifeSpace Production.
 - Web Preview: Cloudflare's named staging Preview **inside the same homemew-web-production Worker project** ; backend homemew-backend-staging ; LifeSpace Staging.
 - Mini develop/trial/release: all use https://homemew.aisr.online BFF ; backend homemew-backend-production ; LifeSpace Production.
-- No env=staging URL selector. The retired Web URL shows an explicit notice instead of opening production data; /_stage/* BFF paths fail with 404.
+- No env=staging URL selector or UI warning: arbitrary query parameters do not affect the bound LifeSpace target. /_stage/* BFF paths still fail with 404.
 - Keep **both** backend Workers and their distinct Durable Object namespaces; Service Binding from Web Preview invokes the deployed staging backend Worker, not a backend Preview.
 
 ## 2. Before deploying: protect the Preview
@@ -67,7 +67,7 @@ Cloudflare Preview URLs can be enabled through the dashboard, without first depl
 - Production: verify Web session, normal family read and production-only service bindings. Production Mini login on /api/v1/login/wechat must remain functional.
 - Preview: verify /health returns staging, Access JWT is registered to staging HomeMew Application, and logged-in test user can read/create/update test-family records only in LifeSpace Staging. Verify Family Catalog and backend activity on the staging Worker.
 - On both Worker versions, /_stage/api/session and /_stage/api/v1/login/wechat return 404, not production fallback.
-- Web /?env=staging shows the retired-link notice and never starts normal Web requests.
+- Production Web ignores an unrecognized `?env=staging` query; it remains bound to LifeSpace Production. Preview Web remains bound to LifeSpace Staging regardless of query.
 - Mini developer/trial/release versions use only Production; upgrading old staging-enabled client clears cached staging bearer and family context once.
 - A LifeSpace breaking upgrade is ready for production only after verified Web Preview tests **and** backward compatibility checks with deployed Mini BFF + existing Mini clients. football_match/football_goal remain ordinary models and must be manually published in LifeSpace Console as needed.
 - Once live and verified, delete the obsolete Cloudflare Access bypass app covering /_stage paths and remove unused Production Worker STAGING_* secrets. Keep homemew-backend-staging and its Durable Objects.
