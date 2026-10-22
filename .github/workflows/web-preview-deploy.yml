@@ -49,7 +49,7 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const config = JSON.parse(fs.readFileSync('apps/web/wrangler.production.jsonc', 'utf8'));
-          if (config.name !== 'homemew-web-production' || config.preview_urls !== true) throw new Error('Expected same-worker Preview with preview_urls enabled');
+          if (config.name !== 'homemew-web' || config.preview_urls !== true) throw new Error('Expected same-worker Preview with preview_urls enabled');
           if (config.workers_dev !== false) throw new Error('Production workers_dev must remain disabled');
           if (config.vars?.ENVIRONMENT !== 'production') throw new Error('Production Worker must stay on LifeSpace production');
           if (config.previews?.vars?.ENVIRONMENT !== 'staging') throw new Error('Preview must be staging only');
@@ -84,7 +84,7 @@ jobs:
           {
             echo "## HomeMew Web Preview"
             echo
-            echo "- Worker project: homemew-web-production"
+            echo "- Worker project: homemew-web"
             echo "- Preview name: staging"
             echo "- LifeSpace: staging only, independent of URL query"
             echo "- Browser Preview host requires separate Cloudflare Access protection and a staging LifeSpace Access audience"
