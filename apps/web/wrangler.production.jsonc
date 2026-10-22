@@ -13,6 +13,7 @@
     "run_worker_first": [
       "/api/*",
       "/_stage/api/*",
+      "/_stage/health",
       "/health"
     ]
   },
