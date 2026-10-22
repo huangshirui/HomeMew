@@ -78,6 +78,23 @@ Both boundaries must not:
 
 HomeMew application metadata such as Family Catalog classification and External System `ext_*` containers belongs to `apps/backend/` Durable Objects and is reached from Web through the `HOMEMEW_BACKEND` Service Binding.
 
+## Web code versions vs LifeSpace environments
+
+HomeMew Web has **one Worker project** (`homemew-web-production`) with Production and optional **Worker Preview** code versions. Code deployment and LifeSpace data target are separate dimensions:
+
+| Web code | URL parameter | LifeSpace data |
+| --- | --- | --- |
+| Production | missing or `env=production` | Production |
+| Production | `env=staging` | Staging |
+| Worker Preview | missing or `env=production` | Production |
+| Worker Preview | `env=staging` | Staging |
+
+The browser's *explicit URL query* selects only the data environment. Removing `env=staging` immediately selects production; in-app React Router links retain it when navigating staging. No browser-provided upstream URL is honored. The HomeMew Worker front door resolves fixed `/api/*` (production) and `/_stage/api/*` (staging) to distinct LifeSpace and HomeMew backend Service Bindings and secrets, failing closed if staging is unavailable.
+
+Preview is a **second code deployment inside the same Worker**, not a second Worker project or third LifeSpace data environment. It uses separately configured Preview vars/services/secrets, with a trusted-branch manual GitHub Actions workflow; do not expose Preview URLs or production-credential Previews to untrusted PR code. The released Mini Program always uses the production HomeMew domain and switches only its LifeSpace data environment via its launch-path parameter.
+
+Operator setup, access-audience requirements, four-way acceptance and rollback: `docs/runbooks/2026-10-22-web-preview-and-environment-routing.md`.
+
 ## Authentication boundary
 
 Cloudflare Access is the long-term Web authentication and SSO layer. Authorization Code + PKCE is **not** the target LifeSpace browser architecture.
