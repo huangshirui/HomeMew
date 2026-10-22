@@ -1,4 +1,3 @@
-import { selectApplicationEnvironment } from './application-environment.mjs';
 import webHandler from './worker.mjs';
 import { handleMiniProgramBff } from './miniprogram-bff.mjs';
 import { handleMiniProgramFinalEventBff } from './miniprogram-final-event-bff.mjs';
@@ -46,10 +45,11 @@ function webApplicationEnv(env) {
 export function createFrontDoorHandler({ app = webHandler } = {}) {
   return {
     async fetch(request, env, context) {
-      const selected = selectApplicationEnvironment(request, env);
-      if (selected.error) return selected.error;
-      request = selected.request;
-      env = selected.env;
+      // Legacy /_stage path must never fall through to the current deployment's backend.
+      // Production and Preview select their LifeSpace environment solely from Worker bindings.
+      if (new URL(request.url).pathname.startsWith('/_stage/')) {
+        return json({ error: { code: 'NOT_FOUND', message: 'Legacy staging route is retired' } }, 404);
+      }
       const eventBffResponse = await handleMiniProgramFinalEventBff(request, env);
       if (eventBffResponse) return eventBffResponse;
 
