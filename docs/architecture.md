@@ -47,6 +47,15 @@ External-system administration is an advanced HomeMew Web capability. The Mini P
 
 A HomeMew Application may own multiple active `lsa_*` credentials when operationally useful for independent deployment, zero-downtime rotation or independent revocation. Credential count is not client count. The provider backend and Web Worker may therefore use different `lsa_*` values while still representing the same canonical HomeMew Application.
 
+### Runtime deployment environments (2026-10-22)
+
+The current policy is `docs/decisions/2026-10-22-fixed-deployment-environments.md`, superseding the earlier URL-based staging selector.
+
+- **One HomeMew Web Worker project**: `homemew-web-production` Production code always binds LifeSpace Production; its separate named Worker Preview code always binds LifeSpace Staging. Preview is an isolated *code deployment* within the same Worker project, not a second Web Worker or an alternate UI feature mode.
+- **Two HomeMew backend Workers retained**: `homemew-backend-production` and `homemew-backend-staging`, with independent Durable Object identities/catalog/coordination state. Web Production binds the former; Web Preview binds the latter.
+- **Mini development/trial/release** always use the existing production front door and the stable BFF, reaching LifeSpace Production. Testing LifeSpace schema-breaking changes uses Web Preview + LifeSpace Staging; released Mini compatibility must be explicitly verified before a production platform migration.
+- Neither Web nor Mini accepts `?env=staging` as an environment selector; the old `/_stage/*` API routes have been retired. Environment authority comes only from the trusted Worker deployment configuration. Preview hosts must be protected by Access and its audience registered against the staging HomeMew Application.
+
 ## 3. HomeMew Cloudflare application backend
 
 `apps/backend/` is a narrow trusted HomeMew application backend, not a second business Core and not the Web Access-principal authority.
