@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight, CalendarDays, Check, CheckSquare2, Clock3, RefreshCw, Sparkles } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from '../components/environment-navigation';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';

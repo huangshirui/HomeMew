@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { withRuntimeEnvironment } from './lib/runtime-environment';
 import { ActivityReporter } from './components/activity-reporter';
 import { AppShell } from './components/app-shell';
 import { HouseholdProvider } from './components/household-provider';
@@ -38,7 +39,7 @@ export function App() {
             <Route path="settings/integrations" element={<SettingsPage section="integrations" />} />
             <Route path="settings/integrations/:integrationId" element={<IntegrationDetailPage />} />
           </Route>
-          <Route path="*" element={<Navigate replace to="/" />} />
+          <Route path="*" element={<Navigate replace to={withRuntimeEnvironment("/")} />} />
         </Routes>
       </HouseholdProvider>
     </SessionGate>

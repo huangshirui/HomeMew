@@ -1,6 +1,7 @@
 import { Check, Clipboard, LoaderCircle, LogIn, LogOut, Plus, ShieldCheck, Trash2, UserMinus, Users } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { withRuntimeEnvironment } from '../lib/runtime-environment';
 import { useHousehold, type FamilyMember } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
@@ -206,7 +207,7 @@ export function FamilyPage() {
         method: 'POST',
       });
       await refresh();
-      navigate('/', { replace: true });
+      navigate(withRuntimeEnvironment('/'), { replace: true });
     } catch (cause) {
       setActionError(lifecycleError(cause, '退出家庭失败'));
     } finally {
@@ -229,7 +230,7 @@ export function FamilyPage() {
         body: JSON.stringify({ version: latest.version }),
       });
       await refresh();
-      navigate('/', { replace: true });
+      navigate(withRuntimeEnvironment('/'), { replace: true });
     } catch (cause) {
       setActionError(lifecycleError(cause, '注销家庭失败'));
     } finally {

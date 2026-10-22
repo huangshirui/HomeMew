@@ -1,6 +1,6 @@
 import { ExternalLink, ShieldCheck, Users } from 'lucide-react';
 import { PageHeader } from '../components/ui/page-header';
-import { Link } from 'react-router-dom';
+import { Link } from '../components/environment-navigation';
 import { Card } from '../components/ui/card';
 import { IntegrationsPage } from './integrations-page';
 

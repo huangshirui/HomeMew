@@ -88,7 +88,7 @@ jobs:
 
       - name: Deploy production Web Worker
         run: >-
-          corepack pnpm --dir apps/web exec wrangler deploy
+          corepack pnpm dlx wrangler@4.135.0 deploy
           --config "$GITHUB_WORKSPACE/apps/web/wrangler.production.jsonc"
 
       - name: Verify Access front door and Mini Program provider route

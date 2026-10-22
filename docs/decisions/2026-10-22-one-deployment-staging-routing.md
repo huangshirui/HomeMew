@@ -1,17 +1,19 @@
-# Decision: One HomeMew deployment with explicit staging backend routing
+# Decision: One HomeMew Worker, independent code previews and LifeSpace environment routing
 
 Date: 2026-10-22
-Status: Proposed implementation (PR, not deployed)
+Status: Accepted architecture; implementation rollout pending configuration
 Scope: HomeMew Web front door, Mini runtime environment selection; **not** a UI feature toggle.
 
 ## Motivation / 背景
 
-One production-deployed HomeMew Web Worker should serve the **same code/assets** while an explicit URL or Mini launch-path parameter chooses whether its backend calls use LifeSpace staging or production. This does **not** resurrect a dedicated HomeMew Web staging deployment. LifeSpace remains the authority for environments, Identity, Core and domain truth.
+One HomeMew Web Worker project has a production code deployment and optional Cloudflare Worker Preview deployments of unmerged/new Web code. **Code version is independent from LifeSpace data environment.** On *either* code version, the URL explicitly selects LifeSpace staging or (by default) production. No separate HomeMew Web staging Worker project is created. LifeSpace production and staging retain independent Identity/Core deployments and persistent data.
 
 ## User-facing convention / 入口
 
 - Web normal: `https://homemew.aisr.online/` -> production.
-- Web staging: `https://homemew.aisr.online/?env=staging` -> same SPA; that browser tab's API, login/session, icon/media and application operations call `/_stage/api/*`. `?env=production` reselects production. No visual feature switch.
+- Web staging: `https://homemew.aisr.online/?env=staging` -> production *code* with staging LifeSpace. Any Worker Preview URL without `env` -> LifeSpace production; the same Preview URL with `?env=staging` -> LifeSpace staging. `?env=production` is equivalent to omitting `env`. No UI feature toggle.
+- Web `env` is **not persisted in sessionStorage**: removing the query immediately selects production. Internal React Router links and redirects explicitly carry `env=staging` so normal navigation stays in staging; direct navigation to a URL without the query intentionally resets to production.
+- Preview and production use the **same** server-side environment router and application codebase; only the deployed *version* and Preview-scoped configuration differ.
 - Mini normal: `pages/home/home` -> production.
 - Mini staging: `pages/home/home?env=staging` (or another registered entry page with `?env=staging`) -> the Mini runtime's app backend base URL becomes `https://homemew.aisr.online/_stage`; all stable Mini BFF and wx.login endpoints stay HomeMew application routes. Switching environments invalidates cached token, expiry, current family and cached domain display state. A cold launch defaults to production. No second Mini binary is required, but this code still needs to be shipped in a published Mini version.
 
@@ -23,7 +25,15 @@ One production-deployed HomeMew Web Worker should serve the **same code/assets**
 - `__Host-homemew_staging_session` differs from the production `__Host-homemew_session`. Different HMAC secrets and cookies prevent staging Identity tokens being reused as production sessions. Family UI preference and daily activity report cache keys are environment-scoped. Origin CSRF enforcement, request IDs, Cloudflare Access JWT verification and LifeSpace authorization remain unchanged.
 - If **any** staging configuration is unavailable, respond 503 `STAGING_NOT_CONFIGURED` instead of accidentally calling production. Do not deploy routing before validating Cloudflare bindings, Access ingress policies, LifeSpace staging Application × Model permissions, staging Access audience/exchange, and staging backend Durable Object bindings/credentials.
 - Cloudflare Access must continue to protect the Web paths. Review the existing Mini BFF and WeChat login bypass rules **specifically for the additional `/_stage/api/v1/login/wechat` and `/_stage/api/v1/miniprogram/*` routes**; add narrow route exceptions as needed without opening the entire `/_stage/api/*` prefix publicly. This is a deployment configuration requirement, not a feature-flag/UI mechanism.
-- Assets are deployed once; the same `/calendar`, `/habits`, `/football` React routes render for both environments. There is no extra HomeMew staging hostname/Worker deployment.
+- Within each **code version** assets are deployed once, and the same `/calendar`, `/habits`, `/football` React routes support both LifeSpace environments. Worker Preview deploys a different code version/assets under the same Worker project; there is no second HomeMew staging Worker project.
+
+## Cloudflare Preview / 代码版本维度
+
+- Use Worker Previews (`wrangler >=4.135.0`) on the existing `homemew-web-production` Worker **project**, with a manual, review-gated named Preview `staging`; do not create a new `homemew-web-staging` Worker. The existing production deploy stays separately gated.
+- `previews.vars` explicitly defaults to LifeSpace production, and `previews.services` explicitly maps **both** fixed sets of LifeSpace and HomeMew backend bindings. Cloudflare Worker Previews do not inherit production variables or secrets. Preview Service Bindings route to the named target Workers' deployed versions, not to automatically matched previews of those Workers.
+- Preview has its own four secrets: production-Identity `LIFESPACE_APPLICATION_CREDENTIAL`, `WEB_SESSION_SECRET`, staging-Identity `STAGING_LIFESPACE_APPLICATION_CREDENTIAL`, `STAGING_WEB_SESSION_SECRET`. Distinct session secrets are required. LifeSpace `lsa_*` never enters repo, GitHub artifacts, or browser code. Both target Identity instances must associate the **Preview Cloudflare Access audience** with their own HomeMew Application.
+- Restrict Preview URL with Cloudflare Access **before sharing/running it**. Do not allow unreviewed/untrusted code to deploy with production credentials, because Preview default requests can write production data. Preview deployment is manual and GitHub Environment `preview` should require authorized reviewers. The normal Mini Program never points at a Preview URL and remains on the published production HomeMew front door.
+- Preview is for code testing, not a third LifeSpace data environment. Both preview and production perform the same `/_stage/api/*` routing and fail closed on incomplete staging credentials. See `docs/runbooks/2026-10-22-web-preview-and-environment-routing.md`.
 
 ## Domain Web changes / 业务范围
 
@@ -33,7 +43,8 @@ Analytics V1 is currently a bounded client aggregate of explicitly fetched footb
 
 ## Review / rollout
 
-1. Code review + full Web/Mini unit tests and typecheck in PR.
+1. Code review + full Web/Mini unit tests and typecheck in PR, including URL reset and navigation-preservation tests.
 2. Confirm the latest LifeSpace staging Core schema 72 and published baseline; register football models via the authorized LifeSpace process before football E2E.
 3. Provision staging credentials and Cloudflare Access ingress exceptions, validate isolation and login on one *deployed* HomeMew production front door in a controlled operator-approved release.
-4. Do not treat a merged PR or passing CI as evidence of deployment or real staging end-to-end validation. Production defaults must remain unchanged.
+4. Before deploying any Preview, configure Access protection and LifeSpace Access audiences. Use manual GitHub Environment approval for any branch with Preview production credentials.
+5. Validate all four combinations: production/Preview code × production/staging LifeSpace data. Do not treat a merged PR or passing CI as evidence of deployment or real end-to-end validation. Production defaults must remain unchanged.
