@@ -6,13 +6,6 @@ import { getApplicationBaseUrl, isTokenValid, REQUEST_TIMEOUT, STORAGE_KEYS } fr
 type LoginPayload = LoginResponse & { error?: { code?: string; message?: string } };
 
 let refreshPromise: Promise<LoginResponse> | null = null;
-let authGeneration = 0;
-
-export function invalidatePendingAuth(): void {
-  authGeneration += 1;
-  refreshPromise = null;
-}
-
 export async function callLogin(): Promise<LoginResponse> {
   const targetBaseUrl = getApplicationBaseUrl();
   const code = await new Promise<string>((resolve, reject) => wx.login({
@@ -52,9 +45,7 @@ function persistLogin(result: LoginResponse): LoginResponse {
  */
 async function refreshLogin(): Promise<LoginResponse> {
   if (refreshPromise) return refreshPromise;
-  const generation = authGeneration;
   const promise = callLogin().then(result => {
-    if (generation !== authGeneration) throw new Error('环境已切换，请重试身份恢复');
     return persistLogin(result);
   });
   refreshPromise = promise;
