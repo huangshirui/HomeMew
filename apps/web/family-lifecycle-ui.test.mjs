@@ -35,7 +35,7 @@ test('family page exposes owner close and non-owner leave through LifeSpace', ()
   ], 'member leave flow');
 
   requireAll(family, [
-    /await refresh\(\);\s*navigate\(withRuntimeEnvironment\('\/'\), \{ replace: true \}\);/u,
+    /await refresh\(\);\s*navigate\('\/' , \{ replace: true \}\);/u,
     /variant="destructive"/u,
   ], 'post-lifecycle UX');
 });
