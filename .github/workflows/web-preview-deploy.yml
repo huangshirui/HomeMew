@@ -1,0 +1,98 @@
+name: Deploy HomeMew Web Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY_HOMEMEW_WEB_PREVIEW to confirm trusted branch code
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homemew-web-preview-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Preview staging of HomeMew Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: preview
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout selected trusted revision
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Validate manual Preview gate and bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.confirmation }}" = "DEPLOY_HOMEMEW_WEB_PREVIEW" || { echo "Preview confirmation mismatch" >&2; exit 1; }
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "Missing Cloudflare credential" >&2; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "Missing Cloudflare account" >&2; exit 1; }
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const config = JSON.parse(fs.readFileSync('apps/web/wrangler.production.jsonc', 'utf8'));
+          if (config.name !== 'homemew-web-production' || config.preview_urls !== true) throw new Error('Expected same-worker Preview with preview_urls enabled');
+          if (config.workers_dev !== false) throw new Error('Production workers_dev must remain disabled');
+          if (config.previews?.vars?.ENVIRONMENT !== 'production') throw new Error('Preview default must select LifeSpace production');
+          const verify = (source, binding, service) => {
+            if (source?.find(item => item.binding === binding)?.service !== service) throw new Error(`Wrong ${binding} binding`);
+          };
+          const pairs = [
+            ['HOMEMEW_BACKEND', 'homemew-backend-production'],
+            ['LIFESPACE_IDENTITY', 'lifespace-identity'],
+            ['LIFESPACE_CORE', 'lifespace-core'],
+            ['HOMEMEW_BACKEND_STAGING', 'homemew-backend-staging'],
+            ['LIFESPACE_IDENTITY_STAGING', 'lifespace-identity-staging'],
+            ['LIFESPACE_CORE_STAGING', 'lifespace-core-staging']
+          ];
+          for (const [binding, service] of pairs) verify(config.previews.services, binding, service);
+          if (config.previews.vars?.LIFESPACE_IDENTITY_URL !== 'https://auth.aisr.online') throw new Error('Preview default Identity must be production');
+          if (config.previews.vars?.LIFESPACE_CORE_URL !== 'https://core.aisr.online') throw new Error('Preview default Core must be production');
+          if (config.previews.vars?.STAGING_LIFESPACE_IDENTITY_URL !== 'https://auth-staging.aisr.online') throw new Error('Preview staging Identity must be staging');
+          if (config.previews.vars?.STAGING_LIFESPACE_CORE_URL !== 'https://core-staging.aisr.online') throw new Error('Preview staging Core must be staging');
+          NODE
+
+      - name: Test, typecheck and build Web
+        run: |
+          corepack pnpm test:web
+          corepack pnpm typecheck:web
+          corepack pnpm build:web
+
+      - name: Deploy named Preview under same Worker
+        run: >-
+          corepack pnpm dlx wrangler@4.135.0 preview
+          --name staging
+          --config "$GITHUB_WORKSPACE/apps/web/wrangler.production.jsonc"
+
+      - name: Summarize Preview deployment
+        if: ${{ success() }}
+        run: |
+          {
+            echo "## HomeMew Web Preview"
+            echo
+            echo "- Worker project: homemew-web-production"
+            echo "- Preview name: staging"
+            echo "- LifeSpace default: production (URL without env)"
+            echo "- LifeSpace staging: ?env=staging (fixed /_stage/api/* route)"
+            echo "- Browser Preview host requires separate Cloudflare Access protection and registered LifeSpace Access audience"
+            echo "- Mini Program remains on homemew.aisr.online; it does not use this Preview"
+            echo "- Secrets are Preview-scoped and must not be exposed in source or build logs"
+          } >> "$GITHUB_STEP_SUMMARY"
