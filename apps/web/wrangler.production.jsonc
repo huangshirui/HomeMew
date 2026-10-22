@@ -12,17 +12,23 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": [
       "/api/*",
+      "/_stage/api/*",
       "/health"
     ]
   },
   "vars": {
     "ENVIRONMENT": "production",
     "LIFESPACE_IDENTITY_URL": "https://auth.aisr.online",
-    "LIFESPACE_CORE_URL": "https://core.aisr.online"
+    "LIFESPACE_CORE_URL": "https://core.aisr.online",
+    "STAGING_LIFESPACE_IDENTITY_URL": "https://auth-staging.aisr.online",
+    "STAGING_LIFESPACE_CORE_URL": "https://core-staging.aisr.online"
   },
   "services": [
     { "binding": "HOMEMEW_BACKEND", "service": "homemew-backend-production" },
     { "binding": "LIFESPACE_CORE", "service": "lifespace-core" },
-    { "binding": "LIFESPACE_IDENTITY", "service": "lifespace-identity" }
+    { "binding": "LIFESPACE_IDENTITY", "service": "lifespace-identity" },
+    { "binding": "HOMEMEW_BACKEND_STAGING", "service": "homemew-backend-staging" },
+    { "binding": "LIFESPACE_CORE_STAGING", "service": "lifespace-core-staging" },
+    { "binding": "LIFESPACE_IDENTITY_STAGING", "service": "lifespace-identity-staging" }
   ]
 }
