@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { BarChart3, CalendarDays, Plus, RefreshCw, Shield, Trophy, Trash2, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
+import { RecordIconField, RecordIconMark, emptyIconDraft, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { PageHeader } from '../components/ui/page-header';
@@ -15,7 +16,7 @@ export type Match = {
   playerPersonIds: string[]; notes: string | null;
 };
 export type FootballGoal = { id: string; version: number; matchId: string; scorerPersonId: string; goalMethod: string | null; notes: string | null };
-type Reference = { id: string; name: string; description?: string | null };
+type Reference = { id: string; name: string; description?: string | null; presentation?: { icon?: RecordIcon | null } };
 type MatchDraft = {
   matchDate: string; matchType: 'official' | 'friendly'; competitionActivityId: string;
   representativeTeamId: string; opponentTeamId: string; representativeTeamScore: string;
@@ -100,6 +101,7 @@ export function FootballPage() {
   const [goalDraft, setGoalDraft] = useState<GoalDraft | null>(null);
   const [quickAdd, setQuickAdd] = useState<'team' | 'competition' | null>(null);
   const [quickName, setQuickName] = useState('');
+  const [quickIcon, setQuickIcon] = useState<RecordIconDraft>(emptyIconDraft());
   const [saving, setSaving] = useState(false);
   const [year, setYear] = useState('');
   const [type, setType] = useState('');
@@ -108,6 +110,7 @@ export function FootballPage() {
   const spaceId = currentFamily?.id;
   const membersByPersonId = useMemo(() => new Map(members.filter(m => m.personId).map(m => [m.personId!, m.displayName || '家庭成员'])), [members]);
   const teamNames = useMemo(() => new Map(teams.map(t => [t.id, t.name])), [teams]);
+  const teamRecords = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
   const competitionNames = useMemo(() => new Map(competitions.map(t => [t.id, t.name])), [competitions]);
   useModalScrollLock(Boolean(draft || goalDraft || quickAdd));
 
@@ -198,14 +201,15 @@ export function FootballPage() {
     setSaving(true); setError('');
     const target = quickAdd;
     try {
+      const presentation = await presentationToSave(spaceId, target === 'team' ? 'person_group' : 'activity', quickIcon);
       const item = await apiRequest<Reference>(modelUrl(spaceId, target === 'team' ? 'person_group' : 'activity'), {
         method: 'POST',
-        body: JSON.stringify(target === 'team' ? { name, description: null, memberPersonIds: [] }
-          : { name, description: null, attendeePersonIds: [], startDate: null, endDate: null }),
+        body: JSON.stringify(target === 'team' ? { name, description: null, memberPersonIds: [], ...presentation }
+          : { name, description: null, attendeePersonIds: [], startDate: null, endDate: null, ...presentation }),
       });
       if (target === 'team') { setTeams(list => [...list, item]); setDraft(d => d ? { ...d, opponentTeamId: item.id } : d); }
       else { setCompetitions(list => [...list, item]); setDraft(d => d ? { ...d, competitionActivityId: item.id } : d); }
-      setQuickAdd(null); setQuickName('');
+      setQuickAdd(null); setQuickName(''); setQuickIcon(emptyIconDraft());
     } catch (cause) { setError(errorText(cause)); } finally { setSaving(false); }
   }
 
@@ -236,9 +240,13 @@ export function FootballPage() {
         {filtered.length ? filtered.map(m => <Card key={m.id} className="space-y-3 p-4">
           <p className="text-xs text-stone-500">{m.matchDate} · {m.matchType === 'official' ? '正式比赛' : '友谊赛'}{m.competitionActivityId ? ' · ' + (competitionNames.get(m.competitionActivityId) ?? '赛事') : ''}</p>
           <div className="flex items-center justify-between gap-2 text-center">
-            <span className="min-w-0 flex-1 truncate font-medium">{teamNames.get(m.representativeTeamId) ?? '代表球队'}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-1 truncate font-medium">
+              {teamRecords.get(m.representativeTeamId)?.presentation?.icon && currentFamily ? <RecordIconMark icon={teamRecords.get(m.representativeTeamId)?.presentation?.icon} spaceId={currentFamily.id} modelKey="person_group" recordId={m.representativeTeamId}/> : <Shield className="size-4 shrink-0 text-stone-400"/>}
+              {teamNames.get(m.representativeTeamId) ?? '代表球队'}</span>
             <strong className="shrink-0 text-xl tabular-nums">{m.representativeTeamScore ?? '–'} : {m.opponentTeamScore ?? '–'}</strong>
-            <span className="min-w-0 flex-1 truncate font-medium">{teamNames.get(m.opponentTeamId) ?? '对方球队'}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-1 truncate font-medium">
+              {teamRecords.get(m.opponentTeamId)?.presentation?.icon && currentFamily ? <RecordIconMark icon={teamRecords.get(m.opponentTeamId)?.presentation?.icon} spaceId={currentFamily.id} modelKey="person_group" recordId={m.opponentTeamId}/> : <Shield className="size-4 shrink-0 text-stone-400"/>}
+              {teamNames.get(m.opponentTeamId) ?? '对方球队'}</span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="secondary" onClick={() => setSelected(m)}>比赛详情／进球</Button>
@@ -276,11 +284,15 @@ export function FootballPage() {
         </Card>
       </div> : <div className="grid gap-4 md:grid-cols-2">
         <Card className="space-y-2 p-5"><h2 className="font-semibold">球队 (PersonGroup)</h2>
-          {teams.map(item=><div className="border-b border-stone-100 py-2 text-sm" key={item.id}>{item.name}</div>)}
+          {teams.map(item=><div className="flex items-center gap-2 border-b border-stone-100 py-2 text-sm" key={item.id}>
+            {item.presentation?.icon && spaceId ? <RecordIconMark icon={item.presentation.icon} spaceId={spaceId} modelKey="person_group" recordId={item.id}/> : <Shield className="size-4 text-stone-400"/>}{item.name}
+          </div>)}
           {canWrite ? <Button variant="secondary" onClick={()=>{setQuickAdd('team');setQuickName('');}}><Plus className="size-4"/> 新建球队</Button> : null}
         </Card>
         <Card className="space-y-2 p-5"><h2 className="font-semibold">赛事 (Activity)</h2>
-          {competitions.map(item=><div className="border-b border-stone-100 py-2 text-sm" key={item.id}>{item.name}</div>)}
+          {competitions.map(item=><div className="flex items-center gap-2 border-b border-stone-100 py-2 text-sm" key={item.id}>
+            {item.presentation?.icon && spaceId ? <RecordIconMark icon={item.presentation.icon} spaceId={spaceId} modelKey="activity" recordId={item.id}/> : <Trophy className="size-4 text-stone-400"/>}{item.name}
+          </div>)}
           {canWrite ? <Button variant="secondary" onClick={()=>{setQuickAdd('competition');setQuickName('');}}><Plus className="size-4"/> 新建赛事</Button> : null}
         </Card>
       </div>}
@@ -338,7 +350,8 @@ export function FootballPage() {
     {quickAdd ? <div className="fixed inset-0 z-[70] flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6" role="presentation">
       <form onSubmit={saveReference} role="dialog" aria-modal="true" aria-label="快速新建" className="w-full max-w-sm space-y-4 rounded-t-3xl bg-white p-5 sm:rounded-3xl">
         <h2 className="font-semibold">新建{quickAdd==='team'?'球队':'赛事'}</h2>
-        <label className={field}>名称 *<input className={classInput} required maxLength={100} value={quickName} onChange={e=>setQuickName(e.target.value)}/></label>
+        <div className="flex items-center gap-2">{spaceId ? <RecordIconField icon={quickIcon} onChange={setQuickIcon} spaceId={spaceId} modelKey={quickAdd === 'team' ? 'person_group' : 'activity'}/> : null}
+          <label className={`${field} flex-1`}>名称 *<input className={classInput} required maxLength={100} value={quickName} onChange={e=>setQuickName(e.target.value)}/></label></div>
         <p className="text-xs text-stone-500">创建为 LifeSpace {quickAdd==='team'?'PersonGroup':'Activity'}，可稍后补充人员、说明或图标。</p>
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={()=>setQuickAdd(null)}>取消</Button><Button type="submit" variant="primary" disabled={saving}>创建并选中</Button></div>
       </form>
