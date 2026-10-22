@@ -51,7 +51,7 @@ A HomeMew Application may own multiple active `lsa_*` credentials when operation
 
 The current policy is `docs/decisions/2026-10-22-fixed-deployment-environments.md`, superseding the earlier URL-based staging selector.
 
-- **One HomeMew Web Worker project**: `homemew-web-production` Production code always binds LifeSpace Production; its separate named Worker Preview code always binds LifeSpace Staging. Preview is an isolated *code deployment* within the same Worker project, not a second Web Worker or an alternate UI feature mode.
+- **One HomeMew Web Worker project**: `homemew-web` Production code always binds LifeSpace Production; its separate named Worker Preview code always binds LifeSpace Staging. Preview is an isolated *code deployment* within the same Worker project, not a second Web Worker or an alternate UI feature mode.
 - **Two HomeMew backend Workers retained**: `homemew-backend-production` and `homemew-backend-staging`, with independent Durable Object identities/catalog/coordination state. Web Production binds the former; Web Preview binds the latter.
 - **Mini development/trial/release** always use the existing production front door and the stable BFF, reaching LifeSpace Production. Testing LifeSpace schema-breaking changes uses Web Preview + LifeSpace Staging; released Mini compatibility must be explicitly verified before a production platform migration.
 - Neither Web nor Mini accepts `?env=staging` as an environment selector; the old `/_stage/*` API routes have been retired. Environment authority comes only from the trusted Worker deployment configuration. Preview hosts must be protected by Access and its audience registered against the staging HomeMew Application.
@@ -168,7 +168,7 @@ unlinked Access principal
 
 The target user ID for account linking is never supplied by Web. Identity owns the Access-principal -> `usr_*` relationship. This HomeMew product policy is fixed by `docs/decisions/2026-08-25-web-existing-user-link-only.md`.
 
-The final Web domain is `homemew.aisr.online`. Since the accepted production cutover on 2026-08-24, that hostname is owned by `homemew-web-production`: browser Web traffic and the same-origin BFF remain behind Cloudflare Access, while the exact `POST /api/v1/login/wechat` provider route uses an Access bypass and the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. Normal Web deployments do not implicitly move Custom Domain ownership; domain transfer/rollback remains a separately confirmed release operation. The dedicated HomeMew Web staging environment is retired by the 2026-09-16 final-BFF decision; production release now uses repository gates plus explicit production smoke verification. See `docs/decisions/2026-08-24-web-production-cutover.md`.
+The final Web domain is `homemew.aisr.online`. Since the accepted production cutover on 2026-08-24, that hostname is owned by `homemew-web`: browser Web traffic and the same-origin BFF remain behind Cloudflare Access, while the exact `POST /api/v1/login/wechat` provider route uses an Access bypass and the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. Normal Web deployments do not implicitly move Custom Domain ownership; domain transfer/rollback remains a separately confirmed release operation. The dedicated HomeMew Web staging environment is retired by the 2026-09-16 final-BFF decision; production release now uses repository gates plus explicit production smoke verification. See `docs/decisions/2026-08-24-web-production-cutover.md`.
 
 ## 6. Household model mapping
 

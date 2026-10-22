@@ -9,7 +9,7 @@ function bindings(entries) {
 }
 
 test('one Worker codebase has production-only production bindings', () => {
-  assert.equal(config.name, 'homemew-web-production');
+  assert.equal(config.name, 'homemew-web');
   assert.equal(config.workers_dev, false);
   assert.equal(config.preview_urls, true);
   assert.deepEqual(bindings(config.services), {

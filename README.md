@@ -26,7 +26,7 @@ HomeMew 不再拥有独立的家庭业务 Core。旧 HomeMew Core 已在 2026-08
 
 ## LifeSpace Application 边界
 
-从 LifeSpace 的视角，**HomeMew 是一个 Application**。Mini Program、Web、Mini/Web BFF、`homemew-backend-production`、`homemew-web-production` 和 integration orchestration 都是 HomeMew 内部客户端/部署实现，不是独立 LifeSpace Application。
+从 LifeSpace 的视角，**HomeMew 是一个 Application**。Mini Program、Web、Mini/Web BFF、`homemew-backend-production`、`homemew-web` 和 integration orchestration 都是 HomeMew 内部客户端/部署实现，不是独立 LifeSpace Application。
 
 ```text
 LifeSpace Application: HomeMew
@@ -59,7 +59,7 @@ HomeMew 生产业务数据已经完成一次性迁移并切换到 LifeSpace。�
 2026-08-24，HomeMew Web 已正式接管生产前门：
 
 ```text
-homemew.aisr.online -> homemew-web-production
+homemew.aisr.online -> homemew-web
   -> Web / same-origin BFF -> auth.aisr.online / core.aisr.online
   -> POST /api/v1/login/wechat
        -> HOMEMEW_BACKEND Service Binding

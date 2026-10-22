@@ -29,7 +29,7 @@ test('household load failures are visible and recoverable', () => {
 test('Web README reflects the accepted production front door', () => {
   const readme = source('./README.md');
 
-  assert.match(readme, /homemew\.aisr\.online.*homemew-web-production/su);
+  assert.match(readme, /homemew\.aisr\.online.*homemew-web/su);
   assert.match(readme, /HOMEMEW_BACKEND/u);
   assert.doesNotMatch(readme, /Do not move the production domain to the Web Worker/u);
   assert.doesNotMatch(readme, /Production configuration intentionally contains no Web custom-domain route yet/u);

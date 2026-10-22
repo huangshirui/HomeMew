@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: homemew-web-production
+  group: homemew-web-prod-release
   cancel-in-progress: false
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const config = JSON.parse(fs.readFileSync('apps/web/wrangler.production.jsonc', 'utf8'));
-          if (config.name !== 'homemew-web-production') throw new Error('Unexpected production Worker name');
+          if (config.name !== 'homemew-web') throw new Error('Unexpected production Worker name');
           if (config.workers_dev !== false) throw new Error('Production workers_dev must remain false');
           if (Array.isArray(config.routes) && config.routes.length > 0) {
             throw new Error('Normal production deployment must not transfer or recreate the Custom Domain');
@@ -85,6 +85,9 @@ jobs:
           set -euo pipefail
           curl --fail --silent --show-error --retry 3 https://auth.aisr.online/health >/dev/null
           curl --fail --silent --show-error --retry 3 https://core.aisr.online/health >/dev/null
+
+      - name: Verify renamed Cloudflare Worker identity (prevent duplicate creation)
+        run: node apps/web/verify-cloudflare-worker.mjs
 
       - name: Deploy production Web Worker
         run: >-
@@ -120,7 +123,7 @@ jobs:
           {
             echo "## HomeMew Web production"
             echo
-            echo "- Worker: homemew-web-production"
+            echo "- Worker: homemew-web"
             echo "- LifeSpace: auth.aisr.online / core.aisr.online"
             echo "- LifeSpace release baseline: verified before deploy"
             echo "- HOMEMEW_BACKEND binding: homemew-backend-production"
