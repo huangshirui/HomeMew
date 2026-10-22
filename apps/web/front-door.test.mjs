@@ -103,3 +103,14 @@ test('missing backend binding fails closed for Mini Program login', async () => 
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, 'BACKEND_NOT_CONFIGURED');
 });
+
+test('retired /_stage routes are denied on both production and Preview handlers', async () => {
+  const handler = createFrontDoorHandler({ app: { fetch: async () => assert.fail('Legacy staging route must never reach BFF') } });
+  for (const path of ['/_stage/api/session', '/_stage/api/v1/login/wechat', '/_stage/health']) {
+    const response = await handler.fetch(request(path), {
+      HOMEMEW_BACKEND: { fetch: async () => assert.fail('Must not reach any backend') },
+    });
+    assert.equal(response.status, 404, path);
+    assert.equal((await response.json()).error.code, 'NOT_FOUND');
+  }
+});
