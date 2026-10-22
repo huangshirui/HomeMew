@@ -9,8 +9,7 @@ import {
   Webhook,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Link } from '../components/environment-navigation';
+import { Link, useNavigate } from 'react-router-dom';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
