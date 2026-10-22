@@ -48,16 +48,19 @@ Never put staging/production credentials into GitHub source or logs. Previews do
 
 Older STAGING_LIFESPACE_APPLICATION_CREDENTIAL and STAGING_WEB_SESSION_SECRET secrets may still exist on the Production Worker: after deploying this refactor they are unused. Remove only **after** validating the production release and retired route denial; do not copy the unreadable values to Preview.
 
-## 4. Manual deployment sequence
+## 4. Manual deployment sequence — Preview first, Production after acceptance
 
-1. Once CI passes and the PR merges to main, GitHub Actions → Deploy HomeMew Web production → choose main, confirm DEPLOY_HOMEMEW_WEB_PRODUCTION. This applies the simplified bindings and enables Preview URLs, without transferring the production custom domain.
-2. Cloudflare Workers & Pages → homemew-web-production → Domains: enable Preview URLs if still disabled. Production workers.dev may remain disabled.
-3. After preparing Access protection and trust policies, GitHub Actions → Deploy HomeMew Web Preview → choose a reviewed trusted branch, confirm DEPLOY_HOMEMEW_WEB_PREVIEW. It creates/updates the named staging Preview without replacing Production.
-4. Configure the two Preview secrets on the created Preview (dashboard or secured Wrangler >=4.135.0 terminal). Wrangler commands from repository root:
+1. Once CI passes and the feature PR merges to main, enable Worker **Preview URLs** for the existing homemew-web-production Worker in Cloudflare Dashboard → Workers & Pages → Domains, without replacing the current Production code. The production workers.dev route can remain disabled.
+2. **Before publishing a Preview**, protect this Worker's Preview hostnames/wildcard with Cloudflare Access. Register the resulting Access audience in LifeSpace **Staging** for the staging HomeMew Application. Review GitHub preview Environment branch/approver restrictions.
+3. GitHub Actions → Deploy HomeMew Web Preview → choose a reviewed trusted code branch, confirm DEPLOY_HOMEMEW_WEB_PREVIEW. This creates/updates the named staging Preview under the same Worker, **without changing Production code**.
+4. Add TWO Preview-scoped secrets to the named staging Preview from a secure terminal or Preview settings. Wrangler >= 4.135.0 commands from repository root:
    - corepack pnpm dlx wrangler@4.135.0 preview secret put LIFESPACE_APPLICATION_CREDENTIAL --name staging --config apps/web/wrangler.production.jsonc
    - corepack pnpm dlx wrangler@4.135.0 preview secret put WEB_SESSION_SECRET --name staging --config apps/web/wrangler.production.jsonc
-   These commands prompt for values; never type secrets directly in CLI arguments.
-5. Redeploy named Preview if needed after saving secrets. Read the URL reported by Cloudflare, never guess the workers.dev account subdomain.
+   Commands prompt for values. Redeploy the Preview if required; never place secret plaintext in GitHub logs or code.
+5. Run full Web Preview + LifeSpace Staging acceptance (Access authentication, staging user, Family Catalog, Goal/Habit/Anniversary models, safe test writes). **Only after acceptance** run GitHub Actions → Deploy HomeMew Web production on main with DEPLOY_HOMEMEW_WEB_PRODUCTION. This publishes the same reviewed code on the existing production custom domain using only Production bindings.
+6. Validate existing Production Mini BFF and user journeys. After confirming retired route denial, remove obsolete /_stage/* Cloudflare Access bypass and unused Production STAGING_* secrets, not the staging backend Worker.
+
+Cloudflare Preview URLs can be enabled through the dashboard, without first deploying the new HomeMew Web Production version. Protect the preview host pattern before uploading untrusted code. Do not claim a preview deploy alone proves LifeSpace production compatibility.
 
 ## 5. Acceptance / 验收
 
