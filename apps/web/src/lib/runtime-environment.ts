@@ -1,20 +1,32 @@
 /**
- * An explicit URL entry selects the LifeSpace environment for the current browser tab.
- * The URL is not a UI feature toggle. Every HTTP resource (including images) uses the
- * same fixed, server-routed environment prefix. No arbitrary origin is accepted.
+ * LifeSpace target is selected only by the explicit URL parameter.
+ * Cloudflare Worker Production/Preview determines the *code version* independently.
+ * Missing or invalid env always means LifeSpace production, even after visiting staging.
  */
+import type { To } from 'react-router-dom';
+
 export type RuntimeEnvironment = 'production' | 'staging';
-const STORAGE_KEY = 'homemew.web.runtimeEnvironment';
 
 export function getRuntimeEnvironment(): RuntimeEnvironment {
   if (typeof window === 'undefined') return 'production';
-  const query = new URL(window.location.href).searchParams.get('env');
-  if (query === 'staging' || query === 'production') {
-    try { window.sessionStorage.setItem(STORAGE_KEY, query); } catch { /* preference only */ }
-    return query;
+  return new URLSearchParams(window.location.search).get('env') === 'staging' ? 'staging' : 'production';
+}
+
+export function withRuntimeEnvironment(to: To): To {
+  if (getRuntimeEnvironment() !== 'staging') return to;
+  if (typeof to === 'string') {
+    const fragmentIndex = to.indexOf('#');
+    const beforeHash = fragmentIndex < 0 ? to : to.slice(0, fragmentIndex);
+    const fragment = fragmentIndex < 0 ? '' : to.slice(fragmentIndex);
+    const queryIndex = beforeHash.indexOf('?');
+    const path = queryIndex < 0 ? beforeHash : beforeHash.slice(0, queryIndex);
+    const search = new URLSearchParams(queryIndex < 0 ? '' : beforeHash.slice(queryIndex + 1));
+    search.set('env', 'staging');
+    return `${path}?${search.toString()}${fragment}`;
   }
-  try { return window.sessionStorage.getItem(STORAGE_KEY) === 'staging' ? 'staging' : 'production'; }
-  catch { return 'production'; }
+  const search = new URLSearchParams(to.search?.replace(/^\?/, '') ?? '');
+  search.set('env', 'staging');
+  return { ...to, search: `?${search.toString()}` };
 }
 
 export function environmentApiPath(path: string): string {
