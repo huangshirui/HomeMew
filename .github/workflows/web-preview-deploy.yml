@@ -72,6 +72,9 @@ jobs:
           corepack pnpm typecheck:web
           corepack pnpm build:web
 
+      - name: Verify renamed Cloudflare Worker identity (prevent duplicate creation)
+        run: node apps/web/verify-cloudflare-worker.mjs
+
       - name: Deploy named Preview under same Worker
         run: >-
           corepack pnpm dlx wrangler@4.135.0 preview
