@@ -32,6 +32,11 @@ Keep dependencies demand-driven:
 - `/calendar` — 月/周日历，家庭全域日程搜索，按参与成员/全天类型筛选，以及密集日期的完整日程查看
 - `/tasks` — 未完成/已完成状态、任务搜索、按负责人和截止日期（逾期/今天/未来 7 天/无日期）组合筛选
 - `/days`
+- `/activities` — Activity 容器与家庭参与者
+- `/goals` — Goal 目标和生命周期 Actions
+- `/habits` — Habit 单人归属、Check-in 与历史
+- `/anniversaries` — Anniversary 年度纪念日（日历中同时展示）
+- `/football` — FootballMatch / FootballGoal 比赛、进球与统计（需先在 LifeSpace 正式 Publish）
 - `/wishes`
 - `/family`
 - `/settings`
@@ -288,3 +293,25 @@ pnpm check
 `pnpm test:web` runs dependency-free Worker/BFF tests for the normal Access session boundary, legacy Service orchestration compatibility and the new External System capability-container boundary. It also asserts that HomeMew Web does not expose the LifeSpace Access registration flow.
 
 The root check validates the active HomeMew application surfaces: backend syntax/tests, Mini Program tests/typecheck, and Web BFF tests/typecheck/build. The retired legacy HomeMew Core is not part of the active workspace.
+
+## One-deployment staging selection / 仅切换后端环境
+
+Use the *same* Web deployment and the same React pages/assets. Opening
+`https://homemew.aisr.online/?env=staging` selects LifeSpace staging for this
+browser tab; `?env=production` selects production. This is **not** a page
+feature toggle. The frontend uses fixed same-origin `/_stage/api/*` routes,
+which the Worker binds to distinct staging Identity/Core/application services
+and Web session HMAC secret. No staging Web build/domain is deployed.
+
+The front-door requires staging service bindings and the separately installed
+`STAGING_LIFESPACE_APPLICATION_CREDENTIAL` and `STAGING_WEB_SESSION_SECRET`
+secrets; otherwise stage requests fail with HTTP 503 and never fall back to
+production. Review staging LifeSpace Access audience, app model grants, and
+the Cloudflare Access path-policy exceptions for Mini login/BFF routes before
+manual deployment. See
+`docs/decisions/2026-10-22-one-deployment-staging-routing.md`.
+
+Mini runs in the **same** HomeMew app deployment via the explicit launch path
+`pages/home/home?env=staging`; this selects staging service routing, not a
+second Mini release or an arbitrary LifeSpace URL. Mini user tokens/family
+cache are cleared on changing environment.

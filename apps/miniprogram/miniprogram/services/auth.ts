@@ -6,15 +6,22 @@ import { getApplicationBaseUrl, isTokenValid, REQUEST_TIMEOUT, STORAGE_KEYS } fr
 type LoginPayload = LoginResponse & { error?: { code?: string; message?: string } };
 
 let refreshPromise: Promise<LoginResponse> | null = null;
+let authGeneration = 0;
+
+export function invalidatePendingAuth(): void {
+  authGeneration += 1;
+  refreshPromise = null;
+}
 
 export async function callLogin(): Promise<LoginResponse> {
+  const targetBaseUrl = getApplicationBaseUrl();
   const code = await new Promise<string>((resolve, reject) => wx.login({
     success: result => result.code ? resolve(result.code) : reject(new Error('微信身份恢复失败：未获取到 code')),
     fail: error => reject(new Error(`微信身份恢复失败: ${error.errMsg}`)),
   }));
 
   return new Promise((resolve, reject) => wx.request({
-    url: `${getApplicationBaseUrl()}/api/v1/login/wechat`,
+    url: `${targetBaseUrl}/api/v1/login/wechat`,
     method: 'POST',
     data: { code },
     header: { 'Content-Type': 'application/json' },
@@ -45,11 +52,16 @@ function persistLogin(result: LoginResponse): LoginResponse {
  */
 async function refreshLogin(): Promise<LoginResponse> {
   if (refreshPromise) return refreshPromise;
-  refreshPromise = callLogin().then(persistLogin);
+  const generation = authGeneration;
+  const promise = callLogin().then(result => {
+    if (generation !== authGeneration) throw new Error('环境已切换，请重试身份恢复');
+    return persistLogin(result);
+  });
+  refreshPromise = promise;
   try {
-    return await refreshPromise;
+    return await promise;
   } finally {
-    refreshPromise = null;
+    if (refreshPromise === promise) refreshPromise = null;
   }
 }
 

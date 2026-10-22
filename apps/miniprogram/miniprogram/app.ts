@@ -1,7 +1,10 @@
 import { FamilyListItem } from './types/index';
-import { ensureRuntimeEnvironmentStorage, getApplicationBaseUrl } from './services/config';
+import { ensureRuntimeEnvironmentStorage, getApplicationBaseUrl, selectLaunchEnvironment } from './services/config';
 import { reportMiniProgramActivityOncePerDay } from './services/activity';
 import { coordinateAppEntry, AppEntryOptions } from './services/entry-navigation';
+import { resetRuntimeReady } from './services/runtime-bootstrap';
+import { invalidatePendingAuth } from './services/auth';
+import { clearUserState } from './stores/index';
 
 App<IAppOption>({
   globalData: { userInfo: null, currentFamily: null, families: [] as FamilyListItem[] },
@@ -12,6 +15,14 @@ App<IAppOption>({
   },
 
   onShow(options: AppEntryOptions) {
+    const changed = selectLaunchEnvironment(options?.query?.env);
+    if (changed) {
+      invalidatePendingAuth();
+      // A different backend has different principals, tokens, families and caches.
+      ensureRuntimeEnvironmentStorage();
+      resetRuntimeReady();
+      clearUserState();
+    }
     // Normal startup never routes through an application-level splash page.
     // Prepare runtime/onboarding in parallel with the requested entry page.
     void coordinateAppEntry(options).catch((error) => {

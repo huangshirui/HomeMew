@@ -2,6 +2,7 @@ import { handleIntegrationRequest, integrationsReady } from './integration-api.m
 
 const ACCESS_ASSERTION_HEADER = 'cf-access-jwt-assertion';
 const SESSION_COOKIE = '__Host-homemew_session';
+function sessionCookieName(env) { return env.WEB_SESSION_COOKIE === '__Host-homemew_staging_session' ? env.WEB_SESSION_COOKIE : SESSION_COOKIE; }
 const SESSION_VERSION = 1;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -194,15 +195,15 @@ async function makeSessionCookie(env, assertion, token, expiresIn, nowMs) {
   const key = await hmacKey(sessionSecret(env));
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(encoded));
   const value = `${encoded}.${bytesToBase64Url(new Uint8Array(signature))}`;
-  return `${SESSION_COOKIE}=${value}; Path=/; Max-Age=${maxAge}; Secure; HttpOnly; SameSite=Lax`;
+  return `${sessionCookieName(env)}=${value}; Path=/; Max-Age=${maxAge}; Secure; HttpOnly; SameSite=Lax`;
 }
 
-function clearSessionCookie() {
-  return `${SESSION_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`;
+function clearSessionCookie(env) {
+  return `${sessionCookieName(env)}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`;
 }
 
 async function readSession(request, env, assertion, nowMs) {
-  const value = cookieValue(request, SESSION_COOKIE);
+  const value = cookieValue(request, sessionCookieName(env));
   if (!value) return null;
   const [encoded, signature] = value.split('.');
   if (!encoded || !signature) return null;
@@ -527,8 +528,8 @@ async function proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, servi
 }
 
 
-const RECORD_ICON_IMAGE = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish)\/records\/(rec_[A-Za-z0-9_-]+)\/image$/u;
-const RECORD_ICON_UPLOAD = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish)\/image$/u;
+const RECORD_ICON_IMAGE = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish|activity|goal|habit|anniversary|person_group)\/records\/(rec_[A-Za-z0-9_-]+)\/image$/u;
+const RECORD_ICON_UPLOAD = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish|activity|goal|habit|anniversary|person_group)\/image$/u;
 const RECORD_ICON_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const RECORD_ICON_MAX_BYTES = 256 * 1024;
 
@@ -620,7 +621,7 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         }
         if (request.method === 'POST' && url.pathname === '/api/session/logout') {
           requireSameOrigin(request);
-          return new Response(null, { status: 204, headers: { 'set-cookie': clearSessionCookie(), 'x-request-id': id } });
+          return new Response(null, { status: 204, headers: { 'set-cookie': clearSessionCookie(env), 'x-request-id': id } });
         }
         if (request.method === 'POST' && url.pathname === '/api/access/link-challenge') {
           return await createLinkChallenge(request, env, fetcher, assertion, id);

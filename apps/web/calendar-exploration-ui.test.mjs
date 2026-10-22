@@ -38,8 +38,8 @@ test('month and week views query different half-open local date windows', () => 
 });
 
 test('month overflow opens a complete daily list and phone uses touch-friendly agenda', () => {
-  assert.match(source, /dayEvents\.slice\(0, 4\)/u);
-  assert.match(source, /dayEvents\.length > 4/u);
+  assert.match(source, /dayAnniversaries\.slice/u);
+  assert.match(source, /dayEvents\.length \+ dayAnniversaries\.length > 4/u);
   assert.match(source, /onClick=\{\(\) => setExpandedDay\(day\)\}/u);
   assert.match(source, /events=\{eventsByDay\.get\(expandedDay\) \?\? \[\]\}/u);
   assert.match(source, /aria-modal="true"/u);

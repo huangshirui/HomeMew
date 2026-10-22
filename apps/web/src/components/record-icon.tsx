@@ -1,9 +1,10 @@
+import { environmentApiPath } from '../lib/runtime-environment';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ImagePlus, Plus, Search, X } from 'lucide-react';
 import { EMOJI_GROUPS } from '../../../miniprogram/miniprogram/components/record-icon-picker/emoji-data';
 
-export type IconModel = 'day_record' | 'event' | 'task' | 'wish';
+export type IconModel = 'day_record' | 'event' | 'task' | 'wish' | 'activity' | 'goal' | 'habit' | 'anniversary' | 'person_group';
 export type RecordIcon = { type: 'emoji'; value: string } | { type: 'image'; fileId: string };
 export type RecordIconDraft = {
   iconEmoji: string;
@@ -54,7 +55,7 @@ export function iconDraftFor(icon?: RecordIcon | null): RecordIconDraft {
 }
 
 export function recordIconSrc(spaceId: string, modelKey: IconModel, recordId: string): string {
-  return `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/records/${encodeURIComponent(recordId)}/image`;
+  return environmentApiPath(`/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/records/${encodeURIComponent(recordId)}/image`);
 }
 
 const MAX_ICON_BYTES = 256 * 1024;
@@ -99,7 +100,7 @@ async function uploadIcon(spaceId: string, modelKey: IconModel, file: File): Pro
   // business fields in a single governed Record Create/Update.
   const image = await prepareIconImage(file);
   const response = await fetch(
-    `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/image`, {
+    environmentApiPath(`/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/image`), {
       method: 'POST', credentials: 'same-origin', headers: { 'content-type': image.type }, body: image,
     },
   );

@@ -4,6 +4,8 @@ import { AppShell } from './components/app-shell';
 import { HouseholdProvider } from './components/household-provider';
 import { SessionGate } from './components/session-gate';
 import { CalendarPage } from './pages/calendar-page';
+import { DomainPage } from './pages/domain-page';
+import { FootballPage } from './pages/football-page';
 import { DaysPage } from './pages/days-page';
 import { FamilyPage } from './pages/family-page';
 import { HomePage } from './pages/home-page';
@@ -24,6 +26,11 @@ export function App() {
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="days" element={<DaysPage />} />
+            <Route path="activities" element={<DomainPage modelKey="activity" />} />
+            <Route path="goals" element={<DomainPage modelKey="goal" />} />
+            <Route path="anniversaries" element={<DomainPage modelKey="anniversary" />} />
+            <Route path="habits" element={<DomainPage modelKey="habit" />} />
+            <Route path="football" element={<FootballPage />} />
             <Route path="wishes" element={<WishesPage />} />
             <Route path="family" element={<FamilyPage />} />
             <Route path="more" element={<MorePage />} />

@@ -10,7 +10,7 @@ test('Web activity reporter runs only after SessionGate authentication and de-du
   assert.match(appSource, /<SessionGate>[\s\S]*<ActivityReporter \/>/);
   assert.match(reporterSource, /sessionStorage/);
   assert.match(reporterSource, /visibilitychange/);
-  assert.match(reporterSource, /fetch\('\/api\/activity\/me'/);
+  assert.match(reporterSource, /environmentApiPath/);
   assert.match(reporterSource, /reportedInMemoryDay === day/);
 });
 

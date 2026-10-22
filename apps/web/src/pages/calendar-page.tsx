@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ChevronLeft, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3, Gift, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useHousehold } from '../components/household-provider';
 import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
@@ -31,6 +32,22 @@ type EventRecord = {
   createdAt: string;
   updatedAt: string;
 };
+
+type AnniversaryRecord = { id: string; name: string; month: number; day: number; year: number | null; };
+function matchesAnniversary(date: string, record: AnniversaryRecord): boolean {
+  // Leap-day anniversaries only occur in leap years. No silent date substitution.
+  return Number(date.slice(5, 7)) === record.month && Number(date.slice(8)) === record.day;
+}
+function AnniversaryDayItems({ records }: { records: AnniversaryRecord[] }) {
+  return records.length ? <div className="space-y-2">
+    {records.map(record => <Link key={record.id} to="/anniversaries"
+      className="flex items-center gap-3 rounded-xl bg-violet-50 px-4 py-3 text-left text-sm text-violet-900 hover:bg-violet-100">
+      <Gift className="size-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate font-semibold">{record.name}</span>
+      <span className="text-xs">纪念日</span>
+    </Link>)}
+  </div> : null;
+}
 
 type EventDraft = {
   icon: RecordIconDraft;
@@ -253,6 +270,9 @@ export function CalendarPage() {
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const requestGeneration = useRef(0);
   const [events, setEvents] = useState<EventRecord[]>([]);
+  const [anniversaries, setAnniversaries] = useState<AnniversaryRecord[]>([]);
+  const [anniversaryError, setAnniversaryError] = useState('');
+  const anniversaryGeneration = useRef(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -333,6 +353,40 @@ export function CalendarPage() {
   }, [currentFamily, queryEvents, searchActive]);
 
   useEffect(() => {
+    const generation = ++anniversaryGeneration.current;
+    if (!currentFamily) { setAnniversaries([]); return; }
+    const months = [...new Set(gridDays.map(day => Number(day.slice(5, 7))))];
+    setAnniversaryError('');
+    void (async () => {
+      try {
+        const collected: AnniversaryRecord[] = [];
+        for (const month of months) {
+          let cursor: string | null = null;
+          for (let page = 0; page < 10; page += 1) {
+            const result: { items: AnniversaryRecord[]; nextCursor: string | null } = await queryModelRecords<AnniversaryRecord>(currentFamily.id, 'anniversary', {
+              filter: { field: 'month', op: 'eq', value: month },
+              sort: [{ field: 'day', direction: 'asc' }],
+              page: { limit: 200, ...(cursor ? { cursor } : {}) },
+            });
+            if (generation !== anniversaryGeneration.current) return;
+            collected.push(...result.items);
+            cursor = result.nextCursor;
+            if (!cursor) break;
+            if (page === 9) throw new Error('纪念日查询超出分页限制');
+          }
+        }
+        if (generation === anniversaryGeneration.current) setAnniversaries(collected);
+      } catch (cause) {
+        if (generation === anniversaryGeneration.current) {
+          setAnniversaries([]);
+          setAnniversaryError(messageOf(cause, '纪念日加载失败'));
+        }
+      }
+    })();
+    return () => { anniversaryGeneration.current += 1; };
+  }, [currentFamily, gridStart, gridEndExclusive, refreshToken]);
+
+  useEffect(() => {
     void refreshToken;
     void loadEvents();
     return () => { requestGeneration.current += 1; };
@@ -390,6 +444,15 @@ export function CalendarPage() {
     }
     return map;
   }, [currentFamily, events, gridEndExclusive, gridStart]);
+
+  const anniversariesByDay = useMemo(() => {
+    const result = new Map<string, AnniversaryRecord[]>();
+    for (const date of gridDays) {
+      const items = anniversaries.filter(record => matchesAnniversary(date, record));
+      if (items.length) result.set(date, items);
+    }
+    return result;
+  }, [gridDays, anniversaries]);
 
   function openCreate(date?: string) {
     if (!currentFamily) return;
@@ -598,6 +661,9 @@ export function CalendarPage() {
         </div>
       </div> : null}
 
+      {anniversaryError ? <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
+        纪念日未能同步：{anniversaryError}
+      </div> : null}
       {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100" role="alert">{error}</div> : null}
 
       {searchActive ? (
@@ -670,6 +736,7 @@ export function CalendarPage() {
               <div className="grid grid-cols-7">
                 {gridDays.map((day) => {
                   const dayEvents = eventsByDay.get(day) ?? [];
+                  const dayAnniversaries = anniversariesByDay.get(day) ?? [];
                   const inMonth = day.startsWith(month);
                   const isToday = day === todayInFamily;
                   const isSelected = day === activeDay;
@@ -687,21 +754,28 @@ export function CalendarPage() {
                         className={`relative z-10 flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold sm:hidden ${isSelected ? 'bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200' : inMonth ? 'text-stone-700' : 'text-stone-400'}`}
                         onClick={() => setSelectedDay(day)}
                         aria-pressed={isSelected}
-                        aria-label={`${day}，${dayEvents.length} 项日程`}
+                        aria-label={`${day}，${dayEvents.length} 项日程，${dayAnniversaries.length} 项纪念日`}
                       >
                         <span className={`grid size-6 place-items-center rounded-full ${isToday ? 'bg-emerald-600 text-white' : ''}`}>{Number(day.slice(-2))}</span>
-                        {dayEvents.length ? <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald-500" /> : <span aria-hidden="true" className="size-1.5" />}
+                        <span className="flex gap-0.5" aria-hidden="true">{dayEvents.length ? <span className="size-1.5 rounded-full bg-emerald-500" /> : null}{dayAnniversaries.length ? <span className="size-1.5 rounded-full bg-violet-500" /> : null}</span>
                       </button>
                       <button
                         type="button"
                         className={`relative z-10 hidden size-7 place-items-center rounded-full text-xs font-medium sm:grid ${isToday ? 'bg-emerald-600 text-white' : inMonth ? 'text-stone-700 hover:bg-stone-100' : 'text-stone-400'}`}
                         onClick={() => setExpandedDay(day)}
-                        aria-label={`${day}，查看全部 ${dayEvents.length} 项日程`}
+                        aria-label={`${day}，查看全部 ${dayEvents.length} 项日程和 ${dayAnniversaries.length} 项纪念日`}
                       >
                         {Number(day.slice(-2))}
                       </button>
                       <div className="relative z-10 mt-1.5 hidden space-y-1 sm:block">
-                        {dayEvents.slice(0, 4).map((event) => (
+                        {dayAnniversaries.slice(0, 2).map(item => (
+                          <Link key={`${day}-ann-${item.id}`} to="/anniversaries"
+                            title={`纪念日 · ${item.name}`}
+                            className="block w-full truncate rounded-lg bg-violet-50 px-2 py-1 text-xs text-violet-900 hover:bg-violet-100">
+                            🎁 {item.name}
+                          </Link>
+                        ))}
+                        {dayEvents.slice(0, Math.max(0, 4 - Math.min(2, dayAnniversaries.length))).map((event) => (
                           <button
                             key={`${day}-${event.id}`}
                             type="button"
@@ -714,15 +788,15 @@ export function CalendarPage() {
                               className="mr-1" />{event.summary}
                           </button>
                         ))}
-                        {dayEvents.length > 4 ? (
+                        {dayEvents.length + dayAnniversaries.length > 4 ? (
                           <button type="button" className="w-full rounded-lg px-1 py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:ring-2 focus-visible:ring-emerald-500"
-                            aria-label={`${day} 还有 ${dayEvents.length - 4} 项，查看全部 ${dayEvents.length} 项日程`}
+                            aria-label={`${day} 查看全部 ${dayEvents.length + dayAnniversaries.length} 项安排`}
                             onClick={() => setExpandedDay(day)}>
-                            +{dayEvents.length - 4} 项 · 查看全部
+                            查看全部 {dayEvents.length + dayAnniversaries.length} 项
                           </button>
                         ) : null}
                       </div>
-                      {canWrite && !dayEvents.length ? <span aria-hidden="true" className="pointer-events-none absolute inset-x-1 bottom-3 hidden items-center justify-center gap-1 text-[11px] text-emerald-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:flex"><Plus className="size-3" /> 新建日程</span> : null}
+                      {canWrite && !dayEvents.length && !dayAnniversaries.length ? <span aria-hidden="true" className="pointer-events-none absolute inset-x-1 bottom-3 hidden items-center justify-center gap-1 text-[11px] text-emerald-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:flex"><Plus className="size-3" /> 新建日程</span> : null}
                     </div>
                   );
                 })}
@@ -742,11 +816,13 @@ export function CalendarPage() {
             />
           )}
 
+          {view === 'week' && [...anniversariesByDay.values()].some(list => list.length > 0) ? <Card className="space-y-2 p-4"><p className="text-sm font-semibold text-violet-900">本周纪念日</p>{gridDays.filter(day => (anniversariesByDay.get(day)?.length ?? 0) > 0).map(day => <div key={day}><span className="text-xs text-stone-500">{day}</span><AnniversaryDayItems records={anniversariesByDay.get(day) ?? []} /></div>)}</Card> : null}
           {view === 'month' ? <section className="space-y-3 sm:hidden" aria-label={`${activeDay}的日程`}>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-stone-900">{Number(activeDay.slice(5, 7))}月{Number(activeDay.slice(8))}日 · 日程</h2>
               {canWrite ? <Button variant="secondary" className="shrink-0" onClick={() => openCreate(activeDay)}><Plus className="size-4" /> 新建</Button> : null}
             </div>
+            <AnniversaryDayItems records={anniversariesByDay.get(activeDay) ?? []} />
             <CalendarAgenda events={activeEvents} timeZone={currentFamily.timezone} onOpen={openEdit} />
           </section> : null}
         </>
@@ -762,6 +838,7 @@ export function CalendarPage() {
               </div>
               <Button variant="ghost" size="icon" aria-label="关闭日程列表" autoFocus onClick={() => setExpandedDay(null)}><X className="size-4" /></Button>
             </div>
+            <AnniversaryDayItems records={anniversariesByDay.get(expandedDay) ?? []} />
             <CalendarAgenda events={eventsByDay.get(expandedDay) ?? []} timeZone={currentFamily.timezone} onOpen={(event) => { setExpandedDay(null); openEdit(event); }} />
             {canWrite ? <Button variant="primary" className="mt-4 w-full" onClick={() => { const date = expandedDay; setExpandedDay(null); openCreate(date); }}><Plus className="size-4" /> 新建当天日程</Button> : null}
           </div>
