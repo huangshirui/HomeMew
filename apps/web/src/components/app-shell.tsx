@@ -16,8 +16,7 @@ import {
   Settings,
   Users,
 } from 'lucide-react';
-import { Outlet } from 'react-router-dom';
-import { NavLink } from './environment-navigation';
+import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '../lib/cn';
 import { useHousehold } from './household-provider';
 
