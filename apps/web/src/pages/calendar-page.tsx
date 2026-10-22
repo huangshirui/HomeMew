@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ChevronLeft, ChevronRight, Clock3, Gift, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from '../components/environment-navigation';
 import { useHousehold } from '../components/household-provider';
 import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
