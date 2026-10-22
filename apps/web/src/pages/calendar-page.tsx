@@ -816,7 +816,7 @@ export function CalendarPage() {
             />
           )}
 
-          {view === 'week' && [...anniversariesByDay.values()].some(list => list.length > 0) ? <Card className="space-y-2 p-4"><p className="text-sm font-semibold text-violet-900">本周纪念日</p>{gridDays.map(day => <div key={day}><span className="text-xs text-stone-500">{day}</span><AnniversaryDayItems records={anniversariesByDay.get(day) ?? []} /></div>)}</Card> : null}
+          {view === 'week' && [...anniversariesByDay.values()].some(list => list.length > 0) ? <Card className="space-y-2 p-4"><p className="text-sm font-semibold text-violet-900">本周纪念日</p>{gridDays.filter(day => (anniversariesByDay.get(day)?.length ?? 0) > 0).map(day => <div key={day}><span className="text-xs text-stone-500">{day}</span><AnniversaryDayItems records={anniversariesByDay.get(day) ?? []} /></div>)}</Card> : null}
           {view === 'month' ? <section className="space-y-3 sm:hidden" aria-label={`${activeDay}的日程`}>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-stone-900">{Number(activeDay.slice(5, 7))}月{Number(activeDay.slice(8))}日 · 日程</h2>
