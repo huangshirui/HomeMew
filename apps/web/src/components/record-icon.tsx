@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { ImagePlus, Plus, Search, X } from 'lucide-react';
 import { EMOJI_GROUPS } from '../../../miniprogram/miniprogram/components/record-icon-picker/emoji-data';
 
-export type IconModel = 'day_record' | 'event' | 'task' | 'wish' | 'activity' | 'goal' | 'habit' | 'anniversary';
+export type IconModel = 'day_record' | 'event' | 'task' | 'wish' | 'activity' | 'goal' | 'habit' | 'anniversary' | 'person_group';
 export type RecordIcon = { type: 'emoji'; value: string } | { type: 'image'; fileId: string };
 export type RecordIconDraft = {
   iconEmoji: string;
