@@ -3,16 +3,18 @@ import { fileURLToPath } from 'node:url';
 
 export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
   identity: Object.freeze({
-    contractVersion: '0.11.0',
+    contractVersion: '0.12.0',
+    compatibleContractVersions: Object.freeze(['0.11.0', '0.12.0']),
     minimumSchemaVersion: 10,
+    minimumSchemaByContract: Object.freeze({ '0.11.0': 10, '0.12.0': 11 }),
   }),
   core: Object.freeze({
-    contractVersion: '0.49.0',
-    // Approved production 0.49 adds configuration-time discovery; the existing
-    // HomeMew CRUD/query/authorization contracts and active models are unchanged.
-    // Keep 0.48 for older staging; unreviewed Kernel versions fail closed.
-    compatibleContractVersions: Object.freeze(['0.48.0', '0.49.0']),
+    contractVersion: '0.53.0',
+    // Explicitly reviewed production #42 contracts; never accept an unknown
+    // future Kernel version as compatible merely because its number is higher.
+    compatibleContractVersions: Object.freeze(['0.48.0', '0.49.0', '0.53.0']),
     minimumSchemaVersion: 53,
+    minimumSchemaByContract: Object.freeze({ '0.48.0': 53, '0.49.0': 53, '0.53.0': 72 }),
   }),
 });
 
@@ -42,9 +44,10 @@ export function assertLifeSpaceStatus(payload, service, environment) {
       `${service} contract mismatch: HomeMew accepts ${compatibleContractVersions.join(', ')}, got ${String(data.contractVersion ?? 'unknown')}`,
     );
   }
-  if (schemaVersion < expected.minimumSchemaVersion) {
+  const minimumSchemaVersion = expected.minimumSchemaByContract?.[data.contractVersion] ?? expected.minimumSchemaVersion;
+  if (schemaVersion < minimumSchemaVersion) {
     throw new Error(
-      `${service} schema is behind the HomeMew release baseline: requires >=${expected.minimumSchemaVersion}, got ${String(data.schemaVersion ?? 'unknown')}`,
+      `${service} schema is behind the HomeMew release baseline: requires >=${minimumSchemaVersion}, got ${String(data.schemaVersion ?? 'unknown')}`,
     );
   }
   return data;
