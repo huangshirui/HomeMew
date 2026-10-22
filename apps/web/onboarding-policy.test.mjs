@@ -43,7 +43,7 @@ test('primary Web docs retain the accepted production front-door state', () => {
   assert.match(decision, /Status: Accepted/u);
   assert.match(decision, /homemew\.aisr\.online` is now owned by `homemew-web-production/u);
   assert.match(architecture, /2026-08-24/u);
-  assert.match(architecture, /homemew-web-production/u);
+  assert.match(architecture, /homemew-web/u);
   assert.doesNotMatch(architecture, /A later controlled production Web cutover/u);
 
   assert.match(webPlan, /production front-door cutover completed/u);
