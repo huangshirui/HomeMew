@@ -1,4 +1,3 @@
-import { environmentApiPath } from '../lib/runtime-environment';
 import { Check, Clipboard, Link2, LoaderCircle, RefreshCw, Smartphone } from 'lucide-react';
 import { useCallback, useEffect, useState, type PropsWithChildren } from 'react';
 import { Button } from './ui/button';
@@ -43,7 +42,7 @@ export function SessionGate({ children }: PropsWithChildren) {
     setState({ kind: 'loading' });
     setActionError(null);
     try {
-      const response = await fetch(environmentApiPath('/api/session'), {
+      const response = await fetch('/api/session', {
         method: 'GET',
         credentials: 'same-origin',
         cache: 'no-store',
@@ -77,7 +76,7 @@ export function SessionGate({ children }: PropsWithChildren) {
     setActionError(null);
     setCopied(false);
     try {
-      const response = await fetch(environmentApiPath('/api/access/link-challenge'), {
+      const response = await fetch('/api/access/link-challenge', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { accept: 'application/json' },
