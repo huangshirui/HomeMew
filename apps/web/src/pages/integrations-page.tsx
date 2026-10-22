@@ -11,7 +11,6 @@ import {
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from '../components/environment-navigation';
-import { withRuntimeEnvironment } from '../lib/runtime-environment';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
@@ -105,7 +104,7 @@ export function IntegrationsPage() {
       setName('');
       setDescription('');
       setShowCreate(false);
-      navigate(withRuntimeEnvironment(`/settings/integrations/${encodeURIComponent(system.id)}`));
+      navigate(`/settings/integrations/${encodeURIComponent(system.id)}`);
     } catch (cause) {
       setError(displayIntegrationError(cause, '创建外部系统失败'));
     } finally {
