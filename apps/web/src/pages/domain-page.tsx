@@ -198,7 +198,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   }
   if (householdLoading) return <Card className="p-8 text-sm text-stone-500">正在加载家庭信息…</Card>;
   return <div className="space-y-4">
-    <PageHeader title={spec.title} action={canCreate ? <Button variant="primary" onClick={newRecord}><Plus className="size-4" /> 新建{spec.title}</Button> : undefined} />
+    <PageHeader title={spec.title}>{canCreate ? <Button variant="primary" onClick={newRecord}><Plus className="size-4" /> 新建{spec.title}</Button> : null}</PageHeader>
     <p className="text-sm text-stone-500">{spec.description}</p>
     {modelKey === 'goal' || modelKey === 'habit' ? <div className="flex flex-wrap items-center gap-2">
       {['all','active','paused',...(modelKey === 'goal' ? ['achieved','abandoned'] : ['ended'])].map(key =>
