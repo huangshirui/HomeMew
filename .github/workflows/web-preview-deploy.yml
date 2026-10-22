@@ -51,23 +51,19 @@ jobs:
           const config = JSON.parse(fs.readFileSync('apps/web/wrangler.production.jsonc', 'utf8'));
           if (config.name !== 'homemew-web-production' || config.preview_urls !== true) throw new Error('Expected same-worker Preview with preview_urls enabled');
           if (config.workers_dev !== false) throw new Error('Production workers_dev must remain disabled');
-          if (config.previews?.vars?.ENVIRONMENT !== 'production') throw new Error('Preview default must select LifeSpace production');
-          const verify = (source, binding, service) => {
-            if (source?.find(item => item.binding === binding)?.service !== service) throw new Error(`Wrong ${binding} binding`);
+          if (config.vars?.ENVIRONMENT !== 'production') throw new Error('Production Worker must stay on LifeSpace production');
+          if (config.previews?.vars?.ENVIRONMENT !== 'staging') throw new Error('Preview must be staging only');
+          const bindings = Object.fromEntries((config.previews.services || []).map(({binding,service}) => [binding,service]));
+          const expected = {
+            HOMEMEW_BACKEND: 'homemew-backend-staging',
+            LIFESPACE_IDENTITY: 'lifespace-identity-staging',
+            LIFESPACE_CORE: 'lifespace-core-staging'
           };
-          const pairs = [
-            ['HOMEMEW_BACKEND', 'homemew-backend-production'],
-            ['LIFESPACE_IDENTITY', 'lifespace-identity'],
-            ['LIFESPACE_CORE', 'lifespace-core'],
-            ['HOMEMEW_BACKEND_STAGING', 'homemew-backend-staging'],
-            ['LIFESPACE_IDENTITY_STAGING', 'lifespace-identity-staging'],
-            ['LIFESPACE_CORE_STAGING', 'lifespace-core-staging']
-          ];
-          for (const [binding, service] of pairs) verify(config.previews.services, binding, service);
-          if (config.previews.vars?.LIFESPACE_IDENTITY_URL !== 'https://auth.aisr.online') throw new Error('Preview default Identity must be production');
-          if (config.previews.vars?.LIFESPACE_CORE_URL !== 'https://core.aisr.online') throw new Error('Preview default Core must be production');
-          if (config.previews.vars?.STAGING_LIFESPACE_IDENTITY_URL !== 'https://auth-staging.aisr.online') throw new Error('Preview staging Identity must be staging');
-          if (config.previews.vars?.STAGING_LIFESPACE_CORE_URL !== 'https://core-staging.aisr.online') throw new Error('Preview staging Core must be staging');
+          if (JSON.stringify(bindings) !== JSON.stringify(expected)) throw new Error('Preview bindings must be staging-only');
+          if (config.previews.vars.LIFESPACE_IDENTITY_URL !== 'https://auth-staging.aisr.online') throw new Error('Preview Identity must be staging');
+          if (config.previews.vars.LIFESPACE_CORE_URL !== 'https://core-staging.aisr.online') throw new Error('Preview Core must be staging');
+          if (config.previews.vars.STAGING_LIFESPACE_IDENTITY_URL || config.previews.vars.STAGING_LIFESPACE_CORE_URL) throw new Error('Preview must not support dual-environment routing');
+          if (config.assets.run_worker_first.indexOf('/_stage/*') === -1) throw new Error('Legacy staging paths must be handled and rejected');
           NODE
 
       - name: Test, typecheck and build Web
@@ -90,9 +86,8 @@ jobs:
             echo
             echo "- Worker project: homemew-web-production"
             echo "- Preview name: staging"
-            echo "- LifeSpace default: production (URL without env)"
-            echo "- LifeSpace staging: ?env=staging (fixed /_stage/api/* route)"
-            echo "- Browser Preview host requires separate Cloudflare Access protection and registered LifeSpace Access audience"
-            echo "- Mini Program remains on homemew.aisr.online; it does not use this Preview"
+            echo "- LifeSpace: staging only, independent of URL query"
+            echo "- Browser Preview host requires separate Cloudflare Access protection and a staging LifeSpace Access audience"
+            echo "- Mini Program develop/trial/release always use homemew.aisr.online production"
             echo "- Secrets are Preview-scoped and must not be exposed in source or build logs"
           } >> "$GITHUB_STEP_SUMMARY"

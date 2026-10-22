@@ -4,6 +4,16 @@
 
 > 当前架构权威：`/docs/decisions/2026-09-16-miniprogram-final-bff-boundary.md` 与 `/docs/plans/2026-09-16-miniprogram-final-bff-rollout.md`。本 README 保留产品需求与交互细节；其中尚未由 Phase 1 固化的具体 path/DTO 仅是历史需求示例，不是最终 wire contract。所有运行时 API 均指稳定的 HomeMew Mini BFF 产品契约；小程序不得直接选择或调用 LifeSpace Core/Identity 公网地址与 wire path。LifeSpace 仍是 Identity、Space/Grant、领域数据和授权的唯一权威来源。
 
+## 当前测试及环境策略（2026-10-22）
+
+- **开发版、体验版、正式版**微信小程序均使用固定正式入口 https://homemew.aisr.online，经 HomeMew Mini BFF 连接 LifeSpace Production。
+- 不再支持在小程序路径加入 env=staging 切换数据环境；即使从历史 staging 启动路径打开，新版本也不改变后端目标。
+- 升级时如果本地存储仍记录旧的 staging 环境，会丢弃旧的 staging Token、家庭选择和家庭缓存，再进行生产环境身份恢复。
+- LifeSpace 破坏性变更先在 HomeMew Web Preview + LifeSpace Staging 上验收。小程序开发版测试 UI 和现有 Production Mini BFF；正式 LifeSpace 更新还必须验证既有小程序/BFF 的向后兼容。
+- 不需要再发布一套 staging 小程序。
+
+现行决策：docs/decisions/2026-10-22-fixed-deployment-environments.md
+
 ## 本地开发与构建
 
 本项目用本地 `tsc` 将 TypeScript 预编译为 `miniprogram/**/*.js`，微信开发者工具直接加载 `.js`（不依赖工具内置 SWC 编译器，避免其缺失 `@swc/runtime` 辅助模块导致的白屏问题）。在 `apps/miniprogram/` 目录下：

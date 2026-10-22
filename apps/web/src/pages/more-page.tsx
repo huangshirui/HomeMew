@@ -1,6 +1,6 @@
 import { CalendarRange, Clock3, Flame, Gift, Heart, Settings, Target, Trophy, Users } from 'lucide-react';
 import { PageHeader } from '../components/ui/page-header';
-import { Link } from '../components/environment-navigation';
+import { Link } from 'react-router-dom';
 import { Card } from '../components/ui/card';
 
 const entries = [

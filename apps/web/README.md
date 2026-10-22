@@ -78,22 +78,20 @@ Both boundaries must not:
 
 HomeMew application metadata such as Family Catalog classification and External System `ext_*` containers belongs to `apps/backend/` Durable Objects and is reached from Web through the `HOMEMEW_BACKEND` Service Binding.
 
-## Web code versions vs LifeSpace environments
+## Web code deployments / LifeSpace target
 
-HomeMew Web has **one Worker project** (`homemew-web-production`) with Production and optional **Worker Preview** code versions. Code deployment and LifeSpace data target are separate dimensions:
+The existing Cloudflare Worker project, `homemew-web-production`, hosts both **Web Production** and a named **Web Preview** code version.
 
-| Web code | URL parameter | LifeSpace data |
-| --- | --- | --- |
-| Production | missing or `env=production` | Production |
-| Production | `env=staging` | Staging |
-| Worker Preview | missing or `env=production` | Production |
-| Worker Preview | `env=staging` | Staging |
+- **Web Production** serves `homemew.aisr.online` and always uses LifeSpace Production / `homemew-backend-production`.
+- **Web Preview** is another code version under the same Worker project, with its own staging bindings/Secrets, and always uses LifeSpace Staging / `homemew-backend-staging`.
+- The URL does not select environment. No `?env=staging`, no `/_stage/api/*` proxy, no per-page business switch. Legacy Web URLs with `?env=staging` deliberately refuse to open the application instead of accidentally writing Production.
+- Mini Program developer, trial and release builds always use the HomeMew production BFF; they never call Web Preview.
+- Backend Workers and their independent Durable Objects remain deployed in both environments.
 
-The browser's *explicit URL query* selects only the data environment. Removing `env=staging` immediately selects production; in-app React Router links retain it when navigating staging. No browser-provided upstream URL is honored. The HomeMew Worker front door resolves fixed `/api/*` (production) and `/_stage/api/*` (staging) to distinct LifeSpace and HomeMew backend Service Bindings and secrets, failing closed if staging is unavailable.
+Previews Base settings are defined in `apps/web/wrangler.production.jsonc`, while the two required Preview secrets are set only on the named Preview. Before staging acceptance, protect the Preview host via Cloudflare Access and register its Access audience with the staging HomeMew Application.
 
-Preview is a **second code deployment inside the same Worker**, not a second Worker project or third LifeSpace data environment. It uses separately configured Preview vars/services/secrets, with a trusted-branch manual GitHub Actions workflow; do not expose Preview URLs or production-credential Previews to untrusted PR code. The released Mini Program always uses the production HomeMew domain and switches only its LifeSpace data environment via its launch-path parameter.
-
-Operator setup, access-audience requirements, four-way acceptance and rollback: `docs/runbooks/2026-10-22-web-preview-and-environment-routing.md`.
+Decision: `docs/decisions/2026-10-22-fixed-deployment-environments.md`.
+Manual configuration and release runbook: `docs/runbooks/2026-10-22-web-preview-and-environment-routing.md`.
 
 ## Authentication boundary
 

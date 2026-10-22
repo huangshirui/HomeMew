@@ -2,17 +2,7 @@
 
 const PROD_APPLICATION_BASE_URL = 'https://homemew.aisr.online';
 
-export type RuntimeEnvironment = 'production' | 'staging';
-let activeRuntimeEnvironment: RuntimeEnvironment = 'production';
-
-/** Explicit Mini launch query only; not a UI toggle and never arbitrary URLs. */
-export function selectLaunchEnvironment(value: unknown): boolean {
-  if (value !== 'staging' && value !== 'production') return false;
-  if (activeRuntimeEnvironment === value) return false;
-  activeRuntimeEnvironment = value;
-  return true;
-}
-
+/** Mini development, trial and release builds all use LifeSpace production. */
 export const STORAGE_KEYS = {
   accessToken: 'accessToken',
   tokenExpiresAt: 'tokenExpiresAt',
@@ -29,31 +19,26 @@ export const REQUEST_TIMEOUT = 15000;
 export const UPLOAD_TIMEOUT = 30000;
 export const TOKEN_EXPIRE_BUFFER_MS = 2 * 60 * 1000;
 
-export function resolveRuntimeEnvironment(_envVersion: string | undefined): RuntimeEnvironment {
-  return activeRuntimeEnvironment;
+export function resolveRuntimeEnvironment(_envVersion: string | undefined): 'production' {
+  return 'production';
 }
 
-export function getRuntimeEnvironment(): RuntimeEnvironment {
-  return activeRuntimeEnvironment;
-}
-
-/** Remove pre-BFF cached service addresses while retaining UI preferences. */
-export function ensureRuntimeEnvironmentStorage(): RuntimeEnvironment {
-  const current = getRuntimeEnvironment();
+/**
+ * One-time migration for older Mini builds that could select staging.
+ * Never reuse a LifeSpace staging bearer with the now production-only Mini.
+ */
+export function ensureProductionRuntimeStorage(): void {
   const previous = wx.getStorageSync(STORAGE_KEYS.runtimeEnvironment) as string;
-  if (previous !== current) {
+  if (previous === 'staging') {
     for (const key of [
       STORAGE_KEYS.accessToken,
       STORAGE_KEYS.tokenExpiresAt,
       STORAGE_KEYS.currentFamilyId,
       STORAGE_KEYS.homeCache,
-      'coreApiUrl',
-      'identityApiUrl',
-      'loginBackendUrl',
+      'coreApiUrl', 'identityApiUrl', 'loginBackendUrl',
     ]) wx.removeStorageSync(key);
-    wx.setStorageSync(STORAGE_KEYS.runtimeEnvironment, current);
   }
-  return current;
+  if (previous !== 'production') wx.setStorageSync(STORAGE_KEYS.runtimeEnvironment, 'production');
 }
 
 export function normalizeBaseUrl(url: string): string {
@@ -61,7 +46,7 @@ export function normalizeBaseUrl(url: string): string {
 }
 
 export function getApplicationBaseUrl(): string {
-  return getRuntimeEnvironment() === 'staging' ? PROD_APPLICATION_BASE_URL + '/_stage' : PROD_APPLICATION_BASE_URL;
+  return PROD_APPLICATION_BASE_URL;
 }
 
 export function buildUserAvatarUrl(applicationBaseUrl: string, userId: string): string {

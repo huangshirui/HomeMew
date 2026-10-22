@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Link } from '../components/environment-navigation';
+import { Link } from 'react-router-dom';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';

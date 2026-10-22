@@ -1,4 +1,3 @@
-import { environmentApiPath } from '../lib/runtime-environment';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ImagePlus, Plus, Search, X } from 'lucide-react';
@@ -55,7 +54,7 @@ export function iconDraftFor(icon?: RecordIcon | null): RecordIconDraft {
 }
 
 export function recordIconSrc(spaceId: string, modelKey: IconModel, recordId: string): string {
-  return environmentApiPath(`/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/records/${encodeURIComponent(recordId)}/image`);
+  return `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/records/${encodeURIComponent(recordId)}/image`;
 }
 
 const MAX_ICON_BYTES = 256 * 1024;
@@ -100,7 +99,7 @@ async function uploadIcon(spaceId: string, modelKey: IconModel, file: File): Pro
   // business fields in a single governed Record Create/Update.
   const image = await prepareIconImage(file);
   const response = await fetch(
-    environmentApiPath(`/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/image`), {
+    `/api/record-icons/spaces/${encodeURIComponent(spaceId)}/models/${modelKey}/image`, {
       method: 'POST', credentials: 'same-origin', headers: { 'content-type': image.type }, body: image,
     },
   );

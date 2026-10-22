@@ -1,8 +1,10 @@
 # Decision: One HomeMew Worker, independent code previews and LifeSpace environment routing
 
 Date: 2026-10-22
-Status: Accepted architecture; implementation rollout pending configuration
+Status: Superseded by 2026-10-22-fixed-deployment-environments.md
 Scope: HomeMew Web front door, Mini runtime environment selection; **not** a UI feature toggle.
+
+**历史方案，已废弃：** 下文的 `?env=staging`、`/_stage/*` 和 Preview 双目标配置不可再执行。现行决策见 `docs/decisions/2026-10-22-fixed-deployment-environments.md`。
 
 ## Motivation / 背景
 
