@@ -114,7 +114,7 @@ jobs:
             echo
             echo "- Worker: homemew-backend-production"
             echo "- LifeSpace release baseline: verified before deploy"
-            echo "- Public front door ownership: unchanged (homemew-web-production)"
+            echo "- Public front door ownership: unchanged (homemew-web)"
             echo "- Mini Program provider route: verified through the Web front door"
             echo "- Member activity: SQLite-backed Durable Object"
             echo "- Family catalog: SQLite-backed Durable Object application metadata"
