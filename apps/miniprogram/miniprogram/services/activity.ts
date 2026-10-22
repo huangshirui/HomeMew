@@ -1,5 +1,5 @@
 import { ensureAccessToken } from './auth';
-import { getApplicationBaseUrl, getRuntimeEnvironment, REQUEST_TIMEOUT } from './config';
+import { getApplicationBaseUrl, REQUEST_TIMEOUT } from './config';
 
 let reportedLocalDay: string | null = null;
 let reportPromise: Promise<void> | null = null;
@@ -32,7 +32,7 @@ async function sendMiniProgramActivity(): Promise<void> {
 }
 
 export async function reportMiniProgramActivityOncePerDay(): Promise<void> {
-  const day = getRuntimeEnvironment() + ':' + localDayKey();
+  const day = localDayKey();
   if (reportedLocalDay === day) return;
   if (reportPromise) {
     await reportPromise;
