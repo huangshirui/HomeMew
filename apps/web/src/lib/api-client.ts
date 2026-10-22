@@ -1,4 +1,3 @@
-import { environmentApiPath } from './runtime-environment';
 export class ApiError extends Error {
   constructor(
     public readonly code: string,
@@ -25,7 +24,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   headers.set('accept', 'application/json');
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
 
-  const response = await fetch(environmentApiPath(path), {
+  const response = await fetch(path, {
     ...init,
     credentials: 'same-origin',
     cache: init.method === undefined || init.method === 'GET' ? 'no-store' : init.cache,
