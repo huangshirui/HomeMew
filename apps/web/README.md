@@ -80,7 +80,7 @@ HomeMew application metadata such as Family Catalog classification and External 
 
 ## Web code deployments / LifeSpace target
 
-The existing Cloudflare Worker project, `homemew-web-production`, hosts both **Web Production** and a named **Web Preview** code version.
+The existing Cloudflare Worker project, `homemew-web`, hosts both **Web Production** and a named **Web Preview** code version.
 
 - **Web Production** serves `homemew.aisr.online` and always uses LifeSpace Production / `homemew-backend-production`.
 - **Web Preview** is another code version under the same Worker project, with its own staging bindings/Secrets, and always uses LifeSpace Staging / `homemew-backend-staging`.
@@ -280,7 +280,7 @@ The user-facing domain is:
 homemew.aisr.online
 ```
 
-Since the accepted production cutover on 2026-08-24, that hostname is owned by `homemew-web-production`. Browser Web traffic remains behind Cloudflare Access. The exact Mini login route `POST /api/v1/login/wechat` uses its narrow Access bypass and delegates through the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. The stable Mini BFF surface uses only explicit routes, requires the LifeSpace user bearer where applicable, and delegates only to fixed internal operations.
+Since the accepted production cutover on 2026-08-24, that hostname is owned by `homemew-web`. Browser Web traffic remains behind Cloudflare Access. The exact Mini login route `POST /api/v1/login/wechat` uses its narrow Access bypass and delegates through the `HOMEMEW_BACKEND` Service Binding to `homemew-backend-production`. The stable Mini BFF surface uses only explicit routes, requires the LifeSpace user bearer where applicable, and delegates only to fixed internal operations.
 
 Release path:
 
