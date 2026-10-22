@@ -528,8 +528,8 @@ async function proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, servi
 }
 
 
-const RECORD_ICON_IMAGE = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish|activity|goal|habit|anniversary)\/records\/(rec_[A-Za-z0-9_-]+)\/image$/u;
-const RECORD_ICON_UPLOAD = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish|activity|goal|habit|anniversary)\/image$/u;
+const RECORD_ICON_IMAGE = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish|activity|goal|habit|anniversary|person_group)\/records\/(rec_[A-Za-z0-9_-]+)\/image$/u;
+const RECORD_ICON_UPLOAD = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish|activity|goal|habit|anniversary|person_group)\/image$/u;
 const RECORD_ICON_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const RECORD_ICON_MAX_BYTES = 256 * 1024;
 
