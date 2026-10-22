@@ -2,8 +2,16 @@
 
 const PROD_APPLICATION_BASE_URL = 'https://homemew.aisr.online';
 
-export type RuntimeEnvironment = 'production';
-const ACTIVE_RUNTIME_ENVIRONMENT: RuntimeEnvironment = 'production';
+export type RuntimeEnvironment = 'production' | 'staging';
+let activeRuntimeEnvironment: RuntimeEnvironment = 'production';
+
+/** Explicit Mini launch query only; not a UI toggle and never arbitrary URLs. */
+export function selectLaunchEnvironment(value: unknown): boolean {
+  if (value !== 'staging' && value !== 'production') return false;
+  if (activeRuntimeEnvironment === value) return false;
+  activeRuntimeEnvironment = value;
+  return true;
+}
 
 export const STORAGE_KEYS = {
   accessToken: 'accessToken',
@@ -22,11 +30,11 @@ export const UPLOAD_TIMEOUT = 30000;
 export const TOKEN_EXPIRE_BUFFER_MS = 2 * 60 * 1000;
 
 export function resolveRuntimeEnvironment(_envVersion: string | undefined): RuntimeEnvironment {
-  return ACTIVE_RUNTIME_ENVIRONMENT;
+  return activeRuntimeEnvironment;
 }
 
 export function getRuntimeEnvironment(): RuntimeEnvironment {
-  return ACTIVE_RUNTIME_ENVIRONMENT;
+  return activeRuntimeEnvironment;
 }
 
 /** Remove pre-BFF cached service addresses while retaining UI preferences. */
@@ -53,7 +61,7 @@ export function normalizeBaseUrl(url: string): string {
 }
 
 export function getApplicationBaseUrl(): string {
-  return PROD_APPLICATION_BASE_URL;
+  return getRuntimeEnvironment() === 'staging' ? PROD_APPLICATION_BASE_URL + '/_stage' : PROD_APPLICATION_BASE_URL;
 }
 
 export function buildUserAvatarUrl(applicationBaseUrl: string, userId: string): string {
