@@ -3,6 +3,7 @@ import { ensureRuntimeEnvironmentStorage, getApplicationBaseUrl, selectLaunchEnv
 import { reportMiniProgramActivityOncePerDay } from './services/activity';
 import { coordinateAppEntry, AppEntryOptions } from './services/entry-navigation';
 import { resetRuntimeReady } from './services/runtime-bootstrap';
+import { invalidatePendingAuth } from './services/auth';
 import { clearUserState } from './stores/index';
 
 App<IAppOption>({
@@ -16,6 +17,7 @@ App<IAppOption>({
   onShow(options: AppEntryOptions) {
     const changed = selectLaunchEnvironment(options?.query?.env);
     if (changed) {
+      invalidatePendingAuth();
       // A different backend has different principals, tokens, families and caches.
       ensureRuntimeEnvironmentStorage();
       resetRuntimeReady();
