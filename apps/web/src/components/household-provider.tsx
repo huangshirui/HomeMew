@@ -1,4 +1,3 @@
-import { getRuntimeEnvironment } from '../lib/runtime-environment';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { apiRequest } from '../lib/api-client';
 
@@ -47,7 +46,7 @@ const HouseholdContext = createContext<HouseholdContextValue | null>(null);
 
 function rememberedFamilyId(): string | null {
   try {
-    return window.localStorage.getItem(CURRENT_FAMILY_KEY + '.' + getRuntimeEnvironment());
+    return window.localStorage.getItem(CURRENT_FAMILY_KEY);
   } catch {
     return null;
   }
@@ -55,8 +54,8 @@ function rememberedFamilyId(): string | null {
 
 function rememberFamilyId(familyId: string | null) {
   try {
-    if (familyId) window.localStorage.setItem(CURRENT_FAMILY_KEY + '.' + getRuntimeEnvironment(), familyId);
-    else window.localStorage.removeItem(CURRENT_FAMILY_KEY + '.' + getRuntimeEnvironment());
+    if (familyId) window.localStorage.setItem(CURRENT_FAMILY_KEY, familyId);
+    else window.localStorage.removeItem(CURRENT_FAMILY_KEY);
   } catch {
     // Browser storage is only a UI preference; ignore unavailable storage.
   }
