@@ -86,6 +86,9 @@ jobs:
           curl --fail --silent --show-error --retry 3 https://auth.aisr.online/health >/dev/null
           curl --fail --silent --show-error --retry 3 https://core.aisr.online/health >/dev/null
 
+      - name: Verify renamed Cloudflare Worker identity (prevent duplicate creation)
+        run: node apps/web/verify-cloudflare-worker.mjs
+
       - name: Deploy production Web Worker
         run: >-
           corepack pnpm dlx wrangler@4.135.0 deploy
