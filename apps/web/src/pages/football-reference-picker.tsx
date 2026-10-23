@@ -112,10 +112,10 @@ export function FootballReferencePicker({
     } catch (cause) {
       if (cause instanceof ApiError && [401, 403, 404, 410].includes(cause.status ?? 0)) {
         setRecent(forgetFootballReference(userId, spaceId, model, item.id));
-        setError('该记录已不可访问，已从本机最近使用中移除');
+        setError('这个选项已不可用，已从最近选择中移除');
       } else {
         // Network outages and server failures must not silently erase valid local recents.
-        setError('暂时无法验证缓存记录，请重试；本机缓存已保留');
+        setError('暂时无法选择，请检查网络后重试。最近选择不会丢失。');
       }
     } finally { setValidatingId(''); }
   };
@@ -153,7 +153,7 @@ export function FootballReferencePicker({
           </button>}
         </div>
         {!search.trim() && recent.length > 0 && <div className="mb-2 border-b border-stone-100 pb-2">
-          <p className="px-2 py-1 text-xs text-stone-500">本机最近选择 · × 仅移除缓存</p>
+          <p className="px-2 py-1 text-xs text-stone-500">最近选过 · 点击 × 从列表中移除</p>
           <div className="max-h-40 space-y-0.5 overflow-y-auto">
             {recent.map(item => <div key={item.id} className="flex min-h-10 items-center gap-1 rounded-lg hover:bg-stone-50">
               <button type="button" role="option" aria-selected={item.id === value}
@@ -162,14 +162,14 @@ export function FootballReferencePicker({
                 className="min-w-0 flex-1 truncate px-3 py-2 text-left text-sm text-stone-800">
                 {item.name}{item.id === value && <span className="ml-2 text-emerald-700">✓</span>}
               </button>
-              <button type="button" aria-label={'从本机缓存移除' + item.name}
-                onClick={() => removeRecent(item.id)} title="只移除本机缓存，不删除球队或赛事"
+              <button type="button" aria-label={'从最近选择中移除' + item.name}
+                onClick={() => removeRecent(item.id)} title="只从最近选择中移除，不会删除球队或赛事"
                 className="mr-1 rounded-lg p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
                 <X className="size-4"/>
               </button>
             </div>)}
           </div>
-          {validatingId && <p className="px-2 text-xs text-stone-400">验证缓存记录中…</p>}
+          {validatingId && <p className="px-2 text-xs text-stone-400">正在确认…</p>}
         </div>}
         <div className="mt-2 max-h-48 space-y-0.5 overflow-y-auto">
           {optional && <button type="button" role="option" aria-selected={!value}
