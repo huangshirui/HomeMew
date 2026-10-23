@@ -203,12 +203,14 @@ export function FootballPage() {
       .filter(id => id && !knownTeams.has(id) && !attemptedRefLookup.current.has('team:' + id));
     const needsCompetitions = [...new Set(matches.map(m => m.competitionActivityId).filter((id): id is string => !!id))]
       .filter(id => !knownCompetitions.has(id) && !attemptedRefLookup.current.has('competition:' + id));
-    for (const id of needsTeams) attemptedRefLookup.current.add('team:' + id);
-    for (const id of needsCompetitions) attemptedRefLookup.current.add('competition:' + id);
+    const teamBatch = needsTeams.slice(0, 80);
+    const competitionBatch = needsCompetitions.slice(0, 40);
+    for (const id of teamBatch) attemptedRefLookup.current.add('team:' + id);
+    for (const id of competitionBatch) attemptedRefLookup.current.add('competition:' + id);
     let active = true;
     void Promise.all([
-      Promise.all(needsTeams.slice(0, 80).map(id => apiRequest<FootballReference>(modelUrl(spaceId, 'person_group', id)).catch(() => null))),
-      Promise.all(needsCompetitions.slice(0, 40).map(id => apiRequest<FootballReference>(modelUrl(spaceId, 'activity', id)).catch(() => null))),
+      Promise.all(teamBatch.map(id => apiRequest<FootballReference>(modelUrl(spaceId, 'person_group', id)).catch(() => null))),
+      Promise.all(competitionBatch.map(id => apiRequest<FootballReference>(modelUrl(spaceId, 'activity', id)).catch(() => null))),
     ]).then(([fetchedTeams, fetchedCompetitions]) => {
       if (!active) return;
       const newTeams = fetchedTeams.filter((item): item is FootballReference => item !== null);
