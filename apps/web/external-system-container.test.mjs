@@ -24,7 +24,7 @@ test('external system creation only creates HomeMew metadata', () => {
   const page = source('./src/pages/integrations-page.tsx');
   const api = source('./integration-api.mjs');
 
-  assert.match(page, /这里只创建 HomeMew 的系统容器/u);
+  assert.match(page, /先填写外部系统的信息/u);
   assert.match(page, /displayName: name\.trim\(\)/u);
   assert.doesNotMatch(page, /credentialMode/u);
   assert.doesNotMatch(page, /permissions:/u);
@@ -42,7 +42,7 @@ test('Service Access, Agent Access and Event Push are separate capability module
   assert.match(detail, /<ServiceAccessSection/u);
   assert.match(detail, /<AgentAccessSection/u);
   assert.match(detail, /<EventSubscriptionsSection/u);
-  assert.match(detail, /需要先配置 Service Access/u);
+  assert.match(detail, /需要先设置服务接入/u);
   assert.match(service, /创建 Service Access/u);
   assert.match(agent, /bindExternalSystemAgent/u);
   assert.doesNotMatch(agent, /patchServiceBinding/u);
