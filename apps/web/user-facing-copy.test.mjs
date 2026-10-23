@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ApiError } from './src/lib/api-client.ts';
+const apiError = (code, message, requestId, status) => Object.assign(new Error(message), { code, requestId, status });
 import { householdErrorMessage } from './src/lib/user-facing-error.ts';
 
 const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 test('household errors do not reveal internal field names, request IDs or SQL messages', () => {
   const queries = [
-    new ApiError('QUERY_UNSUPPORTED', 'matchId.eq is unsupported', 'req_abc', 400),
-    new ApiError('INTERNAL', 'D1 SQL constraint failed', 'req_other', 500),
+    apiError('QUERY_UNSUPPORTED', 'matchId.eq is unsupported', 'req_abc', 400),
+    apiError('INTERNAL', 'D1 SQL constraint failed', 'req_other', 500),
     new Error('TypeError: Failed to fetch'),
   ];
   for (const query of queries) {
@@ -17,8 +17,8 @@ test('household errors do not reveal internal field names, request IDs or SQL me
     assert.doesNotMatch(message, /matchId|unsupported|req_|SQL|D1|TypeError|Failed to fetch/);
     assert.match(message, /[\u3400-\u9fff]/u);
   }
-  assert.match(householdErrorMessage(new ApiError('FORBIDDEN', 'forbidden', undefined, 403)), /权限/u);
-  assert.match(householdErrorMessage(new ApiError('CONFLICT', 'conflict', undefined, 409)), /刷新/u);
+  assert.match(householdErrorMessage(apiError('FORBIDDEN', 'forbidden', undefined, 403)), /权限/u);
+  assert.match(householdErrorMessage(apiError('CONFLICT', 'conflict', undefined, 409)), /刷新/u);
   assert.equal(householdErrorMessage(new Error('比赛日期和双方球队为必填')), '比赛日期和双方球队为必填');
 });
 
