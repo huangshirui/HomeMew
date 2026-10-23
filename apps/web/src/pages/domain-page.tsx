@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { CalendarDays, Check, Clock3, Gift, Pause, Play, Plus, RefreshCw, Target, Trash2, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { ContainerRelations } from '../components/container-relations';
@@ -113,6 +113,7 @@ function memberNames(ids: string[], names: Map<string, string>) {
 export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const { currentFamily, members, user, loading: householdLoading } = useHousehold();
   const [records, setRecords] = useState<DomainRecord[]>([]);
+  const requestGeneration = useRef(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
@@ -135,13 +136,19 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const visible = records; // Goal/Habit status filtering is performed by the indexed LifeSpace query.
 
   const reload = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     if (!currentFamily) { setRecords([]); return; }
-    setLoading(true); setError('');
-    try { setRecords(await loadRecords(currentFamily.id, modelKey, statusFilter)); }
-    catch (cause) { setRecords([]); setError(message(cause)); }
-    finally { setLoading(false); }
+    setLoading(true); setRecords([]); setError('');
+    try {
+      const next = await loadRecords(currentFamily.id, modelKey, statusFilter);
+      if (generation === requestGeneration.current) setRecords(next);
+    } catch (cause) {
+      if (generation === requestGeneration.current) { setRecords([]); setError(message(cause)); }
+    } finally {
+      if (generation === requestGeneration.current) setLoading(false);
+    }
   }, [currentFamily?.id, modelKey, statusFilter]);
-  useEffect(() => { void refresh; void reload(); }, [reload, refresh]);
+  useEffect(() => { void refresh; void reload(); return () => { requestGeneration.current += 1; }; }, [reload, refresh]);
   useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setContainerFor(null); setStatusFilter('active'); }, [currentFamily?.id, modelKey]);
 
   function newRecord() {
