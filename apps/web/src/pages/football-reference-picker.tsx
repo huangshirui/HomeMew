@@ -19,6 +19,7 @@ type Props = {
   optional?: boolean;
   disabled?: boolean;
   className?: string;
+  onCreate?: (name: string) => void;
 };
 
 const inputClass = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-500';
@@ -26,7 +27,7 @@ const inputClass = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-3
 // Keep the named-record search in LifeSpace; never derive options from an unbounded local table scan.
 // Canonical Query search is substring LIKE today: debounce and require two characters to limit cost.
 export function FootballReferencePicker({
-  spaceId, userId, model, value, onChange, label, known, optional = false, disabled = false, className = '',
+  spaceId, userId, model, value, onChange, label, known, optional = false, disabled = false, className = '', onCreate,
 }: Props) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -34,6 +35,7 @@ export function FootballReferencePicker({
   const [matches, setMatches] = useState<FootballReference[]>([]);
   const [resolved, setResolved] = useState<FootballReference | null>(null);
   const [busy, setBusy] = useState(false);
+  const [searchedTerm, setSearchedTerm] = useState('');
   const [error, setError] = useState('');
   const [recent, setRecent] = useState<RecentFootballReference[]>([]);
   const [validatingId, setValidatingId] = useState('');
@@ -44,7 +46,7 @@ export function FootballReferencePicker({
     [known, matches, resolved, value]);
 
   useEffect(() => {
-    setOpen(false); setSearch(''); setMatches([]); setResolved(null); setError('');
+    setOpen(false); setSearch(''); setMatches([]); setResolved(null); setError(''); setSearchedTerm('');
     setRecent(readRecentFootballReferences(userId, spaceId, model));
     ++serial.current;
   }, [spaceId, userId, model]);
@@ -64,13 +66,14 @@ export function FootballReferencePicker({
     const term = search.trim();
     const sufficient = [...term].length >= 2;
     const ticket = ++serial.current;
+    setSearchedTerm('');
     if (!sufficient) {
       // With an empty search, show only user-picked recents; do not scan unrelated models.
       setMatches([]); setBusy(false); setError(term ? '请输入至少两个字符' : '');
       return;
     }
+    setBusy(true); setError(''); setMatches([]);
     const timer = window.setTimeout(() => {
-      setBusy(true); setError('');
       queryModelRecords<FootballReference>(spaceId, model, {
         ...(sufficient ? { search: { text: term } } : {}),
         sort: [{ field: 'name', direction: 'asc' }],
@@ -78,10 +81,11 @@ export function FootballReferencePicker({
       }).then(page => {
         if (ticket !== serial.current) return;
         setMatches(page.items);
+        setSearchedTerm(term);
         setError(page.nextCursor ? '仅展示前 20 条，请继续输入名称缩小范围' : '');
       }).catch(cause => {
         if (ticket !== serial.current) return;
-        setMatches([]);
+        setMatches([]); setSearchedTerm('');
         setError(cause instanceof Error ? cause.message : '搜索失败');
       }).finally(() => { if (ticket === serial.current) setBusy(false); });
     }, 320);
@@ -182,6 +186,12 @@ export function FootballReferencePicker({
           </button>)}
           {!busy && !matches.length && !error && <p className="px-2 py-3 text-sm text-stone-500">{search.trim() ? '没有找到匹配记录' : '输入至少两个字搜索更多记录'}</p>}
         </div>
+        {onCreate && !disabled && !busy && !error && matches.length === 0 &&
+          searchedTerm === search.trim() && [...searchedTerm].length >= 2 &&
+          <button type="button" className="mt-2 flex w-full items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-800"
+            onClick={() => { onCreate(searchedTerm); setOpen(false); }}>
+            + 新建{model === 'activity' ? '赛事' : '球队'}“{searchedTerm}”
+          </button>}
         {busy && <p className="px-2 py-1 text-xs text-stone-500">正在搜索…</p>}
         {error && <p role="status" className="px-2 py-1 text-xs text-stone-500">{error}</p>}
       </div>}
