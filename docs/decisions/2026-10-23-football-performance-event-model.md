@@ -141,3 +141,11 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 - 小程序没有足球比赛页面，也没有相关稳定 Mini BFF 足球业务路由。本次先提供 native wx-storage 缓存工具和带 × 的可复用近期候选组件，暂不连接不存在的界面。未来小程序页面接入时，必须先通过明确的 HomeMew BFF 查询、校验被缓存引用，再提交实际选择，不能直接访问 LifeSpace Core 线协议。
 - 本机缓存不能证明某个对象属于足球业务的正式目录；该目录依然需要后续经批准的 LifeSpace 业务关系或用途机制，不能用此缓存充当第二份权威业务库。
 
+
+## 2026-10-23 · 赛事统一归 Activity、足球管理收敛到球队与球员、零结果快捷新建
+
+- **活动/赛事**：足球模块不再提供独立「赛事目录管理」页面，不会在足球页初始化时枚举全部 Activity；页面将「赛事 → 活动」直接链接到 HomeMew 的 /activities 进行统一管理。比赛表单仍可查询整个 LifeSpace Activity 的可见名称，也可在搜索无结果时快捷创建最简 Activity 并自动回填赛事 ID，但这不是独立的赛事类型、业务目录或新模型。
+- **球队/球员**：/football/manage 路由改为独立 FootballManagePage（球队、球员两栏），不再渲染活动列表。球队只从已记录比赛引用及当前浏览器最近使用记录中汇集，另可服务端搜索查找其它 PersonGroup；名称、图标、说明和删除继续使用 LifeSpace 记录 API。球员使用 LifeSpace Space Person Directory（/people），展示并编辑 `linkedUser=false` 且不是家庭成员 Person 的记录；支持名称搜索、分页、创建、乐观锁更新和条件性删除。受家庭成员身份关联的 Person 仍由家庭管理/身份生命周期维护；**创建球员不会创建家庭成员/用户**。对于已有 FootballMatch/FootballPerformance 引用的球员，客户端拒绝删除；其他跨业务引用仍依赖平台验证，不宣称此局部检查涵盖一切。
+- **快捷创建**：FootballReferencePicker 的 `onCreate(name)` 只在输入至少两个字符、服务端查询成功返回零结果、无加载/错误时出现。比赛表单不再固定显示「＋新建球队/赛事」按钮；点击时搜索词直接填入相应新建表单，提交后自动回填比赛。FootballPersonPicker 同样在搜索无结果时显示「＋新建球员{name}」，预填 Space Person 名称，保存后加入当前参赛名单。主页面也提供「新建球员」和查找其他 Space Person 入口，选中人员可作为当前统计主体。
+- **统计**：现有通用“指标 + 分组”作为详细分析保留；新版首页建议改成球员表现看板，先以已知数据展示出场、进球、助攻和时间趋势，提供进攻/防守/出场分区，明确事件不重复计数与缺失不等于零。此为 UX 建议，**本轮未更改统计口径或图表**，待用户确认。
+- **发布边界**：全部为 HomeMew Web PR #142 的应用层变更，无 LifeSpace Baseline/DSL/权限变更。各项 Web Check 通过后仅可手动部署 Preview；不能宣称浏览器实际交互已验收。
