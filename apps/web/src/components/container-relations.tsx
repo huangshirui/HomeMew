@@ -308,14 +308,14 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
           <span className="min-w-0 truncate text-sm">{item.name || item.summary || item.id}</span>
           <Button variant="secondary" disabled={working} onClick={() => void link(item)}>关联</Button>
         </div>)}
-        {!candidates.length && !candidateLoading ? <p className="text-xs text-stone-500">搜索后从结果中选择一条记录；不会复制或转移原始记录。</p> : null}
+        {!candidates.length && !candidateLoading ? <p className="text-xs text-stone-500">选择要添加的内容，原来的内容会保留在原处。</p> : null}
         {candidateCursor ? <Button variant="ghost" disabled={candidateLoading} onClick={() => void searchCandidates(candidateCursor)}>加载更多搜索结果</Button> : null}
         <Button variant="ghost" onClick={() => setPickerOpen(false)}>收起</Button>
       </section> : null}
 
       {taskOpen ? <form className="space-y-3 rounded-2xl border border-stone-200 p-4" onSubmit={event => void addTask(event)}>
-        <h3 className="font-semibold">在此容器中新建待办</h3>
-        <p className="text-xs text-stone-500">新建 LifeSpace Task 并立即关联；任务和关系原子保存。</p>
+        <h3 className="font-semibold">新建关联待办</h3>
+        <p className="text-xs text-stone-500">新建的待办会自动放到这里。</p>
         <label className="block text-sm font-medium">待办名称<input required maxLength={100} value={taskName} onChange={event => setTaskName(event.target.value)}
           className="mt-1 h-10 w-full rounded-xl border border-stone-200 px-3" /></label>
         <label className="block text-sm font-medium">截止日期（可选）<input type="date" value={taskDueDate} onChange={event => setTaskDueDate(event.target.value)}
@@ -326,7 +326,7 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
 
       {countdownOpen && modelKey === 'activity' ? <form className="space-y-3 rounded-2xl border border-stone-200 p-4" onSubmit={event => void addCountdown(event)}>
         <h3 className="font-semibold">新建关联倒计时</h3>
-        <p className="text-xs text-stone-500">创建独立 DayRecord（日子），同时关联到本活动；失败时两者都不保存。</p>
+        <p className="text-xs text-stone-500">新建的倒计时会同时显示在「日子」中。</p>
         <label className="block text-sm font-medium">倒计时名称<input required maxLength={100} value={countdownName} onChange={event => setCountdownName(event.target.value)}
           className="mt-1 h-10 w-full rounded-xl border border-stone-200 px-3" /></label>
         <label className="block text-sm font-medium">目标日期<input type="date" required value={countdownDate} onChange={event => setCountdownDate(event.target.value)}
