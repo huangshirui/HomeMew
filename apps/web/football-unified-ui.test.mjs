@@ -7,6 +7,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const page = read('./src/pages/football-page.tsx');
 const form = read('./src/pages/football-performance-sheet.tsx');
 const domain = read('./src/pages/football-domain.ts');
+const app = read('./src/app.tsx');
 const picker = read('./src/pages/football-person-picker.tsx');
 
 test('football module exposes only Record and Statistics as top-level navigation', () => {
@@ -14,7 +15,7 @@ test('football module exposes only Record and Statistics as top-level navigation
   assert.match(page, /name: '记录'/);
   assert.match(page, /name: '统计'/);
   assert.doesNotMatch(page, /label:'球队与赛事'/);
-  assert.match(page, /管理球队与赛事/);
+  assert.match(page, /navigate\('\/football\/manage'\)/);
 });
 
 test('quick actions only prepare a draft; explicit confirmation writes one performance', () => {
@@ -158,4 +159,39 @@ test('quick-record cards match the confirmed icon and neutral visual design', ()
   assert.match(domain, /appearance: '出场记录'/);
   assert.match(page, /出场记录/);
   assert.doesNotMatch(page, /出场片段/);
+});
+
+test('football filters reuse the Calendar/Tasks header standard and one global player selector', () => {
+  assert.match(page, /aria-controls="football-search-filters"/);
+  assert.match(page, /aria-expanded=\{filterOpen\}/);
+  assert.match(page, /搜索与筛选/);
+  assert.match(page, /新建比赛/);
+  assert.match(page, /aria-label="按年份筛选"/);
+  assert.match(page, /<option value="">全部年份<\/option>/);
+  assert.match(page, /whitespace-nowrap text-sm text-stone-600">球员/);
+  assert.doesNotMatch(page, /全部球员/);
+  assert.match(page, /playerPersonId: personId/);
+  assert.match(page, /重置筛选/);
+});
+
+test('team and competition management is a separate route with edit and protected delete', () => {
+  assert.match(app, /path="football\/manage" element=\{<FootballPage \/>}/);
+  assert.match(page, /navigate\('\/football\/manage'\)/);
+  assert.match(page, /navigate\('\/football'\)/);
+  assert.doesNotMatch(page, /showReferences/);
+  assert.match(page, /method: refEditing \? 'PATCH' : 'POST'/);
+  assert.match(page, /version: refEditing.version/);
+  assert.match(page, /iconDraftFor/);
+  assert.match(page, /deleteReference\(group.kind, item\)/);
+  assert.match(page, /filter: \{ field, op: 'contains', value: reference.id \}/);
+  assert.match(page, /page: \{ limit: 1 \}/);
+  assert.match(page, /已被比赛使用/);
+  assert.match(domain, /version: number; name: string; description/);
+});
+
+test('matches are a compact list, not full-height match cards', () => {
+  assert.match(page, /matches\.map\(m => <div/);
+  assert.match(page, /last:border-b-0/);
+  assert.doesNotMatch(page, /matches\.map\(m => <Card/);
+  assert.match(page, /加载更多比赛/);
 });
