@@ -48,7 +48,7 @@ function rememberPerson(spaceId: string, personId: string) {
 }
 
 export function FootballPage() {
-  const { currentFamily, members, loading: householdLoading } = useHousehold();
+  const { currentFamily, members, user, loading: householdLoading } = useHousehold();
   const navigate = useNavigate();
   const managing = useLocation().pathname.endsWith('/manage');
   const spaceId = currentFamily?.id;
@@ -477,7 +477,7 @@ export function FootballPage() {
               {canWrite && <Button variant="secondary" onClick={() => startReference(group.kind)}>
                 <Plus className="size-4"/> 新增{group.name}</Button>}
             </div>
-            <FootballReferencePicker spaceId={spaceId} model={group.model}
+            <FootballReferencePicker userId={user?.id ?? ''} spaceId={spaceId} model={group.model}
               label={'搜索定位' + group.name} optional known={group.items}
               value={managerFocus[group.kind]} onChange={id => void focusReference(group.kind, id)}/>
             <div className="divide-y divide-stone-100">
@@ -527,13 +527,13 @@ export function FootballPage() {
           <label className="min-w-32 flex-1 text-sm text-stone-600">比赛类型<select className={input}
             value={filters.matchType} onChange={e=>onFilter({matchType:e.target.value})}>
             <option value="">全部类型</option><option value="official">正式比赛</option><option value="friendly">友谊赛</option></select></label>
-          <FootballReferencePicker className="min-w-32 flex-1" spaceId={spaceId}
+          <FootballReferencePicker userId={user?.id ?? ''} className="min-w-32 flex-1" spaceId={spaceId}
             model="activity" label="赛事" optional known={competitions}
             value={filters.competitionActivityId} onChange={id => onFilter({competitionActivityId:id})}/>
-          <FootballReferencePicker className="min-w-32 flex-1" spaceId={spaceId}
+          <FootballReferencePicker userId={user?.id ?? ''} className="min-w-32 flex-1" spaceId={spaceId}
             model="person_group" label="代表球队" optional known={teams}
             value={filters.representativeTeamId} onChange={id => onFilter({representativeTeamId:id})}/>
-          <FootballReferencePicker className="min-w-32 flex-1" spaceId={spaceId}
+          <FootballReferencePicker userId={user?.id ?? ''} className="min-w-32 flex-1" spaceId={spaceId}
             model="person_group" label="对手球队" optional known={teams}
             value={filters.opponentTeamId} onChange={id => onFilter({opponentTeamId:id})}/>
           <Button variant="ghost" onClick={() => {setFilters({ ...blankFilters(), playerPersonId: personId }); setSearchInput(''); setAppliedSearch('');}}>重置筛选</Button>
@@ -713,13 +713,13 @@ export function FootballPage() {
               onChange={e=>setMatchForm({...matchForm,matchType:e.target.value as FootballMatchDraft['matchType']})}>
               <option value="official">正式比赛</option><option value="friendly">友谊赛</option></select></label>
           </div>
-          <FootballReferencePicker spaceId={spaceId} model="activity" label="赛事" optional
+          <FootballReferencePicker userId={user?.id ?? ''} spaceId={spaceId} model="activity" label="赛事" optional
             known={competitions} disabled={saving} value={matchForm.competitionActivityId}
             onChange={id=>setMatchForm(prev=>prev ? {...prev,competitionActivityId:id} : prev)}/>
           <Button variant="ghost" type="button" onClick={()=>startReference('competition')}>＋ 新建赛事</Button>
           <div className="grid grid-cols-2 gap-3">
             {(['representativeTeamId','opponentTeamId'] as const).map(k=><div className="min-w-0" key={k}>
-              <FootballReferencePicker spaceId={spaceId} model="person_group"
+              <FootballReferencePicker userId={user?.id ?? ''} spaceId={spaceId} model="person_group"
                 label={k === 'representativeTeamId' ? '代表球队' : '对手球队'}
                 known={teams} disabled={saving} value={matchForm[k]}
                 onChange={id=>setMatchForm(prev=>prev ? {...prev,[k]:id} : prev)}/>
