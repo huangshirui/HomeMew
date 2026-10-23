@@ -1008,7 +1008,7 @@ function EventEditor({
 
           {editing ? (
             <div className="grid gap-2 rounded-2xl bg-white p-4 text-xs text-stone-500 ring-1 ring-stone-200 sm:grid-cols-2">
-              <span className="flex items-center gap-1.5"><Clock3 className="size-3.5" /> 版本 {editing.version}</span>
+              
               <span className="sm:text-right">最后更新 {new Date(editing.updatedAt).toLocaleString('zh-CN')}</span>
             </div>
           ) : null}
