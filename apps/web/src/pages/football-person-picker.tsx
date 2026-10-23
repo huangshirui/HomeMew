@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import type { FamilyMember } from '../components/household-provider';
 import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import type { FootballPerson } from './football-domain';
 
 type Props = {
@@ -37,7 +38,7 @@ export function FootballPersonPicker({ spaceId, members, selected, onChange, mul
         '/api/lifespace/core/v1/spaces/' + encodeURIComponent(spaceId) + '/people?limit=50' +
         (query ? '&q=' + encodeURIComponent(query) : ''),
       ).then(result => { if (alive) { setPeople(result.items); setSearched(query); } })
-        .catch(error => { if (alive) { setSearched(''); setPeople([]); setFailure(error instanceof Error ? error.message : '搜索失败'); } })
+        .catch(error => { if (alive) { setSearched(''); setPeople([]); setFailure(householdErrorMessage(error, '搜索失败，请稍后重试。')); } })
         .finally(() => { if (alive) setBusy(false); });
     }, 220);
     return () => { alive = false; window.clearTimeout(timer); };
