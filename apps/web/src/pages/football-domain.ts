@@ -9,7 +9,7 @@ export type FootballMatch = {
 };
 export type FootballPerformance = {
   id: string; version: number; matchId: string; playerPersonId: string;
-  performanceType: string; goalMethod?: string | null; minutesPlayed?: number | null;
+  performanceType: string; goalMethod?: string | null; shotOutcome?: string | null; minutesPlayed?: number | null;
   position?: string | null; entryMode?: string | null; notes?: string | null;
 };
 export type FootballReference = {
@@ -24,7 +24,7 @@ export type FootballMatchDraft = {
   playerPersonIds: string[]; notes: string;
 };
 export type FootballPerformanceDraft = {
-  performanceType: string; playerPersonId: string; goalMethod: string;
+  performanceType: string; playerPersonId: string; goalMethod: string; shotOutcome: string;
   minutesPlayed: string; position: string; entryMode: string; notes: string;
 };
 export type SemanticField = { key: string; type: string; values?: string[]; title?: string; required?: boolean };
@@ -38,11 +38,23 @@ export const blankFilters = (): MatchFilter => ({
   competitionActivityId: '', playerPersonId: '',
 });
 export const commonTypes: Record<string, string> = {
-  goal: '进球', assist: '助攻', tackle: '抢断', interception: '拦截', appearance: '出场片段',
+  appearance: '出场片段',
+  goal: '进球', assist: '助攻', shot: '射门', key_pass: '关键传球',
+  successful_dribble: '成功过人', cross: '传中', penalty_won: '造点球',
+  tackle: '抢断', interception: '拦截', clearance: '解围', block: '封堵',
+  ball_recovery: '球权回收', aerial_duel_won: '争顶成功', pressure: '压迫',
+  save: '扑救', goalkeeper_claim: '出击控球', goalkeeper_punch: '击拳解围',
+  one_on_one_save: '单刀扑救',
+  yellow_card: '黄牌', red_card: '红牌', foul: '犯规', foul_won: '造犯规',
+  offside: '越位', own_goal: '乌龙球', critical_error: '致命失误',
+  highlight: '精彩表现',
 };
 export const goalMethods: Record<string, string> = {
   left_foot: '左脚', right_foot: '右脚', header: '头球', penalty: '点球',
   other: '其他', unknown: '不明',
+};
+export const shotOutcomes: Record<string, string> = {
+  on_target: '射正', off_target: '射偏', blocked: '被封堵', woodwork: '击中门框', unknown: '未知',
 };
 export const entryModes: Record<string, string> = {
   starter: '首发', substitute: '替补／再次登场', position_change: '场内换位',
@@ -90,12 +102,12 @@ export function matchPayload(draft: FootballMatchDraft) {
   };
 }
 export function blankPerformance(performanceType: string, playerPersonId: string): FootballPerformanceDraft {
-  return { performanceType, playerPersonId, goalMethod: '', minutesPlayed: '',
+  return { performanceType, playerPersonId, goalMethod: '', shotOutcome: '', minutesPlayed: '',
     position: '', entryMode: '', notes: '' };
 }
 export function performanceDraft(record: FootballPerformance): FootballPerformanceDraft {
   return { performanceType: record.performanceType, playerPersonId: record.playerPersonId,
-    goalMethod: record.goalMethod ?? '', minutesPlayed: record.minutesPlayed === null ||
+    goalMethod: record.goalMethod ?? '', shotOutcome: record.shotOutcome ?? '', minutesPlayed: record.minutesPlayed === null ||
       record.minutesPlayed === undefined ? '' : String(record.minutesPlayed),
     position: record.position ?? '', entryMode: record.entryMode ?? '', notes: record.notes ?? '' };
 }
@@ -105,18 +117,27 @@ export function performancePayload(draft: FootballPerformanceDraft, matchId: str
   if (!draft.playerPersonId) throw Error('请选择球员');
   const common = { matchId, playerPersonId: draft.playerPersonId,
     performanceType: draft.performanceType, notes: draft.notes.trim() || null };
+  // Older published definitions may not have shotOutcome yet; never send undeclared fields.
+  const outcomes = enumOptions(schema, 'shotOutcome');
+  if (draft.performanceType === 'shot' && draft.shotOutcome && !outcomes.includes(draft.shotOutcome)) {
+    throw Error('射门结果不在已发布模型中');
+  }
+  const optionalShotOutcome = outcomes.length
+    ? { shotOutcome: draft.performanceType === 'shot' ? draft.shotOutcome || null : null } : {};
   if (draft.performanceType === 'goal') {
     if (draft.goalMethod && !enumOptions(schema, 'goalMethod').includes(draft.goalMethod)) throw Error('进球方式不在已发布模型中');
-    return { ...common, goalMethod: draft.goalMethod || null, minutesPlayed: null, position: null, entryMode: null };
+    return { ...common, ...optionalShotOutcome, goalMethod: draft.goalMethod || null,
+      minutesPlayed: null, position: null, entryMode: null };
   }
   if (draft.performanceType === 'appearance') {
     const minutes = draft.minutesPlayed === '' ? null : Number(draft.minutesPlayed);
     if (minutes !== null && (!Number.isInteger(minutes) || minutes < 0)) throw Error('本段时长必须为非负整数');
     if (draft.entryMode && !enumOptions(schema, 'entryMode').includes(draft.entryMode)) throw Error('进入方式不在已发布模型中');
-    return { ...common, goalMethod: null, minutesPlayed: minutes,
+    return { ...common, ...optionalShotOutcome, goalMethod: null, minutesPlayed: minutes,
       position: draft.position.trim() || null, entryMode: draft.entryMode || null };
   }
-  return { ...common, goalMethod: null, minutesPlayed: null, position: null, entryMode: null };
+  return { ...common, ...optionalShotOutcome, goalMethod: null,
+    minutesPlayed: null, position: null, entryMode: null };
 }
 export function matchQueryFilter(filters: MatchFilter, includePlayer = true): CanonicalQueryFilter | undefined {
   const clauses: CanonicalQueryFilter[] = [];
@@ -146,6 +167,13 @@ export async function queryAllBounded<T>(spaceId: string, model: string, query: 
 export function countAppearances(matches: FootballMatch[], playerId: string): number {
   return matches.filter(m => m.playerPersonIds?.includes(playerId)).length;
 }
+// Record one event per action; overlapping statistical categories are derived, not extra records.
+export function performanceEventCount(events: FootballPerformance[], type: string): number {
+  const countedTypes = type === 'shot' ? ['shot', 'goal']
+    : type === 'key_pass' ? ['key_pass', 'assist']
+      : type === 'save' ? ['save', 'one_on_one_save'] : [type];
+  return events.filter(e => countedTypes.includes(e.performanceType)).length;
+}
 export function metricValue(metric: string, matches: FootballMatch[], events: FootballPerformance[], playerId: string): number | null {
   const matchIds = new Set(matches.filter(m => m.playerPersonIds?.includes(playerId)).map(m => m.id));
   const relevant = events.filter(e => e.playerPersonId === playerId && matchIds.has(e.matchId));
@@ -162,7 +190,7 @@ export function metricValue(metric: string, matches: FootballMatch[], events: Fo
       ? segments.reduce((sum, e) => sum + (e.minutesPlayed ?? 0), 0) : null;
   }
   const type = metric.startsWith('type:') ? metric.slice(5) : metric;
-  return relevant.filter(e => e.performanceType === type).length;
+  return performanceEventCount(relevant, type);
 }
 export async function readPerformanceSchema(spaceId: string): Promise<PerformanceSchema> {
   const result = await apiRequest<PerformanceSchema>(
