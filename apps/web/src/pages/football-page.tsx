@@ -255,8 +255,11 @@ export function FootballPage() {
     } catch (e) { setError(message(e)); }
     finally { setSaving(false); }
   }
-  function startReference(kind: ReferenceKind, target: 'representativeTeamId' | 'opponentTeamId' | null = null) {
-    setQuickRef(kind); setRefTarget(target); setRefName(''); setRefIcon(emptyIconDraft()); setFormError('');
+  function startReference(kind: ReferenceKind, target: 'representativeTeamId' | 'opponentTeamId' | null = null,
+    record: FootballReference | null = null) {
+    setQuickRef(kind); setRefTarget(target); setRefEditing(record);
+    setRefName(record?.name ?? ''); setRefDescription(record?.description ?? '');
+    setRefIcon(iconDraftFor(record?.presentation?.icon)); setFormError('');
   }
   async function saveReference(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -265,24 +268,58 @@ export function FootballPage() {
     setSaving(true); setFormError('');
     try {
       const key = quickRef === 'team' ? 'person_group' : 'activity';
-      const presentation = await presentationToSave(spaceId, key, refIcon);
-      const ref = await apiRequest<FootballReference>(modelUrl(spaceId, key), {
-        method: 'POST', body: JSON.stringify(quickRef === 'team'
-          ? { name: refName.trim(), description: null, memberPersonIds: [], ...presentation }
-          : { name: refName.trim(), description: null, attendeePersonIds: [],
-            startDate: null, endDate: null, ...presentation }),
+      const presentation = await presentationToSave(spaceId, key, refIcon, refEditing?.presentation?.icon);
+      const body = refEditing
+        ? { name: refName.trim(), description: refDescription.trim() || null, version: refEditing.version, ...presentation }
+        : quickRef === 'team'
+          ? { name: refName.trim(), description: refDescription.trim() || null, memberPersonIds: [], ...presentation }
+          : { name: refName.trim(), description: refDescription.trim() || null, attendeePersonIds: [],
+              startDate: null, endDate: null, ...presentation };
+      const ref = await apiRequest<FootballReference>(modelUrl(spaceId, key, refEditing?.id), {
+        method: refEditing ? 'PATCH' : 'POST', body: JSON.stringify(body),
       });
       if (quickRef === 'team') {
-        setTeams(prev => [...prev, ref]);
+        setTeams(prev => refEditing ? prev.map(t => t.id === ref.id ? ref : t) : [...prev, ref]);
         if (refTarget) setMatchForm(prev => prev ? { ...prev, [refTarget]: ref.id } : prev);
       } else {
-        setCompetitions(prev => [...prev, ref]);
+        setCompetitions(prev => refEditing ? prev.map(t => t.id === ref.id ? ref : t) : [...prev, ref]);
         setMatchForm(prev => prev ? { ...prev, competitionActivityId: ref.id } : prev);
       }
-      setQuickRef(null); setRefName(''); setRefIcon(emptyIconDraft());
+      setQuickRef(null); setRefEditing(null); setRefName(''); setRefDescription(''); setRefIcon(emptyIconDraft());
+      setSuccess(refEditing ? '已更新' + (quickRef === 'team' ? '球队' : '赛事') : '已新增' + (quickRef === 'team' ? '球队' : '赛事'));
     } catch (e) { setFormError(message(e)); }
     finally { setSaving(false); }
   }
+
+  async function deleteReference(kind: ReferenceKind, reference: FootballReference) {
+    if (!spaceId || !canWrite || saving || !reference.version) return;
+    const name = kind === 'team' ? '球队' : '赛事';
+    const fields = kind === 'team' ? ['representativeTeamId', 'opponentTeamId'] : ['competitionActivityId'];
+    setSaving(true); setError('');
+    try {
+      for (const field of fields) {
+        const result = await queryModelRecords<FootballMatch>(spaceId, 'football_match', {
+          filter: { field, op: 'contains', value: reference.id }, page: { limit: 1 },
+        });
+        if (result.items.length) throw Error('此' + name + '已被比赛使用，请先调整关联比赛后再删除');
+      }
+      if (!window.confirm('确认删除' + name + '“' + reference.name + '”？此记录可能也被其他模块引用。')) return;
+      await apiRequest(modelUrl(spaceId, kind === 'team' ? 'person_group' : 'activity', reference.id), {
+        method: 'DELETE', body: JSON.stringify({ version: reference.version }),
+      });
+      if (kind === 'team') setTeams(prev => prev.filter(item => item.id !== reference.id));
+      else setCompetitions(prev => prev.filter(item => item.id !== reference.id));
+      setSuccess(name + '已删除');
+    } catch (cause) { setError(message(cause)); }
+    finally { setSaving(false); }
+  }
+
+  const yearOptions = useMemo(() => {
+    const now = new Date().getFullYear();
+    return Array.from(new Set([filters.year, ...matches.map(m => m.matchDate.slice(0, 4)),
+      ...Array.from({ length: 35 }, (_, i) => String(now - i))].filter(Boolean)))
+      .sort((a, b) => Number(b) - Number(a));
+  }, [filters.year, matches]);
 
   const types = schema ? enumOptions(schema, 'performanceType') : [];
   const moreTypes = types.filter(t => !quickTypes.includes(t) && t !== 'appearance');
@@ -406,42 +443,35 @@ export function FootballPage() {
         </div>
       </div>}
       {tab === 'record' && !selected && <>
-        {showReferences && <div className="grid gap-3 md:grid-cols-2">
-          <Card className="space-y-3 p-4"><div className="flex items-center justify-between">
-            <h2 className="font-semibold">球队</h2>{canWrite && <Button variant="secondary" onClick={()=>startReference('team')}><Plus className="size-4"/> 新增</Button>}</div>
-            <div className="max-h-52 space-y-2 overflow-y-auto">{teams.map(t=><p key={t.id} className="text-sm text-stone-600">{t.name}</p>)}</div>
-          </Card>
-          <Card className="space-y-3 p-4"><div className="flex items-center justify-between">
-            <h2 className="font-semibold">赛事</h2>{canWrite && <Button variant="secondary" onClick={()=>startReference('competition')}><Plus className="size-4"/> 新增</Button>}</div>
-            <div className="max-h-52 space-y-2 overflow-y-auto">{competitions.map(t=><p key={t.id} className="text-sm text-stone-600">{t.name}</p>)}</div>
-          </Card>
-        </div>}
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">比赛记录</h2>
           <Button variant="ghost" onClick={()=>void loadMatchPage(null,false)}><RefreshCw className="size-4"/> 刷新</Button>
         </div>
         {loading && matches.length===0 && <Card className="p-6 text-sm text-stone-500">正在查询比赛…</Card>}
-        <div className="space-y-2">
-          {matches.map(m => <Card key={m.id} className="space-y-2 p-3 sm:p-4">
-            <p className="text-xs text-stone-400">{m.matchDate} · {m.matchType === 'official' ? '正式比赛' : '友谊赛'} · {competitionNames.get(m.competitionActivityId ?? '') ?? '未关联赛事'}</p>
-            <div className="flex items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-1 text-sm font-medium">
+        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+          {matches.map(m => <div key={m.id}
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-stone-100 px-3 py-3 last:border-b-0 sm:flex-nowrap sm:px-4">
+            <div className="w-28 shrink-0 text-xs text-stone-500">
+              <p className="font-medium text-stone-700">{m.matchDate}</p>
+              <p>{m.matchType === 'official' ? '正式' : '友谊赛'}</p>
+            </div>
+            <div className="min-w-0 flex-[1_1_220px]">
+              <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
                 {teamRecords.get(m.representativeTeamId)?.presentation?.icon &&
                   <RecordIconMark icon={teamRecords.get(m.representativeTeamId)!.presentation!.icon!}
                     spaceId={spaceId} modelKey="person_group" recordId={m.representativeTeamId}/>}
-                <span className="truncate">{teamNames.get(m.representativeTeamId) ?? '代表球队'}</span>
+                <span className="min-w-0 truncate">{teamNames.get(m.representativeTeamId) ?? '代表球队'}</span>
+                <strong className="shrink-0 whitespace-nowrap font-semibold tabular-nums">{m.representativeTeamScore ?? '–'} : {m.opponentTeamScore ?? '–'}</strong>
+                <span className="min-w-0 truncate">{teamNames.get(m.opponentTeamId) ?? '对手球队'}</span>
               </div>
-              <strong className="whitespace-nowrap text-lg tabular-nums">{m.representativeTeamScore ?? '–'} : {m.opponentTeamScore ?? '–'}</strong>
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-1 text-sm font-medium">
-                <span className="truncate">{teamNames.get(m.opponentTeamId) ?? '对手球队'}</span>
-              </div>
+              {m.competitionActivityId && <p className="truncate text-xs text-stone-400">{competitionNames.get(m.competitionActivityId) ?? '关联赛事'}</p>}
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="primary" onClick={()=>{setSelected(m);setSuccess('');}}>进入记录</Button>
-              {canWrite && <Button variant="ghost" onClick={()=>startMatch(m)}>编辑比赛</Button>}
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <Button variant="secondary" className="h-9 px-3" onClick={() => {setSelected(m);setSuccess('');}}>记录</Button>
+              {canWrite && <Button variant="ghost" className="h-9 px-2" onClick={()=>startMatch(m)}>编辑</Button>}
             </div>
-          </Card>)}
-          {!loading && !matches.length && <Card className="p-8 text-sm text-stone-500">当前范围没有比赛；可以新建比赛或调整筛选。</Card>}
+          </div>)}
+          {!loading && !matches.length && <p className="p-8 text-center text-sm text-stone-500">当前范围没有比赛；可以新建比赛或调整筛选。</p>}
         </div>
         {nextCursor && <Button className="w-full" variant="secondary" disabled={loading} onClick={()=>void loadMatchPage(nextCursor,true)}>加载更多比赛</Button>}
       </>}
@@ -626,12 +656,18 @@ export function FootballPage() {
     {quickRef && spaceId && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6">
       <form role="dialog" aria-modal="true" aria-label="新增球队或赛事" onSubmit={saveReference}
         className="w-full max-w-sm space-y-4 rounded-t-3xl bg-white p-5 sm:rounded-3xl">
-        <div className="flex items-center justify-between"><h2 className="font-semibold">新建{quickRef==='team'?'球队':'赛事'}</h2>
+        <div className="flex items-center justify-between"><h2 className="font-semibold">{refEditing ? '编辑' : '新建'}{quickRef==='team'?'球队':'赛事'}</h2>
           <Button variant="ghost" type="button" disabled={saving} onClick={()=>setQuickRef(null)}><X className="size-4"/></Button></div>
         <div className="flex gap-2">
-          <RecordIconField spaceId={spaceId} modelKey={quickRef==='team'?'person_group':'activity'} icon={refIcon} onChange={setRefIcon}/>
+          <RecordIconField spaceId={spaceId} modelKey={quickRef==='team'?'person_group':'activity'} icon={refIcon}
+            recordId={refEditing?.id} original={refEditing?.presentation?.icon} onChange={setRefIcon}/>
           <label className={label + ' flex-1'}>名称 *<input className={input} required value={refName} onChange={e=>setRefName(e.target.value)}/></label>
         </div>
+        <label className={label}>说明（可选）
+          <textarea className="min-h-20 w-full rounded-xl border border-stone-200 p-3 text-sm"
+            maxLength={quickRef === 'team' ? 2000 : 5000} value={refDescription}
+            onChange={e => setRefDescription(e.target.value)}/>
+        </label>
         {formError && <p role="alert" className="text-sm text-red-700">{formError}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="secondary" type="button" disabled={saving} onClick={()=>setQuickRef(null)}>取消</Button>
