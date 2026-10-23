@@ -522,7 +522,7 @@ export function FootballPage() {
         onChange={ids => {if (ids[0]) selectPerson(ids[0]); setPlayerSearchOpen(false);}}
         onCreate={canWrite ? name => startPlayer(name) : undefined}/>
     </Card>}
-    {success && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>
+    {success && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!managing && schemaError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
       当前 LifeSpace 环境尚不能读取足球表现模型；比赛资料仍可查看和编辑，新增表现要先在 LifeSpace 发布 football_performance 并授权。{schemaError}
