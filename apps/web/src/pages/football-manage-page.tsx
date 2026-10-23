@@ -39,12 +39,13 @@ export function FootballManagePage() {
   const [teamDraft, setTeamDraft] = useState<TeamDraft | null>(null);
   const [editingPerson, setEditingPerson] = useState<EditablePerson | null>(null);
   const [personDraft, setPersonDraft] = useState('');
+  const [personDialogOpen, setPersonDialogOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const familyPersonIds = useMemo(() => new Set(members.map(item => item.personId).filter(Boolean)), [members]);
   const editablePlayers = players.filter(p => !p.linkedUser && !familyPersonIds.has(p.id));
-  useModalScrollLock(Boolean(teamDraft || personDraft));
+  useModalScrollLock(Boolean(teamDraft || personDialogOpen));
 
   // Show actual football-used and device-recent teams, not every PersonGroup in the Space.
   useEffect(() => {
@@ -128,7 +129,7 @@ export function FootballManagePage() {
     finally { setBusy(false); }
   };
   const startPlayer = (record?: EditablePerson) => {
-    setEditingPerson(record ?? null); setPersonDraft(record?.displayName ?? ''); setError('');
+    setEditingPerson(record ?? null); setPersonDraft(record?.displayName ?? ''); setPersonDialogOpen(true); setError('');
   };
   const savePlayer = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -144,7 +145,7 @@ export function FootballManagePage() {
           ...(editingPerson ? { version: editingPerson.version } : {}) }),
       });
       setPlayers(prev => [...new Map([...prev.filter(x => x.id !== person.id), person].map(x => [x.id, x])).values()]);
-      setEditingPerson(null); setPersonDraft(''); setSuccess('球员已保存');
+      setEditingPerson(null); setPersonDraft(''); setPersonDialogOpen(false); setSuccess('球员已保存');
     } catch (cause) { setError(failure(cause)); }
     finally { setBusy(false); }
   };
@@ -255,7 +256,7 @@ export function FootballManagePage() {
         </div>
       </form>
     </div>}
-    {personDraft !== '' || editingPerson ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 sm:items-center sm:p-6">
+    {personDialogOpen ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 sm:items-center sm:p-6">
       <form role="dialog" aria-modal="true" aria-label="编辑球员" className="w-full max-w-md space-y-3 rounded-t-3xl bg-white p-5 sm:rounded-3xl"
         onSubmit={savePlayer}>
         <h2 className="font-semibold">{editingPerson ? '编辑球员' : '新建球员'}</h2>
@@ -265,7 +266,7 @@ export function FootballManagePage() {
         </label>
         <p className="text-xs text-stone-500">创建非家庭成员 Space Person，不自动加入家庭，也不产生登录账号。</p>
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" type="button" disabled={busy} onClick={() => {setPersonDraft('');setEditingPerson(null);}}>取消</Button>
+          <Button variant="secondary" type="button" disabled={busy} onClick={() => {setPersonDraft('');setEditingPerson(null);setPersonDialogOpen(false);}}>取消</Button>
           <Button variant="primary" type="submit" disabled={busy}>保存</Button>
         </div>
       </form>
