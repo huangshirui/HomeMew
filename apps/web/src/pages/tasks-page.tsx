@@ -7,7 +7,8 @@ import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { PageHeader } from '../components/ui/page-header';
 import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords, type CanonicalQueryFilter, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type TaskRecord = {
@@ -49,8 +50,7 @@ function addDateDays(value: string, days: number) {
 }
 
 function messageOf(cause: unknown, fallback: string) {
-  if (cause instanceof ApiError) return `${cause.message}${cause.requestId ? ` · ${cause.requestId}` : ''}`;
-  return cause instanceof Error ? cause.message : fallback;
+  return householdErrorMessage(cause, fallback);
 }
 
 function draftFromTask(task: TaskRecord): TaskDraft {
