@@ -377,7 +377,7 @@ export function FootballPage() {
           </Card>)}
           {!loading && !matches.length && <Card className="p-8 text-sm text-stone-500">当前范围没有比赛；可以新建比赛或调整筛选。</Card>}
         </div>
-        {nextCursor && <Button block variant="secondary" disabled={loading} onClick={()=>void loadMatchPage(nextCursor,true)}>加载更多比赛</Button>}
+        {nextCursor && <Button className="w-full" variant="secondary" disabled={loading} onClick={()=>void loadMatchPage(nextCursor,true)}>加载更多比赛</Button>}
       </>}
       {tab === 'record' && selected && <>
         <div className="flex items-center gap-2">
@@ -403,7 +403,7 @@ export function FootballPage() {
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {quickTypes.filter(t => types.includes(t)).map(t =>
-              <Button key={t} size="lg" variant={t === 'goal' || t === 'assist' ? 'primary' : 'secondary'}
+              <Button key={t} className="h-12 flex-1" variant={t === 'goal' || t === 'assist' ? 'primary' : 'secondary'}
                 disabled={!canWrite || !personId || saving} onClick={()=>startPerformance(t)}>
                 <Plus className="size-4"/> {performanceTitle(t)}
               </Button>)}
@@ -445,7 +445,7 @@ export function FootballPage() {
                 {p.notes ? ' · ' + p.notes : ''}
               </p>
             </div>
-            {canWrite && <Button variant="ghost" size="sm" onClick={()=>startPerformance(p.performanceType,p)}>编辑</Button>}
+            {canWrite && <Button variant="ghost" onClick={()=>startPerformance(p.performanceType,p)}>编辑</Button>}
             {canWrite && <Button variant="ghost" size="icon" disabled={saving}
               aria-label="删除表现" onClick={()=>void deleteRecord('football_performance',p.id,p.version)}><Trash2 className="size-4"/></Button>}
           </div>)}
