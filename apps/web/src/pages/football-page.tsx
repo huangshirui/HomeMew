@@ -6,7 +6,8 @@ import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presenta
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { PageHeader } from '../components/ui/page-header';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { FootballPersonPicker } from './football-person-picker';
@@ -34,8 +35,7 @@ const quickActionIcons: Record<string, string> = {
 type ReferenceKind = 'team' | 'competition';
 
 function message(cause: unknown): string {
-  return cause instanceof ApiError ? cause.message + (cause.requestId ? ' · ' + cause.requestId : '')
-    : cause instanceof Error ? cause.message : '请求失败';
+  return householdErrorMessage(cause, '操作失败，请稍后再试。');
 }
 function matchLabel(m: FootballMatch, teams: Map<string, string>): string {
   return (teams.get(m.representativeTeamId) ?? '代表球队') + ' vs ' + (teams.get(m.opponentTeamId) ?? '对方球队');
