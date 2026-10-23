@@ -195,3 +195,11 @@ test('matches are a compact list, not full-height match cards', () => {
   assert.doesNotMatch(page, /matches\.map\(m => <Card/);
   assert.match(page, /加载更多比赛/);
 });
+
+test('football search uses the published FootballMatch notes searchable field', () => {
+  assert.match(page, /placeholder="搜索比赛备注"/);
+  assert.match(page, /role="search"/);
+  assert.match(page, /search: \{ text: appliedSearch \}/);
+  assert.match(page, /setAppliedSearch\(searchInput\.trim\(\)\)/);
+  assert.match(page, /setAppliedSearch\(''\)/);
+});
