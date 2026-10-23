@@ -9,7 +9,8 @@ import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { WeekTimeGrid } from '../components/week-time-grid';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { Card } from '../components/ui/card';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 
 type TemporalRange =
@@ -250,8 +251,7 @@ function timeLabel(event: EventRecord, timeZone: string) {
 }
 
 function messageOf(cause: unknown, fallback: string) {
-  if (cause instanceof ApiError) return `${cause.message}${cause.requestId ? ` · ${cause.requestId}` : ''}`;
-  return cause instanceof Error ? cause.message : fallback;
+  return householdErrorMessage(cause, fallback);
 }
 
 export function CalendarPage() {
