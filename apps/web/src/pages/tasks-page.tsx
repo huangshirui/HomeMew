@@ -513,7 +513,7 @@ function TaskEditor({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '待办详情' : '编辑待办') : '新建待办'}</p>
-            {editing ? <p className="mt-1 text-xs text-stone-500">版本 {editing.version}</p> : null}
+            
           </div>
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
