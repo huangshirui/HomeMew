@@ -136,7 +136,7 @@ export function IntegrationsPage() {
             <div>
               <h2 className="text-lg font-semibold text-stone-900">新建外部系统</h2>
               <p className="mt-1 text-sm leading-6 text-stone-500">
-                这里只创建 HomeMew 的系统容器，不会自动创建 Service Principal、Agent、凭据、Data Grant 或 Webhook。
+                先填写外部系统的信息，保存后再设置连接方式和使用权限。
               </p>
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
@@ -183,7 +183,7 @@ export function IntegrationsPage() {
       ) : manager ? (
         <Card className="p-8 text-center">
           <p className="font-medium text-stone-800">还没有外部系统</p>
-          <p className="mt-2 text-sm text-stone-500">可以先创建自动化平台、后端服务、Agent Runtime 等系统，再逐项开启需要的接入能力。</p>
+          <p className="mt-2 text-sm text-stone-500">添加要连接的服务后，就可以逐项设置需要的功能。</p>
         </Card>
       ) : null}
     </div>
