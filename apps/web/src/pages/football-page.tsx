@@ -63,6 +63,10 @@ export function FootballPage() {
   const [schemaError, setSchemaError] = useState('');
   const [teams, setTeams] = useState<FootballReference[]>([]);
   const [competitions, setCompetitions] = useState<FootballReference[]>([]);
+  const [teamCursor, setTeamCursor] = useState<string | null>(null);
+  const [competitionCursor, setCompetitionCursor] = useState<string | null>(null);
+  const [referenceLoading, setReferenceLoading] = useState(false);
+  const [managerFocus, setManagerFocus] = useState<{ team: string; competition: string }>({team:'', competition:''});
   const [personId, setPersonId] = useState('');
   const [filters, setFilters] = useState<MatchFilter>(blankFilters);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -96,6 +100,7 @@ export function FootballPage() {
   const statsReq = useRef(0);
   const eventReq = useRef(0);
   const refsReq = useRef(0);
+  const attemptedRefLookup = useRef(new Set<string>());
   const schemaReq = useRef(0);
   const teamNames = useMemo(() => new Map(teams.map(t => [t.id, t.name])), [teams]);
   const teamRecords = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
@@ -124,6 +129,8 @@ export function FootballPage() {
   }
   useEffect(() => {
     setSelected(null); setPerformances([]); setEventsError(''); setMatches([]); setNextCursor(null);
+    setTeams([]); setCompetitions([]); setTeamCursor(null); setCompetitionCursor(null);
+    setManagerFocus({team:'',competition:''}); attemptedRefLookup.current.clear();
     setMoreOpen(false);
     setMatchForm(null); setPerformanceForm(null); setSuccess(''); setError('');
   }, [spaceId]);
@@ -137,15 +144,80 @@ export function FootballPage() {
 
   useEffect(() => {
     if (!spaceId) return;
-    const id = ++refsReq.current;
+    const request = ++refsReq.current;
+    // Lists are only a small first page. Searchable pickers use server queries, not full-table materialization.
     Promise.all([
-      queryAllBounded<FootballReference>(spaceId, 'person_group', { sort: [{ field: 'name', direction: 'asc' }] }, 4),
-      queryAllBounded<FootballReference>(spaceId, 'activity', { sort: [{ field: 'startDate', direction: 'desc' }] }, 4),
+      queryModelRecords<FootballReference>(spaceId, 'person_group', {
+        sort: [{ field: 'name', direction: 'asc' }], page: { limit: 50 },
+      }),
+      queryModelRecords<FootballReference>(spaceId, 'activity', {
+        sort: [{ field: 'name', direction: 'asc' }], page: { limit: 50 },
+      }),
     ]).then(([t, a]) => {
-      if (refsReq.current !== id) return;
-      setTeams(t); setCompetitions(a);
-    }).catch(e => { if (refsReq.current === id) setError(message(e)); });
+      if (refsReq.current !== request) return;
+      setTeams(prev => [...new Map([...prev, ...t.items].map(item => [item.id, item])).values()]);
+      setCompetitions(prev => [...new Map([...prev, ...a.items].map(item => [item.id, item])).values()]);
+      setTeamCursor(t.nextCursor); setCompetitionCursor(a.nextCursor);
+    }).catch(e => { if (refsReq.current === request) setError(message(e)); });
   }, [spaceId, refresh]);
+
+  async function loadMoreReferences(kind: ReferenceKind) {
+    if (!spaceId || referenceLoading) return;
+    const cursor = kind === 'team' ? teamCursor : competitionCursor;
+    if (!cursor) return;
+    setReferenceLoading(true); setError('');
+    try {
+      const result = await queryModelRecords<FootballReference>(
+        spaceId, kind === 'team' ? 'person_group' : 'activity',
+        { sort: [{ field: 'name', direction: 'asc' }], page: { limit: 50, cursor } },
+      );
+      if (kind === 'team') {
+        setTeams(prev => [...new Map([...prev, ...result.items].map(item => [item.id, item])).values()]);
+        setTeamCursor(result.nextCursor);
+      } else {
+        setCompetitions(prev => [...new Map([...prev, ...result.items].map(item => [item.id, item])).values()]);
+        setCompetitionCursor(result.nextCursor);
+      }
+    } catch (cause) { setError(message(cause)); }
+    finally { setReferenceLoading(false); }
+  }
+
+  async function focusReference(kind: ReferenceKind, id: string) {
+    setManagerFocus(prev => ({...prev, [kind]: id}));
+    if (!id || !spaceId) return;
+    const items = kind === 'team' ? teams : competitions;
+    if (items.some(item => item.id === id)) return;
+    try {
+      const record = await apiRequest<FootballReference>(
+        modelUrl(spaceId, kind === 'team' ? 'person_group' : 'activity', id));
+      if (kind === 'team') setTeams(prev => [...prev, record]);
+      else setCompetitions(prev => [...prev, record]);
+    } catch (cause) { setError(message(cause)); }
+  }
+
+  useEffect(() => {
+    if (!spaceId || !matches.length) return;
+    const knownTeams = new Set(teams.map(x => x.id));
+    const knownCompetitions = new Set(competitions.map(x => x.id));
+    const needsTeams = [...new Set(matches.flatMap(m => [m.representativeTeamId, m.opponentTeamId]))]
+      .filter(id => id && !knownTeams.has(id) && !attemptedRefLookup.current.has('team:' + id));
+    const needsCompetitions = [...new Set(matches.map(m => m.competitionActivityId).filter((id): id is string => !!id))]
+      .filter(id => !knownCompetitions.has(id) && !attemptedRefLookup.current.has('competition:' + id));
+    for (const id of needsTeams) attemptedRefLookup.current.add('team:' + id);
+    for (const id of needsCompetitions) attemptedRefLookup.current.add('competition:' + id);
+    let active = true;
+    void Promise.all([
+      Promise.all(needsTeams.slice(0, 80).map(id => apiRequest<FootballReference>(modelUrl(spaceId, 'person_group', id)).catch(() => null))),
+      Promise.all(needsCompetitions.slice(0, 40).map(id => apiRequest<FootballReference>(modelUrl(spaceId, 'activity', id)).catch(() => null))),
+    ]).then(([fetchedTeams, fetchedCompetitions]) => {
+      if (!active) return;
+      const newTeams = fetchedTeams.filter((item): item is FootballReference => item !== null);
+      const newCompetitions = fetchedCompetitions.filter((item): item is FootballReference => item !== null);
+      if (newTeams.length) setTeams(prev => [...new Map([...prev, ...newTeams].map(x => [x.id, x])).values()]);
+      if (newCompetitions.length) setCompetitions(prev => [...new Map([...prev, ...newCompetitions].map(x => [x.id, x])).values()]);
+    });
+    return () => { active = false; };
+  }, [spaceId, matches, teams, competitions]);
 
   const loadMatchPage = useCallback(async (cursor: string | null, append: boolean) => {
     if (!spaceId) return;
@@ -403,8 +475,11 @@ export function FootballPage() {
               {canWrite && <Button variant="secondary" onClick={() => startReference(group.kind)}>
                 <Plus className="size-4"/> 新增{group.name}</Button>}
             </div>
+            <FootballReferencePicker spaceId={spaceId} model={group.model}
+              label={'搜索定位' + group.name} optional known={group.items}
+              value={managerFocus[group.kind]} onChange={id => void focusReference(group.kind, id)}/>
             <div className="divide-y divide-stone-100">
-              {group.items.map(item => <div key={item.id} className="flex min-h-14 items-center gap-3 py-2">
+              {group.items.filter(item => !managerFocus[group.kind] || item.id === managerFocus[group.kind]).map(item => <div key={item.id} className="flex min-h-14 items-center gap-3 py-2">
                 {item.presentation?.icon && <RecordIconMark icon={item.presentation.icon}
                   spaceId={spaceId} modelKey={group.model} recordId={item.id}/>}
                 <div className="min-w-0 flex-1">
@@ -419,6 +494,9 @@ export function FootballPage() {
               </div>)}
               {!group.items.length && <p className="py-5 text-center text-sm text-stone-500">暂无{group.name}</p>}
             </div>
+            {!managerFocus[group.kind] && (group.kind === 'team' ? teamCursor : competitionCursor) &&
+              <Button variant="secondary" className="w-full" disabled={referenceLoading}
+                onClick={() => void loadMoreReferences(group.kind)}>加载更多{group.name}</Button>}
           </Card>)}
       </div>
     </div>}
