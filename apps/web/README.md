@@ -316,3 +316,7 @@ The same HomeMew Web Worker project has two independently deployed code versions
 Mini development/trial/release always use `https://homemew.aisr.online` and the Production Mini BFF. Staging-only Web testing happens on the protected Cloudflare Worker Preview URL, with its own staging credential and Web session secret.
 
 See `docs/decisions/2026-10-22-fixed-deployment-environments.md` and `docs/runbooks/2026-10-22-web-preview-and-environment-routing.md`.
+
+### 足球球队和赛事本机最近选择
+Web 足球表单/筛选的球队、赛事支持最近使用候选。按登录用户、家庭 Space、模型存储最近 12 条（90 天）；× 仅删除本机缓存，不删记录。选择缓存需重新按 ID 验证 LifeSpace 权限；Web 与小程序不跨设备自动同步。缓存不定义业务目录。
+
