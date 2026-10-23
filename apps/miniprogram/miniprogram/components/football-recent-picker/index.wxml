@@ -1,0 +1,12 @@
+<view wx:if="{{recent.length}}" class="football-recents">
+  <text class="football-recents-title">本机最近选择 · × 仅移除缓存</text>
+  <view class="football-recents-list">
+    <view wx:for="{{recent}}" wx:key="id" class="football-recent-row">
+      <button class="football-recent-select" data-id="{{item.id}}" bindtap="onPick">
+        <text class="football-recent-name">{{item.name}}</text>
+      </button>
+      <button class="football-recent-remove" data-id="{{item.id}}" catchtap="onForget"
+        aria-label="从本机缓存移除{{item.name}}">×</button>
+    </view>
+  </view>
+</view>
