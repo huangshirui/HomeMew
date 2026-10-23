@@ -119,7 +119,7 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 
 ### PersonGroup / Activity 类型枚举建议（仅提案，未获平台开发授权）
 
-- **PersonGroup.type**: 建议 `sports_team`（运动队）、`class`（班级）、`work_team`（工作团队）、`interest_group`（兴趣小组）、`other`（其他）。不要使用 `family` 来表达 LifeSpace Space 的家庭分类，也不要让 type 成为授权身份或独立模型。足球球队筛选 `sports_team`；明确 `club` 与运动队可能重叠，首版不另建枚举项。
+- **PersonGroup.type**: 建议 `team`（团队，包括足球队）、`class`（班级）、`organization`（组织）、`community`（社群/兴趣群体）、`other`（其他）。避免把 sports_team / work_team 按应用拆成同义枚举。不要使用 `family` 来表达 LifeSpace Space 的家庭分类，也不要让 type 成为授权身份或独立模型。足球球队筛选 `team`。
 - **Activity.type**: 建议 `competition`（赛事）、`trip`（旅行）、`camp`（营地/集训）、`gathering`（聚会/集体活动）、`learning`（学习活动）、`other`（其他）。足球赛事筛选 `competition`；不要把一场 FootballMatch 自身作为 Activity。
 - **过渡规则**: 两个字段均建议可空且非必填；历史记录保持 `null`，不强制推断分类。可在 Web 创建该业务对象时写默认 type，但必须等 LifeSpace 定义明确发布；发布前本 PR 不传未声明字段。是否需要把 type 设置为 filterable index、是否要限定通用模型的查询由平台另行审查，绝不在 HomeMew 自建影子索引。
 - 这是一项跨 LifeSpace Baseline 的通用模型契约变更，只提供建议。应由用户确认选项后，在 LifeSpace 仓库按 AGENTS 及 compatible Registry 版本化流程单独实现，不能借 HomeMew 前端 PR 改写 Baseline。
