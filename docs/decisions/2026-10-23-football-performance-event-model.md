@@ -123,3 +123,13 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 - **Activity.type**: 建议 `competition`（赛事）、`trip`（旅行）、`camp`（营地/集训）、`gathering`（聚会/集体活动）、`learning`（学习活动）、`other`（其他）。足球赛事筛选 `competition`；不要把一场 FootballMatch 自身作为 Activity。
 - **过渡规则**: 两个字段均建议可空且非必填；历史记录保持 `null`，不强制推断分类。可在 Web 创建该业务对象时写默认 type，但必须等 LifeSpace 定义明确发布；发布前本 PR 不传未声明字段。是否需要把 type 设置为 filterable index、是否要限定通用模型的查询由平台另行审查，绝不在 HomeMew 自建影子索引。
 - 这是一项跨 LifeSpace Baseline 的通用模型契约变更，只提供建议。应由用户确认选项后，在 LifeSpace 仓库按 AGENTS 及 compatible Registry 版本化流程单独实现，不能借 HomeMew 前端 PR 改写 Baseline。
+
+## 2026-10-23 · 分类本意与自动补全（修正前述 Baseline.type 提案）
+
+前述 PersonGroup.type=team/class/... 和 Activity.type=competition/trip/... 仅表示记录的客观类型，**不能可靠表达“属于 HomeMew 足球模块的球队/赛事目录”**；它们并不适合作为 HomeMew 的业务目录筛选依据。两组 Baseline type enum 提案 **暂缓**，未提交平台修改。
+
+推荐优先设计由 HomeMew 定义语义、LifeSpace 持久化的用途/目录归属：例如在 LifeSpace 注册一个普通 HomeMewFootballReference 目录模型，用 `kind` 区分球队/赛事并指向 PersonGroup 或 Activity 的已有 ID。它是用途关系，不复刻队名、赛事名称、授权与业务记录。需要考虑引用去重、同一对象多业务归属、名称跨模型搜索时的 Join/索引能力；若将搜索置于目录模型，必须核查当前 Canonical Query 能否跨关联名称检索，不应假设已有。另一种轻量选择是 LifeSpace 通用多值命名空间用途标签（如 `homemew.football.team`），但需要先设计并发布通用模型元数据/查询能力。HomeMew Worker 本地数据库不能成为跨设备/Agent 的业务真相存储；仅可保存非权威 UI 最近选择等短期偏好。以上均未在本次变更中实施，需另行确认及经过平台审查。
+
+**Web 自动补全立即交付（无需等目录模型）**：比赛表单的两支球队和赛事、五维筛选中的球队和赛事选择器改为共享的 FootballReferencePicker，利用 LifeSpace PersonGroup/Activity 已声明 `searchable: ["name","description"]`。展开时获取排序后的首 20 条；输入至少 2 字符且 320ms 防抖后发起 Canonical Query search，单次 limit=20，结果过多提示继续输入；已选 ID 不在当前候选列表时按 ID GET 精确读取，支持历史比赛。弹出结果保持在流式布局内，避免被 Modal 滚动容器裁剪。保留图标和快速新建入口。
+
+**性能边界**：当前 Canonical Query search 使用 `LIKE '%term%'`，limit=20 只限制返回量，不保证底层读取是索引前缀扫描。加入最短输入与防抖减少调用数量，但未来较大数据集仍须由 LifeSpace 实现严格受索引约束的 prefix search/field suggestions，HomeMew 不进行任意无界查询、影子搜索索引或绕过授权。原对 PersonGroup/Activity 的启动 400 条全部读取已更改为各取前 50 条，管理页支持加载更多及通过输入精确定位任意已存在记录，已有比赛引用缺失名称按 Record ID 补齐；记录管理仍保留正式 LifeSpace 访问边界。
