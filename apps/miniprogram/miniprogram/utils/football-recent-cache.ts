@@ -42,7 +42,7 @@ export function rememberFootballRecent(
   const next = [{ id: item.id, name: item.name, usedAt: now },
     ...readFootballRecent(userId, spaceId, kind, now).filter(x => x.id !== item.id)]
     .filter(x => valid(x, now)).slice(0, MAX);
-  try { wx.setStorageSync(storageKey(userId, spaceId, kind), next); } catch { /* optional UI hint */ }
+  try { wx.setStorageSync(storageKey(userId, spaceId, kind), next); } catch { return []; /* optional UI hint */ }
   return next;
 }
 export function removeFootballRecent(userId: string, spaceId: string, kind: FootballRecentKind, id: string): FootballRecentItem[] {
