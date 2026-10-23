@@ -1,4 +1,6 @@
-import { ApiError } from './api-client';
+import type { ApiError } from './api-client';
+const isApiError = (cause: unknown): cause is ApiError =>
+  cause instanceof Error && typeof (cause as Partial<ApiError>).code === 'string';
 
 /** Human-readable message for household screens; never expose internal contract fields or request IDs. */
 const internalWords = /\b(?:LifeSpace|Schema|Core|Worker|BFF|SQL|D1|API|HTTP|Principal|Actor|Grant|unsupported|invalid|undefined|Exception|fetch|recordId|modelKey|requestId|version)\b|\b(?:rec|spc|usr|lsp)_[A-Za-z0-9_]+\b|[a-zA-Z][\w]*\.[a-zA-Z][\w]*/i;
@@ -6,7 +8,7 @@ function readable(value: string): boolean {
   return /[\u3400-\u9fff]/u.test(value) && !internalWords.test(value);
 }
 export function householdErrorMessage(cause: unknown, fallback = '暂时无法完成操作，请稍后重试。'): string {
-  if (cause instanceof ApiError) {
+  if (isApiError(cause)) {
     if (cause.status === 401) return '登录已失效，请重新登录。';
     if (cause.status === 403) return '你没有权限进行此操作。';
     if (cause.status === 404 || cause.status === 410) return '内容已不存在，请刷新后重试。';
