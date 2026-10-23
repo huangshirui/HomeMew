@@ -15,7 +15,7 @@ import { rememberFootballReference } from './football-recent-references';
 import { FootballPerformanceSheet } from './football-performance-sheet';
 import {
   type FootballMatch, type FootballMatchDraft, type FootballPerformance,
-  type FootballPerformanceDraft, type FootballReference, type MatchFilter, type PerformanceSchema,
+  type FootballPerformanceDraft, type FootballReference, type FootballPerson, type MatchFilter, type PerformanceSchema,
   blankFilters, blankMatch, blankPerformance, commonTypes, entryModes, enumOptions,
   goalMethods, shotOutcomes, matchDraft, matchPayload, matchQueryFilter, metricValue, modelUrl,
   performanceEventCount,
@@ -69,6 +69,10 @@ export function FootballPage() {
   const [referenceLoading, setReferenceLoading] = useState(false);
   const [managerFocus, setManagerFocus] = useState<{ team: string; competition: string }>({team:'', competition:''});
   const [personId, setPersonId] = useState('');
+  const [otherPeople, setOtherPeople] = useState<FootballPerson[]>([]);
+  const [playerDialog, setPlayerDialog] = useState(false);
+  const [newPlayerName, setNewPlayerName] = useState('');
+  const [newPlayerTarget, setNewPlayerTarget] = useState<'match' | 'current'>('current');
   const [filters, setFilters] = useState<MatchFilter>(blankFilters);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -110,8 +114,12 @@ export function FootballPage() {
     id: m.personId!, name: m.displayName || '家庭成员',
   })), [members]);
   const visibleMemberIds = useMemo(() => new Set(familyPeople.map(p => p.id)), [familyPeople]);
-  const currentName = familyPeople.find(p => p.id === personId)?.name ?? '选择球员';
-  useModalScrollLock(Boolean(matchForm || performanceForm || quickRef));
+  const selectablePeople = useMemo(() => [...new Map([
+    ...familyPeople.map(p => ({ id: p.id, name: p.name })),
+    ...otherPeople.map(p => ({ id: p.id, name: p.displayName })),
+  ].map(p => [p.id, p])).values()], [familyPeople, otherPeople]);
+  const currentName = selectablePeople.find(p => p.id === personId)?.name ?? '选择球员';
+  useModalScrollLock(Boolean(matchForm || performanceForm || quickRef || playerDialog));
 
   useEffect(() => {
     if (!spaceId) { setPersonId(''); return; }
@@ -132,6 +140,7 @@ export function FootballPage() {
     setSelected(null); setPerformances([]); setEventsError(''); setMatches([]); setNextCursor(null);
     setTeams([]); setCompetitions([]); setTeamCursor(null); setCompetitionCursor(null);
     setManagerFocus({team:'',competition:''}); attemptedRefLookup.current.clear();
+    setOtherPeople([]); setPlayerDialog(false); setNewPlayerName('');
     setMoreOpen(false);
     setMatchForm(null); setPerformanceForm(null); setSuccess(''); setError('');
   }, [spaceId]);
@@ -147,18 +156,13 @@ export function FootballPage() {
     if (!spaceId) return;
     const request = ++refsReq.current;
     // Lists are only a small first page. Searchable pickers use server queries, not full-table materialization.
-    Promise.all([
-      queryModelRecords<FootballReference>(spaceId, 'person_group', {
-        sort: [{ field: 'name', direction: 'asc' }], page: { limit: 50 },
-      }),
-      queryModelRecords<FootballReference>(spaceId, 'activity', {
-        sort: [{ field: 'name', direction: 'asc' }], page: { limit: 50 },
-      }),
-    ]).then(([t, a]) => {
+    // Do not automatically load generic Activity records as a football competition directory.
+    queryModelRecords<FootballReference>(spaceId, 'person_group', {
+      sort: [{ field: 'name', direction: 'asc' }], page: { limit: 30 },
+    }).then(result => {
       if (refsReq.current !== request) return;
-      setTeams(prev => [...new Map([...prev, ...t.items].map(item => [item.id, item])).values()]);
-      setCompetitions(prev => [...new Map([...prev, ...a.items].map(item => [item.id, item])).values()]);
-      setTeamCursor(t.nextCursor); setCompetitionCursor(a.nextCursor);
+      setTeams(prev => [...new Map([...prev, ...result.items].map(item => [item.id, item])).values()]);
+      setTeamCursor(result.nextCursor);
     }).catch(e => { if (refsReq.current === request) setError(message(e)); });
   }, [spaceId, refresh]);
 
@@ -337,9 +341,9 @@ export function FootballPage() {
     finally { setSaving(false); }
   }
   function startReference(kind: ReferenceKind, target: 'representativeTeamId' | 'opponentTeamId' | null = null,
-    record: FootballReference | null = null) {
+    record: FootballReference | null = null, initialName = '') {
     setQuickRef(kind); setRefTarget(target); setRefEditing(record);
-    setRefName(record?.name ?? ''); setRefDescription(record?.description ?? '');
+    setRefName(record?.name ?? initialName); setRefDescription(record?.description ?? '');
     setRefIcon(iconDraftFor(record?.presentation?.icon)); setFormError('');
   }
   async function saveReference(e: FormEvent<HTMLFormElement>) {
@@ -375,6 +379,31 @@ export function FootballPage() {
       setQuickRef(null); setRefEditing(null); setRefName(''); setRefDescription(''); setRefIcon(emptyIconDraft());
       setSuccess(refEditing ? '已更新' + (quickRef === 'team' ? '球队' : '赛事') : '已新增' + (quickRef === 'team' ? '球队' : '赛事'));
     } catch (e) { setFormError(message(e)); }
+    finally { setSaving(false); }
+  }
+
+  function startPlayer(initialName = '', target: 'match' | 'current' = 'current') {
+    setNewPlayerName(initialName); setNewPlayerTarget(target);
+    setPlayerDialog(true); setFormError('');
+  }
+  async function saveNewPlayer(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!spaceId || !canWrite || saving || !newPlayerName.trim()) return;
+    setSaving(true); setFormError('');
+    try {
+      const created = await apiRequest<FootballPerson>(
+        '/api/lifespace/core/v1/spaces/' + encodeURIComponent(spaceId) + '/people', {
+          method: 'POST',
+          body: JSON.stringify({ displayName: newPlayerName.trim() }),
+        });
+      setOtherPeople(prev => [...new Map([...prev, created].map(p => [p.id,p])).values()]);
+      if (newPlayerTarget === 'match' && matchForm) {
+        setMatchForm(prev => prev ? { ...prev, playerPersonIds: [...new Set([...prev.playerPersonIds, created.id])] } : prev);
+      } else {
+        selectPerson(created.id);
+      }
+      setNewPlayerName(''); setPlayerDialog(false); setSuccess('球员已创建');
+    } catch (cause) { setFormError(message(cause)); }
     finally { setSaving(false); }
   }
 
@@ -460,11 +489,13 @@ export function FootballPage() {
       <div className="ml-auto flex min-w-0 items-center gap-2">
         <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm text-stone-600">球员
           <select aria-label="球员" className={input + ' w-28 shrink-0 sm:w-36'} value={personId} onChange={e => selectPerson(e.target.value)}>
-            {familyPeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {selectablePeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
+        {canWrite && <Button variant="ghost" className="shrink-0" onClick={() => startPlayer()}>+ 新建球员</Button>}
         <Button variant="ghost" className="shrink-0" onClick={() => navigate('/football/manage')}>
-          <Shield className="size-4"/> <span className="hidden sm:inline">球队与赛事</span><span className="sm:hidden">管理</span>
+
+          <Shield className="size-4"/> <span className="hidden sm:inline">球队与球员</span><span className="sm:hidden">管理</span>
         </Button>
       </div>
     </div>}
@@ -722,15 +753,15 @@ export function FootballPage() {
           </div>
           <FootballReferencePicker userId={user?.id ?? ''} spaceId={spaceId} model="activity" label="赛事" optional
             known={competitions} disabled={saving} value={matchForm.competitionActivityId}
-            onChange={id=>setMatchForm(prev=>prev ? {...prev,competitionActivityId:id} : prev)}/>
-          <Button variant="ghost" type="button" onClick={()=>startReference('competition')}>＋ 新建赛事</Button>
+            onChange={id=>setMatchForm(prev=>prev ? {...prev,competitionActivityId:id} : prev)}
+            onCreate={name => startReference('competition', null, null, name)}/>
           <div className="grid grid-cols-2 gap-3">
             {(['representativeTeamId','opponentTeamId'] as const).map(k=><div className="min-w-0" key={k}>
               <FootballReferencePicker userId={user?.id ?? ''} spaceId={spaceId} model="person_group"
                 label={k === 'representativeTeamId' ? '代表球队' : '对手球队'}
                 known={teams} disabled={saving} value={matchForm[k]}
-                onChange={id=>setMatchForm(prev=>prev ? {...prev,[k]:id} : prev)}/>
-              <button className="mt-1 text-xs text-emerald-700" type="button" onClick={()=>startReference('team',k)}>＋ 新建球队</button>
+                onChange={id=>setMatchForm(prev=>prev ? {...prev,[k]:id} : prev)}
+                onCreate={name=>startReference('team', k, null, name)}/>
             </div>)}
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -740,7 +771,9 @@ export function FootballPage() {
                 onChange={e=>setMatchForm({...matchForm,[k]:e.target.value})} placeholder="可以稍后填写"/></label>)}
           </div>
           <FootballPersonPicker spaceId={spaceId} members={members} selected={matchForm.playerPersonIds} multiple
-            onChange={ids=>setMatchForm({...matchForm,playerPersonIds:ids})} label="参赛球员（家庭成员优先）" disabled={saving}/>
+            knownPeople={otherPeople}
+            onChange={ids=>setMatchForm({...matchForm,playerPersonIds:ids})} label="参赛球员（家庭成员优先）"
+            disabled={saving} onCreate={name => startPlayer(name, 'match')}/>
           <label className={label}>备注<textarea className="min-h-20 w-full rounded-xl border border-stone-200 p-3 text-sm"
             value={matchForm.notes} onChange={e=>setMatchForm({...matchForm,notes:e.target.value})}/></label>
           {formError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
@@ -756,6 +789,25 @@ export function FootballPage() {
       schema={schema} draft={performanceForm} onChange={setPerformanceForm}
       saving={saving} error={formError} editing={Boolean(performanceEditing)}
       onSubmit={savePerformance} onClose={()=>{if(!saving){setPerformanceForm(null);setPerformanceEditing(null);}}}/>}
+    {playerDialog && spaceId && <div className="fixed inset-0 z-[90] flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6">
+      <form role="dialog" aria-modal="true" aria-label="新建球员" onSubmit={saveNewPlayer}
+        className="w-full max-w-sm space-y-4 rounded-t-3xl bg-white p-5 sm:rounded-3xl">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">新建球员</h2>
+          <Button type="button" variant="ghost" disabled={saving} onClick={() => setPlayerDialog(false)}><X className="size-4"/></Button>
+        </div>
+        <label className={label}>姓名 *
+          <input autoFocus required maxLength={100} className={input} value={newPlayerName}
+            onChange={e => setNewPlayerName(e.target.value)}/>
+        </label>
+        <p className="text-xs text-stone-500">创建 Space Person，不会创建家庭成员或登录账号。</p>
+        {formError && <p role="alert" className="text-sm text-red-700">{formError}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" disabled={saving} onClick={() => setPlayerDialog(false)}>取消</Button>
+          <Button type="submit" variant="primary" disabled={saving}>确认新建</Button>
+        </div>
+      </form>
+    </div>}
     {quickRef && spaceId && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6">
       <form role="dialog" aria-modal="true" aria-label="新增球队或赛事" onSubmit={saveReference}
         className="w-full max-w-sm space-y-4 rounded-t-3xl bg-white p-5 sm:rounded-3xl">
