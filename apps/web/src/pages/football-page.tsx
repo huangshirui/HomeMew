@@ -65,6 +65,8 @@ export function FootballPage() {
   const [personId, setPersonId] = useState('');
   const [filters, setFilters] = useState<MatchFilter>(blankFilters);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
   const [matchEditing, setMatchEditing] = useState<FootballMatch | null>(null);
   const [matchForm, setMatchForm] = useState<FootballMatchDraft | null>(null);
@@ -111,7 +113,8 @@ export function FootballPage() {
       familyPeople.find(p => p.name.toLocaleLowerCase().includes('kk'))?.id ??
       familyPeople[0]?.id ?? '';
     setPersonId(chosen);
-    setFilters(prev => ({ ...prev, playerPersonId: chosen }));
+    setFilters({ ...blankFilters(), playerPersonId: chosen });
+    setSearchInput(''); setAppliedSearch('');
   }, [spaceId, familyPeople]);
   function selectPerson(id: string) {
     setPersonId(id);
@@ -149,6 +152,7 @@ export function FootballPage() {
     setLoading(true); if (!append) setError('');
     try {
       const result = await queryModelRecords<FootballMatch>(spaceId, 'football_match', {
+        ...(appliedSearch ? { search: { text: appliedSearch } } : {}),
         ...(matchQueryFilter(filters) ? { filter: matchQueryFilter(filters) } : {}),
         sort: [{ field: 'matchDate', direction: 'desc' }],
         page: { limit: 40, ...(cursor ? { cursor } : {}) },
@@ -158,7 +162,7 @@ export function FootballPage() {
       setNextCursor(result.nextCursor);
     } catch (cause) { if (req === matchReq.current) setError(message(cause)); }
     finally { if (req === matchReq.current) setLoading(false); }
-  }, [spaceId, filters]);
+  }, [spaceId, filters, appliedSearch]);
   useEffect(() => { if (tab === 'record') void loadMatchPage(null, false); }, [tab, loadMatchPage, refresh]);
 
   useEffect(() => {
@@ -185,7 +189,8 @@ export function FootballPage() {
     if (tab !== 'stats' || !spaceId || !personId || !schema) return;
     const req = ++statsReq.current;
     setStatsLoading(true); setStatsError('');
-    const query = { ...(matchQueryFilter({ ...filters, playerPersonId: personId }) ?
+    const query = { ...(appliedSearch ? { search: { text: appliedSearch } } : {}),
+      ...(matchQueryFilter({ ...filters, playerPersonId: personId }) ?
       { filter: matchQueryFilter({ ...filters, playerPersonId: personId }) } : {}),
       sort: [{ field: 'matchDate', direction: 'desc' as const }] };
     Promise.all([
@@ -196,7 +201,7 @@ export function FootballPage() {
       .catch(e => { if (statsReq.current === req) { setStatMatches([]); setStatEvents([]); setStatsError(message(e)); } })
       .finally(() => { if (statsReq.current === req) setStatsLoading(false); });
     return () => { ++statsReq.current; };
-  }, [tab, spaceId, personId, schema?.version, filters, refresh]);
+  }, [tab, spaceId, personId, schema?.version, filters, appliedSearch, refresh]);
 
   function startMatch(record?: FootballMatch) {
     setMatchEditing(record ?? null);
@@ -354,8 +359,8 @@ export function FootballPage() {
       </Button> : <>
         {!selected && <Button variant="secondary" onClick={() => setFilterOpen(v => !v)}
           aria-expanded={filterOpen} aria-controls="football-search-filters"
-          className={Object.entries(filters).some(([key, value]) => key !== 'playerPersonId' && value) ? 'text-emerald-800 ring-emerald-300' : ''}>
-          <SlidersHorizontal className="size-4"/> 搜索与筛选{Object.entries(filters).some(([key,value]) => key !== 'playerPersonId' && value) ? ' · 已启用' : ''}
+          className={appliedSearch || Object.entries(filters).some(([key, value]) => key !== 'playerPersonId' && value) ? 'text-emerald-800 ring-emerald-300' : ''}>
+          <SlidersHorizontal className="size-4"/> 搜索与筛选{appliedSearch || Object.entries(filters).some(([key,value]) => key !== 'playerPersonId' && value) ? ' · 已启用' : ''}
         </Button>}
         {tab === 'record' && canWrite && <Button variant="primary" onClick={() => startMatch()}><Plus className="size-4"/> 新建比赛</Button>}
       </>}
@@ -419,6 +424,17 @@ export function FootballPage() {
     {!spaceId ? <Card className="p-6">请先选择家庭。</Card> : !managing && <>
       {!selected && filterOpen && <div id="football-search-filters"
         className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
+        <form className="flex flex-wrap items-center gap-2" role="search"
+          onSubmit={e => { e.preventDefault(); setAppliedSearch(searchInput.trim()); }}>
+          <label className="min-w-0 flex-1">
+            <span className="sr-only">搜索比赛备注</span>
+            <input className={input} placeholder="搜索比赛备注" value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}/>
+          </label>
+          <Button variant="primary" type="submit">搜索</Button>
+          {appliedSearch && <Button variant="ghost" type="button"
+            onClick={() => {setSearchInput(''); setAppliedSearch('');}}>清除</Button>}
+        </form>
         <div className="flex flex-wrap items-end gap-3">
           <span className="shrink-0 pb-3 text-xs font-medium text-stone-500">筛选</span>
           <label className="min-w-32 flex-1 text-sm text-stone-600">年份
@@ -439,7 +455,7 @@ export function FootballPage() {
           <label className="min-w-32 flex-1 text-sm text-stone-600">对手球队<select className={input}
             value={filters.opponentTeamId} onChange={e=>onFilter({opponentTeamId:e.target.value})}>
             <option value="">全部球队</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-          <Button variant="ghost" onClick={() => setFilters({ ...blankFilters(), playerPersonId: personId })}>重置筛选</Button>
+          <Button variant="ghost" onClick={() => {setFilters({ ...blankFilters(), playerPersonId: personId }); setSearchInput(''); setAppliedSearch('');}}>重置筛选</Button>
         </div>
       </div>}
       {tab === 'record' && !selected && <>
