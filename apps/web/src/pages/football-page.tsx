@@ -316,7 +316,7 @@ export function FootballPage() {
   function startPerformance(type: string, record?: FootballPerformance) {
     if (!schema || !selected) return;
     if (!enumOptions(schema, 'performanceType').includes(type)) {
-      setError('该表现类型尚未在 LifeSpace 当前环境发布'); return;
+      setError('暂时无法记录这项表现，请稍后重试'); return;
     }
     setMoreOpen(false);
     setPerformanceEditing(record ?? null);
@@ -505,7 +505,7 @@ export function FootballPage() {
     {success && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!managing && schemaError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-      当前 LifeSpace 环境尚不能读取足球表现模型；比赛资料仍可查看和编辑，新增表现要先在 LifeSpace 发布 football_performance 并授权。{schemaError}
+      比赛表现暂时无法使用，已有比赛仍可查看和编辑。请稍后重试。
     </p>}
     {managing && spaceId && <div className="space-y-4">
       <p className="text-sm text-stone-500">维护比赛使用的球队和赛事。被比赛引用的条目需先解除关联才能删除。</p>
@@ -704,7 +704,7 @@ export function FootballPage() {
       {tab === 'stats' && <>
         {statsError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{statsError}</p>}
         {statsLoading ? <Card className="p-10 text-center text-sm text-stone-500">正在统计已筛选比赛…</Card>
-          : !schema ? <Card className="p-6 text-sm text-stone-500">模型发布后可查看统计。</Card>
+          : !schema ? <Card className="p-6 text-sm text-stone-500">统计暂时无法查看，请稍后重试。</Card>
           : statsError ? null
           : <FootballStatsDashboard matches={statMatches} events={statEvents}
               playerId={personId} playerName={currentName}/>}
@@ -774,7 +774,7 @@ export function FootballPage() {
           <input autoFocus required maxLength={100} className={input} value={newPlayerName}
             onChange={e => setNewPlayerName(e.target.value)}/>
         </label>
-        <p className="text-xs text-stone-500">创建 Space Person，不会创建家庭成员或登录账号。</p>
+        <p className="text-xs text-stone-500">新建的球员不会自动加入家庭成员。</p>
         {formError && <p role="alert" className="text-sm text-red-700">{formError}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" disabled={saving} onClick={() => setPlayerDialog(false)}>取消</Button>
