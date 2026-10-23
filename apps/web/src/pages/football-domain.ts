@@ -1,5 +1,5 @@
 import { apiRequest } from '../lib/api-client';
-import { queryModelRecords, type CanonicalQuery, type CanonicalQueryFilter } from '../lib/canonical-query';
+import { queryModelRecords, type CanonicalQuery, type CanonicalQueryFilter, type CanonicalQueryPage } from '../lib/canonical-query';
 
 export type FootballMatch = {
   id: string; version: number; matchDate: string; matchType: 'official' | 'friendly';
@@ -136,7 +136,7 @@ export function matchQueryFilter(filters: MatchFilter, includePlayer = true): Ca
 export async function queryAllBounded<T>(spaceId: string, model: string, query: Omit<CanonicalQuery, 'page'>, maxPages = 6): Promise<T[]> {
   const items: T[] = []; let cursor: string | null = null;
   for (let i = 0; i < maxPages; i++) {
-    const page = await queryModelRecords<T>(spaceId, model, { ...query, page: { limit: 100, ...(cursor ? { cursor } : {}) } });
+    const page: CanonicalQueryPage<T> = await queryModelRecords<T>(spaceId, model, { ...query, page: { limit: 100, ...(cursor ? { cursor } : {}) } });
     items.push(...page.items);
     cursor = page.nextCursor;
     if (!cursor) return items;
