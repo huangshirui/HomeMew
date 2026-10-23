@@ -7,7 +7,8 @@ import { PageHeader } from '../components/ui/page-header';
 import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type WishStatus = 'open' | 'fulfilled';
@@ -35,8 +36,7 @@ const inputClass = 'h-10 w-full rounded-2xl border border-stone-200 bg-white px-
 const textareaClass = 'min-h-28 w-full resize-y rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 
 function messageOf(cause: unknown, fallback: string) {
-  if (cause instanceof ApiError) return `${cause.message}${cause.requestId ? ` · ${cause.requestId}` : ''}`;
-  return cause instanceof Error ? cause.message : fallback;
+  return householdErrorMessage(cause, fallback);
 }
 
 function draftFromWish(wish: WishRecord): WishDraft {
