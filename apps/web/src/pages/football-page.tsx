@@ -13,11 +13,12 @@ import { FootballPersonPicker } from './football-person-picker';
 import { FootballReferencePicker } from './football-reference-picker';
 import { rememberFootballReference } from './football-recent-references';
 import { FootballPerformanceSheet } from './football-performance-sheet';
+import { FootballStatsDashboard } from './football-stats-dashboard';
 import {
   type FootballMatch, type FootballMatchDraft, type FootballPerformance,
   type FootballPerformanceDraft, type FootballReference, type FootballPerson, type MatchFilter, type PerformanceSchema,
   blankFilters, blankMatch, blankPerformance, commonTypes, entryModes, enumOptions,
-  goalMethods, shotOutcomes, matchDraft, matchPayload, matchQueryFilter, metricValue, modelUrl,
+  goalMethods, shotOutcomes, matchDraft, matchPayload, matchQueryFilter, modelUrl,
   performanceEventCount,
   performanceDraft, performancePayload, performanceTitle, queryAllBounded, readPerformanceSchema,
 } from './football-domain';
@@ -96,8 +97,6 @@ export function FootballPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [refresh, setRefresh] = useState(0);
-  const [metric, setMetric] = useState('goal');
-  const [groupBy, setGroupBy] = useState<'month' | 'year' | 'opponent' | 'competition'>('month');
   const [statMatches, setStatMatches] = useState<FootballMatch[]>([]);
   const [statEvents, setStatEvents] = useState<FootballPerformance[]>([]);
   const [statsError, setStatsError] = useState('');
@@ -452,25 +451,6 @@ export function FootballPage() {
   const types = schema ? enumOptions(schema, 'performanceType') : [];
   const moreTypes = types.filter(t => !quickTypes.includes(t) && t !== 'appearance');
   const typeCount = (kind: string) => performanceEventCount(performances.filter(p => p.playerPersonId === personId), kind);
-  const statMetrics = [
-    ...(types.filter(t => t !== 'appearance').map(t => ({ key: t, name: performanceTitle(t) + '数' }))),
-    { key: 'goalsPerMatch', name: '场均进球' }, { key: 'assistsPerMatch', name: '场均助攻' },
-    { key: 'appearances', name: '参赛场次' }, { key: 'minutes', name: '出场分钟' }, { key: 'starts', name: '首发场次' },
-  ];
-  const statValue = metricValue(metric, statMatches, statEvents, personId);
-  const groupedStats = useMemo(() => {
-    const groups = new Map<string, FootballMatch[]>();
-    for (const match of statMatches) {
-      const key = groupBy === 'month' ? match.matchDate.slice(0, 7)
-        : groupBy === 'year' ? match.matchDate.slice(0, 4)
-          : groupBy === 'opponent' ? (teamNames.get(match.opponentTeamId) ?? '其他对手')
-            : competitionNames.get(match.competitionActivityId ?? '') ?? '未指定赛事';
-      groups.set(key, [...(groups.get(key) ?? []), match]);
-    }
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, m]) => ({ name, value: metricValue(metric, m, statEvents, personId) }));
-  }, [statMatches, statEvents, metric, groupBy, personId, teamNames, competitionNames]);
-  const maxValue = Math.max(1, ...groupedStats.map(g => g.value ?? 0));
   const onFilter = (patch: Partial<MatchFilter>) => setFilters(prev => ({ ...prev, ...patch }));
 
   if (householdLoading) return <Card className="p-8">正在加载家庭信息…</Card>;
@@ -722,41 +702,12 @@ export function FootballPage() {
         </Button>}
       </>}
       {tab === 'stats' && <>
-        <Card className="space-y-4 p-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className={label}>统计指标
-              <select className={input} value={metric} onChange={e=>setMetric(e.target.value)}>
-                {statMetrics.map(m=><option key={m.key} value={m.key}>{m.name}</option>)}
-              </select></label>
-            <label className={label}>图表分组
-              <select className={input} value={groupBy} onChange={e=>setGroupBy(e.target.value as typeof groupBy)}>
-                <option value="month">按月份</option><option value="year">按年份</option>
-                <option value="opponent">按对手</option><option value="competition">按赛事</option>
-              </select></label>
-          </div>
-          <p className="text-xs text-stone-500">球员：{currentName} · 根据所选年份、赛事、球队、对手筛选比赛后计算。只根据已记录表现统计。</p>
-          {statsError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{statsError}</p>}
-          {statsLoading ? <p className="py-8 text-center text-sm text-stone-500">正在分析已筛选比赛…</p> : !schema ? <p className="text-sm text-stone-500">模型发布后可查看统计。</p> : statsError ? null : <>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-stone-50 p-4"><p className="text-xs text-stone-500">{statMetrics.find(m=>m.key===metric)?.name ?? metric}</p>
-                <strong className="mt-2 block text-3xl tabular-nums">{statValue===null?'—':statValue.toFixed(metric.includes('PerMatch')?2:0)}</strong></div>
-              <div className="rounded-xl bg-stone-50 p-4"><p className="text-xs text-stone-500">参赛场次</p>
-                <strong className="mt-2 block text-3xl tabular-nums">{statMatches.length}</strong></div>
-            </div>
-            <h3 className="font-semibold">指标分布</h3>
-            <div className="max-h-80 space-y-3 overflow-y-auto">
-              {groupedStats.map(g=><div key={g.name} className="grid grid-cols-[90px_minmax(0,1fr)_48px] items-center gap-2 text-sm">
-                <span className="truncate">{g.name}</span>
-                <div className="h-4 overflow-hidden rounded-full bg-stone-100">
-                  {g.value!==null && <div className="h-full rounded-full bg-emerald-500" style={{ width: String(g.value/maxValue*100)+'%' }}/>}
-                </div>
-                <span className="text-right tabular-nums">{g.value===null?'—':g.value.toFixed(metric.includes('PerMatch')?2:0)}</span>
-              </div>)}
-              {!groupedStats.length && <p className="text-sm text-stone-500">当前筛选下暂无比赛数据</p>}
-            </div>
-            {metric==='minutes' && <p className="text-xs text-amber-700">出场时间仅计算已完整录入的片段，缺少片段时长的分组显示「—」。</p>}
-          </>}
-        </Card>
+        {statsError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{statsError}</p>}
+        {statsLoading ? <Card className="p-10 text-center text-sm text-stone-500">正在统计已筛选比赛…</Card>
+          : !schema ? <Card className="p-6 text-sm text-stone-500">模型发布后可查看统计。</Card>
+          : statsError ? null
+          : <FootballStatsDashboard matches={statMatches} events={statEvents}
+              playerId={personId} playerName={currentName}/>}
       </>}
     </>}
     {matchForm && spaceId && <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 sm:items-center sm:p-6">
