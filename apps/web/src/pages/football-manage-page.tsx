@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { PageHeader } from '../components/ui/page-header';
 import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { type FootballMatch, type FootballPerformance, type FootballPerson, type FootballReference, modelUrl } from './football-domain';
@@ -20,7 +21,7 @@ type EditablePerson = FootballPerson & { version: number; linkedUser?: boolean }
 type PeopleResult = { items: EditablePerson[]; nextCursor: string | null };
 type TeamDraft = { name: string; description: string; icon: RecordIconDraft };
 
-function failure(error: unknown) { return error instanceof Error ? error.message : '操作失败'; }
+function failure(error: unknown) { return householdErrorMessage(error, '操作失败，请稍后再试。'); }
 
 /** The football module manages non-member Persons, never the membership-linked Family directory. */
 export function FootballManagePage() {
