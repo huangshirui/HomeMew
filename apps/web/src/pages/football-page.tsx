@@ -22,6 +22,11 @@ import {
 const input = 'h-10 w-full min-w-0 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-500';
 const label = 'block space-y-1 text-sm font-medium text-stone-700';
 const quickTypes = ['goal', 'assist', 'shot', 'key_pass', 'successful_dribble', 'tackle', 'interception', 'clearance'];
+// The eight curated icons belong to HomeMew UX, not to the LifeSpace event model.
+const quickActionIcons: Record<string, string> = {
+  goal: '⚽', assist: '👟', shot: '🎯', key_pass: '💡',
+  successful_dribble: '✨', tackle: '🛡️', interception: '✂️', clearance: '🚀',
+};
 type ReferenceKind = 'team' | 'competition';
 
 function message(cause: unknown): string {
@@ -49,6 +54,7 @@ export function FootballPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState<FootballMatch | null>(null);
   const [performances, setPerformances] = useState<FootballPerformance[]>([]);
+  const [eventsError, setEventsError] = useState('');
   const [schema, setSchema] = useState<PerformanceSchema | null>(null);
   const [schemaError, setSchemaError] = useState('');
   const [teams, setTeams] = useState<FootballReference[]>([]);
@@ -56,6 +62,7 @@ export function FootballPage() {
   const [personId, setPersonId] = useState('');
   const [filters, setFilters] = useState<MatchFilter>(blankFilters);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [showReferences, setShowReferences] = useState(false);
   const [matchEditing, setMatchEditing] = useState<FootballMatch | null>(null);
   const [matchForm, setMatchForm] = useState<FootballMatchDraft | null>(null);
@@ -108,7 +115,8 @@ export function FootballPage() {
     setFilters(prev => ({ ...prev, playerPersonId: id }));
   }
   useEffect(() => {
-    setSelected(null); setPerformances([]); setMatches([]); setNextCursor(null);
+    setSelected(null); setPerformances([]); setEventsError(''); setMatches([]); setNextCursor(null);
+    setMoreOpen(false);
     setMatchForm(null); setPerformanceForm(null); setSuccess(''); setError('');
   }, [spaceId]);
 
@@ -150,13 +158,22 @@ export function FootballPage() {
   useEffect(() => { if (tab === 'record') void loadMatchPage(null, false); }, [tab, loadMatchPage, refresh]);
 
   useEffect(() => {
-    if (!spaceId || !selected || !schema) { setPerformances([]); return; }
+    if (!spaceId || !selected || !schema) {
+      ++eventReq.current;
+      setPerformances([]); setEventsError(''); setEventsLoading(false);
+      return;
+    }
     const req = ++eventReq.current;
-    setEventsLoading(true);
+    setEventsLoading(true); setEventsError('');
+    // LifeSpace Canonical Query exposes record/person relation membership through "contains", not "eq".
     queryAllBounded<FootballPerformance>(spaceId, 'football_performance',
-      { filter: { field: 'matchId', op: 'eq', value: selected.id } }, 4)
-      .then(items => { if (eventReq.current === req) setPerformances(items); })
-      .catch(e => { if (eventReq.current === req) setError(message(e)); })
+      { filter: { field: 'matchId', op: 'contains', value: selected.id } }, 4)
+      .then(items => {
+        if (eventReq.current === req) { setPerformances(items); setEventsError(''); }
+      })
+      .catch(e => {
+        if (eventReq.current === req) { setPerformances([]); setEventsError(message(e)); }
+      })
       .finally(() => { if (eventReq.current === req) setEventsLoading(false); });
   }, [spaceId, selected?.id, schema?.version, refresh]);
 
@@ -170,7 +187,7 @@ export function FootballPage() {
     Promise.all([
       queryAllBounded<FootballMatch>(spaceId, 'football_match', query, 5),
       queryAllBounded<FootballPerformance>(spaceId, 'football_performance',
-        { filter: { field: 'playerPersonId', op: 'eq', value: personId } }, 8),
+        { filter: { field: 'playerPersonId', op: 'contains', value: personId } }, 8),
     ]).then(([m, e]) => { if (statsReq.current === req) { setStatMatches(m); setStatEvents(e); } })
       .catch(e => { if (statsReq.current === req) { setStatMatches([]); setStatEvents([]); setStatsError(message(e)); } })
       .finally(() => { if (statsReq.current === req) setStatsLoading(false); });
@@ -201,6 +218,7 @@ export function FootballPage() {
     if (!enumOptions(schema, 'performanceType').includes(type)) {
       setError('该表现类型尚未在 LifeSpace 当前环境发布'); return;
     }
+    setMoreOpen(false);
     setPerformanceEditing(record ?? null);
     setPerformanceForm(record ? performanceDraft(record) : blankPerformance(type, personId));
     setFormError(''); setSuccess('');
@@ -263,6 +281,7 @@ export function FootballPage() {
   }
 
   const types = schema ? enumOptions(schema, 'performanceType') : [];
+  const moreTypes = types.filter(t => !quickTypes.includes(t) && t !== 'appearance');
   const typeCount = (kind: string) => performanceEventCount(performances.filter(p => p.playerPersonId === personId), kind);
   const statMetrics = [
     ...(types.filter(t => t !== 'appearance').map(t => ({ key: t, name: performanceTitle(t) + '数' }))),
@@ -397,41 +416,53 @@ export function FootballPage() {
         {!selected.playerPersonIds.includes(personId) && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
           {currentName} 未列入本场参赛名单。记录表现前请先编辑比赛并确认其参赛。
         </p>}
-        <Card className="space-y-3 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        <Card className="space-y-4 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
             <h2 className="font-semibold">快捷记录 · {currentName}</h2>
-            <span className="text-xs text-stone-400">先打开表单，确认后保存</span>
+            <p className="text-xs text-stone-500">选择项目打开表单，确认后才保存</p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {quickTypes.filter(t => types.includes(t)).map(t =>
-              <Button key={t} className="h-12 flex-1" variant={t === 'goal' || t === 'assist' ? 'primary' : 'secondary'}
-                disabled={!canWrite || !personId || saving} onClick={()=>startPerformance(t)}>
-                <Plus className="size-4"/> {performanceTitle(t)}
-              </Button>)}
+              <button key={t} type="button" onClick={()=>startPerformance(t)}
+                aria-label={`记录${performanceTitle(t)}`}
+                disabled={!canWrite || !personId || saving}
+                className="group flex min-h-16 items-center gap-3 rounded-2xl border border-stone-200 bg-white px-3 py-3 text-left shadow-sm transition-colors hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-50">
+                <span aria-hidden="true" className="shrink-0 text-2xl leading-none">{quickActionIcons[t]}</span>
+                <span className="min-w-0 flex-1 text-sm font-medium text-stone-800">{performanceTitle(t)}</span>
+                <span className="shrink-0 text-xs tabular-nums text-stone-400">
+                  {eventsLoading || eventsError ? '—' : typeCount(t)}
+                </span>
+              </button>)}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {types.includes('appearance') && <Button variant="secondary" disabled={!canWrite} onClick={()=>startPerformance('appearance')}>
-              <Clock3 className="size-4"/> 出场片段
+          <div className="flex flex-wrap gap-2 border-t border-stone-100 pt-3">
+            {types.includes('appearance') && <Button className="h-11" variant="secondary"
+              disabled={!canWrite || !personId || saving} onClick={()=>startPerformance('appearance')}>
+              <Clock3 className="size-4"/> 出场记录
             </Button>}
-            {types.filter(t => !quickTypes.includes(t) && t !== 'appearance').length > 0 && <label className="flex items-center gap-2 text-sm">
-              更多表现 <select className={input + ' w-40'} value="" disabled={!canWrite}
-                onChange={e => { if(e.target.value) startPerformance(e.target.value); }}>
-                <option value="">选择类型</option>
-                {types.filter(t => !quickTypes.includes(t) && t !== 'appearance').map(t=>
-                  <option key={t} value={t}>{performanceTitle(t)}</option>)}
-              </select>
-            </label>}
+            {moreTypes.length > 0 && <Button className="h-11" variant="secondary"
+              aria-expanded={moreOpen} aria-controls="football-more-performance"
+              disabled={!canWrite || !personId || saving} onClick={()=>setMoreOpen(open => !open)}>
+              <Plus className="size-4"/> 更多表现
+              <ChevronDown className={`size-4 transition-transform ${moreOpen ? 'rotate-180' : ''}`}/>
+            </Button>}
           </div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            {quickTypes.filter(t=>types.includes(t)).map(t=><span key={t} className="rounded-lg bg-stone-100 px-3 py-2">
-              {performanceTitle(t)} {typeCount(t)}
-            </span>)}
-          </div>
+          {moreOpen && moreTypes.length > 0 && <div id="football-more-performance"
+            className="space-y-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 sm:p-4">
+            <p className="text-xs text-stone-500">其他表现 · 选择类型后仍可补充信息并确认保存</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {moreTypes.map(t => <button key={t} type="button"
+                disabled={!canWrite || !personId || saving} onClick={()=>startPerformance(t)}
+                className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-left text-sm text-stone-700 transition-colors hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:opacity-50">
+                <span>{performanceTitle(t)}</span><Plus aria-hidden="true" className="size-4 shrink-0 text-stone-400"/>
+              </button>)}
+            </div>
+          </div>}
         </Card>
         <Card className="space-y-3 p-4">
           <h2 className="font-semibold">已记录表现</h2>
           {eventsLoading && <p className="text-sm text-stone-500">读取表现中…</p>}
-          {!eventsLoading && !performances.length && <p className="text-sm text-stone-500">暂无表现记录。点击上方快捷按钮新增。</p>}
+          {eventsError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">读取表现失败：{eventsError}</p>}
+          {!eventsLoading && !eventsError && !performances.length && <p className="text-sm text-stone-500">暂无表现记录。点击上方快捷按钮新增。</p>}
           {performances.map(p=><div key={p.id} className="flex items-center gap-2 rounded-xl border border-stone-100 px-3 py-2">
             <Trophy className="size-4 shrink-0 text-stone-400"/>
             <div className="min-w-0 flex-1">

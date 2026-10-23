@@ -38,7 +38,7 @@ export const blankFilters = (): MatchFilter => ({
   competitionActivityId: '', playerPersonId: '',
 });
 export const commonTypes: Record<string, string> = {
-  appearance: '出场片段',
+  appearance: '出场记录',
   goal: '进球', assist: '助攻', shot: '射门', key_pass: '关键传球',
   successful_dribble: '成功过人', cross: '传中', penalty_won: '造点球',
   tackle: '抢断', interception: '拦截', clearance: '解围', block: '封堵',
@@ -149,7 +149,7 @@ export function matchQueryFilter(filters: MatchFilter, includePlayer = true): Ca
     }
   }
   for (const field of ['matchType','representativeTeamId','opponentTeamId','competitionActivityId'] as const) {
-    if (filters[field]) clauses.push({ field, op: 'eq', value: filters[field] });
+    if (filters[field]) clauses.push({ field, op: field === 'matchType' ? 'eq' : 'contains', value: filters[field] });
   }
   if (includePlayer && filters.playerPersonId) clauses.push({ field: 'playerPersonIds', op: 'contains', value: filters.playerPersonId });
   return clauses.length > 1 ? { and: clauses } : clauses[0];

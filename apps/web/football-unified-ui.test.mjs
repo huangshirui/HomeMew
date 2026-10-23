@@ -129,3 +129,40 @@ test('overlapping shot, key-pass and goalkeeper-save totals are derived once', (
   assert.equal(count(events, 'assist'), 1);
   assert.match(domain, /return performanceEventCount\(relevant, type\)/);
 });
+
+test('relationship filters use LifeSpace Canonical Query contains rather than unsupported eq', () => {
+  assert.match(page, /field: 'matchId', op: 'contains'/);
+  assert.match(page, /field: 'playerPersonId', op: 'contains'/);
+  assert.doesNotMatch(page, /field: 'matchId', op: 'eq'/);
+  assert.doesNotMatch(page, /field: 'playerPersonId', op: 'eq'/);
+  assert.match(domain, /field === 'matchType' \? 'eq' : 'contains'/);
+  const matchFilter = runFootballFunction('matchQueryFilter', 'filters, includePlayer = true');
+  const filters = {
+    year: '', matchType: 'official', representativeTeamId: 'rec_a',
+    opponentTeamId: 'rec_b', competitionActivityId: 'rec_c', playerPersonId: 'per_a',
+  };
+  const tree = matchFilter(filters);
+  const clauses = tree.and;
+  assert.deepEqual(Array.from(clauses, ({ field, op }) => [field, op]), [
+    ['matchType', 'eq'], ['representativeTeamId', 'contains'],
+    ['opponentTeamId', 'contains'], ['competitionActivityId', 'contains'],
+    ['playerPersonIds', 'contains'],
+  ]);
+  assert.match(page, /setEventsError\(message\(e\)\)/);
+  assert.match(page, /!eventsError && !performances.length/);
+});
+
+test('quick-record cards match the confirmed icon and neutral visual design', () => {
+  for (const icon of ['⚽', '👟', '🎯', '💡', '✨', '🛡️', '✂️', '🚀'])
+    assert.ok(page.includes(icon), 'missing shortcut icon ' + icon);
+  assert.match(page, /quickActionIcons\[t\]/);
+  assert.doesNotMatch(page, /t === 'goal' \|\| t === 'assist' \? 'primary'/);
+  assert.match(page, /border-stone-200 bg-white/);
+  assert.match(page, /onClick=\{\(\)=>startPerformance\(t\)\}/);
+  assert.match(page, /aria-expanded=\{moreOpen\}/);
+  assert.match(page, /更多表现/);
+  assert.match(page, /moreTypes\.map/);
+  assert.match(domain, /appearance: '出场记录'/);
+  assert.match(page, /出场记录/);
+  assert.doesNotMatch(page, /出场片段/);
+});
