@@ -77,9 +77,9 @@ export function FootballStatsDashboard({ matches, events, playerId, playerName }
         <MetricCard label="进球" value={number(stats.goals)} unit="球"/>
         <MetricCard label="助攻" value={number(stats.assists)} unit="次"/>
         <MetricCard label="比赛时间" value={availableTime ? number(stats.knownMinutes) : '—'} unit="分钟"
-          hint={'完整记录 ' + availableTime + ' / ' + stats.matches + ' 场'}/>
+          hint={'已记时长 ' + availableTime + ' / ' + stats.matches + ' 场'}/>
       </div>
-      <p className="text-xs text-stone-500">比赛时间仅累计已完整填写出场时长的比赛。未录入的出场时间、动作记录不等于零。</p>
+      <p className="text-xs text-stone-500">比赛时间只统计填写了出场时长的比赛；未填写的内容不计入统计。</p>
     </Card>
     <Card className="space-y-4 p-4 sm:p-5">
       <div>
@@ -130,7 +130,7 @@ export function FootballStatsDashboard({ matches, events, playerId, playerName }
                   </circle>)}
               </g>)}
             {!chart.hasValues && <text x={chart.width/2} y="111" textAnchor="middle" fontSize="14" fill="#78716c">
-              {kind === 'time' ? '暂无完整出场时间与对应进球／助攻记录' : '暂无可计算的表现'}
+              {kind === 'time' ? '还没有足够的比赛时间和进球、助攻记录' : '暂无可计算的表现'}
             </text>}
             <line x1={chart.left} x2={chart.width - chart.right} y1={chart.barTop - 21} y2={chart.barTop - 21} stroke="#e7e5e4"/>
             <text x={chart.left} y={chart.barTop - 34} fill="#44403c" fontWeight="600" fontSize="13">每月参赛场次</text>
@@ -159,15 +159,15 @@ export function FootballStatsDashboard({ matches, events, playerId, playerName }
           </svg>
         </div>}
       {kind === 'time' ? <>
-        <p className="text-xs text-stone-600">时间效率：仅对完整记录出场时长的比赛求和；进球、助攻也仅从同一批比赛中取数。数值越低，平均产出间隔越短。</p>
+        <p className="text-xs text-stone-600">只计算已填写出场时间的比赛，以及这些比赛中的进球和助攻。分钟数越少，效率越高。</p>
         <div className="flex flex-wrap gap-2">
           {months.filter(m => m.matches > 0).map(month =>
             <span key={month.month} className="rounded-lg bg-stone-50 px-2 py-1 text-xs text-stone-500">
-              {month.month} · 时长覆盖 {month.completeMinutesMatches}/{month.matches} 场
+              {month.month} · 已记时长 {month.completeMinutesMatches}/{month.matches} 场
             </span>)}
         </div>
       </> : <p className="text-xs text-stone-500">每个月独立计算场均；无比赛月份的场均不定义，折线断开。参赛场次柱图与折线共用月份横轴。</p>}
-      <p className="text-xs text-stone-500">数据来自已录入的比赛与表现记录；未记录的行为不能视为真实零次。</p>
+      <p className="text-xs text-stone-500">只统计已经填写的比赛和表现。</p>
     </Card>
   </div>;
 }
