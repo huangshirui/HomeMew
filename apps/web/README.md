@@ -320,3 +320,7 @@ See `docs/decisions/2026-10-22-fixed-deployment-environments.md` and `docs/runbo
 ### 足球球队和赛事本机最近选择
 Web 足球表单/筛选的球队、赛事支持最近使用候选。按登录用户、家庭 Space、模型存储最近 12 条（90 天）；× 仅删除本机缓存，不删记录。选择缓存需重新按 ID 验证 LifeSpace 权限；Web 与小程序不跨设备自动同步。缓存不定义业务目录。
 
+
+### 足球管理边界（2026-10-23）
+
+/football/manage 为球队与非家庭球员管理子页：球队使用 LifeSpace PersonGroup，球员使用 Space Person Directory（未绑定用户的 Person），不修改家庭成员 Person。赛事统一由 /activities 管理，足球页提供快捷导航；比赛中新建赛事只是搜索无结果后的快捷 Activity 创建，不提供独立活动目录。球队、赛事、球员搜索为空时，新建按钮携带输入词。统计页改版方案仍需 UX 确认。
