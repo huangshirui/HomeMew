@@ -51,7 +51,7 @@ export function rememberFootballReference(
     ...readRecentFootballReferences(userId, spaceId, model, storage, now).filter(item => item.id !== reference.id),
   ].filter(item => valid(item, now)).slice(0, LIMIT);
   try { storage.setItem(key(userId, spaceId, model), JSON.stringify(next)); }
-  catch { /* cache unavailable: authoritative record workflow is unaffected */ }
+  catch { return []; /* cache unavailable: no saved recents; real workflow unaffected */ }
   return next;
 }
 export function forgetFootballReference(
