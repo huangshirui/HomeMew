@@ -2,6 +2,7 @@ import { Check, Clipboard, Link2, LoaderCircle, RefreshCw, Smartphone } from 'lu
 import { useCallback, useEffect, useState, type PropsWithChildren } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
+import { householdErrorMessage } from '../lib/user-facing-error';
 
 type SessionPayload = {
   data?: {
@@ -90,7 +91,7 @@ export function SessionGate({ children }: PropsWithChildren) {
         expiresAt: typeof payload.data.expiresAt === 'string' ? payload.data.expiresAt : undefined,
       });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : '无法创建关联码');
+      setActionError(householdErrorMessage(error, '无法创建关联码，请稍后重试。'));
     } finally {
       setChallengeBusy(false);
     }
