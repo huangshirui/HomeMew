@@ -60,6 +60,9 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
   const [candidateCursor, setCandidateCursor] = useState<string | null>(null);
   const [candidateLoading, setCandidateLoading] = useState(false);
   const [countdownOpen, setCountdownOpen] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [taskName, setTaskName] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
   const [countdownName, setCountdownName] = useState('');
   const [countdownDate, setCountdownDate] = useState('');
   const [countdowns, setCountdowns] = useState<Record<string, Countdown>>({});
@@ -179,15 +182,45 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
     finally { setWorking(false); }
   }
 
+  async function addTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!writable || !taskName.trim()) return;
+    setWorking(true); setError('');
+    try {
+      // Attach a new task atomically so a failed relation cannot leave an unrelated task behind.
+      await apiRequest(`${core(spaceId)}/models/batch`, {
+        method: 'POST', body: JSON.stringify({
+          atomicConsistency: true,
+          operations: [
+            { operation: 'create', modelKey: 'task', clientRef: 'task', data: {
+              name: taskName.trim().slice(0, 100), dueDate: taskDueDate || null,
+            } },
+            { operation: 'relation_create', predicate: 'relates_to',
+              source: ref(modelKey, record.id),
+              target: { kind: 'record', modelKey: 'task', clientRef: 'task' } },
+          ],
+        }),
+      });
+      setTaskOpen(false); setTaskName(''); setTaskDueDate('');
+      await refreshRelations();
+    } catch (cause) { setError(explain(cause)); }
+    finally { setWorking(false); }
+  }
+
+  function startTask() {
+    setTaskName(''); setTaskDueDate('');
+    setTaskOpen(true); setPickerOpen(false); setCountdownOpen(false);
+  }
+
   function startCountdown() {
     setCountdownName(`${record.name}倒计时`.slice(0, 100));
     setCountdownDate(record.endDate || '');
     setCountdownOpen(true);
-    setPickerOpen(false);
+    setPickerOpen(false); setTaskOpen(false);
   }
 
   function openPicker() {
-    setPickerOpen(true); setCountdownOpen(false);
+    setPickerOpen(true); setCountdownOpen(false); setTaskOpen(false);
     setCandidates([]); setSearch(''); setCandidateCursor(null);
   }
 
@@ -244,7 +277,10 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">关联内容</h3>
-          {writable ? <Button variant="secondary" onClick={openPicker}><Plus className="size-4" /> 关联已有记录</Button> : null}</div>
+          {writable ? <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={startTask}><Plus className="size-4" /> 新建待办</Button>
+            <Button variant="secondary" onClick={openPicker}><Link2 className="size-4" /> 关联已有记录</Button>
+          </div> : null}</div>
         {loading && !outgoing.length ? <p className="text-sm text-stone-500">正在加载…</p> : null}
         {!outgoing.length && !loading ? <p className="text-sm text-stone-500">还没有关联日程、待办或其他记录。</p> : listing(outgoing, true)}
         {outCursor ? <Button variant="ghost" disabled={loading} onClick={() => void moreRelations('source')}>加载更多关联</Button> : null}
@@ -276,6 +312,17 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
         {candidateCursor ? <Button variant="ghost" disabled={candidateLoading} onClick={() => void searchCandidates(candidateCursor)}>加载更多搜索结果</Button> : null}
         <Button variant="ghost" onClick={() => setPickerOpen(false)}>收起</Button>
       </section> : null}
+
+      {taskOpen ? <form className="space-y-3 rounded-2xl border border-stone-200 p-4" onSubmit={event => void addTask(event)}>
+        <h3 className="font-semibold">在此容器中新建待办</h3>
+        <p className="text-xs text-stone-500">新建 LifeSpace Task 并立即关联；任务和关系原子保存。</p>
+        <label className="block text-sm font-medium">待办名称<input required maxLength={100} value={taskName} onChange={event => setTaskName(event.target.value)}
+          className="mt-1 h-10 w-full rounded-xl border border-stone-200 px-3" /></label>
+        <label className="block text-sm font-medium">截止日期（可选）<input type="date" value={taskDueDate} onChange={event => setTaskDueDate(event.target.value)}
+          className="mt-1 h-10 w-full rounded-xl border border-stone-200 px-3" /></label>
+        <div className="flex justify-end gap-2"><Button variant="ghost" disabled={working} onClick={() => setTaskOpen(false)}>取消</Button>
+          <Button variant="primary" type="submit" disabled={working}>{working ? '创建中…' : '创建并关联'}</Button></div>
+      </form> : null}
 
       {countdownOpen && modelKey === 'activity' ? <form className="space-y-3 rounded-2xl border border-stone-200 p-4" onSubmit={event => void addCountdown(event)}>
         <h3 className="font-semibold">新建关联倒计时</h3>
