@@ -96,7 +96,7 @@ export function FootballPage() {
     if (!spaceId) { setPersonId(''); return; }
     const saved = rememberedPerson(spaceId);
     const chosen = familyPeople.find(p => p.id === saved)?.id ??
-      familyPeople.find(p => /(^|[\s·])kk($|[\s·])/i.test(p.name))?.id ??
+      familyPeople.find(p => p.name.toLocaleLowerCase().includes('kk'))?.id ??
       familyPeople[0]?.id ?? '';
     setPersonId(chosen);
     setFilters({ ...blankFilters(), playerPersonId: chosen });
@@ -334,9 +334,9 @@ export function FootballPage() {
             <option value="">全部</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
           <label className={label}>对手球队<select className={input} value={filters.opponentTeamId} onChange={e=>onFilter({opponentTeamId:e.target.value})}>
             <option value="">全部</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-          <label className={label}>球员<select className={input} value={filters.playerPersonId} onChange={e=>onFilter({playerPersonId:e.target.value})}>
-            <option value="">全部球员</option>{familyPeople.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-          <Button variant="ghost" onClick={() => setFilters(blankFilters())}>清空筛选</Button>
+          <label className={label}>球员<select className={input} value={tab==='stats'?personId:filters.playerPersonId} onChange={e=>tab==='stats'?selectPerson(e.target.value):onFilter({playerPersonId:e.target.value})}>
+            {tab==='record' && <option value="">全部球员</option>}{familyPeople.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          <Button variant="ghost" onClick={() => setFilters({ ...blankFilters(), playerPersonId: tab==='stats' ? personId : '' })}>清空筛选</Button>
         </Card>}
       </div>}
       {tab === 'record' && !selected && <>
