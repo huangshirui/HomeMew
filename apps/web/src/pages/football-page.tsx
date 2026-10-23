@@ -494,7 +494,7 @@ export function FootballPage() {
       {tab === 'record' && selected && <>
         <div className="flex items-center gap-2">
           <Button variant="ghost" onClick={()=>setSelected(null)}><ChevronLeft className="size-4"/> 返回比赛列表</Button>
-          <span className="ml-auto text-xs text-stone-500">当前球员：{currentName}</span>
+          <span className="ml-auto text-xs text-stone-500">球员：{currentName}</span>
         </div>
         <Card className="space-y-2 p-4">
           <p className="text-xs text-stone-400">{selected.matchDate} · {competitionNames.get(selected.competitionActivityId ?? '') ?? (selected.matchType === 'official' ? '正式比赛' : '友谊赛')}</p>
@@ -592,7 +592,7 @@ export function FootballPage() {
                 <option value="opponent">按对手</option><option value="competition">按赛事</option>
               </select></label>
           </div>
-          <p className="text-xs text-stone-500">当前球员：{currentName} · 根据所选年份、赛事、球队、对手筛选比赛后计算。只根据已记录表现统计。</p>
+          <p className="text-xs text-stone-500">球员：{currentName} · 根据所选年份、赛事、球队、对手筛选比赛后计算。只根据已记录表现统计。</p>
           {statsError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{statsError}</p>}
           {statsLoading ? <p className="py-8 text-center text-sm text-stone-500">正在分析已筛选比赛…</p> : !schema ? <p className="text-sm text-stone-500">模型发布后可查看统计。</p> : statsError ? null : <>
             <div className="grid grid-cols-2 gap-3">
