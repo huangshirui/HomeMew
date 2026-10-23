@@ -69,7 +69,7 @@ export function FootballPersonPicker({ spaceId, members, selected, onChange, mul
       <div className="relative"><Search className="absolute left-3 top-3 size-4 text-stone-400"/>
         <input autoComplete="off" className={input + ' pl-9'} placeholder="搜索家庭成员或其他球员" value={search} onChange={e => setSearch(e.target.value)}/>
       </div>
-      <p className="px-1 text-xs text-stone-400">家庭成员优先 · 其他 Space Person 按姓名搜索</p>
+      <p className="px-1 text-xs text-stone-400">优先显示家庭成员，也可以按姓名查找其他球员</p>
       <div className="max-h-44 space-y-0.5 overflow-y-auto">
         {candidates.map(p =>
           <button type="button" key={p.id} onClick={() => toggle(p.id)}
