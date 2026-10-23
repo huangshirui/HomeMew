@@ -68,7 +68,7 @@ test('the eight confirmed shortcuts remain separate from the complete published 
   const raw = page.match(/const quickTypes = \[([^\]]+)\];/)?.[1] ?? '';
   const types = Array.from(raw.matchAll(/'([^']+)'/g), match => match[1]);
   assert.deepEqual(types, ['goal','assist','shot','key_pass','successful_dribble','tackle','interception','clearance']);
-  assert.match(page, /types\.filter\(t => !quickTypes\.includes\(t\) && t !== 'appearance'\)/);
+  assert.match(page, /const moreTypes = types\.filter\(t => !quickTypes\.includes\(t\) && t !== 'appearance'\)/);
   assert.match(domain, /shot: '射门'/);
   assert.match(domain, /key_pass: '关键传球'/);
   assert.match(domain, /successful_dribble: '成功过人'/);
