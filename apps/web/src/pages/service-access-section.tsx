@@ -115,7 +115,7 @@ function SecretReveal({ credential, systemName, spaceId, onClose }: {
                 {copied === 'token' ? '已复制' : '复制 Service API Token'}
               </Button>
             )}
-            <p className="mt-2 text-xs leading-5 text-emerald-900/60">Service API Token 是通用 LifeSpace 机器凭据，可供自动化平台、脚本、后端服务等客户端通过 LifeSpace API 访问已授权数据。</p>
+            <p className="mt-2 text-xs leading-5 text-emerald-900/60">请将这份凭据妥善保存在需要连接的外部服务中，不要分享给其他人。</p>
           </div>
         ) : (
           <>
@@ -307,7 +307,7 @@ export function ServiceAccessSection({
 
   async function removeService() {
     if (!service) return;
-    if (!window.confirm(`确认移除“${systemName}”的 Service Access 吗？Service 凭据、当前家庭 Data Grant 和绑定的 Event Push 都会清理；Agent Access 不受影响。`)) return;
+    if (!window.confirm(`确认移除“${systemName}”的服务接入吗？相关凭据和事件推送会停止，AI 助手接入不受影响。`)) return;
     setBusy('remove');
     setError(null);
     try {
@@ -340,7 +340,7 @@ export function ServiceAccessSection({
         <span className="grid size-9 place-items-center rounded-xl bg-emerald-100 text-emerald-800"><Server className="size-4" /></span>
         <div>
           <h2 className="text-xl font-semibold text-stone-900">Service Access</h2>
-          <p className="mt-0.5 text-sm text-stone-500">给自动化流程、脚本、后端服务等机器客户端创建独立 Service Principal、凭据和 Data Grant。</p>
+          <p className="mt-0.5 text-sm text-stone-500">允许外部服务在你设置的权限范围内访问家庭数据。</p>
         </div>
       </div>
 
@@ -354,7 +354,7 @@ export function ServiceAccessSection({
           ) : !service ? (
             <div className="space-y-5">
               <div className="rounded-2xl bg-emerald-50/50 p-4 text-sm leading-6 text-emerald-950/80">
-                Service Access 是可选能力。创建后 LifeSpace 才会生成 <code>svc_*</code>、服务凭据和当前家庭的模型级 Data Grant。
+                只有开启后，外部服务才能使用你授予的家庭数据权限。
               </div>
               <div>
                 <p className="mb-3 text-sm font-semibold text-stone-800">数据访问</p>
@@ -370,7 +370,7 @@ export function ServiceAccessSection({
                   <option value="api_token">Service API Token · Bearer 认证</option>
                   <option value="oauth_client_credentials">OAuth Client Credentials · OAuth 2.0</option>
                 </select>
-                <span className="mt-2 block text-xs leading-5 text-stone-400">两种方式都是通用 LifeSpace 机器接入能力。Service API Token 适合能安全保存长期 Bearer Token 的客户端；OAuth Client Credentials 适合支持标准 OAuth 2.0 客户端凭据流程的系统。</span>
+                <span className="mt-2 block text-xs leading-5 text-stone-400">请根据外部服务支持的登录方式选择。密钥方式适合能妥善保存密钥的服务。</span>
               </label>
               {!readOnly && (
                 <div className="flex justify-end border-t border-stone-100 pt-4">
@@ -433,7 +433,7 @@ export function ServiceAccessSection({
               {service.hasWholeSpaceGrant && (
                 <div className="flex gap-3 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                  <p>这个 Service Principal 仍有旧的 Space 级宽泛授权。请先在 LifeSpace Console 中收敛后再编辑模型权限。</p>
+                  <p>当前服务使用旧的权限设置，为避免误操作，暂时不能在这里修改。请先前往管理控制台调整。</p>
                 </div>
               )}
 
@@ -441,7 +441,7 @@ export function ServiceAccessSection({
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-stone-800">当前家庭数据访问</p>
-                    <p className="mt-1 text-xs leading-5 text-stone-400">LifeSpace Data Grant 决定这个 Service Principal 可读写哪些模型。</p>
+                    <p className="mt-1 text-xs leading-5 text-stone-400">选择这个服务可以查看或修改哪些家庭内容。</p>
                   </div>
                   {!readOnly && !service.hasWholeSpaceGrant && !editingPermissions && (
                     <Button disabled={busy !== null || service.rotationPending} onClick={() => setEditingPermissions(true)}>编辑</Button>
@@ -466,7 +466,7 @@ export function ServiceAccessSection({
                   <div className="text-sm leading-6 text-stone-600">
                     <p className="font-semibold text-stone-900">LifeSpace Connection</p>
                     <code className="mt-2 block break-all text-xs">{familyApiBaseUrl(spaceId)}</code>
-                    <p className="mt-2 text-xs leading-5 text-stone-500">机器客户端使用自己的 Service 凭据访问 LifeSpace；这里的地址只是当前家庭 API 的便捷入口。</p>
+                    <p className="mt-2 text-xs leading-5 text-stone-500">这是外部服务连接当前家庭时使用的地址，请妥善保管凭据。</p>
                   </div>
                 </div>
               </div>
