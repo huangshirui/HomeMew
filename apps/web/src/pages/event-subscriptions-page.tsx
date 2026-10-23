@@ -90,9 +90,9 @@ function formatTime(value: string | null) {
 function displayError(cause: unknown, fallback: string, modelKey?: string) {
   const target = modelKey ? modelLabel(modelKey) : '所选模型';
   if (cause instanceof ApiError && cause.code === 'FORBIDDEN') return '当前账号没有这个家庭的事件推送管理权限。';
-  if (cause instanceof ApiError && cause.code === 'INVALID_WEBHOOK_URL') return 'Webhook 必须是可公开访问的 HTTPS 地址。';
-  if (cause instanceof ApiError && cause.code === 'MODEL_ACCESS_DENIED') return `HomeMew 当前没有${target}模型的读取权限，暂时不能订阅。`;
-  if (cause instanceof ApiError && cause.code === 'EVENT_SUBSCRIBER_ACCESS_DENIED') return `这个外部系统当前没有${target}读取权限。请先在“认证与数据访问”中授予${target}只读或读写权限。`;
+  if (cause instanceof ApiError && cause.code === 'INVALID_WEBHOOK_URL') return '接收地址必须使用 HTTPS，并且可以从互联网访问。';
+  if (cause instanceof ApiError && cause.code === 'MODEL_ACCESS_DENIED') return `暂时无法订阅${target}，请先检查访问权限。`;
+  if (cause instanceof ApiError && cause.code === 'EVENT_SUBSCRIBER_ACCESS_DENIED') return `这个服务还不能查看${target}。请先在“认证与数据访问”中开启对应权限。`;
   return cause instanceof Error ? cause.message : fallback;
 }
 
@@ -162,7 +162,7 @@ function SecretRevealCard({ value, onClose }: { value: SecretReveal; onClose: ()
           </span>
           <div>
             <p className="font-semibold text-emerald-950">{value.endpointName} 的签名密钥</p>
-            <p className="mt-1 text-sm leading-6 text-emerald-900/70">这一个密钥用于验证通过该 Webhook 收到的日程、待办等所有已选事件。明文只会在创建或重新生成时返回。</p>
+            <p className="mt-1 text-sm leading-6 text-emerald-900/70">请妥善保存这份密钥，接收服务需要用它确认消息来源。密钥只显示这一次。</p>
           </div>
         </div>
         <code className="block select-all break-all rounded-2xl bg-white p-4 text-sm text-emerald-950 ring-1 ring-emerald-200">{value.signingSecret}</code>
@@ -173,7 +173,10 @@ function SecretRevealCard({ value, onClose }: { value: SecretReveal; onClose: ()
           </Button>
           <Button onClick={onClose}>我已保存</Button>
         </div>
-        <p className="text-xs leading-5 text-emerald-900/70">验证方式：HMAC-SHA256(timestamp + "." + rawBody)，请求头为 X-LifeSpace-Timestamp 与 X-LifeSpace-Signature。</p>
+        <details className="mt-2 text-xs text-emerald-900/80">
+            <summary className="cursor-pointer">接收服务的验证方法</summary>
+            <p className="mt-2 leading-5">接收服务可使用 HMAC-SHA256(timestamp + "." + rawBody) 验证消息，请求头：X-LifeSpace-Timestamp、X-LifeSpace-Signature。</p>
+          </details>
       </CardContent>
     </Card>
   );
@@ -413,7 +416,7 @@ function EndpointCard({ endpoint, subscriptions, readOnly, onChanged, onReveal }
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-semibold text-stone-900">Webhook</h3>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${endpoint.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'}`}>{endpoint.enabled ? '启用' : '已停用'}</span>
-              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">一套 URL / 一套密钥</span>
+              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">共用地址和密钥</span>
             </div>
             <p className="mt-2 break-all text-sm text-stone-500">{endpoint.destination.url}</p>
           </div>
@@ -442,7 +445,7 @@ function EndpointCard({ endpoint, subscriptions, readOnly, onChanged, onReveal }
         <div>
           <div className="mb-3">
             <h4 className="font-semibold text-stone-900">订阅内容</h4>
-            <p className="mt-1 text-sm leading-6 text-stone-500">只需要选择哪些业务变化发送到上面的同一个 Webhook；不会再为每个模型创建新的 URL 或签名密钥。</p>
+            <p className="mt-1 text-sm leading-6 text-stone-500">选择要通知这个服务的内容即可。</p>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
             {modelOptions.map((option) => (
@@ -456,7 +459,7 @@ function EndpointCard({ endpoint, subscriptions, readOnly, onChanged, onReveal }
               />
             ))}
           </div>
-          <p className="mt-3 text-xs leading-5 text-stone-400">勾选某项前，这个外部系统需要先拥有对应模型的只读或读写 Data Grant。事件订阅本身不会新增数据权限。</p>
+          <p className="mt-3 text-xs leading-5 text-stone-400">请先为这个服务开启相关内容的读取权限。开启通知不会自动增加访问权限。</p>
         </div>
 
         {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
@@ -585,8 +588,8 @@ export function EventSubscriptionsSection({
         <CardContent className="flex gap-3 pt-6">
           <Webhook className="mt-0.5 size-5 shrink-0 text-sky-700" />
           <div>
-            <p className="text-sm font-semibold text-stone-900">一个 Webhook，选择要订阅的内容</p>
-            <p className="mt-1 text-sm leading-6 text-stone-500">日程和待办共享同一个 Webhook URL 和同一套签名密钥。Webhook 只收到 Space、模型、recordId/version 等引用信息；需要完整数据时，外部系统仍按自己的 LifeSpace 权限读取。</p>
+            <p className="text-sm font-semibold text-stone-900">选择要通知的内容</p>
+            <p className="mt-1 text-sm leading-6 text-stone-500">日程和待办的变化会发送到同一个接收地址。通知只包含变化摘要，不会直接发送完整的家庭记录。</p>
           </div>
         </CardContent>
       </Card>
@@ -620,7 +623,7 @@ export function EventSubscriptionsSection({
                 onChange={(event) => setWebhookUrl(event.target.value)}
               />
             </label>
-            <p className="text-xs leading-5 text-stone-400">保存后 LifeSpace 会生成一套签名密钥，只显示一次。以后新增订阅内容不需要生成新的密钥。</p>
+            <p className="text-xs leading-5 text-stone-400">保存后会生成一次性显示的密钥，请及时复制保存。之后可继续增加通知内容。</p>
             <div className="flex justify-end border-t border-stone-100 pt-4">
               <Button variant="primary" disabled={creating || !webhookUrl.trim()} onClick={() => void createEndpoint()}>
                 {creating ? <LoaderCircle className="size-4 animate-spin" /> : <Webhook className="size-4" />}保存 Webhook
