@@ -217,7 +217,7 @@ export function FamilyPage() {
   async function closeFamily() {
     const family = currentFamily;
     if (!family || family.role !== 'owner' || familyActionBusy) return;
-    if (!window.confirm('注销家庭后，所有成员和外部系统会立即失去访问权限。家庭数据不会立即物理删除，当前版本也不能自行恢复。确认继续吗？')) return;
+    if (!window.confirm('注销家庭后，所有成员和外部系统会立即失去访问权限。家庭资料不会立即清除，但目前无法自行恢复。确认继续吗？')) return;
     if (!window.confirm(`再次确认：注销“${family.name}”？注销会立即生效。`)) return;
 
     setFamilyActionBusy('close');
