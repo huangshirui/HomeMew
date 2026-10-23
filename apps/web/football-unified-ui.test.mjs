@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const page = read('./src/pages/football-page.tsx');
@@ -61,4 +62,70 @@ test('analysis filters match scope before selecting a type-based metric', () => 
   assert.match(domain, /assistsPerMatch/);
   assert.match(domain, /countAppearances/);
   assert.match(domain, /new Set\(matches\.filter/);
+});
+
+test('the eight confirmed shortcuts remain separate from the complete published enum picker', () => {
+  const raw = page.match(/const quickTypes = \\[([^\\]]+)\\];/)?.[1] ?? '';
+  const types = Array.from(raw.matchAll(/'([^']+)'/g), match => match[1]);
+  assert.deepEqual(types, ['goal','assist','shot','key_pass','successful_dribble','tackle','interception','clearance']);
+  assert.match(page, /types\\.filter\\(t => !quickTypes\\.includes\\(t\\) && t !== 'appearance'\\)/);
+  assert.match(domain, /shot: '射门'/);
+  assert.match(domain, /key_pass: '关键传球'/);
+  assert.match(domain, /successful_dribble: '成功过人'/);
+  assert.match(domain, /clearance: '解围'/);
+});
+
+function runFootballFunction(name, params) {
+  const match = domain.match(new RegExp('export function ' + name + '\\\\([^]*?\\n}\\n'));
+  assert.ok(match, 'Missing source function ' + name);
+  const body = match[0].slice(match[0].indexOf('{'));
+  return runInNewContext('(function ' + name + '(' + params + ') ' + body + ')', {
+    enumOptions: (schema, field) => schema.fields.find(item => item.key === field)?.values ?? [],
+  });
+}
+
+test('shot outcome follows published schema and never leaks to older definitions', () => {
+  const build = runFootballFunction('performancePayload', 'draft, matchId, schema');
+  const draft = {
+    playerPersonId: 'person_1', performanceType: 'shot', goalMethod: '',
+    shotOutcome: 'on_target', minutesPlayed: '', position: '', entryMode: '', notes: '',
+  };
+  const schema = { fields: [
+    { key: 'performanceType', values: ['goal','shot','tackle'] },
+    { key: 'goalMethod', values: ['header'] },
+    { key: 'shotOutcome', values: ['on_target','off_target','blocked','woodwork','unknown'] },
+  ] };
+  const shot = build(draft, 'match_1', schema);
+  assert.equal(shot.shotOutcome, 'on_target');
+  assert.equal(shot.goalMethod, null);
+  assert.equal(shot.minutesPlayed, null);
+  assert.throws(() => build({ ...draft, shotOutcome: 'invalid' }, 'match_1', schema), /射门结果不在已发布模型中/);
+  const tackle = build({ ...draft, performanceType: 'tackle' }, 'match_1', schema);
+  assert.equal(tackle.shotOutcome, null);
+  assert.equal(tackle.goalMethod, null);
+  const oldSchema = { fields: [
+    { key: 'performanceType', values: ['goal'] }, { key: 'goalMethod', values: ['header'] },
+  ] };
+  const oldGoal = build({ ...draft, performanceType: 'goal', goalMethod: 'header' }, 'match_1', oldSchema);
+  assert.equal(oldGoal.goalMethod, 'header');
+  assert.equal(Object.hasOwn(oldGoal, 'shotOutcome'), false);
+  assert.throws(() => build(draft, 'match_1', oldSchema), /表现类型未在 LifeSpace 发布模型中声明/);
+  assert.match(form, /enumOptions\\(schema, 'shotOutcome'\\)/);
+  assert.match(form, /shotOutcomes\\[key\\] \\?\\? key/);
+  assert.match(form, /shotOutcome: ''/);
+});
+
+test('overlapping shot, key-pass and goalkeeper-save totals are derived once', () => {
+  const count = runFootballFunction('performanceEventCount', 'events, type');
+  const events = [
+    { performanceType: 'goal' }, { performanceType: 'shot' },
+    { performanceType: 'assist' }, { performanceType: 'key_pass' },
+    { performanceType: 'one_on_one_save' }, { performanceType: 'save' },
+  ];
+  assert.equal(count(events, 'shot'), 2);
+  assert.equal(count(events, 'key_pass'), 2);
+  assert.equal(count(events, 'save'), 2);
+  assert.equal(count(events, 'goal'), 1);
+  assert.equal(count(events, 'assist'), 1);
+  assert.match(domain, /return performanceEventCount\\(relevant, type\\)/);
 });
