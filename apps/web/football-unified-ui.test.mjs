@@ -9,6 +9,7 @@ const form = read('./src/pages/football-performance-sheet.tsx');
 const domain = read('./src/pages/football-domain.ts');
 const app = read('./src/app.tsx');
 const picker = read('./src/pages/football-person-picker.tsx');
+const referencePicker = read('./src/pages/football-reference-picker.tsx');
 
 test('football module exposes only Record and Statistics as top-level navigation', () => {
   assert.match(page, /'record' \| 'stats'/);
@@ -202,4 +203,29 @@ test('football search uses the published FootballMatch notes searchable field', 
   assert.match(page, /search: \{ text: appliedSearch \}/);
   assert.match(page, /setAppliedSearch\(searchInput\.trim\(\)\)/);
   assert.match(page, /setAppliedSearch\(''\)/);
+});
+
+test('team and competition selectors support bounded debounced server autocomplete', () => {
+  assert.match(page, /import \{ FootballReferencePicker \}/);
+  assert.match(page, /model="person_group" label="代表球队"/);
+  assert.match(page, /model="person_group" label="对手球队"/);
+  assert.match(page, /model="activity" label="赛事"/);
+  assert.match(referencePicker, /queryModelRecords<FootballReference>/);
+  assert.match(referencePicker, /search: \{ text: term \}/);
+  assert.match(referencePicker, /page: \{ limit: 20 \}/);
+  assert.match(referencePicker, /window\.setTimeout/);
+  assert.match(referencePicker, /320/);
+  assert.match(referencePicker, /length >= 2/);
+  assert.match(referencePicker, /modelUrl\(spaceId, model, value\)/);
+  assert.match(referencePicker, /role="listbox"/);
+  assert.match(referencePicker, /onChange\(id\)/);
+  assert.match(referencePicker, /className="relative z-30 mt-2/); // no clipping by modal scroll container
+});
+test('reference directory is paged and management can search outside the first page', () => {
+  assert.doesNotMatch(page, /queryAllBounded<FootballReference>/);
+  assert.match(page, /page: \{ limit: 50 \}/);
+  assert.match(page, /page: \{ limit: 50, cursor \}/);
+  assert.match(page, /搜索定位/);
+  assert.match(page, /loadMoreReferences\(group\.kind\)/);
+  assert.match(page, /focusReference\(group\.kind, id\)/);
 });
