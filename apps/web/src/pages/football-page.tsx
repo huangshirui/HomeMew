@@ -10,6 +10,7 @@ import { ApiError, apiRequest } from '../lib/api-client';
 import { queryModelRecords } from '../lib/canonical-query';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { FootballPersonPicker } from './football-person-picker';
+import { FootballReferencePicker } from './football-reference-picker';
 import { FootballPerformanceSheet } from './football-performance-sheet';
 import {
   type FootballMatch, type FootballMatchDraft, type FootballPerformance,
@@ -446,15 +447,15 @@ export function FootballPage() {
           <label className="min-w-32 flex-1 text-sm text-stone-600">比赛类型<select className={input}
             value={filters.matchType} onChange={e=>onFilter({matchType:e.target.value})}>
             <option value="">全部类型</option><option value="official">正式比赛</option><option value="friendly">友谊赛</option></select></label>
-          <label className="min-w-32 flex-1 text-sm text-stone-600">赛事<select className={input}
-            value={filters.competitionActivityId} onChange={e=>onFilter({competitionActivityId:e.target.value})}>
-            <option value="">全部赛事</option>{competitions.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-          <label className="min-w-32 flex-1 text-sm text-stone-600">代表球队<select className={input}
-            value={filters.representativeTeamId} onChange={e=>onFilter({representativeTeamId:e.target.value})}>
-            <option value="">全部球队</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-          <label className="min-w-32 flex-1 text-sm text-stone-600">对手球队<select className={input}
-            value={filters.opponentTeamId} onChange={e=>onFilter({opponentTeamId:e.target.value})}>
-            <option value="">全部球队</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+          <FootballReferencePicker className="min-w-32 flex-1" spaceId={spaceId}
+            model="activity" label="赛事" optional known={competitions}
+            value={filters.competitionActivityId} onChange={id => onFilter({competitionActivityId:id})}/>
+          <FootballReferencePicker className="min-w-32 flex-1" spaceId={spaceId}
+            model="person_group" label="代表球队" optional known={teams}
+            value={filters.representativeTeamId} onChange={id => onFilter({representativeTeamId:id})}/>
+          <FootballReferencePicker className="min-w-32 flex-1" spaceId={spaceId}
+            model="person_group" label="对手球队" optional known={teams}
+            value={filters.opponentTeamId} onChange={id => onFilter({opponentTeamId:id})}/>
           <Button variant="ghost" onClick={() => {setFilters({ ...blankFilters(), playerPersonId: personId }); setSearchInput(''); setAppliedSearch('');}}>重置筛选</Button>
         </div>
       </div>}
@@ -632,19 +633,18 @@ export function FootballPage() {
               onChange={e=>setMatchForm({...matchForm,matchType:e.target.value as FootballMatchDraft['matchType']})}>
               <option value="official">正式比赛</option><option value="friendly">友谊赛</option></select></label>
           </div>
-          <label className={label}>赛事
-            <select className={input} value={matchForm.competitionActivityId}
-              onChange={e=>setMatchForm({...matchForm,competitionActivityId:e.target.value})}>
-              <option value="">无</option>{competitions.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <FootballReferencePicker spaceId={spaceId} model="activity" label="赛事" optional
+            known={competitions} disabled={saving} value={matchForm.competitionActivityId}
+            onChange={id=>setMatchForm(prev=>prev ? {...prev,competitionActivityId:id} : prev)}/>
           <Button variant="ghost" type="button" onClick={()=>startReference('competition')}>＋ 新建赛事</Button>
           <div className="grid grid-cols-2 gap-3">
-            {(['representativeTeamId','opponentTeamId'] as const).map(k=><label className={label} key={k}>
-              {k==='representativeTeamId'?'代表球队 *':'对手球队 *'}
-              <select className={input} required value={matchForm[k]}
-                onChange={e=>setMatchForm({...matchForm,[k]:e.target.value})}>
-                <option value="">请选择</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
-              <button className="text-xs text-emerald-700" type="button" onClick={()=>startReference('team',k)}>＋ 新建球队</button>
-            </label>)}
+            {(['representativeTeamId','opponentTeamId'] as const).map(k=><div className="min-w-0" key={k}>
+              <FootballReferencePicker spaceId={spaceId} model="person_group"
+                label={k === 'representativeTeamId' ? '代表球队' : '对手球队'}
+                known={teams} disabled={saving} value={matchForm[k]}
+                onChange={id=>setMatchForm(prev=>prev ? {...prev,[k]:id} : prev)}/>
+              <button className="mt-1 text-xs text-emerald-700" type="button" onClick={()=>startReference('team',k)}>＋ 新建球队</button>
+            </div>)}
           </div>
           <div className="grid grid-cols-2 gap-3">
             {(['representativeTeamScore','opponentTeamScore'] as const).map(k=><label className={label} key={k}>
