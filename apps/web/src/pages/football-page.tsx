@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BarChart3, CalendarDays, ChevronDown, ChevronLeft, Clock3, Plus, RefreshCw, Shield, SlidersHorizontal, Trash2, Trophy, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
-import { RecordIconField, RecordIconMark, emptyIconDraft, presentationToSave, type RecordIconDraft } from '../components/record-icon';
+import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { PageHeader } from '../components/ui/page-header';
@@ -47,6 +48,8 @@ function rememberPerson(spaceId: string, personId: string) {
 
 export function FootballPage() {
   const { currentFamily, members, loading: householdLoading } = useHousehold();
+  const navigate = useNavigate();
+  const managing = useLocation().pathname.endsWith('/manage');
   const spaceId = currentFamily?.id;
   const canWrite = Boolean(currentFamily && currentFamily.role !== 'viewer');
   const [tab, setTab] = useState<'record' | 'stats'>('record');
@@ -63,7 +66,6 @@ export function FootballPage() {
   const [filters, setFilters] = useState<MatchFilter>(blankFilters);
   const [filterOpen, setFilterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [showReferences, setShowReferences] = useState(false);
   const [matchEditing, setMatchEditing] = useState<FootballMatch | null>(null);
   const [matchForm, setMatchForm] = useState<FootballMatchDraft | null>(null);
   const [performanceEditing, setPerformanceEditing] = useState<FootballPerformance | null>(null);
@@ -71,6 +73,8 @@ export function FootballPage() {
   const [formError, setFormError] = useState('');
   const [quickRef, setQuickRef] = useState<ReferenceKind | null>(null);
   const [refName, setRefName] = useState('');
+  const [refDescription, setRefDescription] = useState('');
+  const [refEditing, setRefEditing] = useState<FootballReference | null>(null);
   const [refIcon, setRefIcon] = useState<RecordIconDraft>(emptyIconDraft());
   const [refTarget, setRefTarget] = useState<'representativeTeamId' | 'opponentTeamId' | null>(null);
   const [saving, setSaving] = useState(false);
@@ -107,7 +111,7 @@ export function FootballPage() {
       familyPeople.find(p => p.name.toLocaleLowerCase().includes('kk'))?.id ??
       familyPeople[0]?.id ?? '';
     setPersonId(chosen);
-    setFilters({ ...blankFilters(), playerPersonId: chosen });
+    setFilters(prev => ({ ...prev, playerPersonId: chosen }));
   }, [spaceId, familyPeople]);
   function selectPerson(id: string) {
     setPersonId(id);
@@ -307,10 +311,19 @@ export function FootballPage() {
   if (householdLoading) return <Card className="p-8">正在加载家庭信息…</Card>;
 
   return <div className="space-y-4">
-    <PageHeader title="足球比赛">
-      {tab === 'record' && canWrite && <Button variant="primary" onClick={() => startMatch()}><Plus className="size-4"/> 新建比赛</Button>}
+    <PageHeader title={managing ? '球队与赛事' : '足球比赛'}>
+      {managing ? <Button variant="secondary" onClick={() => navigate('/football')}>
+        <ChevronLeft className="size-4"/> 返回足球比赛
+      </Button> : <>
+        {!selected && <Button variant="secondary" onClick={() => setFilterOpen(v => !v)}
+          aria-expanded={filterOpen} aria-controls="football-search-filters"
+          className={Object.entries(filters).some(([key, value]) => key !== 'playerPersonId' && value) ? 'text-emerald-800 ring-emerald-300' : ''}>
+          <SlidersHorizontal className="size-4"/> 搜索与筛选{Object.entries(filters).some(([key,value]) => key !== 'playerPersonId' && value) ? ' · 已启用' : ''}
+        </Button>}
+        {tab === 'record' && canWrite && <Button variant="primary" onClick={() => startMatch()}><Plus className="size-4"/> 新建比赛</Button>}
+      </>}
     </PageHeader>
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    {!managing && <div className="flex flex-wrap items-center justify-between gap-3">
       <div role="tablist" aria-label="足球主功能" className="flex gap-2">
         {[{ key: 'record' as const, name: '记录', icon: CalendarDays },
           { key: 'stats' as const, name: '统计', icon: BarChart3 }].map(t =>
@@ -320,44 +333,77 @@ export function FootballPage() {
             <t.icon className="size-4"/>{t.name}
           </button>)}
       </div>
-      <label className="flex items-center gap-2 text-sm text-stone-600">当前球员
-        <select className={input + ' max-w-36'} value={personId} onChange={e => selectPerson(e.target.value)}>
-          {familyPeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </label>
-    </div>
+      <div className="ml-auto flex min-w-0 items-center gap-2">
+        <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm text-stone-600">球员
+          <select aria-label="球员" className={input + ' w-28 shrink-0 sm:w-36'} value={personId} onChange={e => selectPerson(e.target.value)}>
+            {familyPeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <Button variant="ghost" className="shrink-0" onClick={() => navigate('/football/manage')}>
+          <Shield className="size-4"/> <span className="hidden sm:inline">球队与赛事</span><span className="sm:hidden">管理</span>
+        </Button>
+      </div>
+    </div>}
     {success && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-    {schemaError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+    {!managing && schemaError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
       当前 LifeSpace 环境尚不能读取足球表现模型；比赛资料仍可查看和编辑，新增表现要先在 LifeSpace 发布 football_performance 并授权。{schemaError}
     </p>}
-    {!spaceId ? <Card className="p-6">请先选择家庭。</Card> : <>
-      {!selected && <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <Button variant="secondary" onClick={() => setFilterOpen(!filterOpen)}>
-            <SlidersHorizontal className="size-4"/> 比赛筛选 {filterOpen ? '收起' : '展开'}
-          </Button>
-          {tab === 'record' && <Button variant="ghost" onClick={() => setShowReferences(!showReferences)}>
-            <Shield className="size-4"/> {showReferences ? '收起球队与赛事' : '管理球队与赛事'}
-          </Button>}
-        </div>
-        {filterOpen && <Card className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
-          <label className={label}>年份
-            <input className={input} type="number" min="1900" max="2100" placeholder="全部年份"
-              value={filters.year} onChange={e => onFilter({ year: e.target.value })}/>
+    {managing && spaceId && <div className="space-y-4">
+      <p className="text-sm text-stone-500">维护比赛使用的球队和赛事。被比赛引用的条目需先解除关联才能删除。</p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {([{kind: 'team' as const, name: '球队', items: teams, model: 'person_group' as const},
+           {kind: 'competition' as const, name: '赛事', items: competitions, model: 'activity' as const}]).map(group =>
+          <Card key={group.kind} className="space-y-3 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold">{group.name}</h2>
+              {canWrite && <Button variant="secondary" onClick={() => startReference(group.kind)}>
+                <Plus className="size-4"/> 新增{group.name}</Button>}
+            </div>
+            <div className="divide-y divide-stone-100">
+              {group.items.map(item => <div key={item.id} className="flex min-h-14 items-center gap-3 py-2">
+                {item.presentation?.icon && <RecordIconMark icon={item.presentation.icon}
+                  spaceId={spaceId} modelKey={group.model} recordId={item.id}/>}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{item.name}</p>
+                  {item.description && <p className="truncate text-xs text-stone-500">{item.description}</p>}
+                </div>
+                {canWrite && <>
+                  <Button variant="ghost" className="shrink-0" onClick={() => startReference(group.kind, null, item)}>编辑</Button>
+                  <Button variant="ghost" size="icon" aria-label={'删除' + group.name + item.name}
+                    disabled={saving} onClick={() => void deleteReference(group.kind, item)}><Trash2 className="size-4"/></Button>
+                </>}
+              </div>)}
+              {!group.items.length && <p className="py-5 text-center text-sm text-stone-500">暂无{group.name}</p>}
+            </div>
+          </Card>)}
+      </div>
+    </div>}
+    {!spaceId ? <Card className="p-6">请先选择家庭。</Card> : !managing && <>
+      {!selected && filterOpen && <div id="football-search-filters"
+        className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <span className="shrink-0 pb-3 text-xs font-medium text-stone-500">筛选</span>
+          <label className="min-w-32 flex-1 text-sm text-stone-600">年份
+            <select aria-label="按年份筛选" className={input} value={filters.year}
+              onChange={e => onFilter({ year: e.target.value })}>
+              <option value="">全部年份</option>{yearOptions.map(year => <option key={year} value={year}>{year}年</option>)}
+            </select>
           </label>
-          <label className={label}>比赛类型<select className={input} value={filters.matchType} onChange={e=>onFilter({matchType:e.target.value})}>
-            <option value="">全部</option><option value="official">正式比赛</option><option value="friendly">友谊赛</option></select></label>
-          <label className={label}>赛事<select className={input} value={filters.competitionActivityId} onChange={e=>onFilter({competitionActivityId:e.target.value})}>
-            <option value="">全部</option>{competitions.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-          <label className={label}>代表球队<select className={input} value={filters.representativeTeamId} onChange={e=>onFilter({representativeTeamId:e.target.value})}>
-            <option value="">全部</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-          <label className={label}>对手球队<select className={input} value={filters.opponentTeamId} onChange={e=>onFilter({opponentTeamId:e.target.value})}>
-            <option value="">全部</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-          <label className={label}>球员<select className={input} value={tab==='stats'?personId:filters.playerPersonId} onChange={e=>tab==='stats'?selectPerson(e.target.value):onFilter({playerPersonId:e.target.value})}>
-            {tab==='record' && <option value="">全部球员</option>}{familyPeople.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-          <Button variant="ghost" onClick={() => setFilters({ ...blankFilters(), playerPersonId: tab==='stats' ? personId : '' })}>清空筛选</Button>
-        </Card>}
+          <label className="min-w-32 flex-1 text-sm text-stone-600">比赛类型<select className={input}
+            value={filters.matchType} onChange={e=>onFilter({matchType:e.target.value})}>
+            <option value="">全部类型</option><option value="official">正式比赛</option><option value="friendly">友谊赛</option></select></label>
+          <label className="min-w-32 flex-1 text-sm text-stone-600">赛事<select className={input}
+            value={filters.competitionActivityId} onChange={e=>onFilter({competitionActivityId:e.target.value})}>
+            <option value="">全部赛事</option>{competitions.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className="min-w-32 flex-1 text-sm text-stone-600">代表球队<select className={input}
+            value={filters.representativeTeamId} onChange={e=>onFilter({representativeTeamId:e.target.value})}>
+            <option value="">全部球队</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+          <label className="min-w-32 flex-1 text-sm text-stone-600">对手球队<select className={input}
+            value={filters.opponentTeamId} onChange={e=>onFilter({opponentTeamId:e.target.value})}>
+            <option value="">全部球队</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+          <Button variant="ghost" onClick={() => setFilters({ ...blankFilters(), playerPersonId: personId })}>重置筛选</Button>
+        </div>
       </div>}
       {tab === 'record' && !selected && <>
         {showReferences && <div className="grid gap-3 md:grid-cols-2">
