@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
-import { apiRequest } from '../lib/api-client';
+import { ApiError, apiRequest } from '../lib/api-client';
 import { queryModelRecords } from '../lib/canonical-query';
 import { RecordIconMark } from '../components/record-icon';
 import { type FootballReference, modelUrl } from './football-domain';
@@ -105,9 +105,14 @@ export function FootballReferencePicker({
       const record = await apiRequest<FootballReference>(modelUrl(spaceId, model, item.id));
       if (record.id !== item.id) throw Error('缓存记录已失效');
       choose(record.id, record);
-    } catch {
-      setRecent(forgetFootballReference(userId, spaceId, model, item.id));
-      setError('此缓存项已失效或当前无权访问，已从本机最近使用中移除');
+    } catch (cause) {
+      if (cause instanceof ApiError && [401, 403, 404, 410].includes(cause.status ?? 0)) {
+        setRecent(forgetFootballReference(userId, spaceId, model, item.id));
+        setError('该记录已不可访问，已从本机最近使用中移除');
+      } else {
+        // Network outages and server failures must not silently erase valid local recents.
+        setError('暂时无法验证缓存记录，请重试；本机缓存已保留');
+      }
     } finally { setValidatingId(''); }
   };
   const removeRecent = (id: string) => {
