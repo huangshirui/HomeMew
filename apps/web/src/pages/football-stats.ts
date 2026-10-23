@@ -81,7 +81,7 @@ export function buildFootballStats(
   for (const match of played.values()) {
     const segments = appearances.get(match.id) ?? [];
     if (!segments.length || !segments.every(s =>
-      Number.isInteger(s.minutesPlayed) && (s.minutesPlayed ?? -1) >= 0)) continue;
+      typeof s.minutesPlayed === 'number' && Number.isInteger(s.minutesPlayed) && s.minutesPlayed >= 0)) continue;
     const minutes = segments.reduce((sum, s) => sum + (s.minutesPlayed ?? 0), 0);
     timedMatches.add(match.id);
     const bucket = buckets.get(match.matchDate.slice(0, 7))!;
