@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ArrowUpRight, CalendarClock, Link2, Plus, Search, Trash2, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 
 type ContainerModel = 'activity' | 'goal' | 'habit';
@@ -24,9 +25,7 @@ const models = [
 const modelName = (key: string) => models.find(model => model.key === key)?.title ?? key;
 const core = (spaceId: string) => `/api/lifespace/core/v1/spaces/${encodeURIComponent(spaceId)}`;
 const ref = (modelKey: string, recordId: string): EntityRef => ({ kind: 'record', modelKey, recordId });
-const explain = (reason: unknown) => reason instanceof ApiError
-  ? reason.message + (reason.requestId ? ' · ' + reason.requestId : '')
-  : reason instanceof Error ? reason.message : '请求失败';
+const explain = (reason: unknown) => householdErrorMessage(reason, '操作失败，请稍后再试。');
 
 function daysUntil(anchorDate: string, timezone: string): number {
   const parts = new Intl.DateTimeFormat('en-US', {
