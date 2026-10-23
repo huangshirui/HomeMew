@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { FootballPersonPicker } from './football-person-picker';
 import {
   type FootballPerformanceDraft, type PerformanceSchema,
-  enumOptions, goalMethods, entryModes, performanceTitle,
+  enumOptions, goalMethods, shotOutcomes, entryModes, performanceTitle,
 } from './football-domain';
 
 type Props = {
@@ -26,6 +26,7 @@ export function FootballPerformanceSheet({
   const patch = (updates: Partial<FootballPerformanceDraft>) => onChange({ ...draft, ...updates });
   const types = enumOptions(schema, 'performanceType');
   const methods = enumOptions(schema, 'goalMethod');
+  const outcomes = enumOptions(schema, 'shotOutcome');
   const modes = enumOptions(schema, 'entryMode');
   return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6">
     <form role="dialog" aria-modal="true" aria-label={editing ? '编辑比赛表现' : '新增比赛表现'}
@@ -40,7 +41,7 @@ export function FootballPerformanceSheet({
           onChange={ids => patch({ playerPersonId: ids[0] ?? '' })} label="表现球员 *" disabled={saving}/>
         <label className={label}>表现类型 *
           <select required className={input} value={draft.performanceType} disabled={saving}
-            onChange={e => onChange({ ...draft, performanceType: e.target.value, goalMethod: '', minutesPlayed: '', position: '', entryMode: '' })}>
+            onChange={e => onChange({ ...draft, performanceType: e.target.value, goalMethod: '', shotOutcome: '', minutesPlayed: '', position: '', entryMode: '' })}>
             {types.map(key => <option key={key} value={key}>{performanceTitle(key)}</option>)}
           </select>
         </label>
@@ -50,6 +51,15 @@ export function FootballPerformanceSheet({
             {methods.map(key => <option key={key} value={key}>{goalMethods[key] ?? key}</option>)}
           </select>
         </label>}
+        {draft.performanceType === 'shot' && outcomes.length > 0 && <label className={label}>射门结果（可选）
+          <select className={input} value={draft.shotOutcome} disabled={saving} onChange={e => patch({ shotOutcome: e.target.value })}>
+            <option value="">未填写</option>
+            {outcomes.map(key => <option key={key} value={key}>{shotOutcomes[key] ?? key}</option>)}
+          </select>
+        </label>}
+        {draft.performanceType === 'shot' && <p className="text-xs text-stone-500">已记录为进球的射门无需再记录一次，进球会自动计入射门和射正统计。</p>}
+        {draft.performanceType === 'key_pass' && <p className="text-xs text-stone-500">同一次助攻无需重复记关键传球，统计时会自动计入。</p>}
+        {draft.performanceType === 'one_on_one_save' && <p className="text-xs text-stone-500">单刀扑救会自动计入扑救总数，无需重复记录普通扑救。</p>}
         {draft.performanceType === 'appearance' && <>
           <label className={label}>本段上场时间（分钟，可选）
             <input className={input} type="number" min="0" step="1" disabled={saving}
