@@ -11,6 +11,8 @@ const app = read('./src/app.tsx');
 const picker = read('./src/pages/football-person-picker.tsx');
 const referencePicker = read('./src/pages/football-reference-picker.tsx');
 const manage = read('./src/pages/football-manage-page.tsx');
+const dashboard = read('./src/pages/football-stats-dashboard.tsx');
+const stats = read('./src/pages/football-stats.ts');
 
 test('football module exposes only Record and Statistics as top-level navigation', () => {
   assert.match(page, /'record' \| 'stats'/);
@@ -55,16 +57,22 @@ test('match participants use bounded person directory search with household prio
   assert.match(page, /playerPersonIds\.includes\(performanceForm\.playerPersonId\)/);
 });
 
-test('analysis filters match scope before selecting a type-based metric', () => {
+test('statistics use filtered LifeSpace records with a natural-month dashboard', () => {
   for (const criterion of ['year','matchType','competitionActivityId','representativeTeamId','opponentTeamId','playerPersonId'])
     assert.match(domain, new RegExp(criterion));
-  assert.match(page, /label="统计指标"|>统计指标/);
-  assert.match(page, /label="图表分组"|>图表分组/);
-  assert.match(domain, /draft\.performanceType === 'appearance'/);
-  assert.match(domain, /goalsPerMatch/);
-  assert.match(domain, /assistsPerMatch/);
-  assert.match(domain, /countAppearances/);
-  assert.match(domain, /new Set\(matches\.filter/);
+  assert.match(page, /<FootballStatsDashboard matches=\{statMatches\} events=\{statEvents\}/);
+  assert.doesNotMatch(page, /label="统计指标"|>统计指标/);
+  assert.doesNotMatch(page, /label="图表分组"|>图表分组/);
+  assert.match(stats, /buildFootballStats/);
+  assert.match(dashboard, /总体数据/);
+  assert.match(dashboard, /专项趋势/);
+  assert.match(dashboard, /进攻场均/);
+  assert.match(dashboard, /进攻时间/);
+  assert.match(dashboard, /防守场均/);
+  assert.match(dashboard, /每月参赛场次/);
+  assert.match(dashboard, /完整记录 /);
+  assert.match(stats, /goalsInTimedMatches/);
+  assert.match(stats, /assistsInTimedMatches/);
 });
 
 test('the eight confirmed shortcuts remain separate from the complete published enum picker', () => {
