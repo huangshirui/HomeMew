@@ -64,8 +64,9 @@ export function FootballReferencePicker({
     const term = search.trim();
     const sufficient = [...term].length >= 2;
     const ticket = ++serial.current;
-    if (term && !sufficient) {
-      setMatches([]); setBusy(false); setError('请输入至少两个字符');
+    if (!sufficient) {
+      // With an empty search, show only user-picked recents; do not scan unrelated models.
+      setMatches([]); setBusy(false); setError(term ? '请输入至少两个字符' : '');
       return;
     }
     const timer = window.setTimeout(() => {
@@ -174,7 +175,7 @@ export function FootballReferencePicker({
             <span className="min-w-0 flex-1 truncate">{item.name}</span>
             {item.id === value && <span className="text-emerald-700">✓</span>}
           </button>)}
-          {!busy && !matches.length && !error && <p className="px-2 py-3 text-sm text-stone-500">没有找到匹配记录</p>}
+          {!busy && !matches.length && !error && <p className="px-2 py-3 text-sm text-stone-500">{search.trim() ? '没有找到匹配记录' : '输入至少两个字搜索更多记录'}</p>}
         </div>
         {busy && <p className="px-2 py-1 text-xs text-stone-500">正在搜索…</p>}
         {error && <p role="status" className="px-2 py-1 text-xs text-stone-500">{error}</p>}
