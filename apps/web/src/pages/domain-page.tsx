@@ -8,7 +8,8 @@ import { Card } from '../components/ui/card';
 import { PageHeader } from '../components/ui/page-header';
 import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { useModalScrollLock } from '../lib/modal-scroll';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 
 type ModelKey = 'activity' | 'goal' | 'anniversary' | 'habit';
@@ -83,8 +84,7 @@ function payloadFor(key: ModelKey, draft: Draft, editing: boolean): Record<strin
   return { ...common, month, day, year, personIds: draft.personIds };
 }
 function message(error: unknown): string {
-  if (error instanceof ApiError) return error.message + (error.requestId ? ' · ' + error.requestId : '');
-  return error instanceof Error ? error.message : '请求失败';
+  return householdErrorMessage(error, '操作失败，请稍后再试。');
 }
 function url(spaceId: string, key: ModelKey, recordId?: string): string {
   return `/api/lifespace/core/v1/spaces/${encodeURIComponent(spaceId)}/models/${key}/records${recordId ? '/' + encodeURIComponent(recordId) : ''}`;
