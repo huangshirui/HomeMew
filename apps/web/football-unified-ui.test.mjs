@@ -56,7 +56,7 @@ test('analysis filters match scope before selecting a type-based metric', () => 
     assert.match(domain, new RegExp(criterion));
   assert.match(page, /label="统计指标"|>统计指标/);
   assert.match(page, /label="图表分组"|>图表分组/);
-  assert.match(domain, /type === 'appearance'/);
+  assert.match(domain, /draft\.performanceType === 'appearance'/);
   assert.match(domain, /goalsPerMatch/);
   assert.match(domain, /assistsPerMatch/);
   assert.match(domain, /countAppearances/);
