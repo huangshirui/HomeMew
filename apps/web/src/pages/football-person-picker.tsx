@@ -8,36 +8,41 @@ type Props = {
   spaceId: string; members: FamilyMember[];
   selected: string[]; onChange: (ids: string[]) => void;
   multiple?: boolean; label?: string; disabled?: boolean;
+  onCreate?: (name: string) => void;
+  knownPeople?: FootballPerson[];
 };
 const input = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-500';
 
-export function FootballPersonPicker({ spaceId, members, selected, onChange, multiple = false, label = '球员', disabled }: Props) {
+export function FootballPersonPicker({ spaceId, members, selected, onChange, multiple = false, label = '球员', disabled, onCreate, knownPeople = [] }: Props) {
   const [search, setSearch] = useState('');
   const [people, setPeople] = useState<FootballPerson[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [searched, setSearched] = useState('');
   const [failure, setFailure] = useState('');
   const family = useMemo(() => members.filter(m => m.personId).map(m => ({
     id: m.personId!, displayName: m.displayName || '家庭成员',
   })), [members]);
-  const selectedNames = useMemo(() => new Map([...family, ...people].map(p => [p.id, p.displayName])), [family, people]);
-  useEffect(() => { setSearch(''); setPeople([]); setOpen(false); }, [spaceId]);
+  const selectedNames = useMemo(() => new Map([...family, ...knownPeople, ...people].map(p => [p.id, p.displayName])), [family, knownPeople, people]);
+  useEffect(() => { setSearch(''); setPeople([]); setOpen(false); setSearched(''); }, [spaceId]);
   useEffect(() => {
     if (!open) return;
     let alive = true;
+    setSearched('');
+    setBusy(true);
     const timer = window.setTimeout(() => {
       setBusy(true); setFailure('');
       const query = search.trim();
       apiRequest<{ items: FootballPerson[]; nextCursor: string | null }>(
         '/api/lifespace/core/v1/spaces/' + encodeURIComponent(spaceId) + '/people?limit=50' +
         (query ? '&q=' + encodeURIComponent(query) : ''),
-      ).then(result => { if (alive) setPeople(result.items); })
-        .catch(error => { if (alive) setFailure(error instanceof Error ? error.message : '搜索失败'); })
+      ).then(result => { if (alive) { setPeople(result.items); setSearched(query); } })
+        .catch(error => { if (alive) { setSearched(''); setPeople([]); setFailure(error instanceof Error ? error.message : '搜索失败'); } })
         .finally(() => { if (alive) setBusy(false); });
     }, 220);
     return () => { alive = false; window.clearTimeout(timer); };
   }, [open, search, spaceId]);
-  const candidateMap = new Map([...family, ...people].map(person => [person.id, person]));
+  const candidateMap = new Map([...family, ...knownPeople, ...people].map(person => [person.id, person]));
   const candidates = [...candidateMap.values()].filter(person => !search.trim() ||
     person.displayName.toLowerCase().includes(search.trim().toLowerCase()) ||
     people.some(p => p.id === person.id));
@@ -76,6 +81,12 @@ export function FootballPersonPicker({ spaceId, members, selected, onChange, mul
       {busy && <p className="px-2 text-xs text-stone-400">正在搜索…</p>}
       {failure && <p role="alert" className="px-2 text-xs text-red-700">{failure}</p>}
       {!busy && !candidates.length && <p className="px-2 text-xs text-stone-400">没有找到匹配的球员</p>}
+      {onCreate && !disabled && !busy && !failure && !candidates.length &&
+        search.trim().length >= 2 && searched === search.trim() && <button type="button"
+          className="w-full rounded-xl bg-emerald-50 px-3 py-2 text-left text-sm text-emerald-800"
+          onClick={() => { onCreate(search.trim()); setOpen(false); }}>
+          + 新建球员“{search.trim()}”
+        </button>}
       {multiple && <button type="button" className="w-full rounded-lg bg-stone-100 py-2 text-sm" onClick={() => setOpen(false)}>完成</button>}
     </div>}
   </div>;
