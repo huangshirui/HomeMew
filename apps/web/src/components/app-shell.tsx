@@ -24,15 +24,18 @@ const dailyNavigation = [
   { to: '/', label: '今天', icon: Home, end: true },
   { to: '/calendar', label: '日程', icon: CalendarDays },
   { to: '/tasks', label: '待办', icon: CheckSquare2 },
-  { to: '/days', label: '日子', icon: Clock3 },
-  { to: '/wishes', label: '许愿', icon: Heart },
 ];
 
-const domainNavigation = [
+const growthNavigation = [
   { to: '/activities', label: '活动', icon: CalendarRange },
   { to: '/goals', label: '目标', icon: Target },
   { to: '/habits', label: '习惯', icon: Flame },
+];
+
+const memoriesNavigation = [
+  { to: '/days', label: '日子', icon: Clock3 },
   { to: '/anniversaries', label: '纪念日', icon: Gift },
+  { to: '/wishes', label: '许愿池', icon: Heart },
   { to: '/football', label: '足球比赛', icon: Trophy },
 ];
 
@@ -109,61 +112,44 @@ function FamilyIdentity({ mobile = false }: { mobile?: boolean }) {
   );
 }
 
+type SidebarEntry = { to: string; label: string; icon: typeof Home; end?: boolean };
+
+function SidebarSection({ title, entries, first = false }: { title: string; entries: readonly SidebarEntry[]; first?: boolean }) {
+  return (
+    <section className={first ? '' : 'mt-4 border-t border-stone-200/80 pt-4'} aria-label={title}>
+      <h2 className="mb-2 px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400">{title}</h2>
+      <div className="space-y-0.5">
+        {entries.map(({ to, label, icon: Icon, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            className={({ isActive }) => cn(
+              'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+              isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',
+            )}
+          >
+            <Icon className="size-[18px] shrink-0" />
+            {label}
+          </NavLink>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function DesktopNav() {
   const { user } = useHousehold();
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-stone-200/80 bg-[#fbfcfa] px-4 py-5 lg:flex lg:flex-col">
-      <FamilyIdentity />
-      <nav className="mt-6">
-        <div className="space-y-1">
-          {dailyNavigation.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) => cn(
-                'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',
-              )}
-            >
-              <Icon className="size-[18px]" />
-              {label}
-            </NavLink>
-          ))}
-        </div>
-        <div className="mt-6 border-t border-stone-200/80 pt-5">
-          <p className="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400">计划、成长与记录</p>
-          <div className="mt-2 space-y-1">
-            {domainNavigation.map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to} className={({ isActive }) => cn(
-                'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',
-              )}>
-                <Icon className="size-[18px]" />{label}
-              </NavLink>
-            ))}
-          </div>
-        </div>
-        <div className="mt-6 border-t border-stone-200/80 pt-5">
-          <p className="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400">家庭管理</p>
-          <div className="mt-2 space-y-1">
-            {managementNavigation.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) => cn(
-                  'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors',
-                  isActive ? 'bg-emerald-50 text-emerald-800' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-800',
-                )}
-              >
-                <Icon className="size-[18px]" />
-                {label}
-              </NavLink>
-            ))}
-          </div>
-        </div>
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-hidden border-r border-stone-200/80 bg-[#fbfcfa] px-4 py-5 lg:flex">
+      <div className="shrink-0"><FamilyIdentity /></div>
+      <nav aria-label="家庭主导航" className="mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 scrollbar-overlay">
+        <SidebarSection title="日常" entries={dailyNavigation} first />
+        <SidebarSection title="计划与成长" entries={growthNavigation} />
+        <SidebarSection title="生活与回忆" entries={memoriesNavigation} />
+        <SidebarSection title="家庭管理" entries={managementNavigation} />
       </nav>
-      <div className="mt-auto flex items-center gap-3 border-t border-stone-200/80 px-2 pt-4">
+      <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-stone-200/80 px-2 pt-4">
         <Avatar
           src={user?.avatarUrl}
           alt={user?.displayName ? `${user.displayName}的头像` : '我的头像'}
