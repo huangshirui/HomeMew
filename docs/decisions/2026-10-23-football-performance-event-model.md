@@ -110,3 +110,16 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 - Restore the user-approved quick action pictograms ⚽ 👟 🎯 💡 ✨ 🛡️ ✂️ 🚀 with consistent light, neutral buttons. There is no semantic importance or selected state implied for goal/assist; avoid arbitrarily emphasizing those buttons with solid green. Show subtle per-type counts in each quick button instead of an extra duplicated row of count chips.
 - Rename UI-only `appearance` from 出场片段 to **出场记录**, retaining one record per position-stable playing segment and the original `appearance` enum key. Put other published event types in a responsive expandable **更多表现** chooser, not a cramped inline label/select pair. The shortcut still opens the existing unified form and requires explicit save; no automatic writes.
 - Keep performance load errors local to the event list; when a save succeeds but the subsequent read fails, the UI must not imply that the save itself failed. Preview end-to-end verification is required before main merge/production rollout.
+
+## 2026-10-23 · 第二轮 Preview 列表/筛选/管理设计
+
+- 按日程/待办页面既有标准，把「搜索与筛选」放在 PageHeader「新建比赛」旁，筛选区采用相同的白底浅色描边折叠面板。年份是下拉选项；比赛类型/赛事/代表球队/对手球队保留；球员只在顶部保留一个不换行的选择器，其选中 ID 同时驱动比赛列表和统计，不在筛选区重复。
+- 足球顶栏「记录 / 统计」右侧提供「球队与赛事」入口，进入 `/football/manage` 独立子页（返回足球比赛）。管理列表可以新增、编辑名称/说明/图标、按 LifeSpace record version 删除；删除前对代表球队、对手球队、赛事所关联 FootballMatch 使用 bounded `contains` 查询检查，如有关联需先处理比赛。其他 LifeSpace 客户端仍可能关联同一通用模型，故需提醒跨模块删除风险，并保留 LifeSpace 自身授权及引用校验。
+- 比赛记录改为紧凑响应式单行：日期/比赛性质、双方球队与比分、可选赛事、记录/编辑操作，保留 cursor 分页及真实模型引用。
+
+### PersonGroup / Activity 类型枚举建议（仅提案，未获平台开发授权）
+
+- **PersonGroup.type**: 建议 `sports_team`（运动队）、`class`（班级）、`work_team`（工作团队）、`interest_group`（兴趣小组）、`other`（其他）。不要使用 `family` 来表达 LifeSpace Space 的家庭分类，也不要让 type 成为授权身份或独立模型。足球球队筛选 `sports_team`；明确 `club` 与运动队可能重叠，首版不另建枚举项。
+- **Activity.type**: 建议 `competition`（赛事）、`trip`（旅行）、`camp`（营地/集训）、`gathering`（聚会/集体活动）、`learning`（学习活动）、`other`（其他）。足球赛事筛选 `competition`；不要把一场 FootballMatch 自身作为 Activity。
+- **过渡规则**: 两个字段均建议可空且非必填；历史记录保持 `null`，不强制推断分类。可在 Web 创建该业务对象时写默认 type，但必须等 LifeSpace 定义明确发布；发布前本 PR 不传未声明字段。是否需要把 type 设置为 filterable index、是否要限定通用模型的查询由平台另行审查，绝不在 HomeMew 自建影子索引。
+- 这是一项跨 LifeSpace Baseline 的通用模型契约变更，只提供建议。应由用户确认选项后，在 LifeSpace 仓库按 AGENTS 及 compatible Registry 版本化流程单独实现，不能借 HomeMew 前端 PR 改写 Baseline。
