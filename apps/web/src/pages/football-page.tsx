@@ -14,13 +14,14 @@ import {
   type FootballMatch, type FootballMatchDraft, type FootballPerformance,
   type FootballPerformanceDraft, type FootballReference, type MatchFilter, type PerformanceSchema,
   blankFilters, blankMatch, blankPerformance, commonTypes, entryModes, enumOptions,
-  goalMethods, matchDraft, matchPayload, matchQueryFilter, metricValue, modelUrl,
+  goalMethods, shotOutcomes, matchDraft, matchPayload, matchQueryFilter, metricValue, modelUrl,
+  performanceEventCount,
   performanceDraft, performancePayload, performanceTitle, queryAllBounded, readPerformanceSchema,
 } from './football-domain';
 
 const input = 'h-10 w-full min-w-0 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-500';
 const label = 'block space-y-1 text-sm font-medium text-stone-700';
-const quickTypes = ['goal', 'assist', 'tackle', 'interception'];
+const quickTypes = ['goal', 'assist', 'shot', 'key_pass', 'successful_dribble', 'tackle', 'interception', 'clearance'];
 type ReferenceKind = 'team' | 'competition';
 
 function message(cause: unknown): string {
@@ -262,7 +263,7 @@ export function FootballPage() {
   }
 
   const types = schema ? enumOptions(schema, 'performanceType') : [];
-  const typeCount = (kind: string) => performances.filter(p => p.playerPersonId === personId && p.performanceType === kind).length;
+  const typeCount = (kind: string) => performanceEventCount(performances.filter(p => p.playerPersonId === personId), kind);
   const statMetrics = [
     ...(types.filter(t => t !== 'appearance').map(t => ({ key: t, name: performanceTitle(t) + '数' }))),
     { key: 'goalsPerMatch', name: '场均进球' }, { key: 'assistsPerMatch', name: '场均助攻' },
@@ -422,7 +423,7 @@ export function FootballPage() {
             </label>}
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
-            {types.filter(t=>t!=='appearance').map(t=><span key={t} className="rounded-lg bg-stone-100 px-3 py-2">
+            {quickTypes.filter(t=>types.includes(t)).map(t=><span key={t} className="rounded-lg bg-stone-100 px-3 py-2">
               {performanceTitle(t)} {typeCount(t)}
             </span>)}
           </div>
@@ -438,6 +439,7 @@ export function FootballPage() {
                 <span className="ml-2 font-normal text-stone-500">{familyPeople.find(x=>x.id===p.playerPersonId)?.name ?? '其他参赛球员'}</span></p>
               <p className="text-xs text-stone-400">
                 {p.performanceType==='goal' ? (goalMethods[p.goalMethod ?? ''] ?? p.goalMethod ?? '进球方式可补充') : ''}
+                {p.performanceType==='shot' ? (shotOutcomes[p.shotOutcome ?? ''] ?? p.shotOutcome ?? '射门结果可补充') : ''}
                 {p.performanceType==='appearance' ? [
                   p.minutesPlayed !== null && p.minutesPlayed !== undefined ? p.minutesPlayed + ' 分钟' : '时长可补充',
                   p.position ?? '', entryModes[p.entryMode ?? ''] ?? ''
