@@ -162,7 +162,7 @@ export function FootballManagePage() {
         }),
       ]);
       if (refs.some(result => result.items.length)) throw Error('球员被比赛或表现记录引用，请先处理关联');
-      if (!window.confirm('删除球员“' + person.displayName + '”？该 Person 可能被其他模块使用。')) return;
+      if (!window.confirm('删除球员“' + person.displayName + '”？这个人也可能用于其他家庭记录。')) return;
       await apiRequest(personPath(spaceId, person.id), {
         method: 'DELETE', body: JSON.stringify({ version: person.version }),
       });
@@ -190,7 +190,7 @@ export function FootballManagePage() {
     {!spaceId ? <Card className="p-6">请先选择家庭。</Card> :
       tab === 'teams' ? <Card className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-stone-500">最近使用及已记录比赛中的球队。其他 PersonGroup 可以通过名称搜索定位。</p>
+          <p className="text-sm text-stone-500">这里显示你最近选过或在比赛中用过的球队，也可以搜索其他球队。</p>
           {canWrite && <Button variant="primary" onClick={() => startTeam()}><Plus className="size-4"/> 新建球队</Button>}
         </div>
         <FootballReferencePicker userId={user?.id ?? ''} spaceId={spaceId} model="person_group"
@@ -211,11 +211,11 @@ export function FootballManagePage() {
                   disabled={busy} onClick={() => void deleteTeam(team)}><Trash2 className="size-4"/></Button>
               </>}
             </div>)}
-          {!teams.length && <p className="p-4 text-sm text-stone-500">暂无已用球队，可搜索已有 PersonGroup 或新建球队。</p>}
+          {!teams.length && <p className="p-4 text-sm text-stone-500">还没有常用球队，可以搜索或新建。</p>}
         </div>
       </Card> : <Card className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-stone-500">只管理未关联登录用户的 Space Person；家庭成员在家庭管理中维护。</p>
+          <p className="text-sm text-stone-500">这里管理其他球员；家庭成员的信息请到家庭管理中修改。</p>
           {canWrite && <Button variant="primary" onClick={() => startPlayer()}><Plus className="size-4"/> 新建球员</Button>}
         </div>
         <input className={input} placeholder="搜索球员姓名" value={playerSearch}
@@ -264,7 +264,7 @@ export function FootballManagePage() {
           <input autoFocus required maxLength={100} className={input} value={personDraft}
             onChange={e => setPersonDraft(e.target.value)}/>
         </label>
-        <p className="text-xs text-stone-500">创建非家庭成员 Space Person，不自动加入家庭，也不产生登录账号。</p>
+        <p className="text-xs text-stone-500">新建球员不会自动加入家庭成员。</p>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" type="button" disabled={busy} onClick={() => {setPersonDraft('');setEditingPerson(null);setPersonDialogOpen(false);}}>取消</Button>
           <Button variant="primary" type="submit" disabled={busy}>保存</Button>
