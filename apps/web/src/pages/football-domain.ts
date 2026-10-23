@@ -13,7 +13,7 @@ export type FootballPerformance = {
   position?: string | null; entryMode?: string | null; notes?: string | null;
 };
 export type FootballReference = {
-  id: string; name: string; description?: string | null;
+  id: string; version: number; name: string; description?: string | null; type?: string | null;
   presentation?: { icon?: import('../components/record-icon').RecordIcon | null };
 };
 export type FootballPerson = { id: string; displayName: string; alternateNames?: string[] };
