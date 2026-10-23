@@ -1,0 +1,8 @@
+.football-recents { padding: 8rpx 0; }
+.football-recents-title { color: #78716c; font-size: 22rpx; padding: 8rpx 12rpx; display: block; }
+.football-recents-list { max-height: 400rpx; overflow-y: auto; }
+.football-recent-row { display: flex; align-items: center; gap: 8rpx; min-height: 76rpx; border-bottom: 1rpx solid #f5f5f4; }
+.football-recent-select { flex: 1; min-width: 0; text-align: left; font-size: 28rpx; color: #292524; background: transparent; padding: 12rpx; border: 0; line-height: 44rpx; margin: 0; }
+.football-recent-select::after, .football-recent-remove::after { border: 0; }
+.football-recent-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.football-recent-remove { flex-shrink: 0; width: 64rpx; height: 64rpx; line-height: 64rpx; text-align: center; font-size: 36rpx; color: #78716c; border: 0; padding: 0; background: transparent; margin: 0; }
