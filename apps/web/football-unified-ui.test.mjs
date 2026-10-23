@@ -65,10 +65,10 @@ test('analysis filters match scope before selecting a type-based metric', () => 
 });
 
 test('the eight confirmed shortcuts remain separate from the complete published enum picker', () => {
-  const raw = page.match(/const quickTypes = \\[([^\\]]+)\\];/)?.[1] ?? '';
+  const raw = page.match(/const quickTypes = \[([^\]]+)\];/)?.[1] ?? '';
   const types = Array.from(raw.matchAll(/'([^']+)'/g), match => match[1]);
   assert.deepEqual(types, ['goal','assist','shot','key_pass','successful_dribble','tackle','interception','clearance']);
-  assert.match(page, /types\\.filter\\(t => !quickTypes\\.includes\\(t\\) && t !== 'appearance'\\)/);
+  assert.match(page, /types\.filter\(t => !quickTypes\.includes\(t\) && t !== 'appearance'\)/);
   assert.match(domain, /shot: '射门'/);
   assert.match(domain, /key_pass: '关键传球'/);
   assert.match(domain, /successful_dribble: '成功过人'/);
@@ -76,7 +76,7 @@ test('the eight confirmed shortcuts remain separate from the complete published 
 });
 
 function runFootballFunction(name, params) {
-  const match = domain.match(new RegExp('export function ' + name + '\\\\([^]*?\\n}\\n'));
+  const match = domain.match(new RegExp('export function ' + name + '\\([^]*?\\n}\\n'));
   assert.ok(match, 'Missing source function ' + name);
   const body = match[0].slice(match[0].indexOf('{'));
   return runInNewContext('(function ' + name + '(' + params + ') ' + body + ')', {
@@ -110,8 +110,8 @@ test('shot outcome follows published schema and never leaks to older definitions
   assert.equal(oldGoal.goalMethod, 'header');
   assert.equal(Object.hasOwn(oldGoal, 'shotOutcome'), false);
   assert.throws(() => build(draft, 'match_1', oldSchema), /表现类型未在 LifeSpace 发布模型中声明/);
-  assert.match(form, /enumOptions\\(schema, 'shotOutcome'\\)/);
-  assert.match(form, /shotOutcomes\\[key\\] \\?\\? key/);
+  assert.match(form, /enumOptions\(schema, 'shotOutcome'\)/);
+  assert.match(form, /shotOutcomes\[key\] \?\? key/);
   assert.match(form, /shotOutcome: ''/);
 });
 
@@ -127,5 +127,5 @@ test('overlapping shot, key-pass and goalkeeper-save totals are derived once', (
   assert.equal(count(events, 'save'), 2);
   assert.equal(count(events, 'goal'), 1);
   assert.equal(count(events, 'assist'), 1);
-  assert.match(domain, /return performanceEventCount\\(relevant, type\\)/);
+  assert.match(domain, /return performanceEventCount\(relevant, type\)/);
 });
