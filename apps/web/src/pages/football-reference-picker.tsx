@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { ApiError, apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 import { RecordIconMark } from '../components/record-icon';
 import { type FootballReference, modelUrl } from './football-domain';
@@ -86,7 +87,7 @@ export function FootballReferencePicker({
       }).catch(cause => {
         if (ticket !== serial.current) return;
         setMatches([]); setSearchedTerm('');
-        setError(cause instanceof Error ? cause.message : '搜索失败');
+        setError(householdErrorMessage(cause, '搜索失败，请稍后重试。'));
       }).finally(() => { if (ticket === serial.current) setBusy(false); });
     }, 320);
     return () => { window.clearTimeout(timer); ++serial.current; };
