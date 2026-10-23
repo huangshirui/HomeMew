@@ -15,14 +15,14 @@ export type Match = {
   representativeTeamScore: number | null; opponentTeamScore: number | null;
   playerPersonIds: string[]; notes: string | null;
 };
-export type FootballGoal = { id: string; version: number; matchId: string; scorerPersonId: string; assisterPersonId?: string | null; goalMethod: string | null; notes: string | null };
+export type FootballGoal = { id: string; version: number; matchId: string; scorerPersonId: string; goalMethod: string | null; notes: string | null };
 type Reference = { id: string; name: string; description?: string | null; presentation?: { icon?: RecordIcon | null } };
 type MatchDraft = {
   matchDate: string; matchType: 'official' | 'friendly'; competitionActivityId: string;
   representativeTeamId: string; opponentTeamId: string; representativeTeamScore: string;
   opponentTeamScore: string; playerPersonIds: string[]; notes: string;
 };
-type GoalDraft = { scorerPersonId: string; assisterPersonId: string; goalMethod: string; notes: string };
+type GoalDraft = { scorerPersonId: string; goalMethod: string; notes: string };
 type Stats = { total: number; wins: number; draws: number; losses: number; scored: number; conceded: number };
 export function calculateStats(matches: Match[]): Stats {
   const completed = matches.filter(match => Number.isInteger(match.representativeTeamScore) && Number.isInteger(match.opponentTeamScore));
@@ -32,42 +32,6 @@ export function calculateStats(matches: Match[]): Stats {
     if (own > opponent) acc.wins++; else if (own === opponent) acc.draws++; else acc.losses++;
     return acc;
   }, { total: 0, wins: 0, draws: 0, losses: 0, scored: 0, conceded: 0 });
-}
-type PlayerPerformance = { played: number; scored: number; assisted: number; goalsPerMatch: number | null; assistsPerMatch: number | null };
-/**
- * Personal averages have the recorded participant count (not the team's fixture count)
- * as denominator. Keep goals or assists with missing participation as known facts, but
- * never synthesize an appearance; rates remain undefined when no appearance is recorded.
- */
-export function calculatePlayerPerformance(
-  matches: Match[], goalRecords: FootballGoal[], householdPersonIds: ReadonlySet<string>,
-): Array<[string, PlayerPerformance]> {
-  const totals = new Map<string, { played: number; scored: number; assisted: number }>();
-  const matchIds = new Set(matches.map(match => match.id));
-  const ensure = (id: string) => {
-    let t = totals.get(id);
-    if (!t) { t = { played: 0, scored: 0, assisted: 0 }; totals.set(id, t); }
-    return t;
-  };
-  for (const match of matches) {
-    for (const personId of new Set(match.playerPersonIds ?? [])) {
-      if (householdPersonIds.has(personId)) ensure(personId).played++;
-    }
-  }
-  for (const goal of goalRecords) {
-    if (!matchIds.has(goal.matchId)) continue;
-    if (householdPersonIds.has(goal.scorerPersonId)) ensure(goal.scorerPersonId).scored++;
-    if (goal.assisterPersonId && goal.assisterPersonId !== goal.scorerPersonId && householdPersonIds.has(goal.assisterPersonId)) {
-      ensure(goal.assisterPersonId).assisted++;
-    }
-  }
-  return [...totals.entries()].map(([personId, total]): [string, PlayerPerformance] => [
-    personId, {
-      ...total,
-      goalsPerMatch: total.played ? total.scored / total.played : null,
-      assistsPerMatch: total.played ? total.assisted / total.played : null,
-    },
-  ]).sort((a, b) => (b[1].scored + b[1].assisted) - (a[1].scored + a[1].assisted));
 }
 const classInput = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-400';
 const field = 'block space-y-1 text-sm font-medium text-stone-600';
@@ -171,8 +135,19 @@ export function FootballPage() {
   const filtered = useMemo(() => matches.filter(m => (!year || m.matchDate.startsWith(year)) && (!type || m.matchType === type)
     && (!team || m.representativeTeamId === team)), [matches, year, type, team]);
   const stats = useMemo(() => calculateStats(filtered), [filtered]);
-  const householdPersonIds = useMemo(() => new Set(members.filter(m => m.personId).map(m => m.personId!)), [members]);
-  const byPlayer = useMemo(() => calculatePlayerPerformance(filtered, goals, householdPersonIds), [filtered, goals, householdPersonIds]);
+  const filteredIds = useMemo(() => new Set(filtered.map(m => m.id)), [filtered]);
+  const goalRecords = goals.filter(g => filteredIds.has(g.matchId));
+  const byPlayer = useMemo(() => {
+    const counts = new Map<string, { played: number; scored: number }>();
+    for (const m of filtered) for (const id of new Set(m.playerPersonIds ?? [])) {
+      const value = counts.get(id) ?? { played: 0, scored: 0 }; value.played++; counts.set(id, value);
+    }
+    for (const g of goalRecords) {
+      const value = counts.get(g.scorerPersonId) ?? { played: 0, scored: 0 };
+      value.scored++; counts.set(g.scorerPersonId, value);
+    }
+    return [...counts.entries()].sort((a,b) => b[1].scored - a[1].scored);
+  }, [filtered, goalRecords]);
   const months = useMemo(() => {
     const grouped = new Map<string, { scored: number; conceded: number }>();
     for (const m of filtered) {
@@ -211,11 +186,9 @@ export function FootballPage() {
     setSaving(true); setError('');
     try {
       if (!goalDraft.scorerPersonId) throw new Error('请选择进球人');
-      if (goalDraft.assisterPersonId && goalDraft.assisterPersonId === goalDraft.scorerPersonId) throw new Error('进球人与助攻球员不能是同一人');
       await apiRequest(modelUrl(spaceId, 'football_goal'), {
         method: 'POST',
         body: JSON.stringify({ matchId: selected.id, scorerPersonId: goalDraft.scorerPersonId,
-          ...(goalDraft.assisterPersonId ? { assisterPersonId: goalDraft.assisterPersonId } : {}),
           goalMethod: goalDraft.goalMethod || null, notes: goalDraft.notes.trim() || null }),
       });
       setGoalDraft(null); setRefresh(x => x + 1);
@@ -246,7 +219,7 @@ export function FootballPage() {
       {canWrite ? <Button variant="primary" onClick={() => { setEditing(null); setDraft(blankMatch()); }}><Plus className="size-4"/> 记录比赛</Button> : null}
     </PageHeader>
     <div className="flex flex-wrap gap-2" role="tablist" aria-label="足球模块">
-      {([{ id:'matches', label:'比赛', icon:CalendarDays },{ id:'stats',label:'球员统计',icon:BarChart3 },{ id:'references',label:'球队与赛事',icon:Shield }] as const)
+      {([{ id:'matches', label:'比赛', icon:CalendarDays },{ id:'stats',label:'统计',icon:BarChart3 },{ id:'references',label:'球队与赛事',icon:Shield }] as const)
         .map(item => <button role="tab" aria-selected={tab===item.id} key={item.id} onClick={() => setTab(item.id)}
           className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${tab===item.id ? 'bg-emerald-700 text-white' : 'bg-white text-stone-600 ring-1 ring-stone-200'}`}>
           <item.icon className="size-4"/>{item.label}</button>)}
@@ -304,12 +277,10 @@ export function FootballPage() {
             </div>
           </div>) : <p className="text-sm text-stone-500">暂无比分数据</p>}
         </Card>
-        <Card className="space-y-3 p-5"><h2 className="font-semibold">家庭球员统计</h2>
-          <p className="text-xs text-stone-500">仅统计当前家庭成员；场均以明确登记的个人参赛场次为分母。未登记助攻不等于确定无人助攻。</p>
-          {byPlayer.length ? byPlayer.map(([id,v])=><div key={id} className="flex flex-col gap-1 border-b border-stone-100 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <span className="font-medium">{membersByPersonId.get(id) ?? '家庭球员'}</span>
-            <span className="text-stone-500">{v.played} 场参赛 · {v.scored} 球 · {v.assisted} 助攻 · 场均进球 {v.goalsPerMatch === null ? '—' : v.goalsPerMatch.toFixed(2)} · 场均助攻 {v.assistsPerMatch === null ? '—' : v.assistsPerMatch.toFixed(2)}</span>
-          </div>) : <p className="text-sm text-stone-500">暂无家庭球员数据</p>}
+        <Card className="space-y-3 p-5"><h2 className="font-semibold">球员统计</h2>
+          {byPlayer.length ? byPlayer.map(([id,v])=><div key={id} className="flex items-center justify-between border-b border-stone-100 py-2 text-sm">
+            <span>{membersByPersonId.get(id) ?? '家庭成员'}</span><span className="text-stone-500">{v.played} 场出场 · {v.scored} 粒已记录进球</span></div>)
+            : <p className="text-sm text-stone-500">暂无球员数据</p>}
         </Card>
       </div> : <div className="grid gap-4 md:grid-cols-2">
         <Card className="space-y-2 p-5"><h2 className="font-semibold">球队 (PersonGroup)</h2>
@@ -331,9 +302,9 @@ export function FootballPage() {
         <Button variant="ghost" size="icon" aria-label="关闭" onClick={() => setSelected(null)}><X className="size-4"/></Button></div>
       <p className="text-base font-medium">{teamNames.get(selected.representativeTeamId) ?? '代表球队'} {selected.representativeTeamScore ?? '–'} : {selected.opponentTeamScore ?? '–'} {teamNames.get(selected.opponentTeamId) ?? '对方球队'}</p>
       {selected.notes ? <p className="text-sm text-stone-500">{selected.notes}</p> : null}
-      <div className="flex items-center justify-between"><h3 className="font-medium">进球记录</h3>{canWrite ? <Button variant="secondary" onClick={() => setGoalDraft({scorerPersonId:'',assisterPersonId:'',goalMethod:'',notes:''})}><Plus className="size-4"/> 进球</Button> : null}</div>
+      <div className="flex items-center justify-between"><h3 className="font-medium">进球记录</h3>{canWrite ? <Button variant="secondary" onClick={() => setGoalDraft({scorerPersonId:'',goalMethod:'',notes:''})}><Plus className="size-4"/> 进球</Button> : null}</div>
       {goals.filter(g => g.matchId === selected.id).map(g=><div key={g.id} className="flex items-center gap-2 rounded-xl bg-stone-50 p-3 text-sm">
-        <Trophy className="size-4 text-amber-600"/><span className="flex-1">{membersByPersonId.get(g.scorerPersonId) ?? '进球球员'} 进球{g.assisterPersonId ? ' · '+(membersByPersonId.get(g.assisterPersonId) ?? '其他球员')+' 助攻' : ''} · {methodName[g.goalMethod || ''] ?? '方式未填'} {g.notes ? ' · '+g.notes : ''}</span>
+        <Trophy className="size-4 text-amber-600"/><span className="flex-1">{membersByPersonId.get(g.scorerPersonId) ?? '家庭成员'} · {methodName[g.goalMethod || ''] ?? '方式未填'} {g.notes ? ' · '+g.notes : ''}</span>
         {canWrite ? <Button variant="ghost" size="icon" disabled={saving} onClick={() => void deleteRecord('football_goal',g.id,g.version)}><Trash2 className="size-4"/></Button> : null}
       </div>)}
       {canWrite ? <Button variant="ghost" onClick={() => void deleteRecord('football_match',selected.id,selected.version)}><Trash2 className="size-4"/> 删除比赛</Button> : null}
@@ -370,8 +341,6 @@ export function FootballPage() {
         <h2 className="font-semibold">添加进球</h2>
         <label className={field}>进球人 *<select required className={classInput} value={goalDraft.scorerPersonId} onChange={e=>setGoalDraft({...goalDraft,scorerPersonId:e.target.value})}>
           <option value="">选择成员</option>{members.filter(m=>m.personId).map(m=><option key={m.personId} value={m.personId}>{m.displayName||'家庭成员'}</option>)}</select></label>
-        <label className={field}>助攻球员（可选）<select className={classInput} value={goalDraft.assisterPersonId} onChange={e=>setGoalDraft({...goalDraft,assisterPersonId:e.target.value})}>
-          <option value="">未登记助攻</option>{members.filter(m=>m.personId && m.personId !== goalDraft.scorerPersonId).map(m=><option key={m.personId} value={m.personId}>{m.displayName||'家庭成员'}</option>)}</select></label>
         <label className={field}>方式<select className={classInput} value={goalDraft.goalMethod} onChange={e=>setGoalDraft({...goalDraft,goalMethod:e.target.value})}><option value="">未填写</option>
           {Object.entries(methodName).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
         <label className={field}>备注<textarea className="min-h-16 w-full rounded-xl border border-stone-200 p-3" value={goalDraft.notes} onChange={e=>setGoalDraft({...goalDraft,notes:e.target.value})}/></label>
