@@ -70,7 +70,7 @@ test('statistics use filtered LifeSpace records with a natural-month dashboard',
   assert.match(dashboard, /进攻时间/);
   assert.match(dashboard, /防守场均/);
   assert.match(dashboard, /每月参赛场次/);
-  assert.match(dashboard, /完整记录 /);
+  assert.match(dashboard, /已记时长 /);
   assert.match(stats, /goalsInTimedMatches/);
   assert.match(stats, /assistsInTimedMatches/);
 });
