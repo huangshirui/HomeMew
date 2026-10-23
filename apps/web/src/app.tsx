@@ -6,6 +6,7 @@ import { SessionGate } from './components/session-gate';
 import { CalendarPage } from './pages/calendar-page';
 import { DomainPage } from './pages/domain-page';
 import { FootballPage } from './pages/football-page';
+import { FootballManagePage } from './pages/football-manage-page';
 import { DaysPage } from './pages/days-page';
 import { FamilyPage } from './pages/family-page';
 import { HomePage } from './pages/home-page';
@@ -31,7 +32,7 @@ export function App() {
             <Route path="anniversaries" element={<DomainPage modelKey="anniversary" />} />
             <Route path="habits" element={<DomainPage modelKey="habit" />} />
             <Route path="football" element={<FootballPage />} />
-            <Route path="football/manage" element={<FootballPage />} />
+            <Route path="football/manage" element={<FootballManagePage />} />
             <Route path="wishes" element={<WishesPage />} />
             <Route path="family" element={<FamilyPage />} />
             <Route path="more" element={<MorePage />} />
