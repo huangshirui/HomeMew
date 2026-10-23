@@ -133,3 +133,11 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 **Web 自动补全立即交付（无需等目录模型）**：比赛表单的两支球队和赛事、五维筛选中的球队和赛事选择器改为共享的 FootballReferencePicker，利用 LifeSpace PersonGroup/Activity 已声明 `searchable: ["name","description"]`。展开时获取排序后的首 20 条；输入至少 2 字符且 320ms 防抖后发起 Canonical Query search，单次 limit=20，结果过多提示继续输入；已选 ID 不在当前候选列表时按 ID GET 精确读取，支持历史比赛。弹出结果保持在流式布局内，避免被 Modal 滚动容器裁剪。保留图标和快速新建入口。
 
 **性能边界**：当前 Canonical Query search 使用 `LIKE '%term%'`，limit=20 只限制返回量，不保证底层读取是索引前缀扫描。加入最短输入与防抖减少调用数量，但未来较大数据集仍须由 LifeSpace 实现严格受索引约束的 prefix search/field suggestions，HomeMew 不进行任意无界查询、影子搜索索引或绕过授权。原对 PersonGroup/Activity 的启动 400 条全部读取已更改为各取前 50 条，管理页支持加载更多及通过输入精确定位任意已存在记录，已有比赛引用缺失名称按 Record ID 补齐；记录管理仍保留正式 LifeSpace 访问边界。
+
+## 2026-10-23 · 本机最近选择缓存（Web 和小程序）
+
+- 本次增加可清除的客户端 UI 最近选择，而非 PersonGroup/Activity 类型、授权或 LifeSpace 业务目录。按已验证用户 ID、家庭 Space ID、模型种类隔离；最多 12 条，90 天自动过期，重选置顶、去重。只保存引用 ID、显示名称和最近选择时间。Web、小程序各自保存到本机，不跨设备自动同步。
+- Web 足球选择器展示最近选择，每项独立 × 移除本机缓存，不删除 LifeSpace 记录、不更改比赛关联。使用最近选择时先按 ID 从 LifeSpace 重新查询和验证权限，失效自动剔除；首次展示最近选择时不触发无筛选全集搜索。正常输入两个字符后继续用延迟的 Canonical Query 搜索；从比赛表单新建后自动选中的球队/赛事也记入最近。
+- 小程序没有足球比赛页面，也没有相关稳定 Mini BFF 足球业务路由。本次先提供 native wx-storage 缓存工具和带 × 的可复用近期候选组件，暂不连接不存在的界面。未来小程序页面接入时，必须先通过明确的 HomeMew BFF 查询、校验被缓存引用，再提交实际选择，不能直接访问 LifeSpace Core 线协议。
+- 本机缓存不能证明某个对象属于足球业务的正式目录；该目录依然需要后续经批准的 LifeSpace 业务关系或用途机制，不能用此缓存充当第二份权威业务库。
+
