@@ -6,5 +6,5 @@ export const lifeSpaceConfig = {
 export const browserAuthCapability = {
   status: 'platform-follow-up' as const,
   message:
-    'HomeMew Web 尚未接入 LifeSpace 的浏览器登录能力；当前页面只展示界面预览数据。',
+    '暂时无法登录家事喵，请稍后再试。',
 };
