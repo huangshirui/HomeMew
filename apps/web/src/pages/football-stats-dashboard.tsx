@@ -59,7 +59,7 @@ export function FootballStatsDashboard({ matches, events, playerId, playerName }
     const values = months.flatMap(month => variant.keys.map(key => month[key]))
       .filter((n): n is number => n !== null && Number.isFinite(n));
     const lineMax = Math.max(1, Math.max(0, ...values) * 1.1);
-    const countMax = Math.max(1, ...months.map(m => m.matches));
+    const countMax = Math.max(2, Math.ceil(Math.max(0, ...months.map(m => m.matches)) / 2) * 2);
     const y = (v: number) => lineBottom - (v / lineMax) * (lineBottom - top);
     const barY = (v: number) => barBottom - (v / countMax) * (barBottom - barTop);
     return { width, left, right, top, lineBottom, barTop, barBottom,
