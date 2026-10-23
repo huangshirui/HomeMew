@@ -11,6 +11,7 @@ import { queryModelRecords } from '../lib/canonical-query';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { FootballPersonPicker } from './football-person-picker';
 import { FootballReferencePicker } from './football-reference-picker';
+import { rememberFootballReference } from './football-recent-references';
 import { FootballPerformanceSheet } from './football-performance-sheet';
 import {
   type FootballMatch, type FootballMatchDraft, type FootballPerformance,
@@ -360,10 +361,16 @@ export function FootballPage() {
       });
       if (quickRef === 'team') {
         setTeams(prev => refEditing ? prev.map(t => t.id === ref.id ? ref : t) : [...prev, ref]);
-        if (refTarget) setMatchForm(prev => prev ? { ...prev, [refTarget]: ref.id } : prev);
+        if (refTarget) {
+          setMatchForm(prev => prev ? { ...prev, [refTarget]: ref.id } : prev);
+          rememberFootballReference(user?.id ?? '', spaceId, 'person_group', ref);
+        }
       } else {
         setCompetitions(prev => refEditing ? prev.map(t => t.id === ref.id ? ref : t) : [...prev, ref]);
-        setMatchForm(prev => prev ? { ...prev, competitionActivityId: ref.id } : prev);
+        if (matchForm) {
+          setMatchForm(prev => prev ? { ...prev, competitionActivityId: ref.id } : prev);
+          rememberFootballReference(user?.id ?? '', spaceId, 'activity', ref);
+        }
       }
       setQuickRef(null); setRefEditing(null); setRefName(''); setRefDescription(''); setRefIcon(emptyIconDraft());
       setSuccess(refEditing ? '已更新' + (quickRef === 'team' ? '球队' : '赛事') : '已新增' + (quickRef === 'team' ? '球队' : '赛事'));
