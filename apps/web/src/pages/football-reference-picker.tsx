@@ -102,7 +102,7 @@ export function FootballReferencePicker({
         <ChevronDown className="size-4 shrink-0 text-stone-500"/>
       </button>
       {open && <div id={id + '-options'} role="listbox" aria-labelledby={id + '-label'}
-        className="absolute inset-x-0 top-full z-30 mt-1 rounded-2xl border border-stone-200 bg-white p-2 shadow-xl">
+        className="relative z-30 mt-2 rounded-2xl border border-stone-200 bg-white p-2 shadow-sm">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 size-4 text-stone-400"/>
           <input autoFocus autoComplete="off" value={search}
@@ -113,7 +113,7 @@ export function FootballReferencePicker({
             <X className="size-4"/>
           </button>}
         </div>
-        <div className="mt-2 max-h-52 space-y-0.5 overflow-y-auto">
+        <div className="mt-2 max-h-48 space-y-0.5 overflow-y-auto">
           {optional && <button type="button" role="option" aria-selected={!value}
             className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-stone-50"
             onClick={() => choose('')}>全部 / 不指定</button>}
