@@ -58,7 +58,6 @@ export function MorePage() {
           </div>
         </section>
       ))}
-      <p className="text-xs text-stone-400">首页、日程与待办可从底部导航直接进入；家庭管理权限由 LifeSpace 校验。</p>
     </div>
   );
 }
