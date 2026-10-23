@@ -10,6 +10,7 @@ const domain = read('./src/pages/football-domain.ts');
 const app = read('./src/app.tsx');
 const picker = read('./src/pages/football-person-picker.tsx');
 const referencePicker = read('./src/pages/football-reference-picker.tsx');
+const manage = read('./src/pages/football-manage-page.tsx');
 
 test('football module exposes only Record and Statistics as top-level navigation', () => {
   assert.match(page, /'record' \| 'stats'/);
@@ -48,7 +49,7 @@ test('one source of truth: FootballPerformance replaces FootballGoal, with enum 
 
 test('match participants use bounded person directory search with household priority', () => {
   assert.match(picker, /\/people\?limit=50/);
-  assert.match(picker, /family, \.\.\.people/);
+  assert.match(picker, /family, \.\.\.knownPeople, \.\.\.people/);
   assert.match(picker, /search.trim\(\)/);
   assert.match(page, /label="参赛球员（家庭成员优先）"/);
   assert.match(page, /playerPersonIds\.includes\(performanceForm\.playerPersonId\)/);
@@ -175,18 +176,17 @@ test('football filters reuse the Calendar/Tasks header standard and one global p
   assert.match(page, /重置筛选/);
 });
 
-test('team and competition management is a separate route with edit and protected delete', () => {
-  assert.match(app, /path="football\/manage" element=\{<FootballPage \/>}/);
+test('football manager owns teams and unlinked players but never manages Activity list', () => {
+  assert.match(app, /path="football\/manage" element=\{<FootballManagePage \/>}/);
   assert.match(page, /navigate\('\/football\/manage'\)/);
-  assert.match(page, /navigate\('\/football'\)/);
-  assert.doesNotMatch(page, /showReferences/);
-  assert.match(page, /method: refEditing \? 'PATCH' : 'POST'/);
-  assert.match(page, /version: refEditing.version/);
-  assert.match(page, /iconDraftFor/);
-  assert.match(page, /deleteReference\(group.kind, item\)/);
-  assert.match(page, /filter: \{ field, op: 'contains', value: reference.id \}/);
-  assert.match(page, /page: \{ limit: 1 \}/);
-  assert.match(page, /已被比赛使用/);
+  assert.match(manage, /navigate\('\/activities'\)/);
+  assert.match(manage, /赛事管理 → 活动/);
+  assert.match(manage, /!p\.linkedUser && !familyPersonIds\.has\(p\.id\)/);
+  assert.match(manage, /method: editingPerson \? 'PATCH' : 'POST'/);
+  assert.match(manage, /method: editingTeam \? 'PATCH' : 'POST'/);
+  assert.match(manage, /playerPersonIds', op: 'contains'/);
+  assert.match(manage, /field: 'playerPersonId', op: 'contains'/);
+  assert.doesNotMatch(manage, /queryModelRecords<FootballReference>\(spaceId, 'activity'/);
   assert.match(domain, /version: number; name: string; description/);
 });
 
@@ -221,11 +221,34 @@ test('team and competition selectors support bounded debounced server autocomple
   assert.match(referencePicker, /onChange\(id\)/);
   assert.match(referencePicker, /className="relative z-30 mt-2/); // no clipping by modal scroll container
 });
-test('reference directory is paged and management can search outside the first page', () => {
+test('reference lookup is bounded and Activity is never preloaded as a competition directory', () => {
   assert.doesNotMatch(page, /queryAllBounded<FootballReference>/);
-  assert.match(page, /page: \{ limit: 50 \}/);
-  assert.match(page, /page: \{ limit: 50, cursor \}/);
-  assert.match(page, /搜索定位/);
-  assert.match(page, /loadMoreReferences\(group\.kind\)/);
-  assert.match(page, /focusReference\(group\.kind, id\)/);
+  assert.match(page, /page: \{ limit: 30 \}/);
+  assert.match(referencePicker, /page: \{ limit: 20 \}/);
+  assert.match(manage, /readRecentFootballReferences/);
+  assert.match(manage, /page: \{ limit: 50 \}/);
+  assert.match(manage, /搜索定位球队/);
+  assert.doesNotMatch(page, /queryModelRecords<FootballReference>\(spaceId, 'activity'/);
+});
+
+test('quick creation only follows completed zero-result search and carries the typed name', () => {
+  assert.match(referencePicker, /searchedTerm === search\.trim\(\)/);
+  assert.match(referencePicker, /matches\.length === 0/);
+  assert.match(referencePicker, /!busy && !error/);
+  assert.match(referencePicker, /onCreate\(searchedTerm\)/);
+  assert.match(page, /startReference\('competition', null, null, name\)/);
+  assert.match(page, /startReference\('team', k, null, name\)/);
+  assert.match(page, /setRefName\(record\?\.name \?\? initialName\)/);
+  assert.doesNotMatch(page, /type="button" onClick=\{\(\)=>startReference\('competition'\)\}/);
+  assert.match(picker, /searched === search\.trim\(\)/);
+  assert.match(picker, /onCreate\(search\.trim\(\)\)/);
+});
+test('match and top-level player creation use the Space Person Directory', () => {
+  assert.match(page, /async function saveNewPlayer/);
+  assert.match(page, /method: 'POST'/);
+  assert.match(page, /displayName: newPlayerName\.trim\(\)/);
+  assert.match(page, /playerPersonIds: \[\.\.\.new Set/);
+  assert.match(page, /onCreate=\{name => startPlayer\(name, 'match'\)\}/);
+  assert.match(page, /\+ 新建球员/);
+  assert.match(manage, /linkedUser/);
 });
