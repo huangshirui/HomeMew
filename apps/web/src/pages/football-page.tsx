@@ -73,6 +73,7 @@ export function FootballPage() {
   const [playerDialog, setPlayerDialog] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerTarget, setNewPlayerTarget] = useState<'match' | 'current'>('current');
+  const [playerSearchOpen, setPlayerSearchOpen] = useState(false);
   const [filters, setFilters] = useState<MatchFilter>(blankFilters);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -119,6 +120,17 @@ export function FootballPage() {
     ...otherPeople.map(p => ({ id: p.id, name: p.displayName })),
   ].map(p => [p.id, p])).values()], [familyPeople, otherPeople]);
   const currentName = selectablePeople.find(p => p.id === personId)?.name ?? '选择球员';
+  useEffect(() => {
+    if (!spaceId || !personId || selectablePeople.some(p => p.id === personId)) return;
+    let active = true;
+    apiRequest<FootballPerson>('/api/lifespace/core/v1/spaces/' + encodeURIComponent(spaceId) +
+      '/people/' + encodeURIComponent(personId))
+      .then(person => { if (active) setOtherPeople(prev =>
+        [...new Map([...prev,person].map(p => [p.id,p])).values()]); })
+      .catch(() => { /* Revalidate later; never replace an unavailable Person with a guessed identity. */ });
+    return () => { active = false; };
+  }, [spaceId, personId, selectablePeople]);
+
   useModalScrollLock(Boolean(matchForm || performanceForm || quickRef || playerDialog));
 
   useEffect(() => {
@@ -140,7 +152,7 @@ export function FootballPage() {
     setSelected(null); setPerformances([]); setEventsError(''); setMatches([]); setNextCursor(null);
     setTeams([]); setCompetitions([]); setTeamCursor(null); setCompetitionCursor(null);
     setManagerFocus({team:'',competition:''}); attemptedRefLookup.current.clear();
-    setOtherPeople([]); setPlayerDialog(false); setNewPlayerName('');
+    setOtherPeople([]); setPlayerDialog(false); setNewPlayerName(''); setPlayerSearchOpen(false);
     setMoreOpen(false);
     setMatchForm(null); setPerformanceForm(null); setSuccess(''); setError('');
   }, [spaceId]);
@@ -492,14 +504,25 @@ export function FootballPage() {
             {selectablePeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
+        <Button variant="ghost" className="shrink-0" onClick={() => setPlayerSearchOpen(v => !v)}>
+          {playerSearchOpen ? '收起球员搜索' : '查找球员'}
+        </Button>
         {canWrite && <Button variant="ghost" className="shrink-0" onClick={() => startPlayer()}>+ 新建球员</Button>}
         <Button variant="ghost" className="shrink-0" onClick={() => navigate('/football/manage')}>
-
           <Shield className="size-4"/> <span className="hidden sm:inline">球队与球员</span><span className="sm:hidden">管理</span>
+        </Button>
+        <Button variant="ghost" className="shrink-0" onClick={() => navigate('/activities')}>
+          <CalendarDays className="size-4"/> <span className="hidden sm:inline">赛事 → 活动</span><span className="sm:hidden">活动</span>
         </Button>
       </div>
     </div>}
-    {success && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>}
+    {!managing && playerSearchOpen && spaceId && <Card className="max-w-lg p-3">
+      <FootballPersonPicker spaceId={spaceId} members={members} knownPeople={otherPeople}
+        selected={personId ? [personId] : []} label="选择球员"
+        onChange={ids => {if (ids[0]) selectPerson(ids[0]); setPlayerSearchOpen(false);}}
+        onCreate={canWrite ? name => startPlayer(name) : undefined}/>
+    </Card>}
+    {success && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!managing && schemaError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
       当前 LifeSpace 环境尚不能读取足球表现模型；比赛资料仍可查看和编辑，新增表现要先在 LifeSpace 发布 football_performance 并授权。{schemaError}
