@@ -113,7 +113,7 @@ Page({
       success:async res=>{
         if(!res.confirm)return;
         this.setData({submitting:true,error:''});
-        try{await deleteDomainRecord(d.familyId,d.kind,d.recordId,d.version);wx.navigateBack({delta:2});}
+        try{await deleteDomainRecord(d.familyId,d.kind,d.recordId,d.version);wx.redirectTo({url:'/pages/domains/list?kind='+d.kind});}
         catch(e){this.setData({error:errorMessage(e)});}
         finally{this.setData({submitting:false});}
       },
