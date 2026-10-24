@@ -22,12 +22,12 @@ test('mobile family logo selector opens accessible family and member panel witho
   const header = source('./src/components/ui/page-header.tsx');
   const home = source('./src/pages/home-page.tsx');
   assert.match(header, /<FamilyIdentity mobile \/>/u);
-  assert.match(header, /grid-cols-\\[minmax\\(0,1fr\\)_auto_minmax\\(0,1fr\\)\\]/u);
-  assert.match(header, /text-center text-\\[20px\\] font-semibold/u);
-  assert.match(shell, /familyAvatarSource\\(currentFamily.id, currentFamily.avatarUrl\\)/u);
-  assert.match(shell, /aria-expanded=\\{open\\}/u);
-  assert.match(shell, /setCurrentFamilyId\\(family.id\\)/u);
-  assert.match(shell, /<MemberAvatar key=\\{member.id\\}/u);
+  assert.ok(header.includes('grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]'));
+  assert.ok(header.includes('text-center text-[20px] font-semibold'));
+  assert.ok(shell.includes('familyAvatarSource(currentFamily.id, currentFamily.avatarUrl)'));
+  assert.ok(shell.includes('aria-expanded={open}'));
+  assert.ok(shell.includes('setCurrentFamilyId(family.id)'));
+  assert.ok(shell.includes('<MemberAvatar key={member.id}'));
   assert.match(home, /<PageHeader title="首页" mobileActions=/u);
   assert.doesNotMatch(shell, /<div className="mx-auto flex h-16 max-w-7xl/u);
 });
