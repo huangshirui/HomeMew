@@ -51,7 +51,7 @@ function AnniversaryDayItems({ records }: { records: AnniversaryRecord[] }) {
   </div> : null;
 }
 
-type EventDraft = {
+export type EventDraft = {
   icon: RecordIconDraft;
   summary: string;
   description: string;
@@ -156,7 +156,7 @@ function displayMonth(month: string) {
   return `${year}年${rawMonth}月`;
 }
 
-function defaultDraft(timeZone: string, date?: string): EventDraft {
+export function defaultDraft(timeZone: string, date?: string): EventDraft {
   const startDate = date ?? currentDateInZone(timeZone);
   return {
     summary: '',
@@ -206,7 +206,7 @@ function draftFromEvent(event: EventRecord, viewingTimezone: string): EventDraft
   };
 }
 
-function eventPayload(draft: EventDraft) {
+export function eventPayload(draft: EventDraft) {
   if (!draft.summary.trim()) throw new Error('请输入日程名称');
   if (!draft.startDate || !draft.endDate) throw new Error('请选择日期');
   const common = {
@@ -905,7 +905,7 @@ function CalendarHeader({ onCreate, canWrite, onToggleFilters, filtersExpanded, 
   );
 }
 
-function EventEditor({
+export function EventEditor({
   draft,
   spaceId,
   editing,
