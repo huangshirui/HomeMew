@@ -1,4 +1,5 @@
 import webHandler from './worker.mjs';
+import { handleMiniNewDomainBff } from './miniprogram-new-domains-bff.mjs';
 import { handleMiniProgramBff } from './miniprogram-bff.mjs';
 import { handleMiniProgramFinalEventBff } from './miniprogram-final-event-bff.mjs';
 import { handleMiniProgramFamilyBff } from './miniprogram-family-bff.mjs';
@@ -50,6 +51,9 @@ export function createFrontDoorHandler({ app = webHandler } = {}) {
       if (new URL(request.url).pathname.startsWith('/_stage/')) {
         return json({ error: { code: 'NOT_FOUND', message: 'Legacy staging route is retired' } }, 404);
       }
+      const newDomainResponse = await handleMiniNewDomainBff(request, env);
+      if (newDomainResponse) return newDomainResponse;
+
       const eventBffResponse = await handleMiniProgramFinalEventBff(request, env);
       if (eventBffResponse) return eventBffResponse;
 
