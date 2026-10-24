@@ -232,7 +232,7 @@ test('team and competition selectors support bounded debounced server autocomple
   assert.match(referencePicker, /modelUrl\(spaceId, model, value\)/);
   assert.match(referencePicker, /role="listbox"/);
   assert.match(referencePicker, /onChange\(id\)/);
-  assert.match(referencePicker, /overlay \? 'absolute right-0 top-full z-50 mt-2/);
+  assert.match(referencePicker, /overlay\s*\?\s*'absolute right-0 top-full z-50 mt-2/);
   assert.match(referencePicker, /'relative z-30 mt-2 shadow-sm'/); // flow in modal, overlay in filter
   assert.match(page, /className="min-w-32 flex-1" overlay spaceId=\{spaceId\}/);
   assert.equal((page.match(/className="min-w-32 flex-1" overlay spaceId=\{spaceId\}/g) ?? []).length, 3);
