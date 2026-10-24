@@ -69,3 +69,14 @@ test('Task quick action uses the complete existing editor with atomic relation',
   assert.match(relations, /presentationToSave\(spaceId, 'task', taskDraft\.icon\)/);
   assert.match(relations, /atomicConsistency: true/);
 });
+
+test('LifeSpace detail GET populates the viewed record; never loops into navigation', () => {
+  // The regression affected all three containers: a broad rename converted
+  // setContainerFor(record) in the request continuation into openDetail(record).
+  const detailLoad = page.match(/void apiRequest<DomainRecord>\(url\(currentFamily\.id, modelKey, recordId\)\)[\s\S]*?\.finally\(\(\) => \{ if \(!cancelled\) setDetailLoading\(false\); \}\);/)?.[0];
+  assert.ok(detailLoad, 'detail must GET by model key and record ID');
+  assert.match(detailLoad, /\.then\(record => \{ if \(!cancelled\) setContainerFor\(record\); \}\)/);
+  assert.doesNotMatch(detailLoad, /openDetail\(|navigate\(/);
+  assert.match(page, /: !containerFor \? <Card/);
+  assert.match(page, /record=\{containerFor\}/);
+});
