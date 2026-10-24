@@ -17,7 +17,7 @@ test('Activity Goal Habit have deep-linked detail routes, not container dialogs'
   assert.match(page, /detailMode \? !currentFamily/);
   assert.match(page, /mode="page"/);
   assert.match(page, /navigate\(listPath\)/);
-  assert.doesNotMatch(page, /setContainerFor\(record\)/);
+  assert.match(page, /\.then\(record => \{ if \(!cancelled\) setContainerFor\(record\); \}\)/);
 });
 
 test('Current tab is initial Activity view, with date-aware bounded server query', () => {
