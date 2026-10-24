@@ -180,3 +180,10 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 - **总体数据新增「胜率」**：从当前统计筛选范围内、该球员在 `playerPersonIds` 的比赛出发，按比赛 ID 去重；仅比分两侧均为有效非负整数的比赛进入分母，`wins = representativeTeamScore > opponentTeamScore`，平局与失利计入分母但不计胜场。胜率 = 胜场 / 有比分场次。没有有效比分时为 `null`，页面显示“—”，有比分但无胜场显示 0%。卡片附注“有比分 X/Y 场”，提示缺比分覆盖率；不依赖 appearance 出场分钟记录，不按 90 分钟换算，不引入新的 LifeSpace 字段。
 - **趋势 Tab 仅调整名称**：原「进攻场均／进攻时间／防守场均」改为「场均进攻／进攻效率／场均防守」，三种月度趋势的统计指标和时间同批场次规则不变。
 - **发布及验证**：仅 HomeMew Web 层代码，处于 [PR #142](https://github.com/huangshirui/HomeMew/pull/142) Draft，未合并或部署；新增胜、平、负、缺比分、异常比分、人员过滤及重复比赛测试；CI 在最终提交后确认。
+
+## 2026-10-24 · 足球比赛列表分页、球队 PersonGroup 成员增删
+
+- **分页现状核查**：足球比赛列表通过 LifeSpace Canonical Query 按 matchDate 倒序、每页 `limit=40` 获取；保留后续 `nextCursor`，底部“加载更多比赛”才用 cursor 追加下一批，不会首次全量拉取。列表筛选经服务器查询生效。统计看板使用不同的有界筛选数据读取，不应与列表分页混为一谈。
+- **球队成员 UX**：球队管理页面保留 PersonGroup 作为球队唯一业务对象，在球队行显示当前成员数量并添加“管理球员”入口，编辑/新建球队弹窗统一包含「球队成员（N 人）」区域。直接复用已有 FootballPersonPicker，支持家庭成员及其他 Space Person 的远端姓名检索、勾选加入与 × 移除，并经确认保存。取消编辑不写数据。成员更新直接提交 PersonGroup.memberPersonIds（PATCH 乐观锁 version；POST 初始化成员集合），不增加 HomeMew 影子成员表；成员从球队移除不删除 Person 档案，也不修改历史 FootballMatch/FootballPerformance。
+- **人员名称与性能**：编辑有成员的球队时，只按已加入的非家庭成员 Person ID 按需 GET 补全显示名称，ID 去重、最多 4 并发；家庭成员复用现有家庭上下文。保存保留所有旧成员 ID，包括未成功解析名称的成员，除非用户明确点击 ×。不预先加载整个 Space People 目录。
+- **代码验证**：[HomeMew Draft PR #142](https://github.com/huangshirui/HomeMew/pull/142) 新增球队成员保存和比赛分页回归断言；最新 [Web Check #40071105997](https://github.com/huangshirui/HomeMew/actions/runs/40071105997) 与 [Mini Program Check #40071106058](https://github.com/huangshirui/HomeMew/actions/runs/40071106058) 均通过。无 LifeSpace 代码或 Schema 修改，PR 未合并，未部署 Preview/Production。
