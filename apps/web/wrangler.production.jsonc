@@ -50,6 +50,18 @@
   ],
   "preview_urls": true,
   "previews": {
+    "ratelimits": [
+      {
+        "name": "PLACE_SEARCH_USER_LIMIT",
+        "namespace_id": "610003",
+        "simple": { "limit": 10, "period": 60 }
+      },
+      {
+        "name": "PLACE_SEARCH_BURST_LIMIT",
+        "namespace_id": "610004",
+        "simple": { "limit": 8, "period": 10 }
+      }
+    ],
     "vars": {
       "ENVIRONMENT": "staging",
       "LIFESPACE_IDENTITY_URL": "https://auth-staging.aisr.online",

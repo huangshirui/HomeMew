@@ -55,6 +55,13 @@ jobs:
           if (config.vars?.ENVIRONMENT !== 'production') throw new Error('Production Worker must stay on LifeSpace production');
           if (config.previews?.vars?.ENVIRONMENT !== 'staging') throw new Error('Preview must be staging only');
           assertPreviewServiceBindings(config.previews.services);
+          for (const name of ['PLACE_SEARCH_USER_LIMIT', 'PLACE_SEARCH_BURST_LIMIT']) {
+            const preview = config.previews?.ratelimits?.find(binding => binding.name === name);
+            const production = config.ratelimits?.find(binding => binding.name === name);
+            if (!preview || !production || preview.namespace_id === production.namespace_id) {
+              throw new Error('Preview must have an isolated rate limit binding: ' + name);
+            }
+          }
           if (config.previews.vars.LIFESPACE_IDENTITY_URL !== 'https://auth-staging.aisr.online') throw new Error('Preview Identity must be staging');
           if (config.previews.vars.LIFESPACE_CORE_URL !== 'https://core-staging.aisr.online') throw new Error('Preview Core must be staging');
           if (config.previews.vars.STAGING_LIFESPACE_IDENTITY_URL || config.previews.vars.STAGING_LIFESPACE_CORE_URL) throw new Error('Preview must not support dual-environment routing');
