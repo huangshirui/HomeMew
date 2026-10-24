@@ -1,6 +1,7 @@
 import { handleIntegrationRequest, integrationsReady } from './integration-api.mjs';
 import { adaptEventWritePayload, eventLocationWireFormat } from './event-location-compat.mjs';
 import { searchPlaces } from './map-places.mjs';
+import { recentPlacesRequest } from './recent-places.mjs';
 
 const ACCESS_ASSERTION_HEADER = 'cf-access-jwt-assertion';
 const SESSION_COOKIE = '__Host-homemew_session';
@@ -641,6 +642,17 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         }
         if (request.method === 'POST' && url.pathname === '/api/activity/me') {
           return await reportWebActivity(request, env, fetcher, assertion, id, nowMs);
+        }
+        if (url.pathname === '/api/places/recent') {
+          if (!['GET','POST','DELETE'].includes(request.method))
+            throw new HttpError(405,'METHOD_NOT_ALLOWED','Method not allowed');
+          if (request.method !== 'GET') requireSameOrigin(request);
+          const session=await ensureSession(request,env,fetcher,assertion,id,nowMs);
+          const response=await recentPlacesRequest(request,env,session.accessToken);
+          const headers=new Headers(response.headers);
+          headers.set('x-request-id',id);
+          if(session.cookie)headers.set('set-cookie',session.cookie);
+          return new Response(response.body,{status:response.status,headers});
         }
         if (url.pathname === '/api/places/search') {
           if (request.method !== 'GET') throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed');

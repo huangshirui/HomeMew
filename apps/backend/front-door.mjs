@@ -10,6 +10,7 @@ export {
   MemberActivity,
   FamilyCatalog,
   FamilyJoinCoordinator,
+  RecentPlaces,
 } from './worker.mjs';
 export { ExternalSystemCatalog };
 
