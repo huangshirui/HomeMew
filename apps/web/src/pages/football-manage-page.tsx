@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
@@ -12,6 +12,8 @@ import { queryModelRecords } from '../lib/canonical-query';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { type FootballMatch, type FootballPerformance, type FootballPerson, type FootballReference, modelUrl } from './football-domain';
 import { FootballReferencePicker } from './football-reference-picker';
+import { FootballPersonPicker } from './football-person-picker';
+import { fetchUniqueFootballReferences } from './football-reference-hydration';
 import { readRecentFootballReferences, rememberFootballReference } from './football-recent-references';
 
 const input = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-500';
@@ -19,7 +21,7 @@ const personPath = (space: string, id?: string) => '/api/lifespace/core/v1/space
   '/people' + (id ? '/' + encodeURIComponent(id) : '');
 type EditablePerson = FootballPerson & { version: number; linkedUser?: boolean };
 type PeopleResult = { items: EditablePerson[]; nextCursor: string | null };
-type TeamDraft = { name: string; description: string; icon: RecordIconDraft };
+type TeamDraft = { name: string; description: string; icon: RecordIconDraft; memberPersonIds: string[] };
 
 function failure(error: unknown) { return householdErrorMessage(error, '操作失败，请稍后再试。'); }
 
@@ -38,6 +40,8 @@ export function FootballManagePage() {
   const [playerBusy, setPlayerBusy] = useState(false);
   const [editingTeam, setEditingTeam] = useState<FootballReference | null>(null);
   const [teamDraft, setTeamDraft] = useState<TeamDraft | null>(null);
+  const [knownTeamPeople, setKnownTeamPeople] = useState<FootballPerson[]>([]);
+  const teamPeopleReq = useRef(0);
   const [editingPerson, setEditingPerson] = useState<EditablePerson | null>(null);
   const [personDraft, setPersonDraft] = useState('');
   const [personDialogOpen, setPersonDialogOpen] = useState(false);
@@ -89,10 +93,26 @@ export function FootballManagePage() {
   }, [spaceId, tab, playerSearch, fetchPlayers]);
 
   const startTeam = (record?: FootballReference, name = '') => {
+    const request = ++teamPeopleReq.current;
     setEditingTeam(record ?? null);
     setTeamDraft({ name: record?.name ?? name, description: record?.description ?? '',
-      icon: iconDraftFor(record?.presentation?.icon) });
+      icon: iconDraftFor(record?.presentation?.icon),
+      memberPersonIds: [...new Set(record?.memberPersonIds ?? [])] });
+    setKnownTeamPeople([]);
     setError('');
+    if (!record?.memberPersonIds?.length || !spaceId) return;
+    const familyIds = new Set(members.map(m => m.personId).filter(Boolean));
+    const missing = record.memberPersonIds.filter(id => !familyIds.has(id));
+    // Only fetch the actual team members, never enumerate the entire Space Person directory.
+    void fetchUniqueFootballReferences(missing,
+      id => apiRequest<FootballPerson>(personPath(spaceId, id)), 4)
+      .then(result => {
+        if (teamPeopleReq.current === request) setKnownTeamPeople(result.found);
+      });
+  };
+  const closeTeam = () => {
+    ++teamPeopleReq.current;
+    setTeamDraft(null); setEditingTeam(null); setKnownTeamPeople([]);
   };
   const saveTeam = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -101,14 +121,16 @@ export function FootballManagePage() {
     try {
       const presentation = await presentationToSave(spaceId, 'person_group', teamDraft.icon, editingTeam?.presentation?.icon);
       const payload = editingTeam
-        ? { name: teamDraft.name.trim(), description: teamDraft.description.trim() || null, version: editingTeam.version, ...presentation }
-        : { name: teamDraft.name.trim(), description: teamDraft.description.trim() || null, memberPersonIds: [], ...presentation };
+        ? { name: teamDraft.name.trim(), description: teamDraft.description.trim() || null,
+            memberPersonIds: teamDraft.memberPersonIds, version: editingTeam.version, ...presentation }
+        : { name: teamDraft.name.trim(), description: teamDraft.description.trim() || null,
+            memberPersonIds: teamDraft.memberPersonIds, ...presentation };
       const ref = await apiRequest<FootballReference>(modelUrl(spaceId, 'person_group', editingTeam?.id), {
         method: editingTeam ? 'PATCH' : 'POST', body: JSON.stringify(payload),
       });
       setTeams(prev => [...new Map([...prev.filter(x => x.id !== ref.id), ref].map(x => [x.id, x])).values()]);
       rememberFootballReference(user?.id ?? '', spaceId, 'person_group', ref);
-      setTeamFocus(ref.id); setTeamDraft(null); setEditingTeam(null); setSuccess('球队已保存');
+      setTeamFocus(ref.id); closeTeam(); setSuccess('球队已保存');
     } catch (cause) { setError(failure(cause)); }
     finally { setBusy(false); }
   };
@@ -206,7 +228,9 @@ export function FootballManagePage() {
               {team.presentation?.icon && <RecordIconMark icon={team.presentation.icon}
                 spaceId={spaceId} modelKey="person_group" recordId={team.id}/>}
               <span className="min-w-0 flex-1 truncate text-sm">{team.name}</span>
+              <span className="shrink-0 text-xs text-stone-500">{team.memberPersonIds?.length ?? 0} 人</span>
               {canWrite && <>
+                <Button variant="ghost" aria-label={'管理' + team.name + '的球员'} onClick={() => startTeam(team)}>管理球员</Button>
                 <Button variant="ghost" onClick={() => startTeam(team)}>编辑</Button>
                 <Button variant="ghost" size="icon" aria-label={'删除球队' + team.name}
                   disabled={busy} onClick={() => void deleteTeam(team)}><Trash2 className="size-4"/></Button>
@@ -237,7 +261,7 @@ export function FootballManagePage() {
           disabled={playerBusy} onClick={() => void fetchPlayers(playerSearch, playerCursor, true)}>加载更多球员</Button>}
       </Card>}
     {teamDraft && <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/40 sm:items-center sm:p-6">
-      <form role="dialog" aria-modal="true" aria-label="编辑球队" className="w-full max-w-md space-y-3 rounded-t-3xl bg-white p-5 sm:rounded-3xl"
+      <form role="dialog" aria-modal="true" aria-label="编辑球队" className="max-h-[90dvh] w-full max-w-lg space-y-3 overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl"
         onSubmit={saveTeam}>
         <h2 className="text-lg font-semibold">{editingTeam ? '编辑球队' : '新建球队'}</h2>
         <RecordIconField spaceId={spaceId} modelKey="person_group" icon={teamDraft.icon}
@@ -251,8 +275,16 @@ export function FootballManagePage() {
           <textarea className="min-h-20 w-full rounded-xl border border-stone-200 p-3" value={teamDraft.description}
             onChange={e => setTeamDraft(prev => prev ? {...prev,description:e.target.value} : prev)}/>
         </label>
+        <div className="rounded-xl border border-stone-200 p-3">
+          <FootballPersonPicker spaceId={spaceId} members={members} multiple
+            label={'球队成员（' + teamDraft.memberPersonIds.length + ' 人）'}
+            selected={teamDraft.memberPersonIds} knownPeople={[...players, ...knownTeamPeople]}
+            onChange={ids => setTeamDraft(prev => prev ? {...prev,memberPersonIds:[...new Set(ids)]} : prev)}
+            disabled={busy}/>
+          <p className="mt-2 text-xs text-stone-500">可以搜索并选择家庭成员或其他球员。移出球队不会删除球员档案或比赛记录。</p>
+        </div>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={() => setTeamDraft(null)} disabled={busy}>取消</Button>
+          <Button type="button" variant="secondary" onClick={closeTeam} disabled={busy}>取消</Button>
           <Button type="submit" variant="primary" disabled={busy}>保存</Button>
         </div>
       </form>
