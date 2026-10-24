@@ -579,8 +579,8 @@ export function FootballPage() {
             <div className="flex w-32 shrink-0 items-center gap-2 whitespace-nowrap text-xs text-stone-700">
               <span className="tabular-nums">{m.matchDate}</span>
               {m.matchType === 'official'
-                ? <Trophy aria-label="正式比赛" role="img" title="正式比赛" className="size-4 shrink-0 text-amber-600"/>
-                : <Handshake aria-label="友谊赛" role="img" title="友谊赛" className="size-4 shrink-0 text-sky-600"/>}
+                ? <span role="img" aria-label="正式比赛" title="正式比赛"><Trophy className="size-4 shrink-0 text-amber-600"/></span>
+                : <span role="img" aria-label="友谊赛" title="友谊赛"><Handshake className="size-4 shrink-0 text-sky-600"/></span>}
             </div>
             <div className="min-w-0 flex-[1_1_220px]">
               <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
