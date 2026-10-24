@@ -1,4 +1,5 @@
 import { handleIntegrationRequest, integrationsReady } from './integration-api.mjs';
+import { adaptEventWritePayload, eventLocationWireFormat } from './event-location-compat.mjs';
 
 const ACCESS_ASSERTION_HEADER = 'cf-access-jwt-assertion';
 const SESSION_COOKIE = '__Host-homemew_session';
@@ -513,10 +514,21 @@ async function proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, servi
   const target = new URL(`${targetBase}/api${suffix}`);
   target.search = url.search;
 
+  let body = ['GET', 'HEAD'].includes(request.method) ? undefined : request.body;
+  const eventWrite = service === 'core'
+    && /\/v1\/spaces\/spc_[A-Za-z0-9_-]+\/models\/event\/records(?:\/rec_[A-Za-z0-9_-]+)?$/u.test(suffix)
+    && (request.method === 'POST' || request.method === 'PATCH');
+  if (eventWrite && eventLocationWireFormat(env) === 'location') {
+    let payload;
+    try { payload = await request.clone().json(); }
+    catch { throw new HttpError(400, 'INVALID_REQUEST', '日程数据格式无效'); }
+    try { body = JSON.stringify(adaptEventWritePayload(payload, env)); }
+    catch { throw new HttpError(422, 'VALIDATION_ERROR', '日程地点格式无效'); }
+  }
   const response = await fetcher(target, {
     method: request.method,
     headers: proxyHeaders(request, session.accessToken, id),
-    body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
+    body,
     redirect: 'manual',
   });
 
