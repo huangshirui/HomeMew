@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Gift, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, UserRound, X } from 'lucide-react';
+import { RecordTitleField } from '../components/record-title-field';
 import { useHousehold } from '../components/household-provider';
-import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
+import { RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
 import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
@@ -315,11 +316,9 @@ function WishEditor({ draft, spaceId, editing, currentPersonId, canWrite, saving
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="mt-5 grid gap-4">
-          <div className="flex items-end gap-3">
-            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={!editable || saving}
-            original={editing?.presentation?.icon} spaceId={spaceId} modelKey="wish" recordId={editing?.id} />
-            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">愿望<input className={inputClass} maxLength={100} disabled={!editable} value={draft.title} onChange={(event) => set('title', event.target.value)} autoFocus={!editing} /></label>
-          </div>
+          <RecordTitleField label="愿望" icon={draft.icon} onIconChange={icon => set('icon', icon)} disabled={!editable || saving} original={editing?.presentation?.icon} spaceId={spaceId} modelKey="wish" recordId={editing?.id}>
+            <input className={inputClass} maxLength={100} disabled={!editable} value={draft.title} onChange={(event) => set('title', event.target.value)} autoFocus={!editing} />
+          </RecordTitleField>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">希望日期（可空）<input type="date" className={inputClass} disabled={!editable} value={draft.desiredDate} onChange={(event) => set('desiredDate', event.target.value)} /></label>
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">说明<textarea className={textareaClass} maxLength={5000} disabled={!editable} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
           {editing && !isOwner ? <p className="rounded-2xl bg-stone-100 px-4 py-3 text-xs leading-5 text-stone-500">只有愿望主人可以编辑内容；愿望是否实现由拥有写权限的家庭成员共同维护。</p> : null}
