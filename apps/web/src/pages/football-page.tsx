@@ -289,6 +289,9 @@ export function FootballPage() {
   }, [isDetail, loading, matches]);
   useEffect(() => {
     if (!isDetail || !spaceId || !matchId) {
+      // React Router can reuse this component when navigating back from the detail URL.
+      // Clear the selected match so the list regains its filters and stops querying its events.
+      setSelected(null);
       setDetailLoading(false); setDetailError('');
       return;
     }
