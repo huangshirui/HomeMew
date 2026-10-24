@@ -368,4 +368,6 @@ test('three match filters open a floating panel below the clicked input', () => 
   assert.match(referencePicker, /overlay && open \? 'relative z-40 '/);
   assert.match(referencePicker, /max-h-\[min\(28rem,65vh\)\] overflow-y-auto/);
   assert.match(referencePicker, /'relative z-30 mt-2 shadow-sm'/);
+  assert.match(referencePicker, /document\.addEventListener\('pointerdown', outside\)/);
+  assert.match(referencePicker, /event\.key === 'Escape'/);
 });
