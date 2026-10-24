@@ -1084,7 +1084,7 @@ function PlaceSearchInput({name,point,existing,onChange,disabled}:{
         .then(data=>{setItems(data.items);setStructured(data.structured);
           setNote(data.available?(data.items.length?'':'没有找到匹配地点，可直接保存名称'):'地点推荐暂不可用，可直接保存名称');})
         .catch(()=>{if(!controller.signal.aborted){setItems([]);setNote('地点搜索暂不可用，可直接保存名称');}});
-    },350);
+    },650);
     return ()=>{clearTimeout(timer);controller.abort();};
   },[name,active,disabled]);
   return <div className="grid gap-1.5 text-sm font-medium text-stone-700">

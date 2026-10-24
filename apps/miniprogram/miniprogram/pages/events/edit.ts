@@ -407,7 +407,7 @@ Page({
         if (this.data.location === value) this.setData({ locationCandidates: [],
           locationHint: '地点搜索暂不可用，可直接保存名称' });
       });
-    }, 350);
+    }, 650);
   },
 
   onLocationSelect(e: WechatMiniprogram.BaseEvent): void {

@@ -41,3 +41,10 @@ test('same Worker Preview is bound only to staging services and hosts', () => {
   assert.equal(JSON.stringify(config).includes('STAGING_LIFESPACE_APPLICATION_CREDENTIAL'), false);
   assert.equal(JSON.stringify(config).includes('HOMEMEW_BACKEND_STAGING'), false);
 });
+
+test('place-search rate limit bindings guard only API traffic and share deployment configuration',()=>{
+ assert.deepEqual(config.ratelimits,[
+  {name:'PLACE_SEARCH_USER_LIMIT',namespace_id:'610001',simple:{limit:10,period:60}},
+  {name:'PLACE_SEARCH_BURST_LIMIT',namespace_id:'610002',simple:{limit:8,period:10}},
+ ]);
+});

@@ -646,7 +646,7 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
           if (request.method !== 'GET') throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
           // Access-bound Web sessions are required before consuming map API quota.
           const session = await ensureSession(request, env, fetcher, assertion, id, nowMs);
-          const response = await searchPlaces(request, env, { fetcher });
+          const response = await searchPlaces(request, env, { fetcher, actorKey: assertion });
           const headers = new Headers(response.headers);
           headers.set('x-request-id', id);
           if (session.cookie) headers.set('set-cookie', session.cookie);

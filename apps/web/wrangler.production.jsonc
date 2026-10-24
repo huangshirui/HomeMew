@@ -36,6 +36,18 @@
       "service": "lifespace-identity"
     }
   ],
+  "ratelimits": [
+    {
+      "name": "PLACE_SEARCH_USER_LIMIT",
+      "namespace_id": "610001",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "PLACE_SEARCH_BURST_LIMIT",
+      "namespace_id": "610002",
+      "simple": { "limit": 8, "period": 10 }
+    }
+  ],
   "preview_urls": true,
   "previews": {
     "vars": {
