@@ -63,12 +63,77 @@ const recordRef = (model, recordId) => ({ kind: 'record', modelKey: model, recor
 
 , 'u').exec(pathname);
   if (people) { const familyId = safeDecode(people[1], ID); return familyId ? { familyId, people: true } : null; }
-  const relation = new RegExp(`^${PREFIX}/([^/]+)/containers/(activities|goals|habits)/([^/]+)/relations(?:/([^/]+))?$`, 'u').exec(pathname);
+  const relation = new RegExp(`^${PREFIX}/([^/]+)/containers/(activities|goals|habits)/([^/]+)/(relations|candidates|quick-create)(?:/([^/]+))?/**
+ * Bounded product contract for newly shipped HomeMew Mini domains.
+ * The Mini never supplies a LifeSpace model key, query AST or upstream path.
+ * All domain truth, versions, actions and policy checks stay in LifeSpace.
+ */
+import { errorResponse, forwardLifeSpace } from './miniprogram-upstream.mjs';
+
+const PREFIX = '/api/v1/miniprogram/families';
+const ID = /^spc_[a-zA-Z0-9_-]+$/u;
+const RECORD = /^rec_[a-zA-Z0-9_-]+$/u;
+const EDGE = /^[a-z]{2,8}_[a-zA-Z0-9_-]+$/u;
+const DAY = /^\d{4}-\d{2}-\d{2}$/u;
+const KINDS = Object.freeze({
+  activities: { model: 'activity', fields: ['name','description','attendeePersonIds','startDate','endDate','presentation','version'] },
+  goals: { model: 'goal', fields: ['name','description','subjectPersonIds','startDate','targetDate','presentation','version'] },
+  habits: { model: 'habit', fields: ['name','description','subjectPersonId','intervalDays','presentation','version'] },
+  anniversaries: { model: 'anniversary', fields: ['name','description','month','day','year','personIds','presentation','version'] },
+  'football-matches': { model: 'football_match', fields: ['matchDate','matchType','competitionActivityId','representativeTeamId','opponentTeamId','representativeTeamScore','opponentTeamScore','playerPersonIds','notes','version'] },
+  'football-performances': { model: 'football_performance', fields: ['matchId','playerPersonId','performanceType','goalMethod','shotOutcome','minutesPlayed','position','entryMode','notes','version'] },
+  'football-teams': { model: 'person_group', fields: ['name','description','memberPersonIds','presentation','version'] },
+});
+const TARGETS = new Set(['task','event','day_record','activity','goal','habit','anniversary','wish']);
+const ACTIONS = new Set(['pause','resume','achieve','abandon','end','restart','check-in']);
+const PARAMS = new Set(['limit','cursor','q','status','period','today','personId','year','matchType','matchId','playerPersonId','representativeTeamId','opponentTeamId','competitionActivityId']);
+const safeDecode = (raw, pattern) => {
+  try { const decoded = decodeURIComponent(raw); return decoded.length <= 200 && pattern.test(decoded) ? decoded : null; }
+  catch { return null; }
+};
+const col = (space, model) => `/api/v1/spaces/${encodeURIComponent(space)}/models/${model}/records`;
+const recordRef = (model, recordId) => ({ kind: 'record', modelKey: model, recordId });
+
+export function matchMiniNewDomainRoute(pathname) {
+  const people = new RegExp(`^${PREFIX}/([^/]+)/domain-people/**
+ * Bounded product contract for newly shipped HomeMew Mini domains.
+ * The Mini never supplies a LifeSpace model key, query AST or upstream path.
+ * All domain truth, versions, actions and policy checks stay in LifeSpace.
+ */
+import { errorResponse, forwardLifeSpace } from './miniprogram-upstream.mjs';
+
+const PREFIX = '/api/v1/miniprogram/families';
+const ID = /^spc_[a-zA-Z0-9_-]+$/u;
+const RECORD = /^rec_[a-zA-Z0-9_-]+$/u;
+const EDGE = /^[a-z]{2,8}_[a-zA-Z0-9_-]+$/u;
+const DAY = /^\d{4}-\d{2}-\d{2}$/u;
+const KINDS = Object.freeze({
+  activities: { model: 'activity', fields: ['name','description','attendeePersonIds','startDate','endDate','presentation','version'] },
+  goals: { model: 'goal', fields: ['name','description','subjectPersonIds','startDate','targetDate','presentation','version'] },
+  habits: { model: 'habit', fields: ['name','description','subjectPersonId','intervalDays','presentation','version'] },
+  anniversaries: { model: 'anniversary', fields: ['name','description','month','day','year','personIds','presentation','version'] },
+  'football-matches': { model: 'football_match', fields: ['matchDate','matchType','competitionActivityId','representativeTeamId','opponentTeamId','representativeTeamScore','opponentTeamScore','playerPersonIds','notes','version'] },
+  'football-performances': { model: 'football_performance', fields: ['matchId','playerPersonId','performanceType','goalMethod','shotOutcome','minutesPlayed','position','entryMode','notes','version'] },
+  'football-teams': { model: 'person_group', fields: ['name','description','memberPersonIds','presentation','version'] },
+});
+const TARGETS = new Set(['task','event','day_record','activity','goal','habit','anniversary','wish']);
+const ACTIONS = new Set(['pause','resume','achieve','abandon','end','restart','check-in']);
+const PARAMS = new Set(['limit','cursor','q','status','period','today','personId','year','matchType','matchId','playerPersonId','representativeTeamId','opponentTeamId','competitionActivityId']);
+const safeDecode = (raw, pattern) => {
+  try { const decoded = decodeURIComponent(raw); return decoded.length <= 200 && pattern.test(decoded) ? decoded : null; }
+  catch { return null; }
+};
+const col = (space, model) => `/api/v1/spaces/${encodeURIComponent(space)}/models/${model}/records`;
+const recordRef = (model, recordId) => ({ kind: 'record', modelKey: model, recordId });
+
+, 'u').exec(pathname);
+  if (people) { const familyId = safeDecode(people[1], ID); return familyId ? { familyId, people: true } : null; }
+, 'u').exec(pathname);
   if (relation) {
     const space = safeDecode(relation[1], ID), recordId = safeDecode(relation[3], RECORD);
-    const relationId = relation[4] ? safeDecode(relation[4], EDGE) : null;
-    return space && recordId && (!relation[4] || relationId)
-      ? { familyId: space, kind: relation[2], recordId, relationId, relation: true } : null;
+    const relationId = relation[5] ? safeDecode(relation[5], EDGE) : null;
+    return space && recordId && (!relation[5] || relationId)
+      ? { familyId: space, kind: relation[2], recordId, relationId, feature: relation[4], relation: true } : null;
   }
   const match = new RegExp(`^${PREFIX}/([^/]+)/domains/(activities|goals|habits|anniversaries|football-matches|football-performances|football-teams)(?:/([^/]+))?(?:/(actions/([^/]+)|check-ins))?$`, 'u').exec(pathname);
   if (!match) return null;
@@ -152,8 +217,83 @@ async function writePayload(request, kind, isUpdate) {
     return data;
   } catch { return null; }
 }
+async function membersForLinkedCreate(request,env,familyId) {
+  const response = await forward(request,env,`/api/v1/spaces/${encodeURIComponent(familyId)}/members`);
+  if (!response.ok) return { response };
+  try {
+    const envelope = await response.json();
+    if (!Array.isArray(envelope?.data)) return { response: errorResponse(502,'INVALID_UPSTREAM_RESPONSE','家庭成员数据无效') };
+    return { members: envelope.data };
+  } catch { return { response: errorResponse(502,'INVALID_UPSTREAM_RESPONSE','家庭成员数据无效') }; }
+}
+async function quickCreate(request,env,route,url) {
+  if (request.method !== 'POST' || url.search) return bad();
+  let value;
+  try { value = await request.json(); } catch { return bad(); }
+  if (!value || !['task','event','countdown'].includes(value.targetType) ||
+      Object.keys(value).some(key=>!['targetType','draft'].includes(key)) ||
+      !value.draft || typeof value.draft !== 'object' || Array.isArray(value.draft)) return bad();
+  const d=value.draft;
+  let model, data;
+  if (value.targetType === 'countdown') {
+    if (Object.keys(d).some(key=>!['name','anchorDate'].includes(key)) ||
+      typeof d.name !== 'string' || !d.name.trim() || !DAY.test(d.anchorDate||'')) return bad('倒计时名称和日期必填');
+    model='day_record'; data={name:d.name.trim(),kind:'countdown',anchorDate:d.anchorDate};
+  } else {
+    const memberResult=await membersForLinkedCreate(request,env,route.familyId);
+    if (memberResult.response) return memberResult.response;
+    const toPeople=(userIds) => {
+      if (!Array.isArray(userIds) || userIds.some(x=>typeof x!=='string')) return null;
+      const ids=userIds.map(userId=>memberResult.members.find(m=>m.userId===userId)?.personId);
+      return ids.some(x=>!x) ? null : [...new Set(ids)];
+    };
+    if (value.targetType==='task') {
+      if (Object.keys(d).some(key=>!['name','description','dueDate','assigneeIds','presentation'].includes(key)) ||
+        typeof d.name !== 'string' || !d.name.trim()) return bad();
+      const people=toPeople(d.assigneeIds??[]);
+      if (!people) return bad('待办负责人不在家庭中');
+      model='task'; data={name:d.name.trim(),description:d.description??null,dueDate:d.dueDate??null,
+        assigneePersonIds:people,...(d.presentation?{presentation:d.presentation}:{})};
+    } else {
+      if (Object.keys(d).some(key=>!['summary','description','location','attendeeIds','presentation',
+          'isAllDay','startDate','endDateExclusive','startAt','endAt','startTimezone','endTimezone'].includes(key)) ||
+        typeof d.summary !== 'string' || !d.summary.trim()) return bad();
+      const people=toPeople(d.attendeeIds??[]);
+      if (!people) return bad('日程参与人不在家庭中');
+      let when;
+      if (d.isAllDay===true && DAY.test(d.startDate||'') && DAY.test(d.endDateExclusive||'') && d.endDateExclusive>d.startDate)
+        when={kind:'date',start:d.startDate,endExclusive:d.endDateExclusive};
+      else if (d.isAllDay===false && typeof d.startAt==='string' && typeof d.endAt==='string'
+        && Number.isFinite(Date.parse(d.startAt)) && Date.parse(d.endAt)>Date.parse(d.startAt))
+        when={kind:'instant',start:new Date(d.startAt).toISOString(),endExclusive:new Date(d.endAt).toISOString()};
+      if (!when) return bad('日程日期范围无效');
+      model='event';data={summary:d.summary.trim(),description:d.description??null,location:d.location??null,
+        attendeePersonIds:people,when,...(d.presentation?{presentation:d.presentation}:{})};
+    }
+  }
+  return forward(request,env,`/api/v1/spaces/${encodeURIComponent(route.familyId)}/models/batch`,'POST',{
+    atomicConsistency:true,operations:[
+      {operation:'create',modelKey:model,clientRef:'child',data},
+      {operation:'relation_create',predicate:'relates_to',
+        source:recordRef(KINDS[route.kind].model,route.recordId),
+        target:{kind:'record',modelKey:model,clientRef:'child'}},
+    ],
+  });
+}
+async function candidates(request,env,route,url) {
+  if (request.method!=='GET') return bad();
+  const p=url.searchParams;
+  if ([...p.keys()].some(k=>!['model','q','cursor'].includes(k))) return bad();
+  const model=p.get('model'), q=p.get('q')?.trim()||'', cursor=p.get('cursor');
+  if (!TARGETS.has(model)||q.length<2||q.length>120||(cursor&&cursor.length>2048)) return bad('请输入至少 2 个字搜索关联内容');
+  return forward(request,env,col(route.familyId,model)+'/query','POST',{
+    search:{text:q},page:{limit:30,...(cursor?{cursor}:{})},
+  });
+}
 async function relations(request, env, route, url) {
   const { familyId, recordId, kind, relationId } = route;
+  if (route.feature==='quick-create') return quickCreate(request,env,route,url);
+  if (route.feature==='candidates') return candidates(request,env,route,url);
   const base = `/api/v1/spaces/${encodeURIComponent(familyId)}/semantic-relations`;
   const owner = KINDS[kind].model;
   if (relationId) {
