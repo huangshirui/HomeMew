@@ -160,19 +160,19 @@
           class="field-input"
           value="{{location}}"
           bindinput="onLocationInput"
-          placeholder="选填"
+          placeholder="搜索或输入地点"
           maxlength="100"
         />
       </view>
       <view wx:if="{{locationCandidates.length}}" class="place-candidates">
-        <view wx:if="{{placeShowingRecent}}" class="place-hint">最近使用 · 无需地图搜索</view>
+        <view wx:if="{{placeShowingRecent}}" class="place-hint">最近使用</view>
         <view wx:for="{{locationCandidates}}" wx:key="index" data-index="{{index}}"
           bindtap="onLocationSelect" class="place-candidate">
           <text class="place-name">{{item.name}}</text>
           <text wx:if="{{item.address}}" class="place-address">{{item.address}}</text>
         </view>
       </view>
-      <view wx:if="{{placeShowingRecent}}" class="place-hint" bindtap="onLocationSearchMore">搜索更多地点 ›</view>
+      <view wx:if="{{placeShowingRecent}}" class="place-hint" bindtap="onLocationSearchMore">搜索其他地点 ›</view>
       <text wx:if="{{locationHint}}" class="place-hint">{{locationHint}}</text>
     </view>
 

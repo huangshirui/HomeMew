@@ -77,3 +77,9 @@ The user explicitly rejected storing `sourceEventId` and reading Events to hydra
 - Code root cause: `apps/web/map-places.mjs` passed `redirect:'error'` to `fetch`, but Cloudflare Workers only supports `follow` or `manual`; the unsupported value throws a TypeError before any AMap request is issued. The generic catch masked the runtime incompatibility as a provider failure. See https://developers.cloudflare.com/workers/runtime-apis/request/.
 - Fix: use `redirect:'manual'`; explicitly reject any 3xx without following to another host (protecting the secret in `key` URL parameter). Keep existing HTTP failures as 502 and no provider URL/key in logs or output. Parse AMap's `status`/`infocode` separately, logging only a safe five-digit numeric `infocode` for vendor business errors; do not expose vendor payload, address, coordinate or API Key.
 - Regression tests enforce manual redirect mode, 3xx no-follow, one outbound attempt and sanitized AMap errors. Release is a HomeMew Web Worker-only change; no LifeSpace model, Backend DO or secret updates. Preview smoke test after deploy must confirm an actual AMap success response; CI mocks cannot validate the live Key.
+
+## 2026-10-25 · HomeMew 日程地点输入提示去技术化
+
+- **产品 UX 规则**：Web 与微信小程序中的地点联想必须使用面向家庭用户的自然语言。不展示 WGS84/GCJ-02、坐标持久化细节、地图搜索实现方式或“仅保存地点名称”等内部兼容术语。
+- **统一用语**：输入框“搜索或输入地点”；匹配曾用地点标题“最近使用”；显式发起 Provider 查询用“搜索其他地点”；选定明确地点后用“已选定地点”；无匹配、服务暂不可用时分别使用“没有找到合适的地点，可以直接填写”和“暂时无法搜索地点，可以直接填写”。没有坐标的地图链接可提示“地图会根据名称查找地点”，不让用户处理坐标系。
+- **范围和边界**：本变更仅修改人可见的表单/提示文字，无业务契约、Provider Key、API、Recent Places Durable Object、LifeSpace Location 的坐标处理及权限变更。保留 Web 和 Mini 各自 UI 组件风格；通过独立回归测试守护文案。
