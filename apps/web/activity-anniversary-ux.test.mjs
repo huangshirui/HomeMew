@@ -23,7 +23,7 @@ test('Activity list is rows rather than cards, with expandable search next to cr
   assert.match(page, /没有找到符合条件的活动/);
   assert.match(page, /divide-y divide-stone-100/);
   assert.match(page, /查看活动/);
-  assert.match(page, /setContainerFor\(record\)/);
+  assert.match(page, /openDetail\(record\)/);
 });
 
 test('Anniversary has optional user-chosen icon, no hardcoded gift, and natural year/month/day controls', () => {
