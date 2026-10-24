@@ -275,11 +275,30 @@ test('football rows show both team icons, one-line date and match-type icon', ()
 });
 
 test('competition labels resolve only page-referenced Activity IDs, with retry and visible fallback', () => {
-  assert.match(page, /new Set\(matches\.map\(m => m\.competitionActivityId\)/);
+  assert.match(page, /new Set\(referenceMatches\.map\(m => m\.competitionActivityId\)/);
   assert.match(page, /fetchUniqueFootballReferences\(competitionBatch/);
   assert.match(page, /modelUrl\(spaceId, 'activity', id\)/);
   assert.match(page, /competitionNames\.get\(m\.competitionActivityId\)/);
   assert.match(page, /'赛事暂不可查看'/);
   assert.match(page, /attemptedRefLookup\.current\.clear\(\)/);
   assert.doesNotMatch(page, /queryModelRecords<FootballReference>\(spaceId, 'activity'/);
+});
+
+test('match record button opens a standalone routable detail, not inline selection', () => {
+  assert.match(app, /path="football\/:matchId" element=\{<FootballPage \/>\}/);
+  assert.match(page, /useParams<'matchId'>\(\)/);
+  assert.match(page, /navigate\('\/football\/' \+ encodeURIComponent\(record\.id\)\)/);
+  assert.match(page, /onClick=\{\(\) => openMatchDetail\(m\)\}/);
+  assert.match(page, /apiRequest<FootballMatch>\(modelUrl\(spaceId, 'football_match', matchId\)\)/);
+  assert.match(page, /title=\{isDetail \? '比赛详情'/);
+  assert.match(page, /isDetail \? <>/);
+  assert.match(page, /onClick=\{returnToMatchList\}/);
+  assert.match(page, /!isDetail && <div className="flex flex-wrap items-center justify-between/);
+  assert.match(page, /!isDetail && !selected && filterOpen/);
+  assert.match(page, /!isDetail && tab === 'record'/);
+  assert.match(page, /isDetail && !detailLoading && selected && selected\.id === matchId/);
+  assert.match(page, /!isDetail && tab === 'stats'/);
+  assert.match(page, /detailError/);
+  assert.match(page, /rememberFootballList\(spaceId/);
+  assert.match(page, /consumeFootballList\(spaceId/);
 });
