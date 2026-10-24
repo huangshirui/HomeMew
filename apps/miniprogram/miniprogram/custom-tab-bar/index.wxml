@@ -27,7 +27,7 @@
     <text class="tab-text {{selected === 2 ? 'tab-text-active' : ''}}">{{list[2].text}}</text>
   </view>
 
-  <!-- 我的 -->
+  <!-- 更多 -->
   <view class="tab-item" data-path="{{list[3].pagePath}}" bindtap="switchTab">
     <lucide-icon class="tab-icon" name="{{list[3].icon}}" size="27" color="{{selected === 3 ? '#43A047' : '#999999'}}" />
     <text class="tab-text {{selected === 3 ? 'tab-text-active' : ''}}">{{list[3].text}}</text>
