@@ -200,7 +200,7 @@ export function RecordIconField({ icon, onChange, disabled, original, spaceId, m
       aria-label={selectedEmoji || icon.iconFile || icon.iconFileId ? '更换记录图标' : '添加记录图标'}
       title={selectedEmoji || icon.iconFile || icon.iconFileId ? '更换图标' : '添加图标'}
       onClick={() => { setCategory('popular'); setSearch(''); setShown(PAGE_SIZE); setOpen(true); }}
-      className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-emerald-200 bg-emerald-50 text-2xl text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
+      className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-emerald-200 bg-emerald-50 text-2xl text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
       {preview || currentImage
         ? <img src={preview || currentImage || ''} alt="" className="size-full object-contain" />
         : selectedEmoji || (icon.iconFileId ? <ImagePlus className="size-5" /> : <Plus className="size-5" />)}
