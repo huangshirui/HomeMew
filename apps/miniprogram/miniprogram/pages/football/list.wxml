@@ -1,0 +1,46 @@
+<view class="container football-page">
+  <nav-bar title="足球比赛" showBack="true" />
+  <view class="football-top">
+    <view class="football-tabs">
+      <view class="{{mode==='record'?'active':''}}" data-mode="record" bindtap="onMode">比赛记录</view>
+      <view class="{{mode==='teams'?'active':''}}" data-mode="teams" bindtap="onMode">球队</view>
+      <view bindtap="onStats">统计 ›</view>
+    </view>
+    <view class="football-actions">
+      <view class="football-tool" bindtap="onToggleFilter" wx:if="{{mode==='record'}}">筛选 ⚙</view>
+      <view class="football-new" bindtap="{{mode==='record'?'onCreateMatch':'onCreateTeam'}}">＋ {{mode==='record'?'新建比赛':'新建球队'}}</view>
+    </view>
+  </view>
+  <view wx:if="{{filterOpen&&mode==='record'}}" class="card football-filter">
+    <input value="{{search}}" data-name="search" placeholder="搜索比赛" bindinput="onFilterInput"/>
+    <view class="football-filter-row">
+      <input value="{{year}}" type="number" maxlength="4" data-name="year" placeholder="年份（可空）" bindinput="onFilterInput"/>
+      <picker mode="selector" range="{{matchTypes}}" range-key="label" value="{{matchTypeIndex}}" bindchange="onMatchType"><view>{{matchTypes[matchTypeIndex].label}} ▾</view></picker>
+    </view>
+    <picker mode="selector" range="{{personOptions}}" range-key="label" value="{{personIndex}}" bindchange="onPerson">
+      <view class="football-person">球员：{{personOptions[personIndex].label||'全部成员'}} ▾</view>
+    </picker>
+    <view class="football-filter-controls"><text bindtap="onReset">清空</text><button class="btn-primary btn-sm" bindtap="onApply">应用</button></view>
+  </view>
+  <view wx:if="{{loading}}" class="loading-state">正在读取比赛…</view>
+  <view wx:elif="{{error}}" class="load-error-state"><text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onApply">重试</button></view>
+  <view wx:elif="{{mode==='record'}}" class="card football-list">
+    <view wx:for="{{rows}}" wx:key="id" class="football-row" data-id="{{item.id}}" bindtap="onRecord">
+      <view class="football-date">{{item.dateText}}</view>
+      <view class="football-score">
+        <text class="team-name">{{item.representativeName}}</text><text class="score">{{item.score}}</text><text class="team-name">{{item.opponentName}}</text>
+      </view>
+      <view wx:if="{{item.competitionName}}" class="football-competition">{{item.competitionName}}</view>
+    </view>
+    <view wx:if="{{!rows.length}}" class="football-empty">没有找到比赛记录</view>
+  </view>
+  <view wx:else class="card football-list">
+    <view wx:for="{{teams}}" wx:key="id" class="football-row team-row" data-id="{{item.id}}" bindtap="onTeam">
+      <text class="team-emoji">{{item.presentation.icon.type==='emoji'?item.presentation.icon.value:'⚽'}}</text>
+      <text class="team-name">{{item.name}}</text><text class="team-arrow">›</text>
+    </view>
+    <view wx:if="{{!teams.length}}" class="football-empty">尚未创建球队</view>
+  </view>
+  <view wx:if="{{nextCursor}}" class="football-more" bindtap="onReachBottom">{{loadingMore?'加载中…':'加载更多'}}</view>
+  <view class="football-hint">根据已记录的比赛与表现计算；无法推断未录入的动作。</view>
+</view>
