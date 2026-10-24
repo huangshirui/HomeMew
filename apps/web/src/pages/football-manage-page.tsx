@@ -1,8 +1,9 @@
+import { RecordTitleField } from '../components/record-title-field';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Search, Trash2, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
-import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIconDraft } from '../components/record-icon';
+import { RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { PageHeader } from '../components/ui/page-header';
@@ -341,13 +342,12 @@ export function FootballManagePage() {
       <form role="dialog" aria-modal="true" aria-label="编辑球队" className="max-h-[90dvh] w-full max-w-lg space-y-3 overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl"
         onSubmit={saveTeam}>
         <h2 className="text-lg font-semibold">{editingTeam ? '编辑球队' : '新建球队'}</h2>
-        <RecordIconField spaceId={spaceId} modelKey="person_group" icon={teamDraft.icon}
+        <RecordTitleField label="球队名称 *" spaceId={spaceId} modelKey="person_group" icon={teamDraft.icon}
           recordId={editingTeam?.id} original={editingTeam?.presentation?.icon}
-          onChange={icon => setTeamDraft(prev => prev ? {...prev,icon} : prev)}/>
-        <label className="block text-sm">球队名称 *
+          onIconChange={icon => setTeamDraft(prev => prev ? {...prev,icon} : prev)}>
           <input autoFocus required maxLength={100} className={input} value={teamDraft.name}
             onChange={e => setTeamDraft(prev => prev ? {...prev,name:e.target.value} : prev)}/>
-        </label>
+        </RecordTitleField>
         <label className="block text-sm">说明
           <textarea className="min-h-20 w-full rounded-xl border border-stone-200 p-3" value={teamDraft.description}
             onChange={e => setTeamDraft(prev => prev ? {...prev,description:e.target.value} : prev)}/>
