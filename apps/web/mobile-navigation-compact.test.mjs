@@ -46,3 +46,32 @@ test('calendar uses one-line icon actions and responsive, accessible period cont
   assert.match(calendar, /navigatePeriod\(-1\)/u);
   assert.match(calendar, /navigatePeriod\(1\)/u);
 });
+
+test('all main mobile modules use centered title and compact creation controls', () => {
+  const header = source('./src/components/ui/page-header.tsx');
+  const calendar = source('./src/pages/calendar-page.tsx');
+  const tasks = source('./src/pages/tasks-page.tsx');
+  const domain = source('./src/pages/domain-page.tsx');
+  const more = source('./src/pages/more-page.tsx');
+  const family = source('./src/pages/family-page.tsx');
+  assert.ok(header.includes('text-center text-[20px] font-semibold'));
+  assert.match(calendar, /mobileTitle="日程" compactMobile mobileActions=/u);
+  assert.match(tasks, /mobileTitle="待办" mobileActions=/u);
+  assert.match(domain, /mobileActions=\\{<>/u);
+  assert.match(more, /<PageHeader title="更多" \\/>/u);
+  assert.match(family, /<MemberAvatar member=\\{member\\}/u);
+  assert.match(family, /currentFamily.avatarUrl/u); // uploaded family logo
+  for (const name of ['days', 'wishes', 'integrations']) {
+    assert.match(source(`./src/pages/${name}-page.tsx`), /mobileActions=/u);
+  }
+});
+
+test('member avatars use the Mini public media routes and graceful fallbacks', () => {
+  const shell = source('./src/components/app-shell.tsx');
+  const mini = source('./miniprogram-bff.mjs');
+  assert.match(shell, /miniprogram\\/media\\/users\\//u);
+  assert.match(shell, /miniprogram\\/media\\/families\\//u);
+  assert.match(shell, /onError=\\{\\(event\\) =>/u);
+  assert.match(mini, /kind: 'user-avatar-read'/u);
+  assert.match(mini, /kind: 'family-avatar-read'/u);
+});
