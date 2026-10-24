@@ -109,7 +109,15 @@ The reviewed Mini Program intentionally keeps a stable HomeMew-owned Event DTO t
 - The first version may filter by attendee and status.
 - Mini callers continue using the stable HomeMew query DTO; the BFF lowers it to the active LifeSpace Canonical Query without exposing Canonical Query structure to the Mini Program.
 
-### 5.7 Out of first scope
+### 5.7 Location compatibility during the coordinated release
+
+The published LifeSpace Event model currently owns `location: string | null`; the approved target is one canonical nullable `location` object with required `name` and optional `address`/WGS84 `coordinates`. This is a breaking LifeSpace Model Registry migration, **not** a new HomeMew business model.
+
+The Mini Program retains its stable `location: string | null` Event DTO; its BFF maps text to canonical `{name}` on writes and reads `location.name` after the platform cutover. HomeMew Web accepts either upstream representation, and preserves an existing rich Location only if its name has not changed. No service silently geocodes a name or copies previous coordinates to another named place. Search by explicit Location name remains part of LifeSpace's declared Event search semantics.
+
+The trusted Web Worker `LIFESPACE_EVENT_LOCATION_FORMAT` records the *deployed upstream* representation (`string` before cutover, `location` afterwards), per environment. It is never a Mini/browser-selected option and must change only during the reviewed LifeSpace/HomeMew release process in `docs/decisions/2026-10-24-event-location-coordinated-release.md`.
+
+### 5.8 Out of first scope
 
 - Recurrence rules
 - Exception dates
