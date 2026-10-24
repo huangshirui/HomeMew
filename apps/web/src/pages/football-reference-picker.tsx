@@ -42,6 +42,7 @@ export function FootballReferencePicker({
   const [recent, setRecent] = useState<RecentFootballReference[]>([]);
   const [validatingId, setValidatingId] = useState('');
   const serial = useRef(0);
+  const rootRef = useRef<HTMLDivElement>(null);
   const selected = useMemo(() => known.find(item => item.id === value)
     ?? matches.find(item => item.id === value)
     ?? (resolved?.id === value ? resolved : null),
@@ -128,7 +129,21 @@ export function FootballReferencePicker({
     if (!open) setRecent(readRecentFootballReferences(userId, spaceId, model));
     setOpen(v => !v);
   };
-  return <div className={(overlay && open ? 'relative z-40 ' : '') + className}>
+  // Close floating and in-form popovers on outside clicks / Escape.
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open]);
+  return <div ref={rootRef} className={(overlay && open ? 'relative z-40 ' : '') + className}>
     <label id={id + '-label'} className="mb-1 block text-sm font-medium text-stone-700">
       {label}{!optional && ' *'}
     </label>
