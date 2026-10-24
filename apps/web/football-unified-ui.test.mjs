@@ -315,3 +315,27 @@ test('competition labels stay on the match row beside the score, not below team 
   assert.match(row, /competitionNames\.get\(m\.competitionActivityId\)/);
   assert.doesNotMatch(row, /<p className="truncate text-xs text-stone-500"/);
 });
+
+test('matches load forty at a time and only append pages while cursor exists', () => {
+  assert.match(page, /page: \{ limit: 40, \.\.\.\(cursor \? \{ cursor \} : \{\}\) \}/);
+  assert.match(page, /setMatches\(prev => append \? \[\.\.\.prev, \.\.\.result\.items\] : result\.items\)/);
+  assert.match(page, /setNextCursor\(result\.nextCursor\)/);
+  assert.match(page, /\{nextCursor && <Button className="w-full" variant="secondary"/);
+  assert.match(page, /加载更多比赛/);
+});
+
+test('team editor adds and removes PersonGroup members without deleting Person records', () => {
+  assert.match(domain, /memberPersonIds\?: string\[\]/);
+  assert.match(manage, /memberPersonIds: \[\.\.\.new Set\(record\?\.memberPersonIds \?\? \[\]\)\]/);
+  assert.match(manage, /memberPersonIds: teamDraft\.memberPersonIds, version: editingTeam\.version/);
+  assert.match(manage, /memberPersonIds: teamDraft\.memberPersonIds, \.\.\.presentation/);
+  assert.match(manage, /<FootballPersonPicker spaceId=\{spaceId\} members=\{members\} multiple/);
+  assert.match(manage, /selected=\{teamDraft\.memberPersonIds\}/);
+  assert.match(manage, /onChange=\{ids => setTeamDraft\(prev => prev \? \{\.\.\.prev,memberPersonIds:\[\.\.\.new Set\(ids\)\]\}/);
+  assert.match(manage, /fetchUniqueFootballReferences\(missing/);
+  assert.match(manage, /memberPersonIds\?\.length \?\? 0/);
+  assert.match(manage, /管理球员/);
+  assert.match(manage, /移出球队不会删除球员档案或比赛记录/);
+  assert.match(manage, /onClick=\{closeTeam\}/);
+  assert.doesNotMatch(manage, /DELETE[^]*memberPersonIds/);
+});
