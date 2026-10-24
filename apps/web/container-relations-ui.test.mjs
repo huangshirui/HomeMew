@@ -15,7 +15,7 @@ test('Goal and Habit default to active without an all-status tab or full collect
 
 test('Activity Goal and Habit share actual container-detail links, respecting Habit owner permissions', () => {
   assert.match(page, /<ContainerRelations/);
-  assert.match(page, /modelKey !== 'anniversary' \? <Button variant="secondary" onClick=\{\(\) => setContainerFor\(record\)\}/);
+  assert.match(page, /openDetail\(record\)/);
   assert.match(page, /writable=\{canManage\(containerFor\)\}/);
   assert.match(page, /myPersonId === record\.subjectPersonId/);
   assert.match(container, /\/semantic-relations/);
@@ -38,7 +38,8 @@ test('Activity countdown and related Task create source-owned links atomically',
 
 test('Activity detail exposes practical dates, participants, editing, plans and countdowns', () => {
   assert.match(container, /participants\?: string/);
-  assert.match(container, /编辑活动/);
+  assert.match(container, /onEdit/);
+  assert.match(container, /编辑\{modelKey === 'activity'/);
   assert.match(container, /活动日期待定/);
   assert.match(container, /活动安排/);
   assert.match(container, /重要日子/);
