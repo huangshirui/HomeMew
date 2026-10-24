@@ -15,7 +15,7 @@ test('Goal and Habit default to active without an all-status tab or full collect
 
 test('Activity Goal and Habit share actual container-detail links, respecting Habit owner permissions', () => {
   assert.match(page, /<ContainerRelations/);
-  assert.match(page, /modelKey !== 'anniversary' \? <Button variant="secondary" onClick=\{\(\) => setContainerFor\(record\)\}/);
+  assert.match(page, /openDetail\(record\)/);
   assert.match(page, /writable=\{canManage\(containerFor\)\}/);
   assert.match(page, /myPersonId === record\.subjectPersonId/);
   assert.match(container, /\/semantic-relations/);
@@ -25,7 +25,7 @@ test('Activity Goal and Habit share actual container-detail links, respecting Ha
 });
 
 test('Activity countdown and related Task create source-owned links atomically', () => {
-  assert.match(container, /新建关联倒计时/);
+  assert.match(container, /添加重要日子/);
   assert.match(container, /kind: 'countdown', anchorDate: countdownDate/);
   assert.match(container, /modelKey: 'day_record', clientRef: 'countdown'/);
   assert.match(container, /modelKey: 'task', clientRef: 'task'/);
@@ -34,4 +34,17 @@ test('Activity countdown and related Task create source-owned links atomically',
   assert.match(container, /source: ref\(modelKey, record\.id\)/);
   assert.match(container, /atomicConsistency: true/);
   assert.match(container, /daysUntil\(day\.anchorDate, timezone\)/);
+});
+
+test('Activity detail exposes practical dates, participants, editing, plans and countdowns', () => {
+  assert.match(container, /participants\?: string/);
+  assert.match(container, /onEdit/);
+  assert.match(container, /编辑活动/);
+  assert.match(container, /<RecordLifecycleMenu/);
+  assert.match(container, /活动日期待定/);
+  assert.match(container, /活动安排/);
+  assert.match(container, /重要日子/);
+  assert.match(container, /添加待办/);
+  assert.match(container, /添加已有内容/);
+  assert.doesNotMatch(container, /容器详情 · 关联的记录保留自己的生命周期/);
 });

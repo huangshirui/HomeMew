@@ -28,9 +28,12 @@ export function App() {
             <Route path="tasks" element={<TasksPage />} />
             <Route path="days" element={<DaysPage />} />
             <Route path="activities" element={<DomainPage modelKey="activity" />} />
+            <Route path="activities/:recordId" element={<DomainPage modelKey="activity" />} />
             <Route path="goals" element={<DomainPage modelKey="goal" />} />
+            <Route path="goals/:recordId" element={<DomainPage modelKey="goal" />} />
             <Route path="anniversaries" element={<DomainPage modelKey="anniversary" />} />
             <Route path="habits" element={<DomainPage modelKey="habit" />} />
+            <Route path="habits/:recordId" element={<DomainPage modelKey="habit" />} />
             <Route path="football" element={<FootballPage />} />
             <Route path="football/:matchId" element={<FootballPage />} />
             <Route path="football/manage" element={<FootballManagePage />} />
