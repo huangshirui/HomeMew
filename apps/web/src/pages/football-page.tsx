@@ -508,8 +508,17 @@ export function FootballPage() {
   if (householdLoading) return <Card className="p-8">正在加载家庭信息…</Card>;
 
   return <div className="space-y-4">
-    <PageHeader title={managing ? '球队与赛事' : '足球比赛'}>
-      {managing ? <Button variant="secondary" onClick={() => navigate('/football')}>
+    <PageHeader title={isDetail ? '比赛详情' : managing ? '球队与赛事' : '足球比赛'}>
+      {isDetail ? <>
+        <Button variant="secondary" onClick={returnToMatchList}><ChevronLeft className="size-4"/> 返回比赛列表</Button>
+        {familyPeople.length > 0 && <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm text-stone-600">
+          球员
+          <select aria-label="当前记录球员" className={input + ' w-28 shrink-0 sm:w-36'}
+            value={personId} onChange={e => selectPerson(e.target.value)}>
+            {familyPeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>}
+      </> : managing ? <Button variant="secondary" onClick={() => navigate('/football')}>
         <ChevronLeft className="size-4"/> 返回足球比赛
       </Button> : <>
         {!selected && <Button variant="secondary" onClick={() => setFilterOpen(v => !v)}
@@ -520,7 +529,7 @@ export function FootballPage() {
         {tab === 'record' && canWrite && <Button variant="primary" onClick={() => startMatch()}><Plus className="size-4"/> 新建比赛</Button>}
       </>}
     </PageHeader>
-    {!managing && <div className="flex flex-wrap items-center justify-between gap-3">
+    {!managing && !isDetail && <div className="flex flex-wrap items-center justify-between gap-3">
       <div role="tablist" aria-label="足球主功能" className="flex gap-2">
         {[{ key: 'record' as const, name: '记录', icon: CalendarDays },
           { key: 'stats' as const, name: '统计', icon: BarChart3 }].map(t =>
@@ -586,7 +595,7 @@ export function FootballPage() {
       </div>
     </div>}
     {!spaceId ? <Card className="p-6">请先选择家庭。</Card> : !managing && <>
-      {!selected && filterOpen && <div id="football-search-filters"
+      {!isDetail && !selected && filterOpen && <div id="football-search-filters"
         className="space-y-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
         <form className="flex flex-wrap items-center gap-2" role="search"
           onSubmit={e => { e.preventDefault(); setAppliedSearch(searchInput.trim()); }}>
@@ -622,7 +631,7 @@ export function FootballPage() {
           <Button variant="ghost" onClick={() => {setFilters({ ...blankFilters(), playerPersonId: personId }); setSearchInput(''); setAppliedSearch('');}}>重置筛选</Button>
         </div>
       </div>}
-      {tab === 'record' && !selected && <>
+      {!isDetail && tab === 'record' && <>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">比赛记录</h2>
           <Button variant="ghost" onClick={()=>void loadMatchPage(null,false)}><RefreshCw className="size-4"/> 刷新</Button>
@@ -658,7 +667,7 @@ export function FootballPage() {
               </p>}
             </div>
             <div className="ml-auto flex shrink-0 items-center gap-1">
-              <Button variant="secondary" className="h-9 px-3" onClick={() => {setSelected(m);setSuccess('');}}>记录</Button>
+              <Button variant="secondary" className="h-9 px-3" onClick={() => openMatchDetail(m)}>记录</Button>
               {canWrite && <Button variant="ghost" className="h-9 px-2" onClick={()=>startMatch(m)}>编辑</Button>}
             </div>
           </div>)}
@@ -666,11 +675,12 @@ export function FootballPage() {
         </div>
         {nextCursor && <Button className="w-full" variant="secondary" disabled={loading} onClick={()=>void loadMatchPage(nextCursor,true)}>加载更多比赛</Button>}
       </>}
-      {tab === 'record' && selected && <>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={()=>setSelected(null)}><ChevronLeft className="size-4"/> 返回比赛列表</Button>
-          <span className="ml-auto text-xs text-stone-500">球员：{currentName}</span>
-        </div>
+      {isDetail && detailLoading && <Card className="p-8 text-center text-sm text-stone-500">正在加载比赛…</Card>}
+      {isDetail && !detailLoading && detailError && <Card className="space-y-3 p-6">
+        <p role="alert" className="text-sm text-red-700">{detailError}</p>
+        <Button variant="secondary" onClick={returnToMatchList}>返回比赛列表</Button>
+      </Card>}
+      {isDetail && !detailLoading && selected && selected.id === matchId && <>
         <Card className="space-y-2 p-4">
           <p className="text-xs text-stone-400">{selected.matchDate} · {competitionNames.get(selected.competitionActivityId ?? '') ?? (selected.matchType === 'official' ? '正式比赛' : '友谊赛')}</p>
           <div className="flex items-center justify-between gap-2">
@@ -754,7 +764,7 @@ export function FootballPage() {
           <Trash2 className="size-4"/> 删除本场比赛
         </Button>}
       </>}
-      {tab === 'stats' && <>
+      {!isDetail && tab === 'stats' && <>
         {statsError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{statsError}</p>}
         {statsLoading ? <Card className="p-10 text-center text-sm text-stone-500">正在统计已筛选比赛…</Card>
           : !schema ? <Card className="p-6 text-sm text-stone-500">统计暂时无法查看，请稍后重试。</Card>
