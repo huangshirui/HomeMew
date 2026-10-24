@@ -17,23 +17,24 @@ test('mobile bottom tabs are full-width, docked, and account for the device safe
   }
 });
 
-test('mobile family selector shares page header, truncates long names and preserves native switching', () => {
+test('mobile family logo selector opens accessible family and member panel without disrupting centered titles', () => {
   const shell = source('./src/components/app-shell.tsx');
   const header = source('./src/components/ui/page-header.tsx');
   const home = source('./src/pages/home-page.tsx');
   assert.match(header, /<FamilyIdentity mobile \/>/u);
-  assert.match(header, /w-\[min\(7rem,35vw\)\]/u);
-  assert.match(shell, /max-w-28 gap-1\.5/u);
-  assert.match(shell, /truncate font-semibold tracking-tight/u);
-  assert.match(shell, /absolute inset-0 h-full w-full cursor-pointer opacity-0/u);
-  assert.match(shell, /setCurrentFamilyId\(event\.target\.value\)/u);
-  assert.match(home, /<FamilyIdentity mobile \/>/u);
+  assert.match(header, /grid-cols-\\[minmax\\(0,1fr\\)_auto_minmax\\(0,1fr\\)\\]/u);
+  assert.match(header, /text-center text-\\[20px\\] font-semibold/u);
+  assert.match(shell, /familyAvatarSource\\(currentFamily.id, currentFamily.avatarUrl\\)/u);
+  assert.match(shell, /aria-expanded=\\{open\\}/u);
+  assert.match(shell, /setCurrentFamilyId\\(family.id\\)/u);
+  assert.match(shell, /<MemberAvatar key=\\{member.id\\}/u);
+  assert.match(home, /<PageHeader title="首页" mobileActions=/u);
   assert.doesNotMatch(shell, /<div className="mx-auto flex h-16 max-w-7xl/u);
 });
 
 test('calendar uses one-line icon actions and responsive, accessible period controls', () => {
   const calendar = source('./src/pages/calendar-page.tsx');
-  assert.match(calendar, /<PageHeader title="家庭日程" mobileTitle="日程" compactMobile>/u);
+  assert.match(calendar, /<PageHeader title="家庭日程" mobileTitle="日程" compactMobile mobileActions=/u);
   assert.match(calendar, /aria-label="新建日程" title="新建日程"/u);
   assert.match(calendar, /aria-controls="calendar-search-filters"/u);
   assert.match(calendar, /<span className="hidden sm:inline">搜索与筛选/u);
