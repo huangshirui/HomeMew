@@ -6,6 +6,7 @@ import { downloadRecordIconImage } from '../../services/record-icons';
 
 type Kind='activities'|'goals'|'habits'|'anniversaries';
 const KINDS:Kind[]=['activities','goals','habits','anniversaries'];
+const modelKeys={activities:'activity',goals:'goal',habits:'habit',anniversaries:'anniversary'} as const;
 const isValidAnniversary=(month:number,day:number,year:number|null)=>{
   if(!Number.isInteger(month)||!Number.isInteger(day)||month<1||month>12||day<1||day>31||
     (year!==null&&(!Number.isInteger(year)||year<1||year>9999)))return false;
@@ -42,7 +43,7 @@ Page({
       });
       if(record?.presentation?.icon?.type==='image'){
         const fileId=record.presentation.icon.fileId;
-        void downloadRecordIconImage(familyId,kind,record.id,fileId).then(iconImagePath=>{
+        void downloadRecordIconImage(familyId,modelKeys[kind],record.id,fileId).then(iconImagePath=>{
           if(!this.data.iconTouched&&this.data.iconFileId===fileId)this.setData({iconImagePath});
         }).catch(()=>{});
       }
@@ -92,7 +93,7 @@ Page({
     }
     this.setData({submitting:true,error:''});
     try{
-      const presentation=await prepareRecordIcon(d.familyId,kind,d.recordId?'edit':'create',d);
+      const presentation=await prepareRecordIcon(d.familyId,modelKeys[kind],d.recordId?'edit':'create',d);
       if(presentation)fields.presentation=presentation;
       if(d.recordId){await updateDomainRecord(d.familyId,kind,d.recordId,{...fields,version:d.version});}
       else{
