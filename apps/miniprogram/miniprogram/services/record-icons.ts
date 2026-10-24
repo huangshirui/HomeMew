@@ -4,7 +4,7 @@ import { ensureAccessToken } from './auth';
 import { getApplicationBaseUrl, generateRequestId, UPLOAD_TIMEOUT } from './config';
 
 const MAX_BYTES = 256 * 1024;
-export type IconModel = 'day_record' | 'event' | 'task' | 'wish';
+export type IconModel = 'day_record' | 'event' | 'task' | 'wish' | 'activity' | 'goal' | 'habit' | 'anniversary' | 'person_group';
 const base = (familyId: string, modelKey: IconModel, recordId?: string) =>
   `${getApplicationBaseUrl()}/api/v1/miniprogram/families/${encodeURIComponent(familyId)}/record-icons/${modelKey}/${recordId ? `records/${encodeURIComponent(recordId)}/` : ''}image`;
 
