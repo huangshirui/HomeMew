@@ -13,6 +13,7 @@
  * 全天日程的 end 在 UI 显示为包含式，提交时按 SPEC 9.5 加一天转换为不包含形式。
  */
 
+import { createLinkedRecord } from '../../services/domains';
 import { getEvent, createEvent, updateEvent, createEventsBatch } from '../../services/events';
 import type { BatchCreateItemResult } from '../../services/events';
 import { listFamilyMembers } from '../../services/families';
@@ -76,6 +77,8 @@ type Mode = 'create' | 'edit';
 Page({
   data: {
     mode: 'create' as Mode,
+    sourceKind: '' as 'activities'|'goals'|'habits'|'',
+    sourceId: '',
     familyId: '',
     eventId: '',
     version: 0,
@@ -122,7 +125,7 @@ Page({
     showEndCalendar: false,
   },
 
-  async onLoad(options: { familyId?: string; id?: string; date?: string; clone?: string }): Promise<void> {
+  async onLoad(options: { familyId?: string; id?: string; date?: string; clone?: string; sourceKind?:string; sourceId?:string }): Promise<void> {
     const familyId = options?.familyId;
     if (!familyId) {
       showError('缺少家庭参数');
@@ -145,6 +148,8 @@ Page({
     const startDate = times.dayOffset ? addDaysToDateOnly(initialDate, times.dayOffset) : initialDate;
     this.setData({
       familyId,
+      sourceKind: ['activities','goals','habits'].includes(options.sourceKind || '') ? options.sourceKind as 'activities'|'goals'|'habits' : '',
+      sourceId: options.sourceId || '',
       mode: options?.id ? 'edit' : 'create',
       eventId: options?.id || '',
       startDate,
@@ -661,7 +666,11 @@ Page({
           const updatePayload: UpdateEventRequest = { ...payloadWithIcon, version: this.data.version };
           await updateEvent(this.data.familyId, this.data.eventId, updatePayload);
         } else {
-          await createEvent(this.data.familyId, payloadWithIcon);
+          if (this.data.sourceKind && this.data.sourceId) {
+            await createLinkedRecord(this.data.familyId,this.data.sourceKind,this.data.sourceId,'event',payloadWithIcon as unknown as Record<string,unknown>);
+          } else {
+            await createEvent(this.data.familyId, payloadWithIcon);
+          }
         }
         hideLoading();
         showSuccess(this.data.mode === 'edit' ? '已保存' : '已创建');
@@ -678,6 +687,11 @@ Page({
         }
         showError(getErrorMessage(err.code, err.message) || '保存失败，请重试');
       }
+      return;
+    }
+
+    if (this.data.sourceKind && this.data.sourceId) {
+      showError('活动关联日程每次只支持创建一条，避免重复关联');
       return;
     }
 
