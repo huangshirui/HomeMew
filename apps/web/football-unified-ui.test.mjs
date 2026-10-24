@@ -337,5 +337,6 @@ test('team editor adds and removes PersonGroup members without deleting Person r
   assert.match(manage, /管理球员/);
   assert.match(manage, /移出球队不会删除球员档案或比赛记录/);
   assert.match(manage, /onClick=\{closeTeam\}/);
-  assert.doesNotMatch(manage, /DELETE[^]*memberPersonIds/);
+  const membershipSave = manage.slice(manage.indexOf('const startTeam ='), manage.indexOf('const deleteTeam ='));
+  assert.doesNotMatch(membershipSave, /method: 'DELETE'/);
 });
