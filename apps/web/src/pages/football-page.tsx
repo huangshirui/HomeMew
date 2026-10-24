@@ -128,8 +128,19 @@ export function FootballPage() {
 
   useModalScrollLock(Boolean(matchForm || performanceForm || quickRef || playerDialog));
 
+  const initializedListContext = useRef('');
   useEffect(() => {
-    if (!spaceId) { setPersonId(''); return; }
+    if (!spaceId || householdLoading) {
+      if (!spaceId) { initializedListContext.current = ''; setPersonId(''); }
+      return;
+    }
+    const context = [spaceId, user?.id ?? '', isDetail ? 'detail' : 'list'].join(':');
+    if (initializedListContext.current === context) {
+      // A household member refresh must not silently clear the user's search or filters.
+      setPersonId(prev => familyPeople.some(p => p.id === prev) ? prev : familyPeople[0]?.id ?? '');
+      return;
+    }
+    initializedListContext.current = context;
     const saved = rememberedPerson(spaceId);
     const defaultPerson = familyPeople.find(p => p.id === saved)?.id ??
       familyPeople.find(p => p.name.toLocaleLowerCase().includes('kk'))?.id ??
@@ -147,7 +158,7 @@ export function FootballPage() {
       setTab(restored.tab);
       restoreScrollRef.current = restored.scrollY;
     }
-  }, [spaceId, user?.id, familyPeople, isDetail]);
+  }, [spaceId, user?.id, householdLoading, familyPeople, isDetail]);
   function openMatchDetail(record: FootballMatch) {
     if (spaceId) rememberFootballList(spaceId, user?.id ?? '', {
       tab, filters, searchInput, appliedSearch, filterOpen, scrollY: window.scrollY,
@@ -177,7 +188,7 @@ export function FootballPage() {
   }, [spaceId, refresh]);
 
   useEffect(() => {
-    if (!spaceId) return;
+    if (!spaceId || isDetail) return;
     const request = ++refsReq.current;
     // Lists are only a small first page. Searchable pickers use server queries, not full-table materialization.
     // Do not automatically load generic Activity records as a football competition directory.
@@ -188,7 +199,7 @@ export function FootballPage() {
       setTeams(prev => [...new Map([...prev, ...result.items].map(item => [item.id, item])).values()]);
       setTeamCursor(result.nextCursor);
     }).catch(e => { if (refsReq.current === request) setError(message(e)); });
-  }, [spaceId, refresh]);
+  }, [spaceId, refresh, isDetail]);
 
   async function loadMoreReferences(kind: ReferenceKind) {
     if (!spaceId || referenceLoading) return;
