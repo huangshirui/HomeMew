@@ -14,6 +14,7 @@ export type FootballPerformance = {
 };
 export type FootballReference = {
   id: string; version: number; name: string; description?: string | null; type?: string | null;
+  memberPersonIds?: string[];
   presentation?: { icon?: import('../components/record-icon').RecordIcon | null };
 };
 export type FootballPerson = { id: string; displayName: string; alternateNames?: string[] };
