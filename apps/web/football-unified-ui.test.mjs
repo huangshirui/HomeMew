@@ -251,12 +251,35 @@ test('quick creation only follows completed zero-result search and carries the t
   assert.match(picker, /searched === search\.trim\(\)/);
   assert.match(picker, /onCreate\(search\.trim\(\)\)/);
 });
-test('match and top-level player creation use the Space Person Directory', () => {
+test('match form quick-creates other players without adding a create action to the global family selector', () => {
   assert.match(page, /async function saveNewPlayer/);
   assert.match(page, /method: 'POST'/);
   assert.match(page, /displayName: newPlayerName\.trim\(\)/);
   assert.match(page, /playerPersonIds: \[\.\.\.new Set/);
   assert.match(page, /onCreate=\{name => startPlayer\(name, 'match'\)\}/);
-  assert.match(page, /\+ 新建球员/);
+  assert.match(page, /\{familyPeople\.map\(p => <option/);
+  assert.doesNotMatch(page, /playerSearchOpen|setPlayerSearchOpen/);
+  assert.doesNotMatch(page, /onClick=\{\(\) => startPlayer\(\)\}/);
   assert.match(manage, /linkedUser/);
+});
+
+test('football rows show both team icons, one-line date and match-type icon', () => {
+  assert.match(page, /teamRecords\.get\(m\.representativeTeamId\)\?\.presentation\?\.icon/);
+  assert.match(page, /teamRecords\.get\(m\.opponentTeamId\)\?\.presentation\?\.icon/);
+  assert.match(page, /recordId=\{m\.opponentTeamId\}/);
+  assert.match(page, /recordId=\{m\.representativeTeamId\}/);
+  assert.match(page, /whitespace-nowrap text-xs text-stone-700/);
+  assert.match(page, /aria-label="正式比赛"/);
+  assert.match(page, /aria-label="友谊赛"/);
+  assert.doesNotMatch(page, /<p>\{m\.matchType === 'official' \? '正式'/);
+});
+
+test('competition labels resolve only page-referenced Activity IDs, with retry and visible fallback', () => {
+  assert.match(page, /new Set\(matches\.map\(m => m\.competitionActivityId\)/);
+  assert.match(page, /fetchUniqueFootballReferences\(competitionBatch/);
+  assert.match(page, /modelUrl\(spaceId, 'activity', id\)/);
+  assert.match(page, /competitionNames\.get\(m\.competitionActivityId\)/);
+  assert.match(page, /'赛事暂不可查看'/);
+  assert.match(page, /attemptedRefLookup\.current\.clear\(\)/);
+  assert.doesNotMatch(page, /queryModelRecords<FootballReference>\(spaceId, 'activity'/);
 });
