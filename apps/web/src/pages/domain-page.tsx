@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { CalendarDays, Check, Clock3, Gift, Minus, Pause, Play, Plus, RefreshCw, Search, SlidersHorizontal, Target, Trash2, X } from 'lucide-react';
 import { RecordTitleField } from '../components/record-title-field';
 import { useHousehold } from '../components/household-provider';
@@ -15,7 +16,7 @@ import { queryModelRecords, type CanonicalQuery, type CanonicalQueryFilter, type
 
 type ModelKey = 'activity' | 'goal' | 'anniversary' | 'habit';
 type Status = 'active' | 'paused' | 'achieved' | 'abandoned' | 'ended';
-type ActivityPeriod = 'all' | 'upcoming' | 'ongoing' | 'past' | 'undated';
+type ActivityPeriod = 'current' | 'upcoming' | 'past' | 'all';
 type DomainRecord = {
   id: string; spaceId: string; version: number; name: string; description?: string | null; createdAt?: string;
   presentation?: { icon?: RecordIcon | null }; status?: Status;
@@ -121,9 +122,13 @@ function activityQuery(search: string, personId: string, period: ActivityPeriod,
   const today = todayInZone(timezone);
   if (personId) filters.push({ field: 'attendeePersonIds', op: 'contains', value: personId });
   if (period === 'upcoming') filters.push({ field: 'startDate', op: 'gt', value: today });
-  if (period === 'ongoing') filters.push({ field: 'startDate', op: 'lte', value: today }, { field: 'endDate', op: 'gte', value: today });
   if (period === 'past') filters.push({ field: 'endDate', op: 'lt', value: today });
-  if (period === 'undated') filters.push({ field: 'startDate', op: 'isNull' }, { field: 'endDate', op: 'isNull' });
+  if (period === 'current') filters.push({
+    and: [
+      { or: [{ field: 'startDate', op: 'isNull' }, { field: 'startDate', op: 'lte', value: today }] },
+      { or: [{ field: 'endDate', op: 'isNull' }, { field: 'endDate', op: 'gte', value: today }] },
+    ],
+  });
   return {
     ...(search ? { search: { text: search } } : {}),
     ...(filters.length ? { filter: filters.length === 1 ? filters[0] : { and: filters } } : {}),
@@ -136,6 +141,9 @@ function memberNames(ids: string[], names: Map<string, string>) {
 }
 
 export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
+  const navigate = useNavigate();
+  const { recordId } = useParams<{ recordId?: string }>();
+  const detailMode = Boolean(recordId && modelKey !== 'anniversary');
   const { currentFamily, members, user, loading: householdLoading } = useHousehold();
   const [records, setRecords] = useState<DomainRecord[]>([]);
   const requestGeneration = useRef(0);
@@ -147,7 +155,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const [activitySearchInput, setActivitySearchInput] = useState('');
   const [activitySearch, setActivitySearch] = useState('');
   const [activityPerson, setActivityPerson] = useState('');
-  const [activityPeriod, setActivityPeriod] = useState<ActivityPeriod>('all');
+  const [activityPeriod, setActivityPeriod] = useState<ActivityPeriod>('current');
   const [activityCursor, setActivityCursor] = useState<string | null>(null);
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const [editing, setEditing] = useState<DomainRecord | null>(null);
@@ -155,18 +163,22 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const [busy, setBusy] = useState(false);
   const [historyFor, setHistoryFor] = useState<DomainRecord | null>(null);
   const [containerFor, setContainerFor] = useState<DomainRecord | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyError, setHistoryError] = useState('');
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
-  useModalScrollLock(Boolean(draft || historyFor || containerFor));
+  useModalScrollLock(Boolean(draft || historyFor));
   const myPersonId = members.find(member => member.userId === user?.id)?.personId;
   const canCreate = Boolean(currentFamily && currentFamily.role !== 'viewer');
   const names = useMemo(() => new Map(members.filter(m => m.personId).map(m => [m.personId!, m.displayName || '家庭成员'])), [members]);
   const spec = settings[modelKey];
   const Icon = spec.icon;
+  const listPath = modelKey === 'activity' ? '/activities' : modelKey === 'goal' ? '/goals' : modelKey === 'habit' ? '/habits' : '/anniversaries';
+  const openDetail = (record: DomainRecord) => navigate(`${listPath}/${encodeURIComponent(record.id)}`);
   const visible = records; // Goal/Habit status filtering is performed by the indexed LifeSpace query.
-  const activityFiltersActive = Boolean(activitySearchInput.trim() || activityPerson || activityPeriod !== 'all');
+  const activityFiltersActive = Boolean(activitySearchInput.trim() || activityPerson || activityPeriod !== 'current');
   useEffect(() => {
     const timer = window.setTimeout(() => setActivitySearch(activitySearchInput.trim()), 320);
     return () => window.clearTimeout(timer);
@@ -174,7 +186,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
 
   const reload = useCallback(async () => {
     const generation = ++requestGeneration.current;
-    if (!currentFamily) { setRecords([]); return; }
+    if (!currentFamily || detailMode) { setRecords([]); return; }
     setLoading(true); setRecords([]); setActivityCursor(null); setError('');
     try {
       if (modelKey === 'activity') {
@@ -189,7 +201,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     } finally {
       if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [currentFamily?.id, currentFamily?.timezone, modelKey, statusFilter, activitySearch, activityPerson, activityPeriod]);
+  }, [currentFamily?.id, currentFamily?.timezone, modelKey, statusFilter, activitySearch, activityPerson, activityPeriod, detailMode]);
   const moreActivities = useCallback(async () => {
     if (!currentFamily || modelKey !== 'activity' || !activityCursor || loading || activityLoadingMore) return;
     const generation = requestGeneration.current;
@@ -205,7 +217,17 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     finally { setActivityLoadingMore(false); }
   }, [currentFamily?.id, currentFamily?.timezone, modelKey, activityCursor, loading, activityLoadingMore, activitySearch, activityPerson, activityPeriod]);
   useEffect(() => { void refresh; void reload(); return () => { requestGeneration.current += 1; }; }, [reload, refresh]);
-  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setContainerFor(null); setStatusFilter('active'); setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('all'); setActivityFilterOpen(false); }, [currentFamily?.id, modelKey]);
+  useEffect(() => {
+    if (!detailMode || !recordId || !currentFamily) { setContainerFor(null); setDetailLoading(false); return; }
+    let cancelled = false;
+    setContainerFor(null); setDetailError(''); setDetailLoading(true);
+    void apiRequest<DomainRecord>(url(currentFamily.id, modelKey, recordId))
+      .then(record => { if (!cancelled) openDetail(record); })
+      .catch(cause => { if (!cancelled) setDetailError(message(cause)); })
+      .finally(() => { if (!cancelled) setDetailLoading(false); });
+    return () => { cancelled = true; };
+  }, [currentFamily?.id, recordId, modelKey, detailMode, refresh]);
+  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setContainerFor(null); setStatusFilter('active'); setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('current'); setActivityFilterOpen(false); }, [currentFamily?.id, modelKey]);
 
   function newRecord() {
     const next = blank();
@@ -230,7 +252,10 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
         method: editing ? 'PATCH' : 'POST',
         body: JSON.stringify({ ...value, ...presentation, ...(editing ? { version: editing.version } : {}) }),
       });
-      setDraft(null); setEditing(null); setRefresh(v => v + 1);
+      const wasCreating = !editing;
+      setDraft(null); setEditing(null);
+      setRefresh(v => v + 1);
+      if (wasCreating && modelKey !== 'anniversary') setActivityFilterOpen(false);
     } catch (cause) { setError(message(cause)); }
     finally { setBusy(false); }
   }
@@ -240,6 +265,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     try {
       await apiRequest(url(currentFamily.id, modelKey, record.id), { method: 'DELETE', body: JSON.stringify({ version: record.version }) });
       setDraft(null); setEditing(null); setRefresh(v => v + 1);
+      if (detailMode) navigate(`/${modelKey === 'activity' ? 'activities' : modelKey === 'goal' ? 'goals' : 'habits'}`);
     } catch (cause) { setError(message(cause)); } finally { setBusy(false); }
   }
   async function action(record: DomainRecord, key: string) {
@@ -264,13 +290,20 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   }
   if (householdLoading) return <Card className="p-8 text-sm text-stone-500">正在加载家庭信息…</Card>;
   return <div className="space-y-4">
-    <PageHeader title={spec.title}>
+    {!detailMode ? <PageHeader title={spec.title}>
       {modelKey === 'activity' ? <Button variant="secondary" onClick={() => setActivityFilterOpen(value => !value)}>
         <SlidersHorizontal className="size-4" /> 搜索与筛选{activityFiltersActive ? ' · 已筛选' : ''}
       </Button> : null}
       {canCreate ? <Button variant="primary" onClick={newRecord}><Plus className="size-4" /> 新建{spec.title}</Button> : null}
-    </PageHeader>
-    {modelKey === 'activity' && activityFilterOpen ? <div className="grid gap-3 rounded-2xl border border-stone-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+    </PageHeader> : null}
+    {!detailMode && modelKey === 'activity' ? <div className="flex flex-wrap gap-2">
+      {([['current','当前'], ['upcoming','即将开始'], ['past','已结束'], ['all','全部']] as const).map(([key,label]) =>
+        <button key={key} type="button" aria-pressed={activityPeriod === key} onClick={() => setActivityPeriod(key)}
+          className={`rounded-xl px-4 py-2 text-sm font-medium ${activityPeriod === key ? 'bg-emerald-700 text-white' : 'bg-white text-stone-600 ring-1 ring-stone-200'}`}>
+          {label}
+        </button>)}
+    </div> : null}
+    {!detailMode && modelKey === 'activity' && activityFilterOpen ? <div className="grid gap-3 rounded-2xl border border-stone-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
       <label className={field}>搜索活动
         <span className="relative block"><Search className="pointer-events-none absolute left-3 top-3 size-4 text-stone-400" />
           <input type="search" aria-label="搜索活动" placeholder="搜索活动名称或说明" className={`${inputClass} pl-9`} value={activitySearchInput}
@@ -281,14 +314,10 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
           <option value="">全部成员</option>{members.filter(item => item.personId).map(item => <option key={item.personId} value={item.personId}>{item.displayName}</option>)}
         </select>
       </label>
-      <label className={field}>活动时间
-        <select className={inputClass} value={activityPeriod} onChange={event => setActivityPeriod(event.target.value as ActivityPeriod)}>
-          <option value="all">全部</option><option value="upcoming">即将开始</option><option value="ongoing">进行中</option><option value="past">已结束</option><option value="undated">未定日期</option>
-        </select>
-      </label>
-      {activityFiltersActive ? <button type="button" className="w-fit text-xs text-emerald-700 hover:underline" onClick={() => { setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('all'); }}>清除筛选</button> : null}
+      <p className="text-xs text-stone-500 sm:self-end">“当前”包含尚未排期、或日期范围覆盖今天的活动；需要明确结束时可切换“已结束”查看历史。</p>
+      {activityFiltersActive ? <button type="button" className="w-fit text-xs text-emerald-700 hover:underline" onClick={() => { setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('current'); }}>清除筛选</button> : null}
     </div> : null}
-    {modelKey === 'goal' || modelKey === 'habit' ? <div className="flex flex-wrap items-center gap-2">
+    {!detailMode && (modelKey === 'goal' || modelKey === 'habit') ? <div className="flex flex-wrap items-center gap-2">
       {(['active','paused',...(modelKey === 'goal' ? ['achieved','abandoned'] : ['ended'])] as Status[]).map(key =>
         <button key={key} type="button" aria-pressed={statusFilter === key} onClick={() => setStatusFilter(key)}
           className={`rounded-xl px-3 py-2 text-xs font-medium ${statusFilter === key ? 'bg-emerald-700 text-white' : 'bg-white text-stone-500 ring-1 ring-stone-200'}`}>
@@ -296,7 +325,38 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
         </button>)}
     </div> : null}
     {error ? <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
-    {!currentFamily ? <Card className="p-6 text-sm text-stone-500">请先选择家庭。</Card>
+    {detailMode ? !currentFamily ? <Card className="p-6 text-sm text-stone-500">请先选择家庭。</Card>
+      : detailLoading ? <Card className="p-6 text-sm text-stone-500">正在加载详情…</Card>
+      : !containerFor ? <Card className="p-6 text-sm text-stone-500">{detailError || '记录不存在或没有查看权限。'} <button className="ml-2 text-emerald-700" onClick={() => navigate(listPath)}>返回{spec.title}</button></Card>
+      : <div className="space-y-5">
+        <button type="button" className="text-sm text-stone-500 hover:text-emerald-800" onClick={() => navigate(listPath)}>← 返回{spec.title}</button>
+        <ContainerRelations key={`${currentFamily.id}:${modelKey}:${containerFor.id}`}
+          spaceId={currentFamily.id} modelKey={modelKey as 'activity'|'goal'|'habit'} record={containerFor} timezone={currentFamily.timezone}
+          writable={canManage(containerFor)} participants={memberNames(containerFor.attendeePersonIds ?? containerFor.subjectPersonIds ?? (containerFor.subjectPersonId ? [containerFor.subjectPersonId] : []), names)}
+          onEdit={() => edit(containerFor)} mode="page" />
+        {modelKey === 'habit' && <div className="rounded-2xl border border-stone-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><h2 className="font-semibold">打卡记录</h2><p className="text-xs text-stone-500">最近打卡日期（按时间排序）</p></div>
+            {canManage(containerFor) && containerFor.status === 'active' ? <Button variant="primary"
+              disabled={busy || containerFor.computed?.checkIn?.checkedInToday} onClick={() => void action(containerFor,'check-in')}>
+              <Check className="size-4"/>{containerFor.computed?.checkIn?.checkedInToday ? '今天已打卡' : '今天打卡'}</Button> : null}
+          </div>
+          {containerFor.computed?.checkIn ? <p className="my-3 text-sm text-stone-600">当前连续 {containerFor.computed.checkIn.streakDays} 天</p> : null}
+          <Button variant="secondary" onClick={() => { setHistoryFor(containerFor); setHistory([]); setHistoryCursor(null); void loadHistory(containerFor,null,false); }}>查看历史记录</Button>
+        </div>}
+        {(modelKey === 'goal' || modelKey === 'habit') && <div className="flex flex-wrap gap-2">
+          {containerFor.status && <span className="rounded-xl bg-stone-100 px-3 py-2 text-sm">{statusText[containerFor.status]}</span>}
+          {canManage(containerFor) && containerFor.status === 'active' && <Button variant="secondary" disabled={busy} onClick={() => void action(containerFor,'pause')}>暂停</Button>}
+          {canManage(containerFor) && containerFor.status === 'paused' && <Button variant="secondary" disabled={busy} onClick={() => void action(containerFor,'resume')}>继续</Button>}
+          {canManage(containerFor) && modelKey === 'goal' && ['active','paused'].includes(containerFor.status ?? '') && <>
+            <Button variant="secondary" disabled={busy} onClick={() => void action(containerFor,'achieve')}>标记达成</Button>
+            <Button variant="ghost" disabled={busy} onClick={() => void action(containerFor,'abandon')}>放弃目标</Button>
+          </>}
+          {canManage(containerFor) && modelKey === 'habit' && ['active','paused'].includes(containerFor.status ?? '') && <Button variant="ghost" disabled={busy} onClick={() => void action(containerFor,'end')}>结束习惯</Button>}
+          {canManage(containerFor) && ['achieved','abandoned','ended'].includes(containerFor.status ?? '') && <Button variant="secondary" disabled={busy} onClick={() => void action(containerFor,'reopen')}>重新开始</Button>}
+        </div>}
+      </div>
+    : !currentFamily ? <Card className="p-6 text-sm text-stone-500">请先选择家庭。</Card>
       : loading ? <Card className="p-6 text-sm text-stone-500">正在加载{spec.title}…</Card>
       : !visible.length ? <Card className="p-8 text-center text-sm text-stone-500">{modelKey === 'activity' && activityFiltersActive ? '没有找到符合条件的活动。' : modelKey === 'goal' || modelKey === 'habit' ? `暂无${statusText[statusFilter]}的${spec.title}` : `还没有${spec.title}记录。`}</Card>
       : modelKey === 'activity' ? <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm divide-y divide-stone-100">
@@ -305,13 +365,13 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
             {record.presentation?.icon ? <RecordIconMark icon={record.presentation.icon} spaceId={currentFamily.id} modelKey="activity" recordId={record.id} /> : <CalendarDays className="size-5" />}
           </div>
           <div className="min-w-0 flex-1 space-y-1">
-            <button type="button" className="block max-w-full truncate text-left font-semibold text-stone-900 hover:text-emerald-700" onClick={() => setContainerFor(record)}>{record.name}</button>
+            <button type="button" className="block max-w-full truncate text-left font-semibold text-stone-900 hover:text-emerald-700" onClick={() => openDetail(record)}>{record.name}</button>
             {record.description ? <p className="truncate text-sm text-stone-500">{record.description}</p> : null}
             <p className="text-xs text-stone-500">{record.startDate || record.endDate ? `${record.startDate || '开始时间待定'} → ${record.endDate || '结束时间待定'}` : '日期待定'}
               {record.attendeePersonIds?.length ? ` · ${memberNames(record.attendeePersonIds, names)}` : ''}</p>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
-            <Button variant="secondary" onClick={() => setContainerFor(record)}>查看活动</Button>
+            <Button variant="secondary" onClick={() => openDetail(record)}>查看活动</Button>
             {canManage(record) ? <Button variant="ghost" onClick={() => edit(record)}>编辑</Button> : null}
           </div>
         </div>)}
@@ -335,7 +395,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
           {modelKey !== 'habit' && memberNames(modelKey === 'goal' ? record.subjectPersonIds ?? [] : record.personIds ?? [], names) ?
             <p className="text-xs text-stone-500">{memberNames(modelKey === 'goal' ? record.subjectPersonIds ?? [] : record.personIds ?? [], names)}</p> : null}
           <div className="flex flex-wrap gap-2 border-t border-stone-100 pt-3">
-            {modelKey !== 'anniversary' ? <Button variant="secondary" onClick={() => setContainerFor(record)}>查看内容</Button> : null}
+            {modelKey !== 'anniversary' ? <Button variant="secondary" onClick={() => openDetail(record)}>查看内容</Button> : null}
              {modelKey === 'habit' ? <Button variant="secondary" onClick={() => { setHistoryFor(record); setHistory([]); setHistoryCursor(null); void loadHistory(record, null, false); }}>打卡历史</Button> : null}
             {canManage(record) ? <>
               <Button variant="secondary" onClick={() => edit(record)}>编辑</Button>
@@ -356,15 +416,10 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
           </div>
         </Card>)}
       </div>}
-    <div className="flex items-center justify-between gap-3">
+    {!detailMode ? <div className="flex items-center justify-between gap-3">
       {modelKey === 'activity' && activityCursor ? <Button variant="secondary" disabled={activityLoadingMore || loading} onClick={() => void moreActivities()}>{activityLoadingMore ? '正在加载…' : '加载更多活动'}</Button> : <span />}
       <Button variant="ghost" disabled={loading || activityLoadingMore} onClick={() => setRefresh(v => v + 1)}><RefreshCw className="size-4" /> 刷新</Button>
-    </div>
-
-    {containerFor && currentFamily && modelKey !== 'anniversary' ? <ContainerRelations key={`${modelKey}:${containerFor.id}`}
-      spaceId={currentFamily.id} modelKey={modelKey} record={containerFor} timezone={currentFamily.timezone}
-      writable={canManage(containerFor)} participants={memberNames(containerFor.attendeePersonIds ?? [], names)}
-      onEdit={() => { const record = containerFor; setContainerFor(null); if (record) edit(record); }} onClose={() => setContainerFor(null)} /> : null}
+    </div> : null}
     {draft && currentFamily ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6"
       role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setDraft(null); }}>
       <form onSubmit={save} role="dialog" aria-modal="true" aria-label={editing ? '编辑' + spec.title : '新建' + spec.title}
