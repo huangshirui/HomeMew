@@ -64,7 +64,7 @@ Page({
     }catch(error:unknown){if(generation===this._generation)this.setData({error:(error as Error).message||'加载失败'});}
     finally{if(generation===this._generation)this.setData({loading:false,loadingMore:false});}
   },
-  onPullDownRefresh():void{this.load(true).finally(()=>wx.stopPullDownRefresh());},
+  onPullDownRefresh():void{void this.load(true).then(()=>wx.stopPullDownRefresh(),()=>wx.stopPullDownRefresh());},
   onReachBottom():void{if(!this.data.loadingMore && !this.data.loading)this.load(false);},
   onLoadMore():void{this.onReachBottom();},
   onFilterTap(e:WechatMiniprogram.TouchEvent):void{this.setData({filter:String(e.currentTarget.dataset.key),records:[],nextCursor:null});this.load(true);},
