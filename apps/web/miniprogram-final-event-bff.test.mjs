@@ -78,6 +78,40 @@ test('TemporalRange resources project to the stable Mini Event DTO', async () =>
   });
 });
 
+test('new LifeSpace Location objects are projected into the stable Mini string Event DTO', async () => {
+  const source = common({ ...temporalItems[0],
+    location: { name: '球场', address: '上海', coordinates: { latitude: 31, longitude: 121 } },
+  });
+  const result = await list([source]);
+  assert.equal(result.payload.data.items[0].location, '球场');
+});
+
+test('Mini string write converts to canonical Location only after explicit upstream cutover', async () => {
+  for (const format of ['string', 'location']) {
+    const calls = [];
+    const env = {
+      LIFESPACE_EVENT_LOCATION_FORMAT: format,
+      LIFESPACE_CORE: { fetch: async incoming => {
+        calls.push(incoming);
+        if (new URL(incoming.url).pathname.endsWith('/members')) return response(members);
+        return response(common({ ...temporalItems[0],
+          location: format === 'location' ? { name: '球场' } : '球场',
+        }), 201);
+      } },
+    };
+    const result = await handleMiniProgramFinalEventBff(request('/api/v1/miniprogram/families/spc_family/events', {
+      method: 'POST', body: {
+        summary: '训练', location: '球场', isAllDay: true,
+        startDate: '2026-09-15', endDateExclusive: '2026-09-16',
+      },
+    }), env);
+    assert.equal(result.status, 201);
+    const body = await calls[1].json();
+    assert.deepEqual(body.location, format === 'location' ? { name: '球场' } : '球场');
+    assert.equal((await result.json()).data.location, '球场');
+  }
+});
+
 test('list sends the authoritative Canonical Query local_date_window', async () => {
   const { calls } = await list();
   assert.equal(new URL(calls[1].url).pathname, '/api/v1/spaces/spc_family/models/event/records/query');
