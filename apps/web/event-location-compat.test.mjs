@@ -16,7 +16,7 @@ test('stable Mini Event DTO always exposes a name whether LifeSpace has string o
   assert.equal(eventLocationName(' 教室 '), '教室');
   assert.equal(eventLocationName({ name: ' 教室 ', coordinates: { latitude: 31, longitude: 121 } }), '教室');
   assert.equal(eventLocationName(null), null);
-  assert.equal(eventLocationName({ coordinates: { latitude: 31, longitude: 121 } }), null);
+  assert.throws(() => eventLocationName({ coordinates: { latitude: 31, longitude: 121 } }));
 });
 test('only configured Location upstream gets name-only canonical objects', () => {
   assert.equal(eventLocationToLifeSpace(' 教室 ', legacy), '教室');
