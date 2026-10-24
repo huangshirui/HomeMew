@@ -39,5 +39,5 @@ test('Anniversary has optional user-chosen icon, no hardcoded gift, and natural 
 
 test('All new household modules share subtitle-free PageHeader', () => {
   assert.doesNotMatch(page, /spec\.description/);
-  assert.match(page, /<PageHeader title=\{spec\.title\}>/);
+  assert.match(page, /<PageHeader title=\{spec\.title\} mobileActions=/);
 });

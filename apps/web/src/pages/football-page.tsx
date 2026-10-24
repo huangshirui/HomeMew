@@ -517,7 +517,26 @@ export function FootballPage() {
   if (householdLoading) return <Card className="p-8">正在加载家庭信息…</Card>;
 
   return <div className="space-y-4">
-    <PageHeader title={isDetail ? '比赛详情' : managing ? '球队与赛事' : '足球比赛'}>
+    <PageHeader title={isDetail ? '比赛详情' : managing ? '球队与赛事' : '足球比赛'}
+      mobileBackTo={isDetail || managing ? '/football' : undefined}
+      mobileActions={isDetail ? (familyPeople.length > 0 ? (
+        <label className="min-w-0"><span className="sr-only">当前记录球员</span>
+          <select aria-label="当前记录球员" className={input + ' w-24 text-xs'} value={personId}
+            onChange={e => selectPerson(e.target.value)}>
+            {familyPeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+      ) : null) : managing ? null : <>
+        {!selected ? <Button variant="secondary" size="icon" className="size-10"
+          onClick={() => setFilterOpen(v => !v)} aria-expanded={filterOpen}
+          aria-controls="football-search-filters" aria-label="搜索与筛选" title="搜索与筛选">
+          <SlidersHorizontal className="size-4" />
+        </Button> : null}
+        {tab === 'record' && canWrite ? <Button variant="primary" size="icon" className="size-10"
+          aria-label="新建比赛" title="新建比赛" onClick={() => startMatch()}>
+          <Plus className="size-4" />
+        </Button> : null}
+      </>}>
       {isDetail ? <>
         <Button variant="secondary" onClick={returnToMatchList}><ChevronLeft className="size-4"/> 返回比赛列表</Button>
         {familyPeople.length > 0 && <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm text-stone-600">

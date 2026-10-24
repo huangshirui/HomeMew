@@ -292,7 +292,16 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   }
   if (householdLoading) return <Card className="p-8 text-sm text-stone-500">正在加载家庭信息…</Card>;
   return <div className="space-y-4">
-    {!detailMode ? <PageHeader title={spec.title}>
+    {!detailMode ? <PageHeader title={spec.title} mobileActions={<>
+      {modelKey === 'activity' ? <Button variant="secondary" size="icon" className="size-10"
+        onClick={() => setActivityFilterOpen(value => !value)} aria-expanded={activityFilterOpen}
+        aria-label={activityFiltersActive ? '搜索与筛选（已启用）' : '搜索与筛选'} title="搜索与筛选">
+        <SlidersHorizontal className="size-4" />
+      </Button> : null}
+      {canCreate ? <Button variant="primary" size="icon" className="size-10"
+        onClick={newRecord} aria-label={`新建${spec.title}`} title={`新建${spec.title}`}>
+        <Plus className="size-4" /></Button> : null}
+    </>}>
       {modelKey === 'activity' ? <Button variant="secondary" onClick={() => setActivityFilterOpen(value => !value)}>
         <SlidersHorizontal className="size-4" /> 搜索与筛选{activityFiltersActive ? ' · 已筛选' : ''}
       </Button> : null}
