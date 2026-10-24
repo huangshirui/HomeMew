@@ -334,6 +334,43 @@ export async function handleMiniNewDomainBff(request, env) {
   if (!url.pathname.startsWith(PREFIX + '/')) return null;
   const route = matchMiniNewDomainRoute(url.pathname);
   if (!route) return null; // Other existing bounded Mini routes handle their paths.
+  if(route.schema) {
+    if(request.method!=='GET'||url.search)return bad();
+    return forward(request,env,`/api/v1/spaces/${encodeURIComponent(route.familyId)}/_discovery/models/football_performance`);
+  }
+  if(route.footballPeople) {
+    const path=`/api/v1/spaces/${encodeURIComponent(route.familyId)}/people`+
+      (route.personId?'/'+encodeURIComponent(route.personId):'');
+    if(request.method==='GET'){
+      const p=url.searchParams;
+      if(route.personId){if(url.search)return bad();return forward(request,env,path);}
+      if([...p.keys()].some(x=>!['q','limit','cursor'].includes(x)))return bad();
+      const limit=Number(p.get('limit')||50);
+      if(!Number.isInteger(limit)||limit<1||limit>50)return bad();
+      const q=p.get('q')||'',cursor=p.get('cursor')||'';
+      if(q.length>120||cursor.length>2048)return bad();
+      const params=new URLSearchParams({limit:String(limit)});
+      if(q)params.set('q',q);if(cursor)params.set('cursor',cursor);
+      return forward(request,env,path+'?'+params.toString());
+    }
+    if(url.search)return bad();
+    if(['POST','PATCH','DELETE'].includes(request.method)){
+      if((request.method==='POST'&&route.personId)||
+        ((request.method==='PATCH'||request.method==='DELETE')&&!route.personId))return bad();
+      let data;try{data=await request.json();}catch{return bad();}
+      if(!data||typeof data!=='object'||Array.isArray(data))return bad();
+      if(request.method==='DELETE'){
+        if(Object.keys(data).join()!=='version'||!Number.isInteger(data.version))return bad();
+      }else{
+        if(Object.keys(data).some(key=>!['displayName','version'].includes(key))||
+          typeof data.displayName!=='string'||!data.displayName.trim())return bad();
+        if(request.method==='PATCH'&&!Number.isInteger(data.version))return bad();
+        if(request.method==='POST'&&data.version!==undefined)return bad();
+      }
+      return forward(request,env,path,request.method,data);
+    }
+    return errorResponse(405,'METHOD_NOT_ALLOWED','不支持该操作');
+  }
   if (route.people) {
     if (request.method !== 'GET' || url.search) return bad();
     return forward(request,env,`/api/v1/spaces/${encodeURIComponent(route.familyId)}/members`);
