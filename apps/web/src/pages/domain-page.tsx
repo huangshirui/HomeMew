@@ -98,8 +98,7 @@ async function loadRecords(spaceId: string, key: ModelKey, statusFilter: Status)
     const result: { items: DomainRecord[]; nextCursor: string | null } = await queryModelRecords<DomainRecord>(spaceId, key, {
       ...(key === 'goal' || key === 'habit' ? { filter: { field: 'status' as const, op: 'eq' as const, value: statusFilter } } : {}),
       sort: key === 'anniversary' ? [{ field: 'month', direction: 'asc' }, { field: 'day', direction: 'asc' }]
-        : key === 'activity' ? [{ field: 'startDate', direction: 'desc' }]
-          : key === 'goal' ? [{ field: 'targetDate', direction: 'asc' }] : [{ field: 'name', direction: 'asc' }],
+        : key === 'goal' ? [{ field: 'targetDate', direction: 'asc' }] : [{ field: 'name', direction: 'asc' }],
       page: { limit: 200, ...(cursor ? { cursor } : {}) },
     });
     collected.push(...result.items);
@@ -365,7 +364,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     {containerFor && currentFamily && modelKey !== 'anniversary' ? <ContainerRelations key={`${modelKey}:${containerFor.id}`}
       spaceId={currentFamily.id} modelKey={modelKey} record={containerFor} timezone={currentFamily.timezone}
       writable={canManage(containerFor)} participants={memberNames(containerFor.attendeePersonIds ?? [], names)}
-      onEdit={() => { const record = containerFor; setContainerFor(null); edit(record); }} onClose={() => setContainerFor(null)} /> : null}
+      onEdit={() => { const record = containerFor; setContainerFor(null); if (record) edit(record); }} onClose={() => setContainerFor(null)} /> : null}
     {draft && currentFamily ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6"
       role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setDraft(null); }}>
       <form onSubmit={save} role="dialog" aria-modal="true" aria-label={editing ? '编辑' + spec.title : '新建' + spec.title}
