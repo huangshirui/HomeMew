@@ -1,5 +1,6 @@
 import { handleIntegrationRequest, integrationsReady } from './integration-api.mjs';
 import { adaptEventWritePayload, eventLocationWireFormat } from './event-location-compat.mjs';
+import { searchPlaces } from './map-places.mjs';
 
 const ACCESS_ASSERTION_HEADER = 'cf-access-jwt-assertion';
 const SESSION_COOKIE = '__Host-homemew_session';
@@ -640,6 +641,16 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         }
         if (request.method === 'POST' && url.pathname === '/api/activity/me') {
           return await reportWebActivity(request, env, fetcher, assertion, id, nowMs);
+        }
+        if (url.pathname === '/api/places/search') {
+          if (request.method !== 'GET') throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
+          // Access-bound Web sessions are required before consuming map API quota.
+          const session = await ensureSession(request, env, fetcher, assertion, id, nowMs);
+          const response = await searchPlaces(request, env, { fetcher });
+          const headers = new Headers(response.headers);
+          headers.set('x-request-id', id);
+          if (session.cookie) headers.set('set-cookie', session.cookie);
+          return new Response(response.body, { status: response.status, headers });
         }
         if (url.pathname === '/api/families') {
           return await handleFamilies(request, env, fetcher, assertion, id, nowMs);
