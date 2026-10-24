@@ -1,0 +1,52 @@
+<view class="container football-editor">
+  <nav-bar title="{{kind==='team'?(recordId?'编辑球队':'新建球队'):(recordId?'编辑比赛':'新建比赛')}}" showBack="true" />
+  <view wx:if="{{loading}}" class="loading-state">正在加载…</view>
+  <block wx:else>
+    <view wx:if="{{error}}" class="thin-error">{{error}}</view>
+    <block wx:if="{{kind==='team'}}">
+      <view class="card">
+        <view class="team-name-row">
+          <record-icon-picker emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{saving}}" bind:change="onRecordIconChange"/>
+          <input placeholder="球队名称" class="football-input" value="{{name}}" data-name="name" bindinput="onValue"/>
+        </view>
+        <textarea placeholder="球队说明（可选）" class="football-notes" value="{{description}}" data-name="description" bindinput="onValue"/>
+      </view>
+    </block>
+    <view wx:else class="card">
+      <picker mode="date" value="{{matchDate}}" bindchange="onDate"><view class="football-field">比赛日期 <text>{{matchDate}} ›</text></view></picker>
+      <picker mode="selector" range="{{matchTypes}}" range-key="name" value="{{matchTypeIndex}}" bindchange="onMatchType">
+        <view class="football-field">比赛类型 <text>{{matchTypes[matchTypeIndex].name}} ▾</text></view>
+      </picker>
+      <view class="football-field">
+        <input value="{{teamSearch}}" data-name="teamSearch" bindinput="onValue" placeholder="按球队名称搜索"/>
+        <text class="action-link" bindtap="onTeamSearch">查找</text>
+      </view>
+      <picker mode="selector" range="{{teams}}" range-key="name" value="{{representativeTeamIndex}}" data-key="representative" bindchange="onTeamPicker">
+        <view class="football-field">代表球队 <text>{{teams[representativeTeamIndex].name||'请选择'}} ▾</text></view>
+      </picker>
+      <picker mode="selector" range="{{teams}}" range-key="name" value="{{opponentTeamIndex}}" data-key="opponent" bindchange="onTeamPicker">
+        <view class="football-field">对方球队 <text>{{teams[opponentTeamIndex].name||'请选择'}} ▾</text></view>
+      </picker>
+      <picker mode="selector" range="{{competition}}" range-key="name" value="{{competitionIndex}}" bindchange="onCompetition">
+        <view class="football-field">赛事 <text>{{competition[competitionIndex].name||'未指定'}} ▾</text></view>
+      </picker>
+      <view class="football-field">代表球队得分<input type="number" placeholder="未录入" value="{{representativeTeamScore}}" data-name="representativeTeamScore" bindinput="onValue"/></view>
+      <view class="football-field">对方球队得分<input type="number" placeholder="未录入" value="{{opponentTeamScore}}" data-name="opponentTeamScore" bindinput="onValue"/></view>
+      <textarea class="football-notes" placeholder="比赛备注（可选）" value="{{notes}}" data-name="notes" bindinput="onValue"/>
+    </view>
+    <view class="card">
+      <view class="football-section-title">{{kind==='team'?'球队球员':'参赛球员'}} <text>可多选</text></view>
+      <view class="football-find">
+        <input value="{{personSearch}}" data-name="personSearch" bindinput="onValue" placeholder="搜索家庭或其他球员"/>
+        <text bindtap="onPeopleSearch">搜索</text>
+        <text bindtap="onAddPerson">＋ 新球员</text>
+      </view>
+      <view class="football-people">
+        <view wx:for="{{people}}" wx:key="id" class="football-person {{item.selected?'selected':''}}" data-id="{{item.id}}" bindtap="onPersonToggle">{{item.selected?'✓ ':''}}{{item.displayName}}</view>
+      </view>
+      <view wx:if="{{peopleCursor}}" class="more-people" bindtap="onMorePeople">加载更多球员</view>
+    </view>
+    <button class="btn-primary" disabled="{{saving}}" loading="{{saving}}" bindtap="onSubmit">保存{{kind==='team'?'球队':'比赛'}}</button>
+    <view wx:if="{{recordId}}" class="football-delete" bindtap="onDelete">删除{{kind==='team'?'球队':'比赛'}}</view>
+  </block>
+</view>
