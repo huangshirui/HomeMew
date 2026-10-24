@@ -72,8 +72,10 @@ export function FootballStatsDashboard({ matches, events, playerId, playerName }
         <h2 className="font-semibold">总体数据</h2>
         <p className="mt-1 text-xs text-stone-500">{playerName} · 当前筛选范围内的比赛</p>
       </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <MetricCard label="参赛场次" value={number(stats.matches)} unit="场"/>
+        <MetricCard label="胜率" value={stats.winRate === null ? '—' : fmt(stats.winRate * 100, 1)} unit={stats.winRate === null ? '' : '%'}
+          hint={'有比分 ' + stats.scoredMatches + ' / ' + stats.matches + ' 场'}/>
         <MetricCard label="进球" value={number(stats.goals)} unit="球"/>
         <MetricCard label="助攻" value={number(stats.assists)} unit="次"/>
         <MetricCard label="比赛时间" value={availableTime ? number(stats.knownMinutes) : '—'} unit="分钟"
@@ -87,8 +89,8 @@ export function FootballStatsDashboard({ matches, events, playerId, playerName }
         <p className="mt-1 text-xs text-stone-500">按自然月分组 · 场均按该月实际参赛场次计算</p>
       </div>
       <div role="group" aria-label="专项趋势类型" className="grid grid-cols-3 gap-1 rounded-xl bg-stone-100 p-1">
-        {([{id:'attack' as const,label:'进攻场均'}, {id:'time' as const,label:'进攻时间'},
-          {id:'defense' as const,label:'防守场均'}]).map(entry =>
+        {([{id:'attack' as const,label:'场均进攻'}, {id:'time' as const,label:'进攻效率'},
+          {id:'defense' as const,label:'场均防守'}]).map(entry =>
           <button key={entry.id} type="button" aria-pressed={kind === entry.id}
             onClick={() => setKind(entry.id)}
             className={'min-w-0 rounded-lg px-2 py-2 text-xs font-medium transition-colors sm:text-sm ' +
