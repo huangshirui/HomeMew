@@ -48,3 +48,14 @@ test('place-search rate limit bindings guard only API traffic and share deployme
   {name:'PLACE_SEARCH_BURST_LIMIT',namespace_id:'610002',simple:{limit:8,period:10}},
  ]);
 });
+
+test('Preview has its own rate limit namespace bindings, not the production ones',()=>{
+ assert.deepEqual(config.previews?.ratelimits?.map(({name,namespace_id,simple})=>({name,namespace_id,simple})),[
+  {name:'PLACE_SEARCH_USER_LIMIT',namespace_id:'610003',simple:{limit:10,period:60}},
+  {name:'PLACE_SEARCH_BURST_LIMIT',namespace_id:'610004',simple:{limit:8,period:10}},
+ ]);
+ const productionNamespaces=new Set(config.ratelimits.map(x=>x.namespace_id));
+ for(const item of config.previews.ratelimits) {
+   assert.equal(productionNamespaces.has(item.namespace_id),false);
+ }
+});
