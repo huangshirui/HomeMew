@@ -98,12 +98,28 @@ export async function searchPlaces(request,env,{fetcher=fetch, actorKey}={}) {
   target.searchParams.set('datatype','poi');
   target.searchParams.set('output','json');
   try{
-    const res=await fetcher(target.toString(),{signal:AbortSignal.timeout(4000),redirect:'error'});
+    // Cloudflare Workers only accepts 'follow' and 'manual'. 'error' throws
+    // synchronously before sending the request. 'manual' + reject 3xx keeps
+    // provider credentials from being forwarded to any redirect target.
+    const res=await fetcher(target.toString(),{signal:AbortSignal.timeout(4000),redirect:'manual'});
+    if(res.status>=300&&res.status<400) {
+      console.warn('[HomeMew place search] provider_redirect_blocked',res.status);
+      return errorResponse(502,'PLACE_SEARCH_UNAVAILABLE','Place search is temporarily unavailable');
+    }
     if(!res.ok) {
       console.warn('[HomeMew place search] provider_http_error', res.status);
       return errorResponse(502,'PLACE_SEARCH_UNAVAILABLE','Place search is temporarily unavailable');
     }
-    const items=parseAmapSuggestions(await res.json());
+    const payload=await res.json();
+    if(payload?.status!=='1'||!Array.isArray(payload.tips)) {
+      // AMap responds with HTTP 200 even for invalid/unauthorized API keys.
+      // The numeric status is safe to log. Never log the provider URL or key.
+      const code=typeof payload?.infocode==='string'&&/^\d{5}$/.test(payload.infocode)
+        ?payload.infocode:'unknown';
+      console.warn('[HomeMew place search] provider_rejected',code);
+      return errorResponse(502,'PLACE_SEARCH_UNAVAILABLE','Place search is temporarily unavailable');
+    }
+    const items=parseAmapSuggestions(payload);
     console.info('[HomeMew place search] provider_success');
     return json({data:{items,available:true,structured}});
   }catch{

@@ -77,3 +77,37 @@ test('rate binding must be configured before paid provider traffic and keys are 
  assert.equal(seen[1],'amap-inputtips');
  assert.equal((await enforcePlaceRateLimits(env,'' )).status,401);
 });
+
+test('Worker-compatible manual redirect handling never forwards an AMap key',async()=>{
+ const request=new Request('https://homemew.test/api/places/search?q=%E6%98%8E%E5%BC%BA%E5%B0%8F%E5%AD%A6');
+ const env={AMAP_WEB_SERVICE_KEY:'private-test-key',LIFESPACE_EVENT_LOCATION_FORMAT:'location',...fakeLimits()};
+ let calls=0;
+ const redirected=await searchPlaces(request,env,{
+   actorKey:'verified-actor',fetcher:async(url,init)=>{
+     calls++;
+     assert.equal(init.redirect,'manual');
+     assert.equal(new URL(url).hostname,'restapi.amap.com');
+     assert.ok(url.includes('key=private-test-key'));
+     return new Response(null,{status:302,headers:{location:'https://untrusted.invalid/steal'}});
+   }
+ });
+ assert.equal(calls,1);
+ assert.equal(redirected.status,502);
+ assert.equal(JSON.stringify(await redirected.json()).includes('private-test-key'),false);
+});
+
+test('AMap business errors are handled without disclosing provider data',async()=>{
+ const request=new Request('https://homemew.test/api/places/search?q=%E5%AD%A6%E6%A0%A1');
+ const env={AMAP_WEB_SERVICE_KEY:'private-test-key',LIFESPACE_EVENT_LOCATION_FORMAT:'location',...fakeLimits()};
+ const response=await searchPlaces(request,env,{
+   actorKey:'verified-actor',fetcher:async(url,init)=>{
+     assert.equal(init.redirect,'manual');
+     return Response.json({status:'0',info:'SERVICE_NOT_AVAILABLE',infocode:'10002'});
+   },
+ });
+ assert.equal(response.status,502);
+ const body=await response.json();
+ assert.equal(body.error.code,'PLACE_SEARCH_UNAVAILABLE');
+ assert.equal(JSON.stringify(body).includes('private-test-key'),false);
+ assert.equal(JSON.stringify(body).includes('SERVICE_NOT_AVAILABLE'),false);
+});
