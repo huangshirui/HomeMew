@@ -55,7 +55,7 @@ test('month blank cells create a date-specific draft, while events keep their ow
 test('main pages share compact headers and optional search/filter panel next to creation', () => {
   const calendar = source('./src/pages/calendar-page.tsx');
   const tasks = source('./src/pages/tasks-page.tsx');
-  assert.match(calendar, /<PageHeader title="家庭日程">/u);
+  assert.match(calendar, /<PageHeader title="家庭日程" mobileTitle="日程" compactMobile>/u);
   assert.match(tasks, /<PageHeader title="家庭待办">/u);
   assert.match(calendar, /aria-expanded=\{filtersExpanded\}/u);
   assert.match(tasks, /aria-expanded=\{filterOpen\}/u);
