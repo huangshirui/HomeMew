@@ -633,13 +633,13 @@ export function FootballPage() {
           <label className="min-w-32 flex-1 text-sm text-stone-600">比赛类型<select className={input}
             value={filters.matchType} onChange={e=>onFilter({matchType:e.target.value})}>
             <option value="">全部类型</option><option value="official">正式比赛</option><option value="friendly">友谊赛</option></select></label>
-          <FootballReferencePicker userId={user?.id ?? ''} className="min-w-32 flex-1" spaceId={spaceId}
+          <FootballReferencePicker userId={user?.id ?? ''} className="min-w-32 flex-1" overlay spaceId={spaceId}
             model="activity" label="赛事" optional known={competitions}
             value={filters.competitionActivityId} onChange={id => onFilter({competitionActivityId:id})}/>
-          <FootballReferencePicker userId={user?.id ?? ''} className="min-w-32 flex-1" spaceId={spaceId}
+          <FootballReferencePicker userId={user?.id ?? ''} className="min-w-32 flex-1" overlay spaceId={spaceId}
             model="person_group" label="代表球队" optional known={teams}
             value={filters.representativeTeamId} onChange={id => onFilter({representativeTeamId:id})}/>
-          <FootballReferencePicker userId={user?.id ?? ''} className="min-w-32 flex-1" spaceId={spaceId}
+          <FootballReferencePicker userId={user?.id ?? ''} className="min-w-32 flex-1" overlay spaceId={spaceId}
             model="person_group" label="对手球队" optional known={teams}
             value={filters.opponentTeamId} onChange={id => onFilter({opponentTeamId:id})}/>
           <Button variant="ghost" onClick={() => {setFilters({ ...blankFilters(), playerPersonId: personId }); setSearchInput(''); setAppliedSearch('');}}>重置筛选</Button>
