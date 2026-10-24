@@ -249,14 +249,14 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     try {
       const value = payloadFor(modelKey, draft, Boolean(editing));
       const presentation = await presentationToSave(currentFamily.id, modelKey as IconModel, draft.icon, editing?.presentation?.icon);
-      await apiRequest(url(currentFamily.id, modelKey, editing?.id), {
+      const wasCreating = !editing;
+      const saved = await apiRequest<DomainRecord>(url(currentFamily.id, modelKey, editing?.id), {
         method: editing ? 'PATCH' : 'POST',
         body: JSON.stringify({ ...value, ...presentation, ...(editing ? { version: editing.version } : {}) }),
       });
-      const wasCreating = !editing;
       setDraft(null); setEditing(null);
       setRefresh(v => v + 1);
-      if (wasCreating && modelKey !== 'anniversary') setActivityFilterOpen(false);
+      if (wasCreating && modelKey !== 'anniversary' && saved?.id) navigate(`${listPath}/${encodeURIComponent(saved.id)}`);
     } catch (cause) { setError(message(cause)); }
     finally { setBusy(false); }
   }
