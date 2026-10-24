@@ -11,6 +11,7 @@ const app = read('./src/app.tsx');
 const picker = read('./src/pages/football-person-picker.tsx');
 const referencePicker = read('./src/pages/football-reference-picker.tsx');
 const manage = read('./src/pages/football-manage-page.tsx');
+const yearFilter = read('./src/pages/football-year-filter.tsx');
 const dashboard = read('./src/pages/football-stats-dashboard.tsx');
 const stats = read('./src/pages/football-stats.ts');
 
@@ -181,8 +182,11 @@ test('football filters reuse the Calendar/Tasks header standard and one global p
   assert.match(page, /aria-expanded=\{filterOpen\}/);
   assert.match(page, /搜索与筛选/);
   assert.match(page, /新建比赛/);
-  assert.match(page, /aria-label="按年份筛选"/);
-  assert.match(page, /<option value="">全部年份<\/option>/);
+  assert.match(page, /<FootballYearFilter year=\{filters\.year\}/);
+  assert.match(yearFilter, /aria-label="按年份筛选"/);
+  assert.match(yearFilter, /<option value="">全部年份<\/option>/);
+  assert.match(yearFilter, /其他年份…/);
+  assert.doesNotMatch(page, /length: 35/);
   assert.match(page, /whitespace-nowrap text-sm text-stone-600">球员/);
   assert.doesNotMatch(page, /全部球员/);
   assert.match(page, /playerPersonId: personId/);
@@ -370,4 +374,21 @@ test('three match filters open a floating panel below the clicked input', () => 
   assert.match(referencePicker, /'relative z-30 mt-2 shadow-sm'/);
   assert.match(referencePicker, /document\.addEventListener\('pointerdown', outside\)/);
   assert.match(referencePicker, /event\.key === 'Escape'/);
+});
+
+test('team manager has exactly one search clear control, not the browser native cross', () => {
+  assert.match(manage, /<input type="text" inputMode="search" aria-label="搜索球队"/);
+  assert.doesNotMatch(manage, /<input type="search" aria-label="搜索球队"/);
+  assert.equal((manage.match(/aria-label="清除球队搜索"/g) ?? []).length, 1);
+});
+
+test('football year filter offers five rolling years with a custom year popup', () => {
+  assert.match(page, /<FootballYearFilter year=\{filters\.year\}/);
+  assert.match(yearFilter, /new Date\(\)\.getFullYear\(\)/);
+  assert.match(yearFilter, /footballYearOptions\(currentYear, year\)/);
+  assert.match(yearFilter, /value="__custom__"/);
+  assert.match(yearFilter, /<form onSubmit=\{submit\}/);
+  assert.match(yearFilter, /type="number"/);
+  assert.match(yearFilter, /top-full z-50/);
+  assert.doesNotMatch(page, /Array\.from\(\{ length: 35 \}/);
 });
