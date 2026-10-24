@@ -1,0 +1,42 @@
+<view class="container domain-edit">
+  <nav-bar title="{{title}}" showBack="true" />
+  <view wx:if="{{loading}}" class="loading-state">加载中…</view>
+  <block wx:else>
+    <view wx:if="{{error}}" class="thin-error">{{error}}</view>
+    <view class="card">
+      <view class="icon-name">
+        <record-icon-picker emoji="{{iconEmoji}}" image-file-id="{{iconFileId}}" image-path="{{iconImagePath}}" disabled="{{submitting}}" bind:change="onRecordIconChange"/>
+        <view class="input-grow"><text class="field-label">名称</text><input value="{{name}}" maxlength="150" placeholder="请输入{{title}}名称" data-name="name" bindinput="onFieldInput"/></view>
+      </view>
+      <text class="field-label">说明（可选）</text>
+      <textarea class="description-input" value="{{description}}" maxlength="3000" placeholder="补充说明或计划…" data-name="description" bindinput="onFieldInput" auto-height />
+    </view>
+    <view class="card">
+      <block wx:if="{{kind==='activities'||kind==='goals'}}">
+        <picker mode="date" value="{{startDate}}" data-name="startDate" bindchange="onDateChange"><view class="field-row">开始日期 <text>{{startDate||'未设置'}} ›</text></view></picker>
+        <picker wx:if="{{kind==='activities'}}" mode="date" value="{{endDate}}" data-name="endDate" bindchange="onDateChange"><view class="field-row">结束日期 <text>{{endDate||'未设置'}} ›</text></view></picker>
+        <picker wx:if="{{kind==='goals'}}" mode="date" value="{{targetDate}}" data-name="targetDate" bindchange="onDateChange"><view class="field-row">目标日期 <text>{{targetDate||'未设置'}} ›</text></view></picker>
+      </block>
+      <block wx:if="{{kind==='anniversaries'}}">
+        <view class="field-row">年（可空）<input type="number" maxlength="4" value="{{year}}" placeholder="每年" data-name="year" bindinput="onFieldInput"/></view>
+        <view class="field-row">月<input type="number" maxlength="2" value="{{month}}" placeholder="1–12" data-name="month" bindinput="onFieldInput"/></view>
+        <view class="field-row">日<input type="number" maxlength="2" value="{{day}}" placeholder="1–31" data-name="day" bindinput="onFieldInput"/></view>
+      </block>
+      <block wx:if="{{kind==='habits'}}">
+        <picker disabled="{{!!recordId}}" mode="selector" range="{{personOptions}}" range-key="displayName" value="{{selectedPersonIndex}}" bindchange="onSubjectChange">
+          <view class="field-row">所属人 <text>{{personOptions[selectedPersonIndex].displayName||'请选择'}} ›</text></view>
+        </picker>
+        <view class="field-row">打卡间隔（天）<input disabled="{{!!recordId}}" type="number" value="{{intervalDays}}" data-name="intervalDays" bindinput="onFieldInput"/></view>
+        <text class="field-hint">习惯创建后所属人与打卡间隔不可修改。</text>
+      </block>
+    </view>
+    <view class="card" wx:if="{{kind!=='habits'}}">
+      <text class="field-label">{{kind==='activities'?'参与人员':kind==='goals'?'目标相关成员':'相关成员'}}（可选）</text>
+      <view class="person-pills">
+        <view wx:for="{{personOptions}}" wx:key="personId" class="person-pill {{item.selected?'chosen':''}}" data-id="{{item.personId}}" bindtap="onTogglePerson">{{item.selected?'✓ ':''}}{{item.displayName}}</view>
+      </view>
+    </view>
+    <button class="btn-primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">保存</button>
+    <button wx:if="{{recordId}}" class="delete-link" disabled="{{submitting}}" bindtap="onDelete">删除{{title}}</button>
+  </block>
+</view>
