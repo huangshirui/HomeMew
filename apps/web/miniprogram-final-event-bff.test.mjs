@@ -112,6 +112,62 @@ test('Mini string write converts to canonical Location only after explicit upstr
   }
 });
 
+test('older Mini title edits preserve rich coordinates when location name is unchanged', async () => {
+  const original = common({
+    ...temporalItems[0],
+    location: { name: '球场', address: '上海', coordinates: { latitude: 31, longitude: 121 } },
+  });
+  const calls = [];
+  const env = {
+    LIFESPACE_EVENT_LOCATION_FORMAT: 'location',
+    LIFESPACE_CORE: { fetch: async incoming => {
+      calls.push(incoming);
+      if (new URL(incoming.url).pathname.endsWith('/members')) return response(members);
+      if (incoming.method === 'GET') return response(original);
+      const update = await incoming.clone().json();
+      return response({ ...original, ...update, version: 4 });
+    } },
+  };
+  const result = await handleMiniProgramFinalEventBff(request(
+    '/api/v1/miniprogram/families/spc_family/events/rec_event', {
+      method: 'PATCH', body: { version: 3, summary: '新标题', location: '球场' },
+    }), env);
+  assert.equal(result.status, 200);
+  assert.equal(calls.length, 3); // members, one existing Event read, one PATCH
+  assert.deepEqual((await calls[2].json()).location, original.location);
+  assert.equal((await result.json()).data.location, '球场');
+});
+
+test('older Mini explicit rename drops outdated coordinates and rejects structured client fields', async () => {
+  const original = common({
+    ...temporalItems[0],
+    location: { name: '球场', address: '上海', coordinates: { latitude: 31, longitude: 121 } },
+  });
+  const calls = [];
+  const env = {
+    LIFESPACE_EVENT_LOCATION_FORMAT: 'location',
+    LIFESPACE_CORE: { fetch: async incoming => {
+      calls.push(incoming);
+      if (new URL(incoming.url).pathname.endsWith('/members')) return response(members);
+      if (incoming.method === 'GET') return response(original);
+      const update = await incoming.clone().json();
+      return response({ ...original, ...update, version: 4 });
+    } },
+  };
+  const changed = await handleMiniProgramFinalEventBff(request(
+    '/api/v1/miniprogram/families/spc_family/events/rec_event', {
+      method: 'PATCH', body: { version: 3, summary: '新标题', location: '新球场' },
+    }), env);
+  assert.equal(changed.status, 200);
+  assert.deepEqual((await calls[2].json()).location, { name: '新球场' });
+
+  const clientObject = await handleMiniProgramFinalEventBff(request(
+    '/api/v1/miniprogram/families/spc_family/events/rec_event', {
+      method: 'PATCH', body: { version: 3, location: original.location },
+    }), env);
+  assert.equal(clientObject.status, 422);
+});
+
 test('list sends the authoritative Canonical Query local_date_window', async () => {
   const { calls } = await list();
   assert.equal(new URL(calls[1].url).pathname, '/api/v1/spaces/spc_family/models/event/records/query');
