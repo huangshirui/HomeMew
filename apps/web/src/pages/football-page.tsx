@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { BarChart3, CalendarDays, ChevronDown, ChevronLeft, Clock3, Handshake, Plus, RefreshCw, Shield, SlidersHorizontal, Trash2, Trophy, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIconDraft } from '../components/record-icon';
@@ -16,6 +16,7 @@ import { rememberFootballReference } from './football-recent-references';
 import { fetchUniqueFootballReferences } from './football-reference-hydration';
 import { FootballPerformanceSheet } from './football-performance-sheet';
 import { FootballStatsDashboard } from './football-stats-dashboard';
+import { consumeFootballList, rememberFootballList } from './football-list-navigation';
 import {
   type FootballMatch, type FootballMatchDraft, type FootballPerformance,
   type FootballPerformanceDraft, type FootballReference, type FootballPerson, type MatchFilter, type PerformanceSchema,
@@ -53,13 +54,18 @@ function rememberPerson(spaceId: string, personId: string) {
 export function FootballPage() {
   const { currentFamily, members, user, loading: householdLoading } = useHousehold();
   const navigate = useNavigate();
-  const managing = useLocation().pathname.endsWith('/manage');
+  const location = useLocation();
+  const { matchId } = useParams<'matchId'>();
+  const isDetail = Boolean(matchId);
+  const managing = location.pathname.endsWith('/manage');
   const spaceId = currentFamily?.id;
   const canWrite = Boolean(currentFamily && currentFamily.role !== 'viewer');
   const [tab, setTab] = useState<'record' | 'stats'>('record');
   const [matches, setMatches] = useState<FootballMatch[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState<FootballMatch | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
   const [performances, setPerformances] = useState<FootballPerformance[]>([]);
   const [eventsError, setEventsError] = useState('');
   const [schema, setSchema] = useState<PerformanceSchema | null>(null);
@@ -108,9 +114,12 @@ export function FootballPage() {
   const refsReq = useRef(0);
   const attemptedRefLookup = useRef(new Set<string>());
   const schemaReq = useRef(0);
+  const restoreScrollRef = useRef<number | null>(null);
   const teamNames = useMemo(() => new Map(teams.map(t => [t.id, t.name])), [teams]);
   const teamRecords = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
   const competitionNames = useMemo(() => new Map(competitions.map(t => [t.id, t.name])), [competitions]);
+  const referenceMatches = useMemo(() => isDetail ? (selected ? [selected] : []) : matches,
+    [isDetail, selected, matches]);
   const familyPeople = useMemo(() => members.filter(m => m.personId).map(m => ({
     id: m.personId!, name: m.displayName || '家庭成员',
   })), [members]);
@@ -122,13 +131,30 @@ export function FootballPage() {
   useEffect(() => {
     if (!spaceId) { setPersonId(''); return; }
     const saved = rememberedPerson(spaceId);
-    const chosen = familyPeople.find(p => p.id === saved)?.id ??
+    const defaultPerson = familyPeople.find(p => p.id === saved)?.id ??
       familyPeople.find(p => p.name.toLocaleLowerCase().includes('kk'))?.id ??
       familyPeople[0]?.id ?? '';
+    const restored = !isDetail ? consumeFootballList(spaceId, user?.id ?? '') : null;
+    const chosen = restored && familyPeople.some(p => p.id === restored.filters.playerPersonId)
+      ? restored.filters.playerPersonId : defaultPerson;
     setPersonId(chosen);
-    setFilters({ ...blankFilters(), playerPersonId: chosen });
-    setSearchInput(''); setAppliedSearch('');
-  }, [spaceId, familyPeople]);
+    setFilters(restored ? { ...restored.filters, playerPersonId: chosen }
+      : { ...blankFilters(), playerPersonId: chosen });
+    setSearchInput(restored?.searchInput ?? '');
+    setAppliedSearch(restored?.appliedSearch ?? '');
+    setFilterOpen(restored?.filterOpen ?? false);
+    if (restored) {
+      setTab(restored.tab);
+      restoreScrollRef.current = restored.scrollY;
+    }
+  }, [spaceId, user?.id, familyPeople, isDetail]);
+  function openMatchDetail(record: FootballMatch) {
+    if (spaceId) rememberFootballList(spaceId, user?.id ?? '', {
+      tab, filters, searchInput, appliedSearch, filterOpen, scrollY: window.scrollY,
+    });
+    navigate('/football/' + encodeURIComponent(record.id));
+  }
+  function returnToMatchList() { navigate('/football'); }
   function selectPerson(id: string) {
     setPersonId(id);
     if (spaceId) rememberPerson(spaceId, id);
@@ -205,12 +231,12 @@ export function FootballPage() {
   }, [spaceId, refresh]);
 
   useEffect(() => {
-    if (!spaceId || !matches.length) return;
+    if (!spaceId || !referenceMatches.length) return;
     const knownTeams = new Set(teams.map(x => x.id));
     const knownCompetitions = new Set(competitions.map(x => x.id));
-    const needsTeams = [...new Set(matches.flatMap(m => [m.representativeTeamId, m.opponentTeamId]))]
+    const needsTeams = [...new Set(referenceMatches.flatMap(m => [m.representativeTeamId, m.opponentTeamId]))]
       .filter(id => id && !knownTeams.has(id) && !attemptedRefLookup.current.has('team:' + id));
-    const needsCompetitions = [...new Set(matches.map(m => m.competitionActivityId).filter((id): id is string => !!id))]
+    const needsCompetitions = [...new Set(referenceMatches.map(m => m.competitionActivityId).filter((id): id is string => !!id))]
       .filter(id => !knownCompetitions.has(id) && !attemptedRefLookup.current.has('competition:' + id));
     const teamBatch = needsTeams.slice(0, 80);
     const competitionBatch = needsCompetitions.slice(0, 40);
@@ -232,7 +258,7 @@ export function FootballPage() {
         setUnavailableCompetitionIds(prev => new Set([...prev, ...fetchedCompetitions.failedIds]));
     });
     return () => { active = false; };
-  }, [spaceId, matches, teams, competitions]);
+  }, [spaceId, referenceMatches, teams, competitions]);
 
   const loadMatchPage = useCallback(async (cursor: string | null, append: boolean) => {
     if (!spaceId) return;
@@ -251,7 +277,32 @@ export function FootballPage() {
     } catch (cause) { if (req === matchReq.current) setError(message(cause)); }
     finally { if (req === matchReq.current) setLoading(false); }
   }, [spaceId, filters, appliedSearch]);
-  useEffect(() => { if (tab === 'record') void loadMatchPage(null, false); }, [tab, loadMatchPage, refresh]);
+  useEffect(() => {
+    if (!isDetail && tab === 'record') void loadMatchPage(null, false);
+  }, [isDetail, tab, loadMatchPage, refresh]);
+  useEffect(() => {
+    if (isDetail || loading || !matches.length || restoreScrollRef.current === null) return;
+    const scrollY = restoreScrollRef.current;
+    restoreScrollRef.current = null;
+    const frame = window.requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [isDetail, loading, matches]);
+  useEffect(() => {
+    if (!isDetail || !spaceId || !matchId) {
+      setDetailLoading(false); setDetailError('');
+      return;
+    }
+    let active = true;
+    setSelected(prev => prev?.id === matchId ? prev : null);
+    setDetailLoading(true); setDetailError('');
+    apiRequest<FootballMatch>(modelUrl(spaceId, 'football_match', matchId))
+      .then(record => { if (active) setSelected(record); })
+      .catch(cause => {
+        if (active) { setSelected(null); setDetailError(message(cause)); }
+      })
+      .finally(() => { if (active) setDetailLoading(false); });
+    return () => { active = false; };
+  }, [isDetail, matchId, spaceId, refresh]);
 
   useEffect(() => {
     if (!spaceId || !selected || !schema) {
@@ -274,7 +325,7 @@ export function FootballPage() {
   }, [spaceId, selected?.id, schema?.version, refresh]);
 
   useEffect(() => {
-    if (tab !== 'stats' || !spaceId || !personId || !schema) return;
+    if (isDetail || tab !== 'stats' || !spaceId || !personId || !schema) return;
     const req = ++statsReq.current;
     setStatsLoading(true); setStatsError('');
     const query = { ...(appliedSearch ? { search: { text: appliedSearch } } : {}),
@@ -289,7 +340,7 @@ export function FootballPage() {
       .catch(e => { if (statsReq.current === req) { setStatMatches([]); setStatEvents([]); setStatsError(message(e)); } })
       .finally(() => { if (statsReq.current === req) setStatsLoading(false); });
     return () => { ++statsReq.current; };
-  }, [tab, spaceId, personId, schema?.version, filters, appliedSearch, refresh]);
+  }, [isDetail, tab, spaceId, personId, schema?.version, filters, appliedSearch, refresh]);
 
   function startMatch(record?: FootballMatch) {
     setMatchEditing(record ?? null);
@@ -306,6 +357,7 @@ export function FootballPage() {
         body: JSON.stringify({ ...matchPayload(matchForm), ...(matchEditing ? { version: matchEditing.version } : {}) }),
       });
       setSelected(result); setMatchEditing(null); setMatchForm(null);
+      if (!isDetail) openMatchDetail(result);
       setRefresh(n => n + 1); setSuccess('比赛已保存');
     } catch (cause) { setFormError(message(cause)); }
     finally { setSaving(false); }
@@ -343,7 +395,10 @@ export function FootballPage() {
     setSaving(true); setError('');
     try {
       await apiRequest(modelUrl(spaceId, model, id), { method: 'DELETE', body: JSON.stringify({ version }) });
-      if (model === 'football_match') setSelected(null);
+      if (model === 'football_match') {
+        setSelected(null);
+        if (isDetail) returnToMatchList();
+      }
       setRefresh(n => n + 1); setSuccess('记录已删除');
     } catch (e) { setError(message(e)); }
     finally { setSaving(false); }
