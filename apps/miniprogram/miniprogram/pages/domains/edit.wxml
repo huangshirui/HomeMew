@@ -37,6 +37,6 @@
       </view>
     </view>
     <button class="btn-primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">保存</button>
-    <button wx:if="{{recordId}}" class="delete-link" disabled="{{submitting}}" bindtap="onDelete">删除{{title}}</button>
+    <button wx:if="{{recordId}}" class="delete-link" disabled="{{submitting}}" bindtap="onDelete">删除此记录</button>
   </block>
 </view>
