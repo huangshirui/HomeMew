@@ -344,7 +344,8 @@ export function DaysPage() {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <PageHeader title="日子"><Button variant="primary" disabled={!currentFamily || !canWrite} onClick={openCreate}><Plus className="size-4" /> 新建</Button></PageHeader>
+      <PageHeader title="日子" mobileActions={<Button variant="primary" size="icon" className="size-10" aria-label="新建日子" title="新建日子"
+        disabled={!currentFamily || !canWrite} onClick={openCreate}><Plus className="size-4" /></Button>}><Button variant="primary" disabled={!currentFamily || !canWrite} onClick={openCreate}><Plus className="size-4" /> 新建</Button></PageHeader>
 
       {!currentFamily ? <Card className="grid min-h-72 place-items-center p-8 text-sm text-stone-500">请先创建或加入一个家庭。</Card> : (
         <>
