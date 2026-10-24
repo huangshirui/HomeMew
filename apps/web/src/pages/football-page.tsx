@@ -16,6 +16,7 @@ import { rememberFootballReference } from './football-recent-references';
 import { fetchUniqueFootballReferences } from './football-reference-hydration';
 import { FootballPerformanceSheet } from './football-performance-sheet';
 import { FootballStatsDashboard } from './football-stats-dashboard';
+import { FootballYearFilter } from './football-year-filter';
 import { consumeFootballList, rememberFootballList } from './football-list-navigation';
 import {
   type FootballMatch, type FootballMatchDraft, type FootballPerformance,
@@ -507,12 +508,6 @@ export function FootballPage() {
     finally { setSaving(false); }
   }
 
-  const yearOptions = useMemo(() => {
-    const now = new Date().getFullYear();
-    return Array.from(new Set([filters.year, ...matches.map(m => m.matchDate.slice(0, 4)),
-      ...Array.from({ length: 35 }, (_, i) => String(now - i))].filter(Boolean)))
-      .sort((a, b) => Number(b) - Number(a));
-  }, [filters.year, matches]);
 
   const types = schema ? enumOptions(schema, 'performanceType') : [];
   const moreTypes = types.filter(t => !quickTypes.includes(t) && t !== 'appearance');
@@ -624,12 +619,7 @@ export function FootballPage() {
         </form>
         <div className="flex flex-wrap items-end gap-3">
           <span className="shrink-0 pb-3 text-xs font-medium text-stone-500">筛选</span>
-          <label className="min-w-32 flex-1 text-sm text-stone-600">年份
-            <select aria-label="按年份筛选" className={input} value={filters.year}
-              onChange={e => onFilter({ year: e.target.value })}>
-              <option value="">全部年份</option>{yearOptions.map(year => <option key={year} value={year}>{year}年</option>)}
-            </select>
-          </label>
+          <FootballYearFilter year={filters.year} onChange={year => onFilter({ year })}/>
           <label className="min-w-32 flex-1 text-sm text-stone-600">比赛类型<select className={input}
             value={filters.matchType} onChange={e=>onFilter({matchType:e.target.value})}>
             <option value="">全部类型</option><option value="official">正式比赛</option><option value="friendly">友谊赛</option></select></label>
