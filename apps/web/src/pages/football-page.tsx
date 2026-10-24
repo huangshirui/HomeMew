@@ -13,6 +13,7 @@ import { useModalScrollLock } from '../lib/modal-scroll';
 import { FootballPersonPicker } from './football-person-picker';
 import { FootballReferencePicker } from './football-reference-picker';
 import { rememberFootballReference } from './football-recent-references';
+import { fetchUniqueFootballReferences } from './football-reference-hydration';
 import { FootballPerformanceSheet } from './football-performance-sheet';
 import { FootballStatsDashboard } from './football-stats-dashboard';
 import {
@@ -65,6 +66,7 @@ export function FootballPage() {
   const [schemaError, setSchemaError] = useState('');
   const [teams, setTeams] = useState<FootballReference[]>([]);
   const [competitions, setCompetitions] = useState<FootballReference[]>([]);
+  const [unavailableCompetitionIds, setUnavailableCompetitionIds] = useState<Set<string>>(() => new Set());
   const [teamCursor, setTeamCursor] = useState<string | null>(null);
   const [competitionCursor, setCompetitionCursor] = useState<string | null>(null);
   const [referenceLoading, setReferenceLoading] = useState(false);
@@ -134,7 +136,7 @@ export function FootballPage() {
   }
   useEffect(() => {
     setSelected(null); setPerformances([]); setEventsError(''); setMatches([]); setNextCursor(null);
-    setTeams([]); setCompetitions([]); setTeamCursor(null); setCompetitionCursor(null);
+    setTeams([]); setCompetitions([]); setUnavailableCompetitionIds(new Set()); setTeamCursor(null); setCompetitionCursor(null);
     setManagerFocus({team:'',competition:''}); attemptedRefLookup.current.clear();
     setOtherPeople([]); setPlayerDialog(false); setNewPlayerName('');
     setMoreOpen(false);
@@ -197,6 +199,12 @@ export function FootballPage() {
   }
 
   useEffect(() => {
+    // A user-triggered refresh rechecks names that previously failed to load.
+    attemptedRefLookup.current.clear();
+    setUnavailableCompetitionIds(new Set());
+  }, [spaceId, refresh]);
+
+  useEffect(() => {
     if (!spaceId || !matches.length) return;
     const knownTeams = new Set(teams.map(x => x.id));
     const knownCompetitions = new Set(competitions.map(x => x.id));
@@ -210,14 +218,18 @@ export function FootballPage() {
     for (const id of competitionBatch) attemptedRefLookup.current.add('competition:' + id);
     let active = true;
     void Promise.all([
-      Promise.all(teamBatch.map(id => apiRequest<FootballReference>(modelUrl(spaceId, 'person_group', id)).catch(() => null))),
-      Promise.all(competitionBatch.map(id => apiRequest<FootballReference>(modelUrl(spaceId, 'activity', id)).catch(() => null))),
+      fetchUniqueFootballReferences(teamBatch,
+        id => apiRequest<FootballReference>(modelUrl(spaceId, 'person_group', id)), 4),
+      fetchUniqueFootballReferences(competitionBatch,
+        id => apiRequest<FootballReference>(modelUrl(spaceId, 'activity', id)), 4),
     ]).then(([fetchedTeams, fetchedCompetitions]) => {
       if (!active) return;
-      const newTeams = fetchedTeams.filter((item): item is FootballReference => item !== null);
-      const newCompetitions = fetchedCompetitions.filter((item): item is FootballReference => item !== null);
-      if (newTeams.length) setTeams(prev => [...new Map([...prev, ...newTeams].map(x => [x.id, x])).values()]);
-      if (newCompetitions.length) setCompetitions(prev => [...new Map([...prev, ...newCompetitions].map(x => [x.id, x])).values()]);
+      if (fetchedTeams.found.length)
+        setTeams(prev => [...new Map([...prev, ...fetchedTeams.found].map(x => [x.id, x])).values()]);
+      if (fetchedCompetitions.found.length)
+        setCompetitions(prev => [...new Map([...prev, ...fetchedCompetitions.found].map(x => [x.id, x])).values()]);
+      if (fetchedCompetitions.failedIds.length)
+        setUnavailableCompetitionIds(prev => new Set([...prev, ...fetchedCompetitions.failedIds]));
     });
     return () => { active = false; };
   }, [spaceId, matches, teams, competitions]);
@@ -584,7 +596,11 @@ export function FootballPage() {
                   : <Shield aria-hidden="true" className="size-4 shrink-0 text-stone-400"/>}
                 <span className="min-w-0 truncate">{teamNames.get(m.opponentTeamId) ?? '对手球队'}</span>
               </div>
-              {m.competitionActivityId && <p className="truncate text-xs text-stone-400">{competitionNames.get(m.competitionActivityId) ?? '关联赛事'}</p>}
+              {m.competitionActivityId && <p className="truncate text-xs text-stone-500"
+                title={unavailableCompetitionIds.has(m.competitionActivityId) ? '暂时无法查看赛事名称，可点击刷新重试' : undefined}>
+                {competitionNames.get(m.competitionActivityId) ??
+                  (unavailableCompetitionIds.has(m.competitionActivityId) ? '赛事暂不可查看' : '正在加载赛事…')}
+              </p>}
             </div>
             <div className="ml-auto flex shrink-0 items-center gap-1">
               <Button variant="secondary" className="h-9 px-3" onClick={() => {setSelected(m);setSuccess('');}}>记录</Button>
