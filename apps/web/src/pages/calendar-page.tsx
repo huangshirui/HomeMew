@@ -905,7 +905,15 @@ function CalendarHeader({ onCreate, canWrite, onToggleFilters, filtersExpanded, 
   filtersActive: boolean;
 }) {
   return (
-    <PageHeader title="家庭日程" mobileTitle="日程" compactMobile>
+    <PageHeader title="家庭日程" mobileTitle="日程" compactMobile mobileActions={<>
+      <Button variant="secondary" size="icon" onClick={onToggleFilters} aria-expanded={filtersExpanded}
+        aria-controls="calendar-search-filters" aria-label={filtersActive ? '搜索与筛选（已启用）' : '搜索与筛选'}
+        title="搜索与筛选" className={filtersActive ? 'size-10 text-emerald-800 ring-emerald-300' : 'size-10'}>
+        <SlidersHorizontal className="size-4" />
+      </Button>
+      <Button variant="primary" size="icon" disabled={!canWrite} onClick={onCreate}
+        aria-label="新建日程" title="新建日程" className="size-10"><Plus className="size-4" /></Button>
+    </>}>
       <Button variant="secondary" size="icon" onClick={onToggleFilters} aria-expanded={filtersExpanded}
         aria-label={filtersActive ? '搜索与筛选（已启用）' : '搜索与筛选'} title="搜索与筛选"
         aria-controls="calendar-search-filters" className={`size-10 shrink-0 sm:h-10 sm:w-auto sm:px-4 ${filtersActive ? 'text-emerald-800 ring-emerald-300' : ''}`}>
