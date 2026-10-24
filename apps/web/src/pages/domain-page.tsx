@@ -331,9 +331,9 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
             : modelKey === 'habit' ? <>
               <p className="text-sm text-stone-600">所属人：{record.subjectPersonId ? names.get(record.subjectPersonId) ?? '家庭成员' : '未关联'}</p>
               <p className="text-sm text-stone-600">每 {record.intervalDays ?? 1} 天打卡 · 连续 {record.computed?.checkIn?.streakDays ?? 0} 天</p>
-            </> : <p className="text-sm text-stone-500">{record.startDate || '未设开始日'} {modelKey === 'activity' ? '→ ' + (record.endDate || '未设结束日') : '→ ' + (record.targetDate || '未设目标日')}</p>}
-          {modelKey !== 'habit' && memberNames(modelKey === 'activity' ? record.attendeePersonIds ?? [] : modelKey === 'goal' ? record.subjectPersonIds ?? [] : record.personIds ?? [], names) ?
-            <p className="text-xs text-stone-500">{memberNames(modelKey === 'activity' ? record.attendeePersonIds ?? [] : modelKey === 'goal' ? record.subjectPersonIds ?? [] : record.personIds ?? [], names)}</p> : null}
+            </> : <p className="text-sm text-stone-500">{record.startDate || '未设开始日'} → {record.targetDate || '未设目标日'}</p>}
+          {modelKey !== 'habit' && memberNames(modelKey === 'goal' ? record.subjectPersonIds ?? [] : record.personIds ?? [], names) ?
+            <p className="text-xs text-stone-500">{memberNames(modelKey === 'goal' ? record.subjectPersonIds ?? [] : record.personIds ?? [], names)}</p> : null}
           <div className="flex flex-wrap gap-2 border-t border-stone-100 pt-3">
             {modelKey !== 'anniversary' ? <Button variant="secondary" onClick={() => setContainerFor(record)}>查看内容</Button> : null}
              {modelKey === 'habit' ? <Button variant="secondary" onClick={() => { setHistoryFor(record); setHistory([]); setHistoryCursor(null); void loadHistory(record, null, false); }}>打卡历史</Button> : null}
