@@ -23,7 +23,11 @@ const ICONS: IconPaths = {
   'list-checks':
     '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>' +
     '<path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
-  // 我的：用户
+  // 更多：三列网格
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  // 个人资料：用户
+  'user-round': '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+  'sliders-horizontal': '<line x1="4" x2="20" y1="21" y2="21"/><line x1="4" x2="20" y1="3" y2="3"/><line x1="4" x2="20" y1="14" y2="14"/><line x1="4" x2="20" y1="10" y2="10"/>',
   user:
     '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>' +
     '<circle cx="12" cy="7" r="4"/>',

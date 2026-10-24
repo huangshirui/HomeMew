@@ -1,0 +1,42 @@
+<view class="container domain-page">
+  <nav-bar title="{{title}}" showBack="true" />
+  <view wx:if="{{noFamily}}" class="empty-state"><text class="empty-title">先创建或加入家庭</text><button class="btn-primary" bindtap="onFamilySetup">前往首页</button></view>
+  <block wx:else>
+    <view class="domain-toolbar">
+      <text class="domain-heading">{{title}}</text>
+      <view class="domain-tools">
+        <view class="tool-btn" bindtap="onToggleSearch"><lucide-icon name="sliders-horizontal" size="19" color="#43A047" /><text>筛选</text></view>
+        <view class="add-btn" bindtap="onCreate">＋ 新建</view>
+      </view>
+    </view>
+    <view wx:if="{{searchOpen}}" class="card search-panel">
+      <view class="search-row"><input placeholder="搜索名称或说明" value="{{search}}" bindinput="onSearchInput" confirm-type="search" bindconfirm="onApplySearch"/><view bindtap="onApplySearch">搜索</view></view>
+      <picker wx:if="{{kind === 'activities'}}" mode="selector" range="{{personOptions}}" range-key="label" value="{{selectedPersonIndex}}" bindchange="onPersonChange">
+        <view class="search-person">参与成员：{{personOptions[selectedPersonIndex].label || '全部成员'}} ▾</view>
+      </picker>
+      <view class="search-reset" bindtap="onClearSearch">清除筛选</view>
+    </view>
+    <scroll-view wx:if="{{filters.length}}" class="domain-filters" scroll-x show-scrollbar="{{false}}">
+      <view class="chip-row"><view wx:for="{{filters}}" wx:key="key" class="domain-chip {{filter===item.key?'selected':''}}" data-key="{{item.key}}" bindtap="onFilterTap">{{item.label}}</view></view>
+    </scroll-view>
+    <view wx:if="{{loading}}" class="loading-state"><text class="loading-text">正在加载{{title}}…</text></view>
+    <view wx:elif="{{error}}" class="load-error-state"><text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onApplySearch">重试</button></view>
+    <view wx:elif="{{!records.length}}" class="card domain-empty">
+      <text>这里还没有{{title}}记录</text><text wx:if="{{kind==='activities' && filter==='current'}}">可切换「即将开始」「已结束」「全部」查看其他活动。</text>
+      <button class="btn-outline btn-sm" bindtap="onCreate">新建{{title}}</button>
+    </view>
+    <view wx:else class="domain-list card">
+      <view wx:for="{{records}}" wx:key="id" class="domain-row" data-id="{{item.id}}" bindtap="onRecordTap">
+        <view class="record-symbol">{{item.icon}}</view>
+        <view class="record-info">
+          <view class="record-title-row"><text class="record-title">{{item.name}}</text><text wx:if="{{item.statusLabel}}" class="record-status">{{item.statusLabel}}</text></view>
+          <text wx:if="{{item.description}}" class="record-description">{{item.description}}</text>
+          <text wx:if="{{item.dates}}" class="record-meta">{{item.dates}}</text>
+          <text wx:if="{{item.people}}" class="record-meta">{{item.people}}</text>
+        </view><text class="record-chevron">›</text>
+      </view>
+    </view>
+    <view class="page-footer" wx:if="{{loadingMore}}">加载更多…</view>
+    <view class="page-footer" wx:elif="{{nextCursor}}" bindtap="onLoadMore">加载更多</view>
+  </block>
+</view>

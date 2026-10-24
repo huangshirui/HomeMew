@@ -1,0 +1,21 @@
+<view class="container more-page">
+  <nav-bar title="更多" />
+  <view class="family-header card" bindtap="onSwitchFamily">
+    <view class="family-symbol">🏡</view><view class="family-info">
+      <text class="family-name">{{familyName}}</text>
+      <text class="family-subtitle">{{familyRole}} · {{familyCount}} 个家庭</text>
+    </view><text class="family-next">›</text>
+  </view>
+  <view wx:for="{{groups}}" wx:for-item="group" wx:key="key" class="more-group">
+    <view class="more-group-label">{{group.title}}</view>
+    <view class="tile-grid">
+      <view wx:for="{{group.items}}" wx:for-item="tile" wx:key="key" class="more-tile" data-path="{{tile.path}}" bindtap="onNav">
+        <view class="tile-icon">{{tile.icon}}</view><text class="tile-name">{{tile.title}}</text>
+      </view>
+    </view>
+  </view>
+  <view class="account-link" bindtap="onProfile">
+    <lucide-icon name="user-round" size="18" color="#5f7865" />
+    <text>{{userName}} · 编辑资料</text><text>›</text>
+  </view>
+</view>

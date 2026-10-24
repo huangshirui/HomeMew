@@ -1,0 +1,75 @@
+<view class="container football-detail">
+  <nav-bar title="比赛详情" showBack="true" />
+  <view wx:if="{{loading}}" class="loading-state">正在加载比赛…</view>
+  <view wx:elif="{{error&&!match}}" class="load-error-state"><text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onRetry">重试</button></view>
+  <block wx:else>
+    <view wx:if="{{error}}" class="thin-error">{{error}}</view>
+    <view class="card match-summary">
+      <view class="match-date">{{match.matchDate}} · {{match.matchType==='friendly'?'友谊赛':'正式比赛'}}</view>
+      <view wx:if="{{competition}}" class="competition-name">{{competition}}</view>
+      <view class="match-score"><text>{{representative}}</text><text class="match-result">{{score}}</text><text>{{opponent}}</text></view>
+      <view wx:if="{{match.notes}}" class="match-notes">{{match.notes}}</view>
+      <view class="match-edit" bindtap="onEditMatch">编辑比赛 ›</view>
+    </view>
+    <view class="card">
+      <view class="section-title">比赛表现</view>
+      <picker mode="selector" range="{{people}}" range-key="displayName" value="{{selectedPersonIndex}}" bindchange="onPlayer">
+        <view class="football-player">记录球员：{{people[selectedPersonIndex].displayName||'未设置参赛球员'}} ▾</view>
+      </picker>
+      <view class="quick-grid">
+        <view wx:for="{{quickTypes}}" wx:key="key" class="quick-item" data-type="{{item.key}}" bindtap="onOpenQuick">
+          <text class="quick-symbol">{{item.icon}}</text><text>{{item.name}}</text>
+        </view>
+      </view>
+      <view class="more-performance">
+        <view data-type="appearance" bindtap="onOpenQuick">＋ 记录出场</view>
+        <picker mode="selector" range="{{allTypes}}" range-key="name" bindchange="onChooseAllType"><view>其他表现类型 ▾</view></picker>
+      </view>
+      <view wx:if="{{schemaError}}" class="thin-error">表现模型暂不可用：{{schemaError}}</view>
+    </view>
+    <view class="card">
+      <view class="section-title">已记录的表现</view>
+      <view wx:for="{{performances}}" wx:key="id" class="performance-row" data-id="{{item.id}}" bindtap="onPerformanceTap">
+        <view><text class="performance-type">{{item.typeText}}</text><text class="performance-person">{{item.personName}}</text></view>
+        <text wx:if="{{item.detailText}}" class="performance-detail">{{item.detailText}}</text>
+        <text class="performance-caret">›</text>
+      </view>
+      <view wx:if="{{!performances.length}}" class="performance-empty">还没有记录表现，点击上方快捷按钮即可开始。</view>
+      <view wx:if="{{performanceCursor}}" class="more-performance" bindtap="onMorePerformance">加载更多表现</view>
+    </view>
+    <view wx:if="{{formOpen}}" class="football-mask" catchtap="onFormClose">
+      <view class="football-sheet" catchtap="noop">
+        <view class="sheet-grip"></view>
+        <view class="sheet-header"><text>记录{{allTypes[performanceTypeIndex].name||'比赛表现'}}</text><text class="sheet-close" bindtap="onFormClose">✕</text></view>
+        <scroll-view scroll-y class="sheet-body">
+          <picker mode="selector" range="{{people}}" range-key="displayName" value="{{playerIndex}}" data-key="player" bindchange="onFormPicker">
+            <view class="form-row">球员 <text>{{people[playerIndex].displayName}} ▾</text></view>
+          </picker>
+          <view wx:if="{{performanceType==='goal'}}">
+            <picker mode="selector" range="{{goalMethods}}" range-key="name" value="{{goalMethodIndex}}" data-key="method" bindchange="onFormPicker">
+              <view class="form-row">进球方式 <text>{{goalMethods[goalMethodIndex].name}} ▾</text></view>
+            </picker>
+          </view>
+          <view wx:if="{{performanceType==='shot'}}">
+            <picker mode="selector" range="{{shotOutcomes}}" range-key="name" value="{{shotOutcomeIndex}}" data-key="outcome" bindchange="onFormPicker">
+              <view class="form-row">射门结果 <text>{{shotOutcomes[shotOutcomeIndex].name}} ▾</text></view>
+            </picker>
+          </view>
+          <block wx:if="{{performanceType==='appearance'}}">
+            <view class="form-row">本段出场分钟数 <input type="number" value="{{minutesPlayed}}" placeholder="可选" data-key="minutesPlayed" bindinput="onFormValue"/></view>
+            <view class="form-row">场上位置 <input value="{{position}}" placeholder="可选" data-key="position" bindinput="onFormValue"/></view>
+            <picker mode="selector" range="{{entryModes}}" range-key="name" value="{{entryModeIndex}}" data-key="entry" bindchange="onFormPicker">
+              <view class="form-row">进入方式 <text>{{entryModes[entryModeIndex].name}} ▾</text></view>
+            </picker>
+          </block>
+          <view class="form-row form-notes">
+            <text>备注</text>
+            <textarea placeholder="可补充细节（选填）" maxlength="2000" value="{{notes}}" data-key="notes" bindinput="onFormValue"/>
+          </view>
+        </scroll-view>
+        <button class="btn-primary" disabled="{{busy}}" loading="{{busy}}" bindtap="onFormSave">确认提交</button>
+        <view wx:if="{{performanceId}}" class="form-delete" bindtap="onFormDelete">删除此记录</view>
+      </view>
+    </view>
+  </block>
+</view>
