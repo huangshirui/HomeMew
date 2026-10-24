@@ -57,3 +57,15 @@ test('Workspace tabs distinguish activity schedules, goal actions, habit-related
   assert.match(page, /今天打卡/);
   assert.match(page, /myPersonId === record\.subjectPersonId/);
 });
+
+test('New containers open their detail rather than disappear under current-date filter', () => {
+  assert.match(page, /const saved = await apiRequest<DomainRecord>/);
+  assert.match(page, /wasCreating && modelKey !== 'anniversary' && saved\?\.id/);
+  assert.match(page, /navigate\(\`\$\{listPath\}\/\$\{encodeURIComponent\(saved\.id\)\}\`\)/);
+});
+test('Task quick action uses the complete existing editor with atomic relation', () => {
+  assert.match(relations, /<TaskEditor draft=\{taskDraft\}/);
+  assert.match(relations, /taskPayload\(taskDraft\)/);
+  assert.match(relations, /presentationToSave\(spaceId, 'task', taskDraft\.icon\)/);
+  assert.match(relations, /atomicConsistency: true/);
+});
