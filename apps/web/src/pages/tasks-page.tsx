@@ -295,7 +295,14 @@ export function TasksPage() {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      <PageHeader title="家庭待办">
+      <PageHeader title="家庭待办" mobileTitle="待办" mobileActions={<>
+        <Button variant="secondary" size="icon" className={`size-10 ${query || assigneeFilter || dueFilter !== 'all' ? 'text-emerald-800 ring-emerald-300' : ''}`}
+          onClick={() => setFilterOpen((value) => !value)} aria-expanded={filterOpen}
+          aria-controls="task-search-filters" aria-label={query || assigneeFilter || dueFilter !== 'all' ? '搜索与筛选（已启用）' : '搜索与筛选'}
+          title="搜索与筛选"><SlidersHorizontal className="size-4" /></Button>
+        <Button variant="primary" size="icon" className="size-10" disabled={!currentFamily || !canWrite}
+          onClick={openCreate} aria-label="新建待办" title="新建待办"><Plus className="size-4" /></Button>
+      </>}>
         <Button variant="secondary" onClick={() => setFilterOpen((value) => !value)}
           aria-expanded={filterOpen} aria-controls="task-search-filters"
           className={query || assigneeFilter || dueFilter !== "all" ? "text-emerald-800 ring-emerald-300" : ""}>
