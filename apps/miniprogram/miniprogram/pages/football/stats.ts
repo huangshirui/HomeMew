@@ -55,7 +55,7 @@ Page({
     const data=aggregateFootball(this._matches,this._events,this.data.personId);
     const trend=this.data.trend,settings=trends.find(t=>t.key===trend)||trends[0];
     const values=data.months.slice(-18).map(b=>metricPair(b,trend));
-    const max=Math.max(1,...values.flatMap(v=>v.filter((x):x is number=>x!==null)));
+    const max=Math.max(1,...values.reduce<number[]>((all,pair)=>all.concat(pair.filter((x):x is number=>x!==null)),[]));
     const months=data.months.slice(-18).map((m,i)=>{
       const a=values[i][0],b=values[i][1];
       return{month:m.month,dateLabel:m.month.slice(2).replace('-','/'),first:fmt(a),
