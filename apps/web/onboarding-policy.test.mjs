@@ -21,8 +21,8 @@ test('HomeMew Web remains existing-user-link-only', () => {
   assert.match(worker, /\/api\/access\/link-challenge/u);
   assert.doesNotMatch(worker, /\/api\/access\/register/u, 'the HomeMew Web BFF must not expose Access registration');
 
-  assert.match(sessionGate, /HomeMew Web 需要已有家事喵账号/u);
-  assert.match(sessionGate, /Web 不会单独创建新的 LifeSpace 用户/u);
+  assert.match(sessionGate, /关联已有家事喵账号/u);
+  assert.match(sessionGate, /还没有账号？请先打开微信小程序使用家事喵/u);
   assert.doesNotMatch(sessionGate, /创建新账号|registerNewAccount|\/api\/access\/register/u);
 
   assert.match(readme, /existing-user link challenge/u);

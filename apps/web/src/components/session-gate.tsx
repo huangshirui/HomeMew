@@ -2,6 +2,7 @@ import { Check, Clipboard, Link2, LoaderCircle, RefreshCw, Smartphone } from 'lu
 import { useCallback, useEffect, useState, type PropsWithChildren } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
+import { householdErrorMessage } from '../lib/user-facing-error';
 
 type SessionPayload = {
   data?: {
@@ -90,7 +91,7 @@ export function SessionGate({ children }: PropsWithChildren) {
         expiresAt: typeof payload.data.expiresAt === 'string' ? payload.data.expiresAt : undefined,
       });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : '无法创建关联码');
+      setActionError(householdErrorMessage(error, '无法创建关联码，请稍后重试。'));
     } finally {
       setChallengeBusy(false);
     }
@@ -147,7 +148,7 @@ export function SessionGate({ children }: PropsWithChildren) {
             <Link2 className="size-5" />
           </div>
           <div>
-            <p className="text-sm font-medium text-emerald-700">Cloudflare Access 登录成功</p>
+            <p className="text-sm font-medium text-emerald-700">已登录</p>
             <h1 className="text-2xl font-semibold tracking-tight text-stone-900">关联你的家事喵小程序账号</h1>
           </div>
         </div>
@@ -155,12 +156,12 @@ export function SessionGate({ children }: PropsWithChildren) {
         <Card>
           <CardContent className="space-y-6 pt-6">
             <div>
-              <h2 className="text-lg font-semibold text-stone-900">HomeMew Web 需要已有家事喵账号</h2>
+              <h2 className="text-lg font-semibold text-stone-900">关联已有家事喵账号</h2>
               <p className="mt-2 text-sm leading-6 text-stone-600">
-                家事喵小程序是基础客户端和账号入口，Web 提供更完整的家庭管理与高级功能。首次使用 Web 时，请把当前 Web 登录关联到你已经在小程序中使用的账号。
+                首次使用网页版时，请关联你在微信小程序中使用的家事喵账号。
               </p>
               <p className="mt-2 text-sm leading-6 text-stone-500">
-                如果你还没有家事喵账号，请先在微信小程序完成首次使用，再回到这里关联。Web 不会单独创建新的 LifeSpace 用户。
+                还没有账号？请先打开微信小程序使用家事喵，再回到这里关联。
               </p>
             </div>
 

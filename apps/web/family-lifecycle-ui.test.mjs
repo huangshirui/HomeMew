@@ -18,7 +18,7 @@ test('family page exposes owner close and non-owner leave through LifeSpace', ()
     /currentFamily\?\.role === 'owner'/u,
     /家庭数据不会立即物理删除/u,
     /所有成员和外部系统会立即失去访问权限/u,
-    /当前版本也不能自行恢复/u,
+    /目前无法自行恢复/u,
     /再次确认：注销/u,
     /apiRequest<SpaceDetail>\(`\/api\/lifespace\/core\/v1\/spaces\/\$\{encodeURIComponent\(family\.id\)\}`\)/u,
     /\/spaces\/\$\{encodeURIComponent\(family\.id\)\}\/close/u,

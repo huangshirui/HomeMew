@@ -36,7 +36,7 @@ Keep dependencies demand-driven:
 - `/goals` — Goal 目标和生命周期 Actions
 - `/habits` — Habit 单人归属、Check-in 与历史
 - `/anniversaries` — Anniversary 年度纪念日（日历中同时展示）
-- `/football` — FootballMatch / FootballGoal 比赛、进球与统计（需先在 LifeSpace 正式 Publish）
+- `/football` — FootballMatch + FootballPerformance：记录／统计双入口；快捷按钮只预填统一表单，确认后才保存；参赛人员优先家庭成员，其他 Person 可搜索；Performance 需要在 LifeSpace Staging/Production 独立 Publish 并完成旧 FootballGoal 迁移后才能正式写入。
 - `/wishes`
 - `/family`
 - `/settings`
@@ -316,3 +316,35 @@ The same HomeMew Web Worker project has two independently deployed code versions
 Mini development/trial/release always use `https://homemew.aisr.online` and the Production Mini BFF. Staging-only Web testing happens on the protected Cloudflare Worker Preview URL, with its own staging credential and Web session secret.
 
 See `docs/decisions/2026-10-22-fixed-deployment-environments.md` and `docs/runbooks/2026-10-22-web-preview-and-environment-routing.md`.
+
+### 足球球队和赛事本机最近选择
+Web 足球表单/筛选的球队、赛事支持最近使用候选。按登录用户、家庭 Space、模型存储最近 12 条（90 天）；× 仅删除本机缓存，不删记录。选择缓存需重新按 ID 验证 LifeSpace 权限；Web 与小程序不跨设备自动同步。缓存不定义业务目录。
+
+
+### 足球管理边界（2026-10-23）
+
+/football/manage 为球队与非家庭球员管理子页：球队使用 LifeSpace PersonGroup，球员使用 Space Person Directory（未绑定用户的 Person），不修改家庭成员 Person。赛事统一由 /activities 管理，足球页提供快捷导航；比赛中新建赛事只是搜索无结果后的快捷 Activity 创建，不提供独立活动目录。球队、赛事、球员搜索为空时，新建按钮携带输入词。统计页改版方案仍需 UX 确认。
+
+### 足球统计看板（月度趋势）
+
+总体显示参赛场次、进球、助攻、有效出场分钟及覆盖率。月度趋势为三视图：进攻场均进球/助攻、进攻每次进球/助攻分钟、防守场均抢断/拦截。图表按 YYYY-MM 自然月对齐，上方两条折线、下方每月参赛场次柱图；没有比赛时场均无定义且断线。没有做 90 分钟换算。分钟效率只计算所有已记录 appearance 片段有分钟值的场次，且进球/助攻必须来自**同批比赛**，缺失则显示“—”而非补零。未来若需要严格识别遗漏了整个片段的比赛，需引入用户明确的时间完整性确认，不能单靠当前记录自动推断。
+
+### 足球比赛详情路由
+
+点击比赛列表「记录」进入独立 `/football/:matchId` 详情页（按 ID 读取，可直接刷新），只展示比赛详情、家庭球员选择、快捷记录和已记录表现。搜索筛选、新建比赛、记录/统计主切换只出现在 /football 列表页面。返回按钮可回列表；通过临时、每用户和家庭隔离的 sessionStorage 状态保留最近一次列表筛选、搜索及滚动位置（30 分钟有效，不代表业务真相）。详情编辑及快捷表现记录不影响平台数据模型。
+
+### 足球统计 · 胜率与月度趋势标签
+
+总体指标：参赛场次、胜率、进球、助攻及已记录比赛时间。胜率以已填写双方比分的参赛场次为分母，只统计代表球队获胜的场次；平局和失利计入分母，缺少双方任一比分时不参与；无有效比分显示“—”，并显示“有比分 X/Y 场”。胜率不受时长缺失影响。专项趋势标签为「场均进攻／进攻效率／场均防守」，月度趋势和时间样本规则保持不变。
+
+### 足球列表分页与球队成员管理（2026-10-24）
+
+比赛列表每页读取 40 场，按日期倒序，底部使用“加载更多比赛”通过 LifeSpace Canonical Query cursor 追加，不在初次打开时读取全部。球队管理（PersonGroup）支持显示成员数，在“管理球员”/“编辑”弹窗中搜索选择家庭成员和其他 Space Person，新增或移除 `memberPersonIds` 并保存；从球队移除成员只修改球队名单，不会删除球员 Person 或历史比赛。已有球队成员按 ID 有界并发读取用于显示名称，不全量拉取人员目录。
+
+### 足球管理搜索与筛选弹层布局
+
+球队管理页使用搜索框直接筛选球队列表，不使用选择/指定球队组件。空搜索展示用户近期或比赛引用过的球队；输入至少两个字后调用 LifeSpace Canonical Query 查询匹配球队（320ms 防抖、每页 20 条、支持加载更多），不读取全量 PersonGroup 目录。足球比赛页“赛事／代表球队／对手球队”筛选候选以输入框下方的绝对定位浮层展示，弹出时不改变整行筛选器高度，支持点击外部/Escape 关闭；比赛表单里的同类 Picker 保留适合弹窗滚动容器的原有布局。
+
+### 足球年份筛选 / 搜索框
+
+球队管理的搜索框使用 `type="text" inputMode="search"` 和一枚清除按钮，避免浏览器内置搜索叉号与自定义 × 重复。足球比赛年份筛选默认仅显示当前年份及之前四年（每年自动滚动），支持「其他年份…」浮层输入任意有效四位年份（1900–9999）；选中值保留在下拉中，可选择「全部年份」清空。避免把最近一页比赛年份误当作完整年份列表，也不执行全表扫描或新增业务缓存。

@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
 import { Card, CardContent } from '../components/ui/card';
 import { ApiError, apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 
 const roleLabel: Record<FamilyMember['role'], string> = {
   owner: '家庭所有者',
@@ -36,12 +37,12 @@ function canManage(role: string | undefined) {
 }
 
 function lifecycleError(cause: unknown, fallback: string) {
-  if (!(cause instanceof ApiError)) return cause instanceof Error ? cause.message : fallback;
+  if (!(cause instanceof ApiError)) return householdErrorMessage(cause, fallback);
   if (cause.code === 'SPACE_OWNER_REQUIRED') return '只有当前家庭所有者可以注销家庭，请刷新页面后重试。';
   if (cause.code === 'SPACE_VERSION_CONFLICT') return '家庭信息已经发生变化，本次注销没有执行。请刷新后重新确认。';
   if (cause.code === 'LAST_SPACE_MANAGER') return '家庭必须保留至少一位所有者或管理员，请先安排其他管理员再退出。';
   if (cause.code === 'SPACE_NOT_FOUND') return '这个家庭已关闭或你已无法访问，请刷新家庭列表。';
-  return cause.message || fallback;
+  return householdErrorMessage(cause, fallback);
 }
 
 export function FamilyPage() {
@@ -88,7 +89,7 @@ export function FamilyPage() {
       setFamilyName('');
       await refresh();
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : '创建家庭失败');
+      setActionError(householdErrorMessage(cause, '创建家庭失败'));
     } finally {
       setCreateFamilyBusy(false);
     }
@@ -125,7 +126,7 @@ export function FamilyPage() {
       setJoinToken('');
       await refresh();
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : '加入家庭失败');
+      setActionError(householdErrorMessage(cause, '加入家庭失败'));
     } finally {
       setJoinFamilyBusy(false);
     }
@@ -142,7 +143,7 @@ export function FamilyPage() {
       });
       await refreshMembers();
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : '修改成员角色失败');
+      setActionError(householdErrorMessage(cause, '修改成员角色失败'));
     } finally {
       setBusyUserId(null);
     }
@@ -159,7 +160,7 @@ export function FamilyPage() {
       });
       await refreshMembers();
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : '移除成员失败');
+      setActionError(householdErrorMessage(cause, '移除成员失败'));
     } finally {
       setBusyUserId(null);
     }
@@ -178,7 +179,7 @@ export function FamilyPage() {
       });
       setInviteToken(result.token);
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : '创建邀请失败');
+      setActionError(householdErrorMessage(cause, '创建邀请失败'));
     } finally {
       setInviteBusy(false);
     }
@@ -217,7 +218,7 @@ export function FamilyPage() {
   async function closeFamily() {
     const family = currentFamily;
     if (!family || family.role !== 'owner' || familyActionBusy) return;
-    if (!window.confirm('注销家庭后，所有成员和外部系统会立即失去访问权限。家庭数据不会立即物理删除，当前版本也不能自行恢复。确认继续吗？')) return;
+    if (!window.confirm('注销家庭后，所有成员和外部系统会立即失去访问权限。家庭资料不会立即清除，但目前无法自行恢复。确认继续吗？')) return;
     if (!window.confirm(`再次确认：注销“${family.name}”？注销会立即生效。`)) return;
 
     setFamilyActionBusy('close');

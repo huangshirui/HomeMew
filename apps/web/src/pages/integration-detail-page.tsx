@@ -36,7 +36,7 @@ function CapabilitySummary({ system }: { system: ExternalSystem }) {
             <p className="text-sm font-semibold text-stone-900">{label}</p>
           </div>
           <p className="mt-2 text-xs leading-5 text-stone-500">
-            {active ? (dependent ? '可配置' : '已配置') : (dependent ? '需要先配置 Service Access' : '未配置')}
+            {active ? (dependent ? '可配置' : '已配置') : (dependent ? '需要先设置服务接入' : '未配置')}
           </p>
         </div>
       ))}
@@ -202,14 +202,14 @@ export function IntegrationDetailPage() {
                 <span className="grid size-9 place-items-center rounded-xl bg-sky-100 text-sky-800"><Webhook className="size-4" /></span>
                 <div>
                   <h2 className="text-xl font-semibold text-stone-900">Event Push</h2>
-                  <p className="mt-0.5 text-sm text-stone-500">LifeSpace 主动把业务变化推送到这个外部系统。</p>
+                  <p className="mt-0.5 text-sm text-stone-500">开启后，日程或待办发生变化时会通知这个外部系统。</p>
                 </div>
               </div>
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-sm font-semibold text-stone-900">需要先配置 Service Access</p>
+                  <p className="text-sm font-semibold text-stone-900">需要先设置服务接入</p>
                   <p className="mt-2 text-sm leading-6 text-stone-500">
-                    当前 LifeSpace Webhook Endpoint 必须绑定一个 subscriber Service Principal，用它在投递前重新检查模型读取权限。因此 HomeMew 不会为了 Webhook 偷偷创建 Service Principal；请先显式创建上面的 Service Access。
+                    要使用事件推送，请先完成上方的服务接入设置，并开启所需的数据读取权限。
                   </p>
                 </CardContent>
               </Card>

@@ -73,7 +73,7 @@ function DirectPermissionEditor({ value, onChange, credentialAccess, disabled = 
         <label key={model.key} className="flex items-center justify-between gap-4 rounded-2xl bg-stone-50 px-4 py-3">
           <span className="min-w-0">
             <span className="block text-sm font-medium text-stone-800">{model.label}</span>
-            <span className="mt-0.5 block text-xs leading-5 text-stone-400">Principal=Agent / Actor=Agent 时无需临时用户授权的权限</span>
+            <span className="mt-0.5 block text-xs leading-5 text-stone-400">AI 助手可以直接使用的家庭权限</span>
           </span>
           <select
             className="h-9 shrink-0 rounded-xl border border-stone-200 bg-white px-2 text-sm text-stone-700 disabled:bg-stone-100 disabled:text-stone-400"
@@ -127,7 +127,7 @@ function AgentCredentialReveal({ token, spaceId, onClose }: {
   return (
     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
       <p className="font-semibold text-emerald-950">新的 Agent API Token</p>
-      <p className="mt-1 text-sm leading-6 text-emerald-900/70">明文只保留在当前页面运行期。请先保存到 Agent Runtime，再关闭。</p>
+      <p className="mt-1 text-sm leading-6 text-emerald-900/70">请先复制并妥善保存这份密钥，关闭后无法再次查看。</p>
       <div className="mt-4 grid gap-4">
         <div>
           <p className="text-xs font-medium text-emerald-900/70">Connection Base URL</p>
@@ -146,7 +146,7 @@ function AgentCredentialReveal({ token, spaceId, onClose }: {
           </Button>
         </div>
       </div>
-      <p className="mt-3 text-xs leading-5 text-emerald-900/60">Agent API Token 是通用 LifeSpace Agent 凭据。Agent Runtime 使用 Connection Base URL + Agent API Token 调用授权范围内的能力；关闭后 Token 明文无法恢复，遗失时请重新签发。</p>
+      <p className="mt-3 text-xs leading-5 text-emerald-900/60">请把连接地址和密钥填入 AI 助手的连接设置中。密钥只显示这一次，遗失后需要重新生成。</p>
       <Button className="mt-3" onClick={onClose}>我已保存，关闭</Button>
     </div>
   );
@@ -331,7 +331,7 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
         <span className="grid size-9 place-items-center rounded-xl bg-violet-100 text-violet-800"><Bot className="size-4" /></span>
         <div>
           <h2 className="text-xl font-semibold text-stone-900">Agent 接入</h2>
-          <p className="mt-0.5 text-sm text-stone-500">给 AI Agent 签发独立身份，并配置它在当前家庭可以直接做什么。</p>
+          <p className="mt-0.5 text-sm text-stone-500">添加 AI 助手，并设置它可以查看或修改哪些家庭内容。</p>
         </div>
       </div>
 
@@ -345,11 +345,11 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
           ) : !agent ? (
             <div className="space-y-5">
               <div className="rounded-2xl bg-violet-50/60 p-4 text-sm leading-6 text-violet-950/80">
-                Agent API Token 用于证明 <strong>Agent 身份</strong>并限定它最多能调用读取还是读写能力；下面的“当前家庭直接权限”才决定它以 <strong>Principal=Agent / Actor=Agent</strong> 执行时实际能访问哪些模型。需要代表家庭成员执行额外操作时，仍可在运行时使用 User Delegation。
+                先选择 AI 助手的访问范围，再设置它在这个家庭中可以直接使用的权限。需要额外操作时，还需获得相应的用户授权。
               </div>
               <div>
                 <p className="text-sm font-semibold text-stone-800">Agent API 能力上限</p>
-                <p className="mt-1 text-xs leading-5 text-stone-400">这是 Agent Token 的技术 Scope 上限，也适用于之后通过 User Delegation 执行的请求。</p>
+                <p className="mt-1 text-xs leading-5 text-stone-400">这是 AI 助手可获得的最高权限；具体可操作的家庭内容还需在下方设置。</p>
                 <select
                   className="mt-2 h-10 rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-700"
                   disabled={readOnly || busy !== null}
@@ -423,7 +423,7 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
               {agent.rotationPending && rotationCandidate && (
                 <div className="rounded-2xl bg-sky-50 p-4 text-sm text-sky-900">
                   <p className="font-medium">新旧 Agent Token 暂时同时有效</p>
-                  <p className="mt-1 leading-6">先在 Agent Runtime 中切换并完成真实请求验证。验证成功后完成轮换；失败则取消。</p>
+                  <p className="mt-1 leading-6">请先在 AI 助手中使用新密钥测试连接，确认成功后再停用旧密钥。</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button variant="primary" disabled={busy !== null} onClick={() => void completeRotation()}>
                       {busy === 'complete' ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}已验证，完成轮换
@@ -438,7 +438,7 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
               {agent.hasWholeSpaceGrant && (
                 <div className="flex gap-3 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                  <p>这个 Agent 存在当前家庭的 Space 级宽泛授权。HomeMew 只管理当前家庭的模型级 Agent Grant，因此这里保持只读；请先在 LifeSpace Console 中收敛宽泛授权。</p>
+                  <p>当前 AI 助手仍使用旧的权限设置。请先在管理控制台完成调整，再回到这里修改。</p>
                 </div>
               )}
 
@@ -446,7 +446,7 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-stone-800">当前家庭直接权限</p>
-                    <p className="mt-1 text-xs leading-5 text-stone-400">这些权限无需逐次用户授权；超出它们时可再走 User Delegation。</p>
+                    <p className="mt-1 text-xs leading-5 text-stone-400">AI 助手可以直接进行这些操作；其他操作需要用户另行授权。</p>
                   </div>
                   {!readOnly && !agent.hasWholeSpaceGrant && !editingPermissions && (
                     <Button disabled={busy !== null || agent.rotationPending || !agent.credentialAccess} onClick={() => setEditingPermissions(true)}>编辑</Button>
@@ -473,7 +473,7 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
               <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
                 <div className="flex items-start gap-3">
                   <KeyRound className="mt-0.5 size-4 shrink-0 text-sky-700" />
-                  <p className="text-sm leading-6 text-stone-600"><strong>Agent Connection</strong> 使用当前家庭的 Connection Base URL + <code>lsp_agt_*</code>。Agent API Token 是通用 Agent 凭据，不绑定单个 Space；HomeMew 这里只配置当前家庭的直接权限。</p>
+                  <p className="text-sm leading-6 text-stone-600">将连接地址和密钥填入 AI 助手的连接设置中。这里的权限只针对当前家庭。</p>
                 </div>
               </div>
 
@@ -481,7 +481,7 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
                 <div className="flex flex-col gap-3 border-t border-red-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-stone-900">移除 Agent 接入</p>
-                    <p className="mt-1 text-xs leading-5 text-stone-500">撤销这个 Agent 的全部 API Token 与当前家庭直接 Grant。稳定 Agent Identity 会作为无权限历史身份保留在 LifeSpace。</p>
+                    <p className="mt-1 text-xs leading-5 text-stone-500">移除后，AI 助手将无法再使用原有密钥访问当前家庭；历史记录会保留。</p>
                   </div>
                   <Button variant="ghost" disabled={busy !== null} onClick={() => void removeAgent()}>
                     {busy === 'remove' ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}移除 Agent 接入

@@ -7,7 +7,8 @@ import { PageHeader } from '../components/ui/page-header';
 import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type WishStatus = 'open' | 'fulfilled';
@@ -35,8 +36,7 @@ const inputClass = 'h-10 w-full rounded-2xl border border-stone-200 bg-white px-
 const textareaClass = 'min-h-28 w-full resize-y rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100';
 
 function messageOf(cause: unknown, fallback: string) {
-  if (cause instanceof ApiError) return `${cause.message}${cause.requestId ? ` · ${cause.requestId}` : ''}`;
-  return cause instanceof Error ? cause.message : fallback;
+  return householdErrorMessage(cause, fallback);
 }
 
 function draftFromWish(wish: WishRecord): WishDraft {
@@ -206,7 +206,7 @@ export function WishesPage() {
           </div>
 
           {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">{error}</div> : null}
-          {!currentPersonId ? <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-100">当前 LifeSpace 用户尚未映射到这个家庭的 Space Person，暂时只能浏览。</div> : null}
+          {!currentPersonId ? <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-100">暂时无法确认你在这个家庭中的身份，目前只能查看愿望。请尝试重新登录。</div> : null}
           {!loading && !wishes.length ? (
             <EmptyState
               icon={<Gift className="size-5" />}
@@ -311,7 +311,7 @@ function WishEditor({ draft, spaceId, editing, currentPersonId, canWrite, saving
       <ModalScrollLock />
       <form onScroll={showScrollbarWhileScrolling} onSubmit={onSave} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <div><p className="text-lg font-semibold text-stone-950">{editing ? (editable ? '编辑愿望' : '愿望详情') : '写下愿望'}</p>{editing ? <p className="mt-1 text-xs text-stone-500">{editing.status === 'fulfilled' ? '愿望成真' : '等待实现'} · 版本 {editing.version}</p> : null}</div>
+          <div><p className="text-lg font-semibold text-stone-950">{editing ? (editable ? '编辑愿望' : '愿望详情') : '写下愿望'}</p>{editing ? <p className="mt-1 text-xs text-stone-500">{editing.status === 'fulfilled' ? '愿望成真' : '等待实现'}</p> : null}</div>
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="mt-5 grid gap-4">

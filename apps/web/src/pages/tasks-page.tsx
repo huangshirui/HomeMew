@@ -7,7 +7,8 @@ import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
 import { PageHeader } from '../components/ui/page-header';
 import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords, type CanonicalQueryFilter, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type TaskRecord = {
@@ -49,8 +50,7 @@ function addDateDays(value: string, days: number) {
 }
 
 function messageOf(cause: unknown, fallback: string) {
-  if (cause instanceof ApiError) return `${cause.message}${cause.requestId ? ` · ${cause.requestId}` : ''}`;
-  return cause instanceof Error ? cause.message : fallback;
+  return householdErrorMessage(cause, fallback);
 }
 
 function draftFromTask(task: TaskRecord): TaskDraft {
@@ -513,7 +513,7 @@ function TaskEditor({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '待办详情' : '编辑待办') : '新建待办'}</p>
-            {editing ? <p className="mt-1 text-xs text-stone-500">版本 {editing.version}</p> : null}
+            
           </div>
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>

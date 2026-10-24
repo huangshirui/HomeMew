@@ -9,7 +9,8 @@ import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { WeekTimeGrid } from '../components/week-time-grid';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { Card } from '../components/ui/card';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 
 type TemporalRange =
@@ -250,8 +251,7 @@ function timeLabel(event: EventRecord, timeZone: string) {
 }
 
 function messageOf(cause: unknown, fallback: string) {
-  if (cause instanceof ApiError) return `${cause.message}${cause.requestId ? ` · ${cause.requestId}` : ''}`;
-  return cause instanceof Error ? cause.message : fallback;
+  return householdErrorMessage(cause, fallback);
 }
 
 export function CalendarPage() {
@@ -1008,7 +1008,7 @@ function EventEditor({
 
           {editing ? (
             <div className="grid gap-2 rounded-2xl bg-white p-4 text-xs text-stone-500 ring-1 ring-stone-200 sm:grid-cols-2">
-              <span className="flex items-center gap-1.5"><Clock3 className="size-3.5" /> 版本 {editing.version}</span>
+              
               <span className="sm:text-right">最后更新 {new Date(editing.updatedAt).toLocaleString('zh-CN')}</span>
             </div>
           ) : null}

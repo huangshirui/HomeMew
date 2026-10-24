@@ -6,7 +6,8 @@ import { PageHeader } from '../components/ui/page-header';
 import { ModalScrollLock, showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { Card } from '../components/ui/card';
 import { EmptyState } from '../components/ui/empty-state';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { RecordIconField, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 
 type DayKind = 'elapsed' | 'countdown' | 'cycle';
@@ -75,8 +76,7 @@ function dateInZone(timeZone: string) {
 }
 
 function messageOf(cause: unknown, fallback: string) {
-  if (cause instanceof ApiError) return `${cause.message}${cause.requestId ? ` · ${cause.requestId}` : ''}`;
-  return cause instanceof Error ? cause.message : fallback;
+  return householdErrorMessage(cause, fallback);
 }
 
 const iconImagePath = (spaceId: string, recordId: string, fileId: string) =>
@@ -469,7 +469,7 @@ function DayEditor({ draft, spaceId, editing, members, canWrite, saving, onChang
       <ModalScrollLock />
       <form onScroll={showScrollbarWhileScrolling} onSubmit={onSave} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-stone-50 p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <div><p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '日子详情' : '编辑日子') : '新建日子'}</p>{editing ? <p className="mt-1 text-xs text-stone-500">版本 {editing.version}</p> : null}</div>
+          <div><p className="text-lg font-semibold text-stone-950">{editing ? (readOnly ? '日子详情' : '编辑日子') : '新建日子'}</p></div>
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="mt-5 grid gap-4">

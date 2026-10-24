@@ -6,8 +6,8 @@ import { IntegrationsPage } from './integrations-page';
 
 const settings = [
   { icon: Users, title: '家庭与成员', description: '家庭资料、成员和角色权限。', to: '/family', enabled: true },
-  { icon: ExternalLink, title: '外部系统', description: '管理自动化平台、Agent、脚本、后端服务等系统的认证、事件订阅和后续对接能力。', to: '/settings/integrations', enabled: true },
-  { icon: ShieldCheck, title: '权限与安全', description: '由 LifeSpace Space/Data Grant 作为最终授权依据。', enabled: false },
+  { icon: ExternalLink, title: '外部系统', description: '连接和管理家庭使用的外部服务。', to: '/settings/integrations', enabled: true },
+  { icon: ShieldCheck, title: '权限与安全', description: '管理家庭数据的访问权限。', enabled: false },
 ];
 
 export function SettingsPage({ section }: { section?: 'integrations' }) {

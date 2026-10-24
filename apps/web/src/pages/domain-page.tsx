@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { CalendarDays, Check, Clock3, Gift, Pause, Play, Plus, RefreshCw, Target, Trash2, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
+import { ContainerRelations } from '../components/container-relations';
 import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type IconModel, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { PageHeader } from '../components/ui/page-header';
 import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { useModalScrollLock } from '../lib/modal-scroll';
-import { ApiError, apiRequest } from '../lib/api-client';
+import { apiRequest } from '../lib/api-client';
+import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 
 type ModelKey = 'activity' | 'goal' | 'anniversary' | 'habit';
@@ -82,17 +84,17 @@ function payloadFor(key: ModelKey, draft: Draft, editing: boolean): Record<strin
   return { ...common, month, day, year, personIds: draft.personIds };
 }
 function message(error: unknown): string {
-  if (error instanceof ApiError) return error.message + (error.requestId ? ' · ' + error.requestId : '');
-  return error instanceof Error ? error.message : '请求失败';
+  return householdErrorMessage(error, '操作失败，请稍后再试。');
 }
 function url(spaceId: string, key: ModelKey, recordId?: string): string {
   return `/api/lifespace/core/v1/spaces/${encodeURIComponent(spaceId)}/models/${key}/records${recordId ? '/' + encodeURIComponent(recordId) : ''}`;
 }
-async function loadRecords(spaceId: string, key: ModelKey): Promise<DomainRecord[]> {
+async function loadRecords(spaceId: string, key: ModelKey, statusFilter: Status): Promise<DomainRecord[]> {
   const collected: DomainRecord[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < 10; page += 1) {
     const result: { items: DomainRecord[]; nextCursor: string | null } = await queryModelRecords<DomainRecord>(spaceId, key, {
+      ...(key === 'goal' || key === 'habit' ? { filter: { field: 'status' as const, op: 'eq' as const, value: statusFilter } } : {}),
       sort: key === 'anniversary' ? [{ field: 'month', direction: 'asc' }, { field: 'day', direction: 'asc' }]
         : key === 'activity' ? [{ field: 'startDate', direction: 'desc' }]
           : key === 'goal' ? [{ field: 'targetDate', direction: 'asc' }] : [{ field: 'name', direction: 'asc' }],
@@ -111,35 +113,43 @@ function memberNames(ids: string[], names: Map<string, string>) {
 export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const { currentFamily, members, user, loading: householdLoading } = useHousehold();
   const [records, setRecords] = useState<DomainRecord[]>([]);
+  const requestGeneration = useRef(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<Status>('active');
   const [editing, setEditing] = useState<DomainRecord | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [historyFor, setHistoryFor] = useState<DomainRecord | null>(null);
+  const [containerFor, setContainerFor] = useState<DomainRecord | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyError, setHistoryError] = useState('');
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
-  useModalScrollLock(Boolean(draft || historyFor));
+  useModalScrollLock(Boolean(draft || historyFor || containerFor));
   const myPersonId = members.find(member => member.userId === user?.id)?.personId;
   const canCreate = Boolean(currentFamily && currentFamily.role !== 'viewer');
   const names = useMemo(() => new Map(members.filter(m => m.personId).map(m => [m.personId!, m.displayName || '家庭成员'])), [members]);
   const spec = settings[modelKey];
   const Icon = spec.icon;
-  const visible = records.filter(record => statusFilter === 'all' || record.status === statusFilter);
+  const visible = records; // Goal/Habit status filtering is performed by the indexed LifeSpace query.
 
   const reload = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     if (!currentFamily) { setRecords([]); return; }
-    setLoading(true); setError('');
-    try { setRecords(await loadRecords(currentFamily.id, modelKey)); }
-    catch (cause) { setRecords([]); setError(message(cause)); }
-    finally { setLoading(false); }
-  }, [currentFamily, modelKey]);
-  useEffect(() => { void refresh; void reload(); }, [reload, refresh]);
-  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setStatusFilter('all'); }, [currentFamily?.id, modelKey]);
+    setLoading(true); setRecords([]); setError('');
+    try {
+      const next = await loadRecords(currentFamily.id, modelKey, statusFilter);
+      if (generation === requestGeneration.current) setRecords(next);
+    } catch (cause) {
+      if (generation === requestGeneration.current) { setRecords([]); setError(message(cause)); }
+    } finally {
+      if (generation === requestGeneration.current) setLoading(false);
+    }
+  }, [currentFamily?.id, modelKey, statusFilter]);
+  useEffect(() => { void refresh; void reload(); return () => { requestGeneration.current += 1; }; }, [reload, refresh]);
+  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setContainerFor(null); setStatusFilter('active'); }, [currentFamily?.id, modelKey]);
 
   function newRecord() {
     const next = blank();
@@ -201,16 +211,16 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     <PageHeader title={spec.title}>{canCreate ? <Button variant="primary" onClick={newRecord}><Plus className="size-4" /> 新建{spec.title}</Button> : null}</PageHeader>
     <p className="text-sm text-stone-500">{spec.description}</p>
     {modelKey === 'goal' || modelKey === 'habit' ? <div className="flex flex-wrap items-center gap-2">
-      {['all','active','paused',...(modelKey === 'goal' ? ['achieved','abandoned'] : ['ended'])].map(key =>
+      {(['active','paused',...(modelKey === 'goal' ? ['achieved','abandoned'] : ['ended'])] as Status[]).map(key =>
         <button key={key} type="button" aria-pressed={statusFilter === key} onClick={() => setStatusFilter(key)}
           className={`rounded-xl px-3 py-2 text-xs font-medium ${statusFilter === key ? 'bg-emerald-700 text-white' : 'bg-white text-stone-500 ring-1 ring-stone-200'}`}>
-          {key === 'all' ? '全部' : statusText[key as Status]}
+          {statusText[key]}
         </button>)}
     </div> : null}
     {error ? <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
     {!currentFamily ? <Card className="p-6 text-sm text-stone-500">请先选择家庭。</Card>
       : loading ? <Card className="p-6 text-sm text-stone-500">正在加载{spec.title}…</Card>
-      : !visible.length ? <Card className="p-8 text-center text-sm text-stone-500">还没有{spec.title}记录。</Card>
+      : !visible.length ? <Card className="p-8 text-center text-sm text-stone-500">{modelKey === 'goal' || modelKey === 'habit' ? `暂无${statusText[statusFilter]}的${spec.title}` : `还没有${spec.title}记录。`}</Card>
       : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map(record => <Card key={record.id} className="space-y-3 p-4">
           <div className="flex items-start gap-2">
@@ -231,7 +241,8 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
           {modelKey !== 'habit' && memberNames(modelKey === 'activity' ? record.attendeePersonIds ?? [] : modelKey === 'goal' ? record.subjectPersonIds ?? [] : record.personIds ?? [], names) ?
             <p className="text-xs text-stone-500">{memberNames(modelKey === 'activity' ? record.attendeePersonIds ?? [] : modelKey === 'goal' ? record.subjectPersonIds ?? [] : record.personIds ?? [], names)}</p> : null}
           <div className="flex flex-wrap gap-2 border-t border-stone-100 pt-3">
-            {modelKey === 'habit' ? <Button variant="secondary" onClick={() => { setHistoryFor(record); setHistory([]); setHistoryCursor(null); void loadHistory(record, null, false); }}>打卡历史</Button> : null}
+            {modelKey !== 'anniversary' ? <Button variant="secondary" onClick={() => setContainerFor(record)}>查看内容</Button> : null}
+             {modelKey === 'habit' ? <Button variant="secondary" onClick={() => { setHistoryFor(record); setHistory([]); setHistoryCursor(null); void loadHistory(record, null, false); }}>打卡历史</Button> : null}
             {canManage(record) ? <>
               <Button variant="secondary" onClick={() => edit(record)}>编辑</Button>
               {modelKey === 'habit' && record.status === 'active' ?
@@ -253,6 +264,9 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
       </div>}
     <div className="flex justify-end"><Button variant="ghost" disabled={loading} onClick={() => setRefresh(v => v + 1)}><RefreshCw className="size-4" /> 刷新</Button></div>
 
+    {containerFor && currentFamily && modelKey !== 'anniversary' ? <ContainerRelations key={`${modelKey}:${containerFor.id}`}
+      spaceId={currentFamily.id} modelKey={modelKey} record={containerFor} timezone={currentFamily.timezone}
+      writable={canManage(containerFor)} onClose={() => setContainerFor(null)} /> : null}
     {draft && currentFamily ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6"
       role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setDraft(null); }}>
       <form onSubmit={save} role="dialog" aria-modal="true" aria-label={editing ? '编辑' + spec.title : '新建' + spec.title}

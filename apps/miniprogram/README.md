@@ -1748,3 +1748,7 @@ JWT 签发
 → 关闭小程序
 ```
 
+
+### 足球最近选择候选（为后续页面预留）
+Native 小程序提供 utils/football-recent-cache.ts 及 components/football-recent-picker：按用户、家庭、球队/赛事隔离，12 条上限、90 天过期、× 仅移除本机缓存。目前小程序没有足球比赛页面或相关 Mini BFF 路由，因此该组件尚未出现在导航界面。未来接入时只能通过稳定 HomeMew Mini BFF 验证选择 ID，再调用组件的 rememberVerifiedSelection；不可直连 LifeSpace Core。
+

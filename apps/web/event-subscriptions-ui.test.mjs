@@ -14,8 +14,8 @@ test('event push UI exposes event and task as filters under one webhook endpoint
   assert.match(value, /key: 'task'[\s\S]*label: '待办'/u);
   assert.match(value, /\/api\/lifespace\/core\/v1\/webhook-endpoints/u);
   assert.match(value, /endpointId, modelKey: option\.key, eventTypes/u);
-  assert.match(value, /一个 Webhook，选择要订阅的内容/u);
-  assert.match(value, /一套 URL \/ 一套密钥/u);
+  assert.match(value, /选择要通知的内容/u);
+  assert.match(value, /共用地址和密钥/u);
 });
 
 test('transport controls live on the webhook endpoint instead of each model subscription', async () => {
