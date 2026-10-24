@@ -3,6 +3,7 @@
 Date: 2026-10-24
 Status: Accepted for UX implementation; PR review and Preview acceptance pending
 Scope: HomeMew Web responsive presentation only; desktop sidebar and LifeSpace/Core contracts unchanged.
+This decision supersedes the mobile top-bar and floating-tab presentation clauses of the 2026-10-19 global family navigation decision; family switching ownership and authority remain unchanged.
 
 ## Problem / 问题
 
