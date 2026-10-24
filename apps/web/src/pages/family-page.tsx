@@ -2,6 +2,7 @@ import { Check, Clipboard, LoaderCircle, LogIn, LogOut, Plus, ShieldCheck, Trash
 import { useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHousehold, type FamilyMember } from '../components/household-provider';
+import { Avatar, MemberAvatar } from '../components/app-shell';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
 import { Card, CardContent } from '../components/ui/card';
@@ -323,10 +324,15 @@ export function FamilyPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-stone-400">当前家庭</p>
-                <h2 className="mt-1 text-xl font-semibold text-stone-900">{currentFamily.name}</h2>
-                <p className="mt-1 text-sm text-stone-500">{members.length} 位成员 · {currentFamily.timezone}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar src={currentFamily.avatarUrl ? `/api/v1/miniprogram/media/families/${encodeURIComponent(currentFamily.id)}/avatar` : null}
+                  alt={`${currentFamily.name}家庭Logo`} fallback={currentFamily.name}
+                  className="size-12 shrink-0 rounded-2xl bg-amber-100 text-amber-800" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-stone-400">当前家庭</p>
+                  <h2 className="mt-1 truncate text-xl font-semibold text-stone-900">{currentFamily.name}</h2>
+                  <p className="mt-1 text-sm text-stone-500">{members.length} 位成员 · {currentFamily.timezone}</p>
+                </div>
               </div>
               <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">{roleLabel[currentFamily.role]}</span>
             </div>
@@ -338,9 +344,7 @@ export function FamilyPage() {
                 return (
                   <div key={member.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="grid size-10 shrink-0 place-items-center rounded-full bg-stone-100 text-sm font-semibold text-stone-600">
-                        {(member.displayName || '?').slice(0, 1)}
-                      </div>
+                      <MemberAvatar member={member} className="size-10 shrink-0 bg-stone-100 text-sm text-stone-600" />
                       <div className="min-w-0">
                         <p className="truncate font-medium text-stone-900">{member.displayName || member.userId}{isSelf ? '（我）' : ''}</p>
                         <p className="mt-0.5 text-xs text-stone-400">{roleLabel[member.role]}</p>
