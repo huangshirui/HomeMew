@@ -14,6 +14,7 @@ import { apiRequest } from '../lib/api-client';
 import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 import { eventLocationDraftValue, eventLocationLabel, type EventLocation, type LocationValue } from '../lib/location-value';
+import { shiftEndWithStart } from '../lib/event-time-shift';
 
 type TemporalRange =
   | { kind: 'date'; start: string; endExclusive: string }
@@ -957,6 +958,14 @@ export function EventEditor({
 }) {
   const readOnly = !canWrite;
   const set = <K extends keyof EventDraft>(key: K, value: EventDraft[K]) => onChange({ ...draft, [key]: value });
+  const changeStart = (start: { date?: string; time?: string }) => {
+    const range=shiftEndWithStart(draft,start,{
+      toStartInstant:(date,time)=>localDateTimeToIso(date,time,draft.timezone),
+      toEndInstant:(date,time)=>localDateTimeToIso(date,time,draft.timezone),
+      fromEndInstant:instant=>localDateParts(new Date(instant),draft.timezone),
+    });
+    onChange({...draft,...range});
+  };
 
   function togglePerson(personId: string) {
     const next = draft.attendeePersonIds.includes(personId)
@@ -987,13 +996,13 @@ export function EventEditor({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-medium text-stone-700">开始日期<input type="date" className={inputClass} disabled={readOnly} value={draft.startDate} onChange={(event) => set('startDate', event.target.value)} /></label>
+            <label className="grid gap-1.5 text-sm font-medium text-stone-700">开始日期<input type="date" className={inputClass} disabled={readOnly} value={draft.startDate} onChange={(event) => changeStart({date:event.target.value})} /></label>
             <label className="grid gap-1.5 text-sm font-medium text-stone-700">结束日期<input type="date" className={inputClass} disabled={readOnly} value={draft.endDate} onChange={(event) => set('endDate', event.target.value)} /></label>
           </div>
 
           {!draft.isAllDay ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="grid gap-1.5 text-sm font-medium text-stone-700">开始时间<input type="time" className={inputClass} disabled={readOnly} value={draft.startTime} onChange={(event) => set('startTime', event.target.value)} /></label>
+              <label className="grid gap-1.5 text-sm font-medium text-stone-700">开始时间<input type="time" className={inputClass} disabled={readOnly} value={draft.startTime} onChange={(event) => changeStart({time:event.target.value})} /></label>
               <label className="grid gap-1.5 text-sm font-medium text-stone-700">结束时间<input type="time" className={inputClass} disabled={readOnly} value={draft.endTime} onChange={(event) => set('endTime', event.target.value)} /></label>
             </div>
           ) : null}

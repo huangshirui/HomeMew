@@ -79,6 +79,7 @@ The reviewed Mini Program intentionally keeps a stable HomeMew-owned Event DTO t
 - HomeMew Web uses the selected family's IANA timezone as viewing/editor context when projecting instants into local date/time controls and converting edited local values back to instants.
 - Changing the family timezone changes projection only; it does not rewrite stored Event instants.
 - Mini-facing nullable start/end timezone fields are compatibility/presentation data only. They must not be treated as authoritative platform time semantics.
+- HomeMew Web and Mini Event editors preserve the existing elapsed duration when the user changes the **start** time or start date: move the end forward/backward by the same instant delta (including midnight rollover), instead of leaving the end fixed or imposing an arbitrary one-hour end. When editing all-day start dates, preserve the calendar-day span (inclusive display end); do not convert date-only ranges through UTC instants. Editing the **end** directly never modifies the start. Invalid/nonexistent local time input falls back to normal save-time validation rather than fabricating instants.
 
 ### 5.4 All-day events
 
