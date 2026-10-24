@@ -77,7 +77,7 @@ Page({
       dateText:m.matchDate+(m.matchType==='friendly'?' · 友谊赛':' · 正式比赛')};
   },
   onReachBottom():void{if(!this.data.loading&&!this.data.loadingMore&&this.data.nextCursor)void this.load(false);},
-  onPullDownRefresh():void{void this.load(true).finally(()=>wx.stopPullDownRefresh());},
+  onPullDownRefresh():void{void this.load(true).then(()=>wx.stopPullDownRefresh(),()=>wx.stopPullDownRefresh());},
   onToggleFilter():void{this.setData({filterOpen:!this.data.filterOpen});},
   onFilterInput(e:WechatMiniprogram.Input):void{
     const name=String(e.currentTarget.dataset.name||'');
