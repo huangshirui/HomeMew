@@ -12,7 +12,7 @@ test('mobile shell exposes household context and real avatars', () => {
 
   assert.match(shell, /aria-label=\{mobile \? '移动端切换家庭' : '切换家庭'\}/u);
   const header = source('./src/components/ui/page-header.tsx');
-  assert.match(header, /<FamilyIdentity mobile \\/>/u);
+  assert.ok(header.includes('<FamilyIdentity mobile />'));
   assert.ok(shell.includes("detailTitles[segments[0]]"));
   assert.match(shell, /currentFamily\?\.avatarUrl/u);
   const more = source('./src/pages/more-page.tsx');
