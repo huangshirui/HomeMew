@@ -174,3 +174,9 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 - **返回体验**：返回按钮和浏览器后退都回到 /football。浏览器 sessionStorage 临时保存本次用户与家庭隔离的列表 UI 状态（筛选、搜索、Tab、折叠状态、滚动 Y，30 分钟内有效、单次消费），属于非权威界面偏好，不存业务记录或权限。载入列表后尝试恢复滚动；列表更多分页未被存档，超出首批比赛时尽力恢复。切回列表清空之前详情的 `selected` 和表现查询，防止过滤条件继续隐藏。
 - **保存行为**：从列表新建/编辑比赛后进入对应独立详情地址；从详情编辑仍停留详情并按 ID 刷新。详情删除比赛后返回列表；快捷表现记录在详情完成，仍需确认后保存。不改变 FootballMatch/FootballPerformance schema、Identity 或平台授权。
 - **验证**：增加 `football-list-navigation.test.mjs` 及更新足球 UI 测试，覆盖深链、列表/详情隔离、缓存作用域/过期/失败、URL 直接加载、页面切换与赛事引用按需读取。仍位于 HomeMew Draft PR #142，等待 CI 与 Preview 验收后再合并。
+
+## 2026-10-24 · 足球总体数据增加胜率与趋势 Tab 文案
+
+- **总体数据新增「胜率」**：从当前统计筛选范围内、该球员在 `playerPersonIds` 的比赛出发，按比赛 ID 去重；仅比分两侧均为有效非负整数的比赛进入分母，`wins = representativeTeamScore > opponentTeamScore`，平局与失利计入分母但不计胜场。胜率 = 胜场 / 有比分场次。没有有效比分时为 `null`，页面显示“—”，有比分但无胜场显示 0%。卡片附注“有比分 X/Y 场”，提示缺比分覆盖率；不依赖 appearance 出场分钟记录，不按 90 分钟换算，不引入新的 LifeSpace 字段。
+- **趋势 Tab 仅调整名称**：原「进攻场均／进攻时间／防守场均」改为「场均进攻／进攻效率／场均防守」，三种月度趋势的统计指标和时间同批场次规则不变。
+- **发布及验证**：仅 HomeMew Web 层代码，处于 [PR #142](https://github.com/huangshirui/HomeMew/pull/142) Draft，未合并或部署；新增胜、平、负、缺比分、异常比分、人员过滤及重复比赛测试；CI 在最终提交后确认。
