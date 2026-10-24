@@ -334,7 +334,7 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
             aria-label={['activity','goal','habit'].includes(target.modelKey) ? `查看${title}详情` : `前往${model!.title}列表`}
             title={['activity','goal','habit'].includes(target.modelKey) ? '打开详情' : '查看所属列表'}
             className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100"><ArrowUpRight className="size-4" /></a> : null}
-          {outgoingDirection && writable ? <button type="button" aria-label={`取消关联${title || target.recordId}`}
+          {outgoingDirection && writable ? <button type="button" aria-label={`取消关联${title}`}
             disabled={working} onClick={() => void unlink(edge)} className="rounded-lg p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600">
             <Trash2 className="size-4" /></button> : null}
         </div>;
