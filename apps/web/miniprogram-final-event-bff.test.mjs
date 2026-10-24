@@ -84,6 +84,7 @@ test('new LifeSpace Location objects are projected into the stable Mini string E
   });
   const result = await list([source]);
   assert.equal(result.payload.data.items[0].location, '球场');
+  assert.deepEqual(result.payload.data.items[0].locationDetail, source.location);
 });
 
 test('Mini string write converts to canonical Location only after explicit upstream cutover', async () => {
@@ -110,6 +111,36 @@ test('Mini string write converts to canonical Location only after explicit upstr
     assert.deepEqual(body.location, format === 'location' ? { name: '球场' } : '球场');
     assert.equal((await result.json()).data.location, '球场');
   }
+});
+
+test('new Mini selection keeps precise WGS84 value while older Mini still uses a label', async () => {
+  const selection = { name: '奥体中心', address: '北京市朝阳区', coordinates: { latitude: 39.992, longitude: 116.39 } };
+  const calls = [];
+  const env = {
+    LIFESPACE_EVENT_LOCATION_FORMAT: 'location',
+    LIFESPACE_CORE: { fetch: async incoming => {
+      if (new URL(incoming.url).pathname.endsWith('/members')) return response(members);
+      const data = await incoming.clone().json();
+      calls.push(data);
+      return response(common({ ...temporalItems[0], ...data }), 201);
+    } },
+  };
+  const result = await handleMiniProgramFinalEventBff(request('/api/v1/miniprogram/families/spc_family/events', {
+    method: 'POST', body: { summary: '周末活动', location: '奥体中心', locationDetail: selection,
+      isAllDay: true, startDate: '2026-10-25', endDateExclusive: '2026-10-26' },
+  }), env);
+  assert.equal(result.status, 201);
+  assert.deepEqual(calls[0].location, selection);
+  assert.equal(Object.hasOwn(calls[0], 'locationDetail'), false);
+  const projection = (await result.json()).data;
+  assert.equal(projection.location, '奥体中心');
+  assert.deepEqual(projection.locationDetail, selection);
+
+  const mismatch = await handleMiniProgramFinalEventBff(request('/api/v1/miniprogram/families/spc_family/events', {
+    method: 'POST', body: { summary: '错误位置', location: '另一个地点', locationDetail: selection,
+      isAllDay: true, startDate: '2026-10-25', endDateExclusive: '2026-10-26' },
+  }), env);
+  assert.equal(mismatch.status, 422);
 });
 
 test('older Mini title edits preserve rich coordinates when location name is unchanged', async () => {
