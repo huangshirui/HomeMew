@@ -18,13 +18,14 @@ const cacheKey = (spaceId: string, userId: string) =>
 
 /** Ephemeral per-tab UI state only: not a business record, filter authority or permission. */
 export function rememberFootballList(spaceId: string, userId: string, state: FootballListState) {
-  if (!spaceId || !userId || typeof sessionStorage === 'undefined') return;
-  try { sessionStorage.setItem(cacheKey(spaceId,userId), JSON.stringify({...state, savedAt:Date.now()})); }
+  if (!spaceId || !userId) return;
+  try { if (typeof sessionStorage === 'undefined') return; sessionStorage.setItem(cacheKey(spaceId,userId), JSON.stringify({...state, savedAt:Date.now()})); }
   catch { /* Browsing still works with storage disabled. */ }
 }
 export function consumeFootballList(spaceId: string, userId: string): FootballListState | null {
-  if (!spaceId || !userId || typeof sessionStorage === 'undefined') return null;
+  if (!spaceId || !userId) return null;
   try {
+    if (typeof sessionStorage === 'undefined') return null;
     const key=cacheKey(spaceId,userId);
     const raw=sessionStorage.getItem(key);
     sessionStorage.removeItem(key);
