@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, CalendarDays, ChevronDown, ChevronLeft, Clock3, Plus, RefreshCw, Shield, SlidersHorizontal, Trash2, Trophy, X } from 'lucide-react';
+import { BarChart3, CalendarDays, ChevronDown, ChevronLeft, Clock3, Handshake, Plus, RefreshCw, Shield, SlidersHorizontal, Trash2, Trophy, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
@@ -74,7 +74,6 @@ export function FootballPage() {
   const [playerDialog, setPlayerDialog] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerTarget, setNewPlayerTarget] = useState<'match' | 'current'>('current');
-  const [playerSearchOpen, setPlayerSearchOpen] = useState(false);
   const [filters, setFilters] = useState<MatchFilter>(blankFilters);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -114,21 +113,7 @@ export function FootballPage() {
     id: m.personId!, name: m.displayName || '家庭成员',
   })), [members]);
   const visibleMemberIds = useMemo(() => new Set(familyPeople.map(p => p.id)), [familyPeople]);
-  const selectablePeople = useMemo(() => [...new Map([
-    ...familyPeople.map(p => ({ id: p.id, name: p.name })),
-    ...otherPeople.map(p => ({ id: p.id, name: p.displayName })),
-  ].map(p => [p.id, p])).values()], [familyPeople, otherPeople]);
-  const currentName = selectablePeople.find(p => p.id === personId)?.name ?? '选择球员';
-  useEffect(() => {
-    if (!spaceId || !personId || selectablePeople.some(p => p.id === personId)) return;
-    let active = true;
-    apiRequest<FootballPerson>('/api/lifespace/core/v1/spaces/' + encodeURIComponent(spaceId) +
-      '/people/' + encodeURIComponent(personId))
-      .then(person => { if (active) setOtherPeople(prev =>
-        [...new Map([...prev,person].map(p => [p.id,p])).values()]); })
-      .catch(() => { /* Revalidate later; never replace an unavailable Person with a guessed identity. */ });
-    return () => { active = false; };
-  }, [spaceId, personId, selectablePeople]);
+  const currentName = familyPeople.find(p => p.id === personId)?.name ?? '选择球员';
 
   useModalScrollLock(Boolean(matchForm || performanceForm || quickRef || playerDialog));
 
@@ -151,7 +136,7 @@ export function FootballPage() {
     setSelected(null); setPerformances([]); setEventsError(''); setMatches([]); setNextCursor(null);
     setTeams([]); setCompetitions([]); setTeamCursor(null); setCompetitionCursor(null);
     setManagerFocus({team:'',competition:''}); attemptedRefLookup.current.clear();
-    setOtherPeople([]); setPlayerDialog(false); setNewPlayerName(''); setPlayerSearchOpen(false);
+    setOtherPeople([]); setPlayerDialog(false); setNewPlayerName('');
     setMoreOpen(false);
     setMatchForm(null); setPerformanceForm(null); setSuccess(''); setError('');
   }, [spaceId]);
@@ -481,13 +466,9 @@ export function FootballPage() {
       <div className="ml-auto flex min-w-0 items-center gap-2">
         <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm text-stone-600">球员
           <select aria-label="球员" className={input + ' w-28 shrink-0 sm:w-36'} value={personId} onChange={e => selectPerson(e.target.value)}>
-            {selectablePeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {familyPeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
-        <Button variant="ghost" className="shrink-0" onClick={() => setPlayerSearchOpen(v => !v)}>
-          {playerSearchOpen ? '收起球员搜索' : '查找球员'}
-        </Button>
-        {canWrite && <Button variant="ghost" className="shrink-0" onClick={() => startPlayer()}>+ 新建球员</Button>}
         <Button variant="ghost" className="shrink-0" onClick={() => navigate('/football/manage')}>
           <Shield className="size-4"/> <span className="hidden sm:inline">球队与球员</span><span className="sm:hidden">管理</span>
         </Button>
@@ -496,12 +477,6 @@ export function FootballPage() {
         </Button>
       </div>
     </div>}
-    {!managing && playerSearchOpen && spaceId && <Card className="max-w-lg p-3">
-      <FootballPersonPicker spaceId={spaceId} members={members} knownPeople={otherPeople}
-        selected={personId ? [personId] : []} label="选择球员"
-        onChange={ids => {if (ids[0]) selectPerson(ids[0]); setPlayerSearchOpen(false);}}
-        onCreate={canWrite ? name => startPlayer(name) : undefined}/>
-    </Card>}
     {success && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>}
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!managing && schemaError && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -589,17 +564,24 @@ export function FootballPage() {
         <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
           {matches.map(m => <div key={m.id}
             className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-stone-100 px-3 py-3 last:border-b-0 sm:flex-nowrap sm:px-4">
-            <div className="w-28 shrink-0 text-xs text-stone-500">
-              <p className="font-medium text-stone-700">{m.matchDate}</p>
-              <p>{m.matchType === 'official' ? '正式' : '友谊赛'}</p>
+            <div className="flex w-32 shrink-0 items-center gap-2 whitespace-nowrap text-xs text-stone-700">
+              <span className="tabular-nums">{m.matchDate}</span>
+              {m.matchType === 'official'
+                ? <Trophy aria-label="正式比赛" role="img" title="正式比赛" className="size-4 shrink-0 text-amber-600"/>
+                : <Handshake aria-label="友谊赛" role="img" title="友谊赛" className="size-4 shrink-0 text-sky-600"/>}
             </div>
             <div className="min-w-0 flex-[1_1_220px]">
               <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
-                {teamRecords.get(m.representativeTeamId)?.presentation?.icon &&
-                  <RecordIconMark icon={teamRecords.get(m.representativeTeamId)!.presentation!.icon!}
-                    spaceId={spaceId} modelKey="person_group" recordId={m.representativeTeamId}/>}
+                {teamRecords.get(m.representativeTeamId)?.presentation?.icon
+                  ? <RecordIconMark icon={teamRecords.get(m.representativeTeamId)!.presentation!.icon!}
+                      spaceId={spaceId} modelKey="person_group" recordId={m.representativeTeamId} className="shrink-0"/>
+                  : <Shield aria-hidden="true" className="size-4 shrink-0 text-stone-400"/>}
                 <span className="min-w-0 truncate">{teamNames.get(m.representativeTeamId) ?? '代表球队'}</span>
                 <strong className="shrink-0 whitespace-nowrap font-semibold tabular-nums">{m.representativeTeamScore ?? '–'} : {m.opponentTeamScore ?? '–'}</strong>
+                {teamRecords.get(m.opponentTeamId)?.presentation?.icon
+                  ? <RecordIconMark icon={teamRecords.get(m.opponentTeamId)!.presentation!.icon!}
+                      spaceId={spaceId} modelKey="person_group" recordId={m.opponentTeamId} className="shrink-0"/>
+                  : <Shield aria-hidden="true" className="size-4 shrink-0 text-stone-400"/>}
                 <span className="min-w-0 truncate">{teamNames.get(m.opponentTeamId) ?? '对手球队'}</span>
               </div>
               {m.competitionActivityId && <p className="truncate text-xs text-stone-400">{competitionNames.get(m.competitionActivityId) ?? '关联赛事'}</p>}
