@@ -33,3 +33,9 @@ Following user acceptance, Activity, Goal and Habit are full page workspaces wit
 - Page overview metrics are limited to grounded projections of actual linked content/check-in readings. Task completion percentage is not claimed as Goal completion progress, and no fake dashboard or aggregate is materialized. Detail may fetch a bounded first page of semantic edges (50) and uses paging rather than reading the entire family catalog.
 - Code scope stays HomeMew Web only; do not merge or deploy production before user Preview UX acceptance.
 
+
+## 2026-10-24 · 关联内容可读名称与生命周期操作防误触
+
+- **关联显示**：LifeSpace Semantic Relations 查询继续显式请求 `hydrate=target|source`，直接使用服务端按当前授权投影的 `targetRecord` / `sourceRecord` 中 `name`、Event `summary` 等可读字段；这些字段优先于 `targetLabel` / `sourceLabel`（某些模型的 referenceLabel 会回退 `rec_*`），不要把内部 Record ID 当面向家庭用户的内容标题。若目标记录没有可读名称，显式呈现「名称暂不可用」而不是伪造名称。活动、目标、习惯可深链到其具体子页，其余模型仅能进入对应列表（不假装直接打开记录）。继续使用 50 条关系分页；不增加按全家庭目录回查或影子名称缓存。
+- **状态与操作区分**：Goal/Habit 列表和详情使用非交互状态标签展示「进行中／已暂停／已达成／已放弃／已结束」。生命周期变更（暂停、恢复、达成、放弃、结束、重新开始）全部收在「···」操作菜单，经过明确二次确认，必要时以危险色标注，避免误触；原有 LifeSpace Actions、版本校验、授权不变。日常「今天打卡」是频繁、正向的主操作，不藏入菜单，仍仅对习惯所属人可用。记录编辑可以经菜单或活动详情页的独立编辑入口进入。
+- **验证**：在 PR #143 内更新 UX 和回归测试，Preview 需验证关联 Event/DayRecord 标题不显示 ID、可访问对象的清晰链接、状态菜单展开/关闭/确认/取消以及只读权限。无 LifeSpace schema 变更。
