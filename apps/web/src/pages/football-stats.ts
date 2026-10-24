@@ -22,6 +22,9 @@ export type FootballStats = {
   matches: number;
   goals: number;
   assists: number;
+  wins: number;
+  scoredMatches: number;
+  winRate: number | null;
   completeMinutesMatches: number;
   knownMinutes: number;
   months: FootballMonth[];
@@ -65,6 +68,19 @@ export function buildFootballStats(
   for (const match of matches) {
     if (match.playerPersonIds?.includes(playerId) && monthRegex.test(match.matchDate.slice(0, 7)))
       played.set(match.id, match);
+  }
+  // Score completeness is independent of appearance/time completeness.
+  // Include draws and losses in the denominator; omit matches without both scores.
+  let scoredMatches = 0;
+  let wins = 0;
+  for (const match of played.values()) {
+    if (typeof match.representativeTeamScore !== 'number' ||
+        typeof match.opponentTeamScore !== 'number' ||
+        !Number.isInteger(match.representativeTeamScore) ||
+        !Number.isInteger(match.opponentTeamScore) ||
+        match.representativeTeamScore < 0 || match.opponentTeamScore < 0) continue;
+    scoredMatches++;
+    if (match.representativeTeamScore > match.opponentTeamScore) wins++;
   }
   const buckets = new Map<string, FootballMonth>();
   for (const match of played.values()) {
@@ -122,6 +138,9 @@ export function buildFootballStats(
     matches: played.size,
     goals: [...buckets.values()].reduce((sum, b) => sum + b.goals, 0),
     assists: [...buckets.values()].reduce((sum, b) => sum + b.assists, 0),
+    wins,
+    scoredMatches,
+    winRate: scoredMatches ? wins / scoredMatches : null,
     knownMinutes: [...buckets.values()].reduce((sum, b) => sum + b.knownMinutes, 0),
     completeMinutesMatches: timedMatches.size,
     months: complete,
