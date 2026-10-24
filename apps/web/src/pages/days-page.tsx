@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Archive, CalendarClock, Clock3, Plus, RefreshCw, RotateCcw, Sparkles, Trash2, Users, X } from 'lucide-react';
+import { RecordTitleField } from '../components/record-title-field';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
@@ -473,14 +474,10 @@ function DayEditor({ draft, spaceId, editing, members, canWrite, saving, onChang
           <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="mt-5 grid gap-4">
-          <div className="flex items-end gap-3">
-            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly || saving}
-              original={editing?.presentation?.icon} spaceId={spaceId} modelKey="day_record" recordId={editing?.id} />
-            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">名称
-              <input className={inputClass} maxLength={100} disabled={readOnly} value={draft.name}
+          <RecordTitleField label="名称" icon={draft.icon} onIconChange={icon => set('icon', icon)} disabled={readOnly || saving} original={editing?.presentation?.icon} spaceId={spaceId} modelKey="day_record" recordId={editing?.id}>
+            <input className={inputClass} maxLength={100} disabled={readOnly} value={draft.name}
                 onChange={(event) => set('name', event.target.value)} />
-            </label>
-          </div>
+          </RecordTitleField>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(KIND_COPY) as DayKind[]).map((kind) => <button key={kind} type="button" disabled={readOnly || Boolean(editing)} onClick={() => set('kind', kind)} className={`rounded-2xl px-3 py-3 text-left ring-1 ${draft.kind === kind ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : 'bg-white text-stone-600 ring-stone-200'}`}><span className="block text-sm font-medium">{KIND_COPY[kind].label}</span><span className="mt-1 block text-[10px] leading-4 opacity-70">{KIND_COPY[kind].hint}</span></button>)}
           </div>
