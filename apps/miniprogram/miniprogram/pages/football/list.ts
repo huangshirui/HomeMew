@@ -1,6 +1,6 @@
 import { currentFamilyStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
-import { listDomainPeople,listDomainRecords,type PersonOption,type DomainRecord } from '../../services/domains';
+import { listDomainPeople,getDomainRecord,type PersonOption,type DomainRecord } from '../../services/domains';
 import { listMatches,listTeams,getTeam,type Match } from '../../services/football';
 
 type MatchRow=Match&{representativeName:string;opponentName:string;competitionName:string;score:string;dateText:string};
@@ -54,7 +54,7 @@ Page({
           try{
             const type=page.items.some(m=>m.competitionActivityId===id)?'activities':'football-teams';
             const model=await (type==='activities'
-              ? listDomainRecords(familyId,'activities',{q:'',limit:1}).then(()=>null) : getTeam(familyId,id));
+              ? getDomainRecord(familyId,'activities',id) : getTeam(familyId,id));
             if(model?.name)names[id]=model.name;
           }catch{}
         }));
@@ -93,6 +93,7 @@ Page({
   },
   onApply():void{this.setData({appliedSearch:this.data.search.trim()});void this.load(true);},
   onReset():void{this.setData({year:'',matchType:'',matchTypeIndex:0,search:'',appliedSearch:'',personIndex:0});void this.load(true);},
+  onCreate():void{if(this.data.mode==='record')this.onCreateMatch();else this.onCreateTeam();},
   onCreateMatch():void{wx.navigateTo({url:'/pages/football/edit?kind=match&familyId='+this.data.familyId});},
   onCreateTeam():void{wx.navigateTo({url:'/pages/football/edit?kind=team&familyId='+this.data.familyId});},
   onRecord(e:WechatMiniprogram.TouchEvent):void{
