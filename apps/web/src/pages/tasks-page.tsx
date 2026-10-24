@@ -31,7 +31,7 @@ type TaskRecord = {
   updatedAt: string;
 };
 
-type TaskDraft = { name: string; description: string; dueDate: string; assigneePersonIds: string[]; icon: RecordIconDraft };
+export type TaskDraft = { name: string; description: string; dueDate: string; assigneePersonIds: string[]; icon: RecordIconDraft };
 type Tab = 'pending' | 'completed';
 type DueFilter = 'all' | 'overdue' | 'today' | 'next7' | 'none';
 
@@ -64,7 +64,7 @@ function draftFromTask(task: TaskRecord): TaskDraft {
   };
 }
 
-function taskPayload(draft: TaskDraft) {
+export function taskPayload(draft: TaskDraft) {
   const name = draft.name.trim();
   if (!name) throw new Error('请输入待办名称');
   return {
@@ -475,7 +475,7 @@ function TaskRow({
   );
 }
 
-function TaskEditor({
+export function TaskEditor({
   draft,
   spaceId,
   editing,
