@@ -675,7 +675,7 @@ export function FootballPage() {
                 <span className="min-w-0 truncate">{teamNames.get(m.opponentTeamId) ?? '对手球队'}</span>
               </div>
               {m.competitionActivityId && <span
-                className="inline-flex max-w-44 min-w-0 shrink-0 items-center truncate rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-normal text-stone-600"
+                className="block max-w-44 min-w-0 shrink-0 truncate rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-normal text-stone-600"
                 title={competitionNames.get(m.competitionActivityId) ??
                   (unavailableCompetitionIds.has(m.competitionActivityId) ? '赛事暂不可查看，可点击刷新重试' : '正在加载赛事…')}>
                 {competitionNames.get(m.competitionActivityId) ??
