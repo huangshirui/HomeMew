@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  ChevronLeft,
   CalendarRange,
   Target,
   Flame,
@@ -16,9 +17,10 @@ import {
   Settings,
   Users,
 } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { cn } from '../lib/cn';
-import { useHousehold } from './household-provider';
+import { useHousehold, type FamilyMember } from './household-provider';
 
 const dailyNavigation = [
   { to: '/', label: '今天', icon: Home, end: true },
@@ -51,12 +53,13 @@ const mobileNavigation = [
   { to: '/more', label: '更多', icon: Ellipsis },
 ];
 
-function Avatar({ src, alt, fallback, className }: { src: string | null | undefined; alt: string; fallback: string; className?: string }) {
+export function Avatar({ src, alt, fallback, className }: { src: string | null | undefined; alt: string; fallback: string; className?: string }) {
   return (
     <span className={cn('relative grid shrink-0 place-items-center overflow-hidden rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800', className)}>
       <span aria-hidden="true">{(fallback || '家').slice(0, 1)}</span>
       {src ? (
         <img
+          key={src}
           src={src}
           alt={alt}
           className="absolute inset-0 size-full object-cover"
@@ -67,43 +70,118 @@ function Avatar({ src, alt, fallback, className }: { src: string | null | undefi
   );
 }
 
-function FamilyIdentity({ mobile = false }: { mobile?: boolean }) {
+// Reuse the stable, same-origin media route also consumed by the Mini Program.
+// These public avatar assets never expose LifeSpace bearer tokens in the browser.
+const familyAvatarSource = (id: string, available: string | null | undefined) =>
+  available ? `/api/v1/miniprogram/media/families/${encodeURIComponent(id)}/avatar` : null;
+
+export function MemberAvatar({ member, className }: { member: FamilyMember; className?: string }) {
+  return <Avatar
+    src={member.userId ? `/api/v1/miniprogram/media/users/${encodeURIComponent(member.userId)}/avatar` : null}
+    alt={`${member.displayName || '家庭成员'}的头像`}
+    fallback={member.displayName || '成'}
+    className={className}
+  />;
+}
+
+function MobileFamilyIdentity() {
+  const { families, currentFamily, members, setCurrentFamilyId } = useHousehold();
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={root} className="relative min-w-0 max-w-28">
+      <button type="button" aria-label={`当前家庭：${currentFamily?.name || '暂无家庭'}，查看家庭与成员`}
+        title={currentFamily?.name || '暂无家庭'}
+        aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(value => !value)}
+        className="flex h-10 w-full min-w-0 items-center gap-1.5 rounded-xl px-0.5 text-left outline-none transition hover:bg-stone-100 focus-visible:ring-2 focus-visible:ring-emerald-500">
+        <Avatar src={currentFamily ? familyAvatarSource(currentFamily.id, currentFamily.avatarUrl) : null}
+          alt={currentFamily ? `${currentFamily.name}家庭Logo` : '家庭Logo'}
+          fallback={currentFamily?.name || '家'}
+          className="size-7 shrink-0 rounded-lg bg-amber-100 text-[11px] text-amber-800" />
+        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-stone-800">{currentFamily?.name || '暂无家庭'}</span>
+        <ChevronDown aria-hidden="true" className="size-3 shrink-0 text-stone-500" />
+      </button>
+      {open ? (
+        <div id={panelId} className="absolute left-0 top-[calc(100%+0.375rem)] z-50 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-stone-200 bg-white p-3 shadow-xl" aria-label="家庭切换与成员">
+          <p className="mb-2 text-xs font-semibold text-stone-500">选择家庭</p>
+          <div className="space-y-1">
+            {families.map(family => (
+              <button key={family.id} type="button"
+                aria-current={family.id === currentFamily?.id ? 'true' : undefined}
+                onClick={() => { setCurrentFamilyId(family.id); setOpen(false); }}
+                className={cn('flex min-h-11 w-full items-center gap-2 rounded-xl px-2 text-left text-sm hover:bg-stone-50',
+                  family.id === currentFamily?.id && 'bg-emerald-50 text-emerald-800')}>
+                <Avatar src={familyAvatarSource(family.id, family.avatarUrl)}
+                  alt={`${family.name}家庭Logo`} fallback={family.name}
+                  className="size-8 shrink-0 rounded-lg bg-amber-100 text-xs text-amber-800" />
+                <span className="min-w-0 flex-1 truncate font-medium">{family.name}</span>
+                {family.id === currentFamily?.id ? <span className="text-xs text-emerald-700">当前</span> : null}
+              </button>
+            ))}
+            {!families.length ? <p className="p-2 text-sm text-stone-500">暂无家庭</p> : null}
+          </div>
+          {currentFamily ? (
+            <div className="mt-3 border-t border-stone-100 pt-3">
+              <p className="mb-2 text-xs font-semibold text-stone-500">家庭成员 · {members.length} 人</p>
+              <div className="flex items-center gap-1.5" aria-label="家庭成员头像">
+                {members.slice(0, 5).map(member => <MemberAvatar key={member.id} member={member} className="size-8 ring-2 ring-white" />)}
+                {members.length > 5 ? <span className="grid size-8 place-items-center rounded-full bg-stone-100 text-[10px] text-stone-600">+{members.length - 5}</span> : null}
+                {!members.length ? <span className="text-xs text-stone-400">暂无成员信息</span> : null}
+              </div>
+            </div>
+          ) : null}
+          <Link to="/family" onClick={() => setOpen(false)}
+            className="mt-3 flex min-h-10 items-center justify-center rounded-xl bg-stone-50 text-xs font-medium text-stone-700 hover:bg-stone-100">
+            家庭与成员
+          </Link>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function FamilyIdentity({ mobile = false }: { mobile?: boolean }) {
   const { families, currentFamily, members, setCurrentFamilyId } = useHousehold();
   const canSwitch = families.length > 1;
+  if (mobile) return <MobileFamilyIdentity />;
 
   return (
     <div className={cn(
       'group relative flex min-w-0 items-center gap-3 rounded-xl px-2 py-2 transition-colors',
       canSwitch && 'cursor-pointer hover:bg-stone-100/80 focus-within:bg-stone-100/80 focus-within:ring-2 focus-within:ring-emerald-500/40',
-      mobile && 'gap-2.5 px-0 py-1 hover:bg-transparent focus-within:bg-transparent',
     )}>
-      <Avatar
-        src={currentFamily?.avatarUrl}
-        alt={currentFamily ? `${currentFamily.name}家庭头像` : '家庭头像'}
-        fallback={currentFamily?.name || '家'}
-        className={cn('size-10 rounded-2xl bg-amber-100 text-amber-800', mobile && 'size-9')}
-      />
+      <Avatar src={currentFamily?.avatarUrl} alt={currentFamily ? `${currentFamily.name}家庭头像` : '家庭头像'}
+        fallback={currentFamily?.name || '家'} className="size-10 rounded-2xl bg-amber-100 text-amber-800" />
       <div className="min-w-0 flex-1">
-        <p className={cn('truncate font-semibold tracking-tight text-stone-900', mobile ? 'text-sm' : 'text-base')}>
-          {currentFamily?.name || '暂无家庭'}
-        </p>
+        <p className="truncate text-base font-semibold tracking-tight text-stone-900">{currentFamily?.name || '暂无家庭'}</p>
         <p className="mt-0.5 truncate text-xs text-stone-400">
           {currentFamily ? (members.length ? `${members.length} 位成员` : '正在加载成员…') : '请先创建或加入家庭'}
         </p>
       </div>
       {canSwitch ? (
         <>
-          <ChevronDown aria-hidden="true" className={cn(
-            'size-4 shrink-0 text-stone-500 transition-opacity',
-            mobile ? 'opacity-75' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
-          )} />
-          <select
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            value={currentFamily?.id || ''}
-            onChange={(event) => setCurrentFamilyId(event.target.value)}
-            aria-label={mobile ? '移动端切换家庭' : '切换家庭'}
-            title="切换家庭"
-          >
+          <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-stone-500 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
+          <select className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            value={currentFamily?.id || ''} onChange={(event) => setCurrentFamilyId(event.target.value)}
+            aria-label={mobile ? '移动端切换家庭' : '切换家庭'} title="切换家庭">
             {families.map((family) => <option key={family.id} value={family.id}>{family.name}</option>)}
           </select>
         </>
@@ -164,18 +242,18 @@ function DesktopNav() {
 
 function MobileBottomNav() {
   return (
-    <nav className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-4 rounded-[24px] bg-stone-950/95 p-1.5 shadow-2xl backdrop-blur lg:hidden">
+    <nav aria-label="移动端主导航" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-stone-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_12px_rgba(28,25,23,0.04)] lg:hidden">
       {mobileNavigation.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}
           end={end}
           className={({ isActive }) => cn(
-            'flex min-h-12 flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] font-medium transition-colors',
-            isActive ? 'bg-white text-stone-900' : 'text-stone-400 hover:text-white',
+            'flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600',
+            isActive ? 'bg-emerald-50/70 text-emerald-800' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-800',
           )}
         >
-          <Icon className="size-[18px]" />
+          <Icon aria-hidden="true" className="size-5" />
           {label}
         </NavLink>
       ))}
@@ -209,28 +287,40 @@ function HouseholdErrorBanner() {
 }
 
 export function AppShell() {
-  const { user, currentFamily } = useHousehold();
+  const { currentFamily } = useHousehold();
+  const { pathname } = useLocation();
+  const segments = pathname.split('/').filter(Boolean);
+  const containerDetail = segments.length === 2 && ['activities', 'goals', 'habits'].includes(segments[0]);
+  const nestedPage = containerDetail
+    || (segments.length === 2 && segments[0] === 'football')
+    || (segments.length === 3 && segments[0] === 'settings' && segments[1] === 'integrations');
+  const parentPath = `/${segments[0]}`;
+  const detailTitles: Record<string, string> = { activities: '活动详情', goals: '目标详情', habits: '习惯详情' };
+
   return (
     <div className="min-h-screen bg-[#f6f8f4] text-stone-900">
       <DesktopNav />
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 border-b border-stone-200/70 bg-[#f6f8f4]/90 backdrop-blur-xl lg:hidden">
-          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-            <div className="min-w-0 flex-1"><FamilyIdentity mobile /></div>
-            <Avatar
-              src={user?.avatarUrl}
-              alt={user?.displayName ? `${user.displayName}的头像` : '我的头像'}
-              fallback={user?.displayName || '我'}
-              className="ml-3 size-9 ring-2 ring-white"
-            />
-          </div>
-        </header>
+        {containerDetail ? (
+          <header className="sticky top-0 z-20 border-b border-stone-200/70 bg-[#f6f8f4]/95 backdrop-blur-xl lg:hidden">
+            <div className="mx-auto grid h-12 max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 px-4 sm:px-6">
+              <Link to={parentPath} aria-label="返回列表" className="flex min-h-11 items-center gap-1 text-sm font-medium text-stone-700">
+                <ChevronLeft aria-hidden="true" className="size-4" /> 返回
+              </Link>
+              <h1 className="truncate text-center text-[20px] font-semibold tracking-tight text-stone-950">{detailTitles[segments[0]]}</h1>
+              <span aria-hidden="true" />
+            </div>
+          </header>
+        ) : null}
         <HouseholdErrorBanner />
-        <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8">
+        <main className={cn(
+          'mx-auto max-w-7xl px-4 pt-3 sm:px-6 sm:pt-5 lg:px-8 lg:pb-10 lg:pt-8',
+          nestedPage ? 'pb-8' : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]',
+        )}>
           <Outlet key={currentFamily?.id ?? 'no-family'} />
         </main>
       </div>
-      <MobileBottomNav />
+      {!nestedPage ? <MobileBottomNav /> : null}
     </div>
   );
 }

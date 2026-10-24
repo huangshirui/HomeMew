@@ -55,11 +55,12 @@ test('mobile calendar offers spacious date selection and a per-day agenda', () =
 
 test('main household pages share a compact icon-free header', () => {
   const header = source('./src/components/ui/page-header.tsx');
-  assert.match(header, /<header className="flex flex-wrap items-center justify-between gap-3"/u);
-  assert.match(header, /sm:text-3xl/u);
+  assert.ok(header.includes('grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]'));
+  assert.match(header, /<FamilyIdentity mobile \/>/u);
+  assert.match(header, /text-3xl font-semibold/u);
   for (const name of ['calendar', 'tasks', 'days', 'wishes', 'family', 'integrations', 'settings', 'more']) {
     const page = source(`./src/pages/${name}-page.tsx`);
     assert.match(page, /<PageHeader/u, `${name} should use shared compact heading`);
   }
-  assert.match(source('./src/pages/integration-detail-page.tsx'), /<PageHeader title=\{system\.displayName\}>/u);
+  assert.match(source('./src/pages/integration-detail-page.tsx'), /<PageHeader title=\{system\.displayName\} mobileBackTo=/u);
 });

@@ -117,7 +117,10 @@ export function IntegrationsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <PageHeader title="外部系统">{manager ? <Button variant="primary" onClick={() => setShowCreate((value) => !value)}><Plus className="size-4" /> 新建外部系统</Button> : null}</PageHeader>
+      <PageHeader title="外部系统" mobileActions={manager ? <Button variant="primary" size="icon" className="size-10"
+        aria-label="新建外部系统" title="新建外部系统" onClick={() => setShowCreate((value) => !value)}>
+        <Plus className="size-4" />
+      </Button> : null}>{manager ? <Button variant="primary" onClick={() => setShowCreate((value) => !value)}><Plus className="size-4" /> 新建外部系统</Button> : null}</PageHeader>
 
       {!manager && (
         <Card className="p-6">

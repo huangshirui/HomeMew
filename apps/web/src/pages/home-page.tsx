@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight, CalendarDays, Check, CheckSquare2, Clock3, RefreshCw, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/ui/page-header';
 import { useHousehold } from '../components/household-provider';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
@@ -95,9 +96,19 @@ export function HomePage() {
   const memberName = (personId: string) => members.find((member) => member.personId === personId)?.displayName;
 
   return <div className="space-y-6">
-    <section className="flex items-start justify-between gap-3">
-      <div><p className="mb-1 text-xs font-medium text-stone-400">{dateLabel}</p><h1 className="text-2xl font-semibold tracking-tight text-stone-950 sm:text-3xl">{greeting}{user?.displayName ? `，${user.displayName}` : ''}。</h1></div>
-      <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefresh((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
+    <div className="lg:hidden">
+      <PageHeader title="首页" mobileActions={<Button variant="ghost" size="icon" className="size-10"
+        aria-label="刷新首页" title="刷新首页" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>
+        <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+      </Button>} />
+    </div>
+    <section className="flex min-w-0 items-start justify-between gap-2">
+      <div className="min-w-0"><p className="mb-1 text-xs font-medium text-stone-400">{dateLabel}</p><h2 className="truncate text-xl font-semibold tracking-tight text-stone-950 sm:text-3xl">{greeting}{user?.displayName ? `，${user.displayName}` : ''}。</h2></div>
+      <div className="hidden lg:block">
+        <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>
+          <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
     </section>
     {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
 

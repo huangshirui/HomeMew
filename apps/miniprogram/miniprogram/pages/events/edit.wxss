@@ -1,4 +1,10 @@
 /* 日程创建/编辑页样式 */
+.place-candidates { border-top: 2rpx solid var(--color-divider); }
+.place-candidate { display:flex;flex-direction:column;padding:16rpx 4rpx;border-bottom:2rpx solid var(--color-divider); }
+.place-name { color:var(--color-text-primary);font-size:28rpx; }
+.place-address,.place-hint { color:var(--color-text-hint);font-size:24rpx;line-height:1.5; }
+.place-hint { display:block;padding:12rpx 4rpx; }
+
 
 /* 编辑页使用底部固定保存栏，无需为悬浮按钮预留底部留白 */
 .container {
