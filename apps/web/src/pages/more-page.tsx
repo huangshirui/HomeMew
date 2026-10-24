@@ -1,6 +1,7 @@
 import { CalendarRange, Clock3, Flame, Gift, Heart, Settings, Target, Trophy, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/ui/page-header';
+import { Avatar } from '../components/app-shell';
 import { useHousehold } from '../components/household-provider';
 
 const groups = [
@@ -33,10 +34,17 @@ const groups = [
 const roleLabels = { owner: '家庭所有者', admin: '管理员', editor: '成员', viewer: '只读成员' } as const;
 
 export function MorePage() {
-  const { currentFamily } = useHousehold();
+  const { currentFamily, user } = useHousehold();
   return (
     <div className="space-y-6">
       <PageHeader title="更多" />
+      <div className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 lg:hidden" aria-label="当前账号">
+        <Avatar src={user?.avatarUrl} alt="我的头像" fallback={user?.displayName || '我'} className="size-10 ring-2 ring-white" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-stone-900">{user?.displayName || '我的账号'}</p>
+          <p className="text-xs text-stone-500">个人账号</p>
+        </div>
+      </div>
       {groups.map(group => (
         <section key={group.title} aria-label={group.title} className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

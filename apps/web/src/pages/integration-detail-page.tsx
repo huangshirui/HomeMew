@@ -125,7 +125,11 @@ export function IntegrationDetailPage() {
         <Card className="p-8 text-center text-sm text-stone-500">找不到这个外部系统，或者它已经不属于当前家庭。</Card>
       ) : (
         <>
-          <PageHeader title={system.displayName}>
+          <PageHeader title={system.displayName} mobileBackTo="/settings/integrations"
+            mobileActions={!editing ? <Button size="icon" className="size-10"
+              aria-label="编辑基本信息" title="编辑基本信息" onClick={() => setEditing(true)}>
+              <Pencil className="size-4" />
+            </Button> : null}>
             {!editing ? <Button onClick={() => setEditing(true)}><Pencil className="size-4" /> 编辑基本信息</Button> : null}
           </PageHeader>
           <Card>

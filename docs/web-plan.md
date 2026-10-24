@@ -31,13 +31,13 @@ External-system administration is Web-only per `docs/decisions/2026-08-24-extern
 
 Desktop uses a persistent sidebar and keeps all primary household areas visible.
 
-Mobile deliberately keeps the bottom bar to five high-frequency entries rather than mirroring the desktop sidebar:
+Mobile uses four docked, full-width tabs instead of mirroring the desktop sidebar:
 
 ```text
-今天 / 日程 / 待办 / 日子 / 更多
+首页 / 日程 / 待办 / 更多
 ```
 
-`更多` contains the lower-frequency `许愿池 / 家庭与成员 / 设置` entry points. This keeps Wishes reachable without overcrowding the mobile bottom navigation and keeps Family/Settings out of the high-frequency task path.
+`更多` hosts the grouped lower-frequency Plan/Growth, Life/Memory, and Family Management entries. The global family selector is integrated into the mobile page heading; the account avatar lives in More. Calendar uses compact mobile controls and nested detail routes hide the bottom tabs. See `docs/decisions/2026-10-24-web-mobile-compact-navigation.md` and the newer navigation-group decision for the authoritative hierarchy.
 
 ## 4. UX requirements
 
