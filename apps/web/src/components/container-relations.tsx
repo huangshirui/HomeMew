@@ -3,6 +3,8 @@ import { ArrowUpRight, CalendarClock, CalendarDays, CheckSquare, Link2, Pencil, 
 import { Button } from '../components/ui/button';
 import { useHousehold } from './household-provider';
 import { eventPayload, defaultDraft, EventEditor, type EventDraft } from '../pages/calendar-page';
+import { taskPayload, TaskEditor, type TaskDraft } from '../pages/tasks-page';
+import { emptyIconDraft } from './record-icon';
 import { presentationToSave } from './record-icon';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
@@ -55,6 +57,7 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
   const { members } = useHousehold();
   const [tab, setTab] = useState<'overview' | 'events' | 'tasks' | 'more'>('overview');
   const [eventDraft, setEventDraft] = useState<EventDraft | null>(null);
+  const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [outgoing, setOutgoing] = useState<Relation[]>([]);
   const [incoming, setIncoming] = useState<Relation[]>([]);
   const [outCursor, setOutCursor] = useState<string | null>(null);
@@ -249,9 +252,37 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
     finally { setWorking(false); }
   }
 
+  async function addFullTask(event: FormEvent) {
+    event.preventDefault();
+    if (!writable || !taskDraft || working) return;
+    setWorking(true); setError('');
+    try {
+      const payload = { ...taskPayload(taskDraft), ...await presentationToSave(spaceId, 'task', taskDraft.icon) };
+      await apiRequest(`${core(spaceId)}/models/batch`, {
+        method: 'POST', body: JSON.stringify({
+          atomicConsistency: true,
+          operations: [
+            { operation: 'create', modelKey: 'task', clientRef: 'task', data: payload },
+            { operation: 'relation_create', predicate: 'relates_to', source: ref(modelKey, record.id),
+              target: { kind: 'record', modelKey: 'task', clientRef: 'task' } },
+          ],
+        }),
+      });
+      setTaskDraft(null);
+      await refreshRelations();
+    } catch (cause) { setError(explain(cause)); }
+    finally { setWorking(false); }
+  }
+
   function startTask() {
-    setTaskName(''); setTaskDueDate('');
-    setTaskOpen(true); setPickerOpen(false); setCountdownOpen(false);
+    if (mode === 'page') {
+      setTaskDraft({ name: '', description: '', dueDate: '',
+        assigneePersonIds: [], icon: emptyIconDraft() });
+      setTaskOpen(false);
+    } else {
+      setTaskName(''); setTaskDueDate(''); setTaskOpen(true);
+    }
+    setPickerOpen(false); setCountdownOpen(false);
   }
 
   function startCountdown() {
@@ -411,6 +442,10 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
       </form> : null}
     </div>
   </div>
+  {taskDraft ? <TaskEditor draft={taskDraft} spaceId={spaceId} editing={null}
+    members={members.filter(member => member.personId)} canWrite={writable} saving={working}
+    onChange={setTaskDraft} onClose={() => { if (!working) setTaskDraft(null); }}
+    onSave={event => void addFullTask(event)} /> : null}
   {eventDraft ? <EventEditor draft={eventDraft} spaceId={spaceId} editing={null}
     members={members.filter(member => member.personId)} canWrite={writable} saving={working}
     onChange={setEventDraft} onClose={() => { if (!working) setEventDraft(null); }}
