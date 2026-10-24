@@ -52,7 +52,7 @@ const mobileNavigation = [
   { to: '/more', label: '更多', icon: Ellipsis },
 ];
 
-function Avatar({ src, alt, fallback, className }: { src: string | null | undefined; alt: string; fallback: string; className?: string }) {
+export function Avatar({ src, alt, fallback, className }: { src: string | null | undefined; alt: string; fallback: string; className?: string }) {
   return (
     <span className={cn('relative grid shrink-0 place-items-center overflow-hidden rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800', className)}>
       <span aria-hidden="true">{(fallback || '家').slice(0, 1)}</span>
