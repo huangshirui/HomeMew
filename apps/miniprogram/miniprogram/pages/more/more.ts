@@ -34,7 +34,7 @@ Page({
     const family=currentFamilyStore.value,role=family?.role||'';
     this.setData({userName:userStore.value?.displayName||'我的资料',familyName:family?.name||'尚未加入家庭',
       familyCount:familiesStore.value.length,
-      familyRole:role==='owner'?'创建者':role==='admin'?'管理员':role==='viewer'?'只读成员':'家庭成员'});
+      familyRole:(role as string)==='owner'?'创建者':role==='admin'?'管理员':(role as string)==='viewer'?'只读成员':'家庭成员'});
   },
   onNav(e:WechatMiniprogram.TouchEvent):void{
     const path=String(e.currentTarget.dataset.path||'');
