@@ -213,11 +213,12 @@ function HouseholdErrorBanner() {
 export function AppShell() {
   const { currentFamily } = useHousehold();
   const { pathname } = useLocation();
-  const containerDetail = /^\\/(activities|goals|habits)\\/[^/]+\\/?$/.test(pathname);
+  const segments = pathname.split('/').filter(Boolean);
+  const containerDetail = segments.length === 2 && ['activities', 'goals', 'habits'].includes(segments[0]);
   const nestedPage = containerDetail
-    || /^\\/football\\/[^/]+\\/?$/.test(pathname)
-    || /^\\/settings\\/integrations\\/[^/]+\\/?$/.test(pathname);
-  const parentPath = `/${pathname.split('/')[1]}`;
+    || (segments.length === 2 && segments[0] === 'football')
+    || (segments.length === 3 && segments[0] === 'settings' && segments[1] === 'integrations');
+  const parentPath = `/${segments[0]}`;
 
   return (
     <div className="min-h-screen bg-[#f6f8f4] text-stone-900">
