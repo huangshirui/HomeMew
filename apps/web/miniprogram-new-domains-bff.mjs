@@ -4,6 +4,7 @@
  * All domain truth, versions, actions and policy checks stay in LifeSpace.
  */
 import { errorResponse, forwardLifeSpace } from './miniprogram-upstream.mjs';
+import { eventLocationToLifeSpace } from './event-location-compat.mjs';
 
 const PREFIX = '/api/v1/miniprogram/families';
 const ID = /^spc_[a-zA-Z0-9_-]+$/u;
@@ -174,7 +175,7 @@ async function quickCreate(request,env,route,url) {
         assigneePersonIds:people,...(d.presentation?{presentation:d.presentation}:{})};
     } else {
       if (Object.keys(d).some(key=>!['summary','description','location','attendeeIds','presentation',
-          'isAllDay','startDate','endDateExclusive','startAt','endAt','startTimezone','endTimezone'].includes(key)) ||
+          'isAllDay','startDate','endDateExclusive','startAt','endAt','startTimezone','endTimezone','locationDetail'].includes(key)) ||
         typeof d.summary !== 'string' || !d.summary.trim()) return bad();
       const people=toPeople(d.attendeeIds??[]);
       if (!people) return bad('日程参与人不在家庭中');
@@ -185,7 +186,21 @@ async function quickCreate(request,env,route,url) {
         && Number.isFinite(Date.parse(d.startAt)) && Date.parse(d.endAt)>Date.parse(d.startAt))
         when={kind:'instant',start:new Date(d.startAt).toISOString(),endExclusive:new Date(d.endAt).toISOString()};
       if (!when) return bad('日程日期范围无效');
-      model='event';data={summary:d.summary.trim(),description:d.description??null,location:d.location??null,
+      // Mini Event keeps its legacy string label. The optional locationDetail is
+      // a deliberate WGS84 selection; never infer coordinates from free text.
+      if (d.location != null && typeof d.location !== 'string') return bad('日程地点名称无效');
+      let selectedLocation = d.location ?? null;
+      if (Object.hasOwn(d, 'locationDetail') && d.locationDetail !== null) {
+        const detail = d.locationDetail;
+        if (!detail || typeof detail !== 'object' || Array.isArray(detail) ||
+          typeof detail.name !== 'string' ||
+          detail.name.trim() !== d.location?.trim()) return bad('所选地点与名称不一致');
+        selectedLocation = detail;
+      }
+      let location;
+      try { location = eventLocationToLifeSpace(selectedLocation, env); }
+      catch { return errorResponse(422, 'VALIDATION_ERROR', '日程地点不符合当前 LifeSpace Location 版本'); }
+      model='event';data={summary:d.summary.trim(),description:d.description??null,location,
         attendeePersonIds:people,when,...(d.presentation?{presentation:d.presentation}:{})};
     }
   }
