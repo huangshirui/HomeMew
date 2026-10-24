@@ -144,6 +144,13 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [statusFilter, setStatusFilter] = useState<Status>('active');
+  const [activityFilterOpen, setActivityFilterOpen] = useState(false);
+  const [activitySearchInput, setActivitySearchInput] = useState('');
+  const [activitySearch, setActivitySearch] = useState('');
+  const [activityPerson, setActivityPerson] = useState('');
+  const [activityPeriod, setActivityPeriod] = useState<ActivityPeriod>('all');
+  const [activityCursor, setActivityCursor] = useState<string | null>(null);
+  const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const [editing, setEditing] = useState<DomainRecord | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
@@ -160,22 +167,46 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const spec = settings[modelKey];
   const Icon = spec.icon;
   const visible = records; // Goal/Habit status filtering is performed by the indexed LifeSpace query.
+  const activityFiltersActive = Boolean(activitySearchInput.trim() || activityPerson || activityPeriod !== 'all');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setActivitySearch(activitySearchInput.trim()), 320);
+    return () => window.clearTimeout(timer);
+  }, [activitySearchInput]);
 
   const reload = useCallback(async () => {
     const generation = ++requestGeneration.current;
     if (!currentFamily) { setRecords([]); return; }
-    setLoading(true); setRecords([]); setError('');
+    setLoading(true); setRecords([]); setActivityCursor(null); setError('');
     try {
-      const next = await loadRecords(currentFamily.id, modelKey, statusFilter);
-      if (generation === requestGeneration.current) setRecords(next);
+      if (modelKey === 'activity') {
+        const result = await queryModelRecords<DomainRecord>(currentFamily.id, 'activity', activityQuery(activitySearch, activityPerson, activityPeriod, currentFamily.timezone, null));
+        if (generation === requestGeneration.current) { setRecords(result.items); setActivityCursor(result.nextCursor); }
+      } else {
+        const next = await loadRecords(currentFamily.id, modelKey, statusFilter);
+        if (generation === requestGeneration.current) setRecords(next);
+      }
     } catch (cause) {
       if (generation === requestGeneration.current) { setRecords([]); setError(message(cause)); }
     } finally {
       if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [currentFamily?.id, modelKey, statusFilter]);
+  }, [currentFamily?.id, currentFamily?.timezone, modelKey, statusFilter, activitySearch, activityPerson, activityPeriod]);
+  const moreActivities = useCallback(async () => {
+    if (!currentFamily || modelKey !== 'activity' || !activityCursor || loading || activityLoadingMore) return;
+    const generation = requestGeneration.current;
+    const cursor = activityCursor;
+    setActivityLoadingMore(true); setError('');
+    try {
+      const next: CanonicalQueryPage<DomainRecord> = await queryModelRecords<DomainRecord>(currentFamily.id, 'activity', activityQuery(activitySearch, activityPerson, activityPeriod, currentFamily.timezone, cursor));
+      if (generation === requestGeneration.current) {
+        setRecords(previous => [...previous, ...next.items.filter(item => !previous.some(existing => existing.id === item.id))]);
+        setActivityCursor(next.nextCursor);
+      }
+    } catch (cause) { if (generation === requestGeneration.current) setError(message(cause)); }
+    finally { setActivityLoadingMore(false); }
+  }, [currentFamily?.id, currentFamily?.timezone, modelKey, activityCursor, loading, activityLoadingMore, activitySearch, activityPerson, activityPeriod]);
   useEffect(() => { void refresh; void reload(); return () => { requestGeneration.current += 1; }; }, [reload, refresh]);
-  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setContainerFor(null); setStatusFilter('active'); }, [currentFamily?.id, modelKey]);
+  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setContainerFor(null); setStatusFilter('active'); setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('all'); setActivityFilterOpen(false); }, [currentFamily?.id, modelKey]);
 
   function newRecord() {
     const next = blank();
