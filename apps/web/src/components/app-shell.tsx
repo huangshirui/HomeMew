@@ -295,6 +295,7 @@ export function AppShell() {
     || (segments.length === 2 && segments[0] === 'football')
     || (segments.length === 3 && segments[0] === 'settings' && segments[1] === 'integrations');
   const parentPath = `/${segments[0]}`;
+  const detailTitles: Record<string, string> = { activities: '活动详情', goals: '目标详情', habits: '习惯详情' };
 
   return (
     <div className="min-h-screen bg-[#f6f8f4] text-stone-900">
@@ -302,11 +303,12 @@ export function AppShell() {
       <div className="lg:pl-64">
         {containerDetail ? (
           <header className="sticky top-0 z-20 border-b border-stone-200/70 bg-[#f6f8f4]/95 backdrop-blur-xl lg:hidden">
-            <div className="mx-auto flex h-12 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6">
-              <Link to={parentPath} className="flex min-h-11 items-center gap-1 text-sm font-medium text-stone-700">
+            <div className="mx-auto grid h-12 max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 px-4 sm:px-6">
+              <Link to={parentPath} aria-label="返回列表" className="flex min-h-11 items-center gap-1 text-sm font-medium text-stone-700">
                 <ChevronLeft aria-hidden="true" className="size-4" /> 返回
               </Link>
-              <div className="w-28"><FamilyIdentity mobile /></div>
+              <h1 className="truncate text-center text-[20px] font-semibold tracking-tight text-stone-950">{detailTitles[segments[0]]}</h1>
+              <span aria-hidden="true" />
             </div>
           </header>
         ) : null}
