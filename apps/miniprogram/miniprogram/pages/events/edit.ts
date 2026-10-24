@@ -48,6 +48,7 @@ import { markDirty } from '../../stores/dirty';
 import { consumeCloneSource } from '../../stores/clone-buffer';
 import { downloadRecordIconImage } from '../../services/record-icons';
 import { searchPlaces, listRecentPlaces, rememberRecentPlace } from '../../services/places';
+import { shiftEndWithStart } from '../../utils/event-time-shift';
 import type { LocationDetail } from '../../types/index';
 import { originalIconState, prepareRecordIcon, pickerChangeState, type RecordIconPickerChange } from '../../utils/record-icon-edit';
 
@@ -475,12 +476,22 @@ Page({
     this.setData({ showStartCalendar: false });
   },
 
+  /** Shift the end by the same elapsed duration when start changes. */
+  changeStart(date?: string, time?: string): void {
+    const range=shiftEndWithStart(this.data,{date,time},{
+      toStartInstant:(day,clock)=>getWallTimeCandidates(day,clock,this.data.startTimezone)[0],
+      toEndInstant:(day,clock)=>getWallTimeCandidates(day,clock,this.data.endTimezone)[0],
+      fromEndInstant:instant=>formatInstantInTimeZone(instant,this.data.endTimezone),
+    });
+    this.setData(range);
+    this.refreshDerived();
+  },
+
   onStartDateSelect(e: WechatMiniprogram.CustomEvent): void {
     const date = e.detail.date as string;
     if (!date) return;
-    // 选开始日期后，结束日期同步到同一天
-    this.setData({ startDate: date, endDate: date, showStartCalendar: false });
-    this.refreshDerived();
+    this.changeStart(date);
+    this.setData({showStartCalendar:false});
   },
 
   onOpenEndDate(): void {
@@ -514,14 +525,7 @@ Page({
   },
 
   onStartTimeChange(e: WechatMiniprogram.PickerChange): void {
-    this.setData({ startTime: e.detail.value as string });
-    // 调整结束时间以保证 > 起始
-    if (this.data.endTime <= this.data.startTime) {
-      const [h, m] = this.data.startTime.split(':').map(Number);
-      const next = (h + 1) % 24;
-      this.setData({ endTime: `${pad(next)}:${pad(m)}` });
-    }
-    this.refreshDerived();
+    this.changeStart(undefined,e.detail.value as string);
   },
 
   onEndTimeChange(e: WechatMiniprogram.PickerChange): void {
