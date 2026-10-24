@@ -1,14 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { CalendarDays } from 'lucide-react';
+import { footballYearOptions } from './football-year-options';
 
 const selectClass = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-500';
 
-/** Only a few useful recent years; older/future years can be entered explicitly. */
-export function footballYearOptions(currentYear: number, selectedYear = ''): string[] {
-  const recent = Array.from({ length: 5 }, (_, index) => String(currentYear - index));
-  return [...new Set([...recent, ...( /^\d{4}$/.test(selectedYear) ? [selectedYear] : [] )])]
-    .sort((left, right) => Number(right) - Number(left));
-}
 
 export function FootballYearFilter({ year, onChange }: {
   year: string; onChange: (year: string) => void;
