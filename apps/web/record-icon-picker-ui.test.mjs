@@ -28,23 +28,24 @@ test('Web and Mini use exactly one Unicode 17.0 grouped Emoji dataset', () => {
   assert.match(picker, /EMOJI_GROUPS\.flatMap/u);
 });
 
-test('all four Web record editors mount the same Icon picker next to title', () => {
+test('all record editors use one consistent icon and name row below the label', () => {
+  const component = read('./src/components/record-title-field.tsx');
+  assert.match(component, /<RecordIconField icon=\{icon\}/u);
+  assert.match(component, /items-center gap-2\.5/u);
   const editors = [
     ['./src/pages/days-page.tsx', 'day_record', '名称'],
     ['./src/pages/calendar-page.tsx', 'event', '日程名称'],
     ['./src/pages/tasks-page.tsx', 'task', '待办名称'],
     ['./src/pages/wishes-page.tsx', 'wish', '愿望'],
+    ['./src/pages/domain-page.tsx', 'modelKey as IconModel', '名称 *'],
+    ['./src/pages/football-manage-page.tsx', 'person_group', '球队名称 *'],
   ];
   for (const [path, model, label] of editors) {
     const source = read(path);
-    const index = source.indexOf('<RecordIconField icon={draft.icon}');
-    assert.ok(index > 0, `missing shared Icon picker in ${model}`);
-    const preceding = source.slice(Math.max(0, index - 130), index);
-    assert.match(preceding, /<div className="flex items-end gap-3">/u, model);
-    const near = source.slice(index, index + 1000);
-    assert.match(near, new RegExp(`modelKey="${model}"`), model);
-    assert.ok(near.includes(label), `picker must precede ${model} title`);
-    assert.equal((source.match(/<RecordIconField icon=\{draft\.icon\}/gu) ?? []).length, 1, model);
+    assert.match(source, /<RecordTitleField/u, path);
+    assert.ok(source.includes(label), `editor must include ${label}`);
+    assert.equal((source.match(/<RecordIconField/gu) ?? []).length, 0, path);
+    assert.ok(source.includes(model), `editor must pass ${model}`);
   }
 });
 
