@@ -6,7 +6,7 @@ const selectClass = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-
 /** Only a few useful recent years; older/future years can be entered explicitly. */
 export function footballYearOptions(currentYear: number, selectedYear = ''): string[] {
   const recent = Array.from({ length: 5 }, (_, index) => String(currentYear - index));
-  return [...new Set([...recent, ...( /^\\d{4}$/.test(selectedYear) ? [selectedYear] : [] )])]
+  return [...new Set([...recent, ...( /^\d{4}$/.test(selectedYear) ? [selectedYear] : [] )])]
     .sort((left, right) => Number(right) - Number(left));
 }
 
@@ -36,7 +36,7 @@ export function FootballYearFilter({ year, onChange }: {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!/^\\d{4}$/.test(draft) || Number(draft) < 1900 || Number(draft) > 9999) return;
+    if (!/^\d{4}$/.test(draft) || Number(draft) < 1900 || Number(draft) > 9999) return;
     onChange(draft);
     setCustomOpen(false);
   };
@@ -46,7 +46,7 @@ export function FootballYearFilter({ year, onChange }: {
       value={customOpen ? '__custom__' : year}
       onChange={event => {
         if (event.target.value === '__custom__') {
-          setDraft(year && /^\\d{4}$/.test(year) ? year : '');
+          setDraft(year && /^\d{4}$/.test(year) ? year : '');
           setCustomOpen(true);
         } else {
           setCustomOpen(false);
@@ -69,7 +69,7 @@ export function FootballYearFilter({ year, onChange }: {
       <div className="mt-3 flex justify-end gap-2">
         <button type="button" className="rounded-lg px-2 py-1.5 text-sm text-stone-600"
           onClick={() => setCustomOpen(false)}>取消</button>
-        <button type="submit" disabled={!/^\\d{4}$/.test(draft) || Number(draft) < 1900 || Number(draft) > 9999}
+        <button type="submit" disabled={!/^\d{4}$/.test(draft) || Number(draft) < 1900 || Number(draft) > 9999}
           className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-white disabled:opacity-50">应用</button>
       </div>
     </form>}
