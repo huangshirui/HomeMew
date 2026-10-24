@@ -11,7 +11,9 @@ test('mobile shell exposes household context and real avatars', () => {
   const shell = source('./src/components/app-shell.tsx');
 
   assert.match(shell, /aria-label=\{mobile \? '移动端切换家庭' : '切换家庭'\}/u);
-  assert.match(shell, /<FamilyIdentity mobile \/>/u);
+  const header = source('./src/components/ui/page-header.tsx');
+  assert.match(header, /<FamilyIdentity mobile \\/>/u);
+  assert.ok(shell.includes("detailTitles[segments[0]]"));
   assert.match(shell, /currentFamily\?\.avatarUrl/u);
   const more = source('./src/pages/more-page.tsx');
   assert.match(more, /user\?\.avatarUrl/u);
