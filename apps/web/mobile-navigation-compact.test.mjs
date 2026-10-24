@@ -57,9 +57,9 @@ test('all main mobile modules use centered title and compact creation controls',
   assert.ok(header.includes('text-center text-[20px] font-semibold'));
   assert.match(calendar, /mobileTitle="日程" compactMobile mobileActions=/u);
   assert.match(tasks, /mobileTitle="待办" mobileActions=/u);
-  assert.match(domain, /mobileActions=\\{<>/u);
-  assert.match(more, /<PageHeader title="更多" \\/>/u);
-  assert.match(family, /<MemberAvatar member=\\{member\\}/u);
+  assert.ok(domain.includes('mobileActions={<>'));
+  assert.ok(more.includes('<PageHeader title="更多" />'));
+  assert.ok(family.includes('<MemberAvatar member={member}'));
   assert.match(family, /currentFamily.avatarUrl/u); // uploaded family logo
   for (const name of ['days', 'wishes', 'integrations']) {
     assert.match(source(`./src/pages/${name}-page.tsx`), /mobileActions=/u);
@@ -69,9 +69,9 @@ test('all main mobile modules use centered title and compact creation controls',
 test('member avatars use the Mini public media routes and graceful fallbacks', () => {
   const shell = source('./src/components/app-shell.tsx');
   const mini = source('./miniprogram-bff.mjs');
-  assert.match(shell, /miniprogram\\/media\\/users\\//u);
-  assert.match(shell, /miniprogram\\/media\\/families\\//u);
-  assert.match(shell, /onError=\\{\\(event\\) =>/u);
+  assert.ok(shell.includes('/api/v1/miniprogram/media/users/'));
+  assert.ok(shell.includes('/api/v1/miniprogram/media/families/'));
+  assert.ok(shell.includes('onError={(event) =>'));
   assert.match(mini, /kind: 'user-avatar-read'/u);
   assert.match(mini, /kind: 'family-avatar-read'/u);
 });
