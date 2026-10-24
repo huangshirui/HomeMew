@@ -1,1 +1,6 @@
-{"navigationStyle":"custom","usingComponents":{}}
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "lucide-icon": "/components/lucide-icon/index"
+  }
+}
