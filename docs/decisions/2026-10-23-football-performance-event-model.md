@@ -187,3 +187,9 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 - **球队成员 UX**：球队管理页面保留 PersonGroup 作为球队唯一业务对象，在球队行显示当前成员数量并添加“管理球员”入口，编辑/新建球队弹窗统一包含「球队成员（N 人）」区域。直接复用已有 FootballPersonPicker，支持家庭成员及其他 Space Person 的远端姓名检索、勾选加入与 × 移除，并经确认保存。取消编辑不写数据。成员更新直接提交 PersonGroup.memberPersonIds（PATCH 乐观锁 version；POST 初始化成员集合），不增加 HomeMew 影子成员表；成员从球队移除不删除 Person 档案，也不修改历史 FootballMatch/FootballPerformance。
 - **人员名称与性能**：编辑有成员的球队时，只按已加入的非家庭成员 Person ID 按需 GET 补全显示名称，ID 去重、最多 4 并发；家庭成员复用现有家庭上下文。保存保留所有旧成员 ID，包括未成功解析名称的成员，除非用户明确点击 ×。不预先加载整个 Space People 目录。
 - **代码验证**：[HomeMew Draft PR #142](https://github.com/huangshirui/HomeMew/pull/142) 新增球队成员保存和比赛分页回归断言；最新 [Web Check #40071105997](https://github.com/huangshirui/HomeMew/actions/runs/40071105997) 与 [Mini Program Check #40071106058](https://github.com/huangshirui/HomeMew/actions/runs/40071106058) 均通过。无 LifeSpace 代码或 Schema 修改，PR 未合并，未部署 Preview/Production。
+
+## 2026-10-24 · 球队管理取消指定选择，比赛筛选弹层保持布局稳定
+
+- **球队管理 UX**：`/football/manage` 的球队页不再使用 `FootballReferencePicker` 的「先指定某支球队」交互或「全部／不指定」候选，改为单一搜索框 + 下方可操作的球队列表。空查询展示最近选择或实际比赛使用过的球队；输入少于两个字符只筛选已载入的常用球队，输入两个字符或以上后通过 LifeSpace Canonical Query 的 `search.text` 实时名称查询，320ms 防抖、单页 `limit=20`、支持 cursor 加载更多。新/修改/删除球队在列表与搜索结果中同步变化；不同家庭及输入变化时旧异步响应不得覆盖新结果，不依赖全量 PersonGroup 扫描。
+- **筛选展开原因与修复**：足球比赛列表的“赛事／代表球队／对手球队”都复用通用 Reference Picker，原下拉内容采用 `position: relative` 留在父级 flex 行的文档流中；父行 `items-end` 底部对齐，弹出列表增加高度时会把其他筛选控件整体顶上去。现在新增专用于筛选的 `overlay` 布局（`position: absolute; top: 100%`，右对齐、有最大高度和独立滚动），不改变外层筛选行高度，始终从对应输入框下方悬浮展开。其他模态表单中的 Picker 保持原有 flow 布局，避免其弹层被表单滚动容器裁剪。点击外部或 Escape 关闭。
+- **范围与测试**：只改 HomeMew Web 应用，不涉及 LifeSpace 模型、权限或额外业务存储；已增加测试约束球队搜索没有单选焦点、服务端搜索分页及三个筛选框均使用悬浮弹层。归入 [HomeMew Draft PR #142](https://github.com/huangshirui/HomeMew/pull/142)，无自动合并或部署。
