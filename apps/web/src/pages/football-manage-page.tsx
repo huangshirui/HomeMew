@@ -1,7 +1,7 @@
 import { RecordTitleField } from '../components/record-title-field';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, Search, Trash2, X } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Plus, Search, Trash2, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
@@ -262,7 +262,11 @@ export function FootballManagePage() {
 
   if (familyLoading) return <Card className="p-6">正在读取家庭资料…</Card>;
   return <div className="space-y-4">
-    <PageHeader title="球队与球员管理">
+    <PageHeader title="球队与球员管理" mobileTitle="球队管理" mobileBackTo="/football"
+      mobileActions={<Button variant="ghost" size="icon" className="size-10"
+        aria-label="赛事管理" title="赛事管理" onClick={() => navigate('/activities')}>
+        <CalendarDays className="size-4" />
+      </Button>}>
       <Button variant="secondary" onClick={() => navigate('/football')}>
         <ChevronLeft className="size-4"/> 返回足球比赛
       </Button>
