@@ -162,6 +162,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [historyFor, setHistoryFor] = useState<DomainRecord | null>(null);
+  const [historyInlineOpen, setHistoryInlineOpen] = useState(false);
   const [containerFor, setContainerFor] = useState<DomainRecord | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
@@ -227,7 +228,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
       .finally(() => { if (!cancelled) setDetailLoading(false); });
     return () => { cancelled = true; };
   }, [currentFamily?.id, recordId, modelKey, detailMode, refresh]);
-  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setContainerFor(null); setStatusFilter('active'); setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('current'); setActivityFilterOpen(false); }, [currentFamily?.id, modelKey]);
+  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setHistoryInlineOpen(false); setContainerFor(null); setStatusFilter('active'); setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('current'); setActivityFilterOpen(false); }, [currentFamily?.id, modelKey]);
 
   function newRecord() {
     const next = blank();
@@ -342,7 +343,21 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
               <Check className="size-4"/>{containerFor.computed?.checkIn?.checkedInToday ? '今天已打卡' : '今天打卡'}</Button> : null}
           </div>
           {containerFor.computed?.checkIn ? <p className="my-3 text-sm text-stone-600">当前连续 {containerFor.computed.checkIn.streakDays} 天</p> : null}
-          <Button variant="secondary" onClick={() => { setHistoryFor(containerFor); setHistory([]); setHistoryCursor(null); void loadHistory(containerFor,null,false); }}>查看历史记录</Button>
+          <Button variant="secondary" onClick={() => {
+            setHistoryInlineOpen(open => !open);
+            if (!historyInlineOpen) { setHistory([]); setHistoryCursor(null); void loadHistory(containerFor, null, false); }
+          }}>{historyInlineOpen ? '收起打卡记录' : '查看打卡记录'}</Button>
+          {historyInlineOpen ? <div className="mt-4 space-y-2 border-t border-stone-100 pt-3">
+            {historyLoading && !history.length ? <p className="text-sm text-stone-500">正在加载打卡记录…</p> : null}
+            {historyError ? <p role="alert" className="text-sm text-rose-700">{historyError}</p> : null}
+            {history.map(entry => <div key={entry.id} className="flex justify-between rounded-xl bg-stone-50 px-3 py-2 text-sm">
+              <span>{entry.checkedOn ?? entry.checkedOnDate ?? '未知日期'}</span>
+              <span className="text-stone-500">{entry.recordedByNameSnapshot ?? ''}</span>
+            </div>)}
+            {!history.length && !historyLoading && !historyError ? <p className="text-sm text-stone-500">暂时没有打卡记录。</p> : null}
+            {historyCursor ? <Button variant="secondary" disabled={historyLoading}
+              onClick={() => void loadHistory(containerFor, historyCursor, true)}>加载更多打卡记录</Button> : null}
+          </div> : null}
         </div>}
         {(modelKey === 'goal' || modelKey === 'habit') && <div className="flex flex-wrap gap-2">
           {containerFor.status && <span className="rounded-xl bg-stone-100 px-3 py-2 text-sm">{statusText[containerFor.status]}</span>}
