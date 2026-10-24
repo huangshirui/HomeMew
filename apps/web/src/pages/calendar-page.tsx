@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ChevronLeft, ChevronRight, Clock3, Gift, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Clock3, Gift, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { RecordTitleField } from '../components/record-title-field';
 import { useHousehold } from '../components/household-provider';
@@ -704,22 +704,32 @@ export function CalendarPage() {
         </section>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-1.5 rounded-3xl bg-white p-2.5 shadow-sm ring-1 ring-stone-200/80 sm:gap-3 sm:p-4">
             <div className="min-w-0">
-              <p className="font-semibold text-stone-900">
+              <p className="whitespace-nowrap text-sm font-semibold text-stone-900 sm:text-base">
                 {view === 'month' ? displayMonth(month) : `${Number(weekStart.slice(5, 7))}月${Number(weekStart.slice(8))}日 — ${Number(addDays(weekStart, 6).slice(5, 7))}月${Number(addDays(weekStart, 6).slice(8))}日`}
               </p>
-              <p className="mt-1 text-xs text-stone-500">{currentFamily.timezone}</p>
+              <p className="mt-1 hidden text-xs text-stone-500 sm:block">{currentFamily.timezone}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex rounded-xl bg-stone-100 p-1" role="group" aria-label="日历视图">
+            <div className="ml-auto flex min-w-0 items-center gap-0.5 sm:flex-wrap sm:gap-2">
+              <label className="relative shrink-0 sm:hidden">
+                <span className="sr-only">日历视图</span>
+                <select aria-label="日历视图" value={view}
+                  onChange={(event) => switchView(event.target.value as 'month' | 'week')}
+                  className="h-9 appearance-none rounded-lg bg-stone-100 pl-2 pr-5 text-xs font-medium text-stone-800 focus-visible:outline-2 focus-visible:outline-emerald-500">
+                  <option value="month">月</option>
+                  <option value="week">周</option>
+                </select>
+                <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-1 top-1/2 size-3 -translate-y-1/2 text-stone-500" />
+              </label>
+              <div className="hidden rounded-xl bg-stone-100 p-1 sm:inline-flex" role="group" aria-label="日历视图">
                 <button type="button" onClick={() => switchView('month')} aria-pressed={view === 'month'} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${view === 'month' ? 'bg-white text-emerald-800 shadow-sm' : 'text-stone-500 hover:text-stone-900'}`}>月</button>
                 <button type="button" onClick={() => switchView('week')} aria-pressed={view === 'week'} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${view === 'week' ? 'bg-white text-emerald-800 shadow-sm' : 'text-stone-500 hover:text-stone-900'}`}>周</button>
               </div>
-              <Button variant="secondary" size="icon" aria-label={view === 'month' ? '上个月' : '上一周'} onClick={() => navigatePeriod(-1)}><ChevronLeft className="size-4" /></Button>
-              <Button variant="secondary" onClick={jumpToday}>今天</Button>
-              <Button variant="secondary" size="icon" aria-label={view === 'month' ? '下个月' : '下一周'} onClick={() => navigatePeriod(1)}><ChevronRight className="size-4" /></Button>
-              <Button variant="ghost" size="icon" aria-label="刷新" disabled={loading} onClick={() => setRefreshToken((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
+              <Button variant="secondary" size="icon" className="size-9 sm:size-10" aria-label={view === 'month' ? '上个月' : '上一周'} onClick={() => navigatePeriod(-1)}><ChevronLeft className="size-4" /></Button>
+              <Button variant="secondary" className="h-9 px-2 text-xs sm:h-10 sm:px-4 sm:text-sm" onClick={jumpToday}>今天</Button>
+              <Button variant="secondary" size="icon" className="size-9 sm:size-10" aria-label={view === 'month' ? '下个月' : '下一周'} onClick={() => navigatePeriod(1)}><ChevronRight className="size-4" /></Button>
+              <Button variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label="刷新" disabled={loading} onClick={() => setRefreshToken((value) => value + 1)}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
             </div>
           </div>
 
@@ -895,12 +905,16 @@ function CalendarHeader({ onCreate, canWrite, onToggleFilters, filtersExpanded, 
   filtersActive: boolean;
 }) {
   return (
-    <PageHeader title="家庭日程">
-      <Button variant="secondary" onClick={onToggleFilters} aria-expanded={filtersExpanded}
-        aria-controls="calendar-search-filters" className={filtersActive ? "text-emerald-800 ring-emerald-300" : ""}>
-        <SlidersHorizontal className="size-4" /> 搜索与筛选{filtersActive ? " · 已启用" : ""}
+    <PageHeader title="家庭日程" mobileTitle="日程" compactMobile>
+      <Button variant="secondary" size="icon" onClick={onToggleFilters} aria-expanded={filtersExpanded}
+        aria-label={filtersActive ? '搜索与筛选（已启用）' : '搜索与筛选'} title="搜索与筛选"
+        aria-controls="calendar-search-filters" className={`size-10 shrink-0 sm:h-10 sm:w-auto sm:px-4 ${filtersActive ? 'text-emerald-800 ring-emerald-300' : ''}`}>
+        <SlidersHorizontal className="size-4" /><span className="hidden sm:inline">搜索与筛选{filtersActive ? ' · 已启用' : ''}</span>
       </Button>
-      <Button variant="primary" disabled={!canWrite} onClick={onCreate}><Plus className="size-4" /> 新建日程</Button>
+      <Button variant="primary" size="icon" disabled={!canWrite} onClick={onCreate}
+        aria-label="新建日程" title="新建日程" className="size-10 shrink-0 sm:h-10 sm:w-auto sm:px-4">
+        <Plus className="size-4" /><span className="hidden sm:inline">新建日程</span>
+      </Button>
     </PageHeader>
   );
 }
