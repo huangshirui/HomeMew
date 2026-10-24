@@ -660,8 +660,8 @@ export function FootballPage() {
                 ? <span role="img" aria-label="正式比赛" title="正式比赛"><Trophy className="size-4 shrink-0 text-amber-600"/></span>
                 : <span role="img" aria-label="友谊赛" title="友谊赛"><Handshake className="size-4 shrink-0 text-sky-600"/></span>}
             </div>
-            <div className="min-w-0 flex-[1_1_220px]">
-              <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+            <div className="flex min-w-0 flex-[1_1_220px] flex-wrap items-center gap-x-4 gap-y-1">
+              <div className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium">
                 {teamRecords.get(m.representativeTeamId)?.presentation?.icon
                   ? <RecordIconMark icon={teamRecords.get(m.representativeTeamId)!.presentation!.icon!}
                       spaceId={spaceId} modelKey="person_group" recordId={m.representativeTeamId} className="shrink-0"/>
@@ -674,11 +674,13 @@ export function FootballPage() {
                   : <Shield aria-hidden="true" className="size-4 shrink-0 text-stone-400"/>}
                 <span className="min-w-0 truncate">{teamNames.get(m.opponentTeamId) ?? '对手球队'}</span>
               </div>
-              {m.competitionActivityId && <p className="truncate text-xs text-stone-500"
-                title={unavailableCompetitionIds.has(m.competitionActivityId) ? '暂时无法查看赛事名称，可点击刷新重试' : undefined}>
+              {m.competitionActivityId && <span
+                className="inline-flex max-w-44 min-w-0 shrink-0 items-center truncate rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-normal text-stone-600"
+                title={competitionNames.get(m.competitionActivityId) ??
+                  (unavailableCompetitionIds.has(m.competitionActivityId) ? '赛事暂不可查看，可点击刷新重试' : '正在加载赛事…')}>
                 {competitionNames.get(m.competitionActivityId) ??
                   (unavailableCompetitionIds.has(m.competitionActivityId) ? '赛事暂不可查看' : '正在加载赛事…')}
-              </p>}
+              </span>}
             </div>
             <div className="ml-auto flex shrink-0 items-center gap-1">
               <Button variant="secondary" className="h-9 px-3" onClick={() => openMatchDetail(m)}>记录</Button>
