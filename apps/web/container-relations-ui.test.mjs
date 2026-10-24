@@ -39,7 +39,8 @@ test('Activity countdown and related Task create source-owned links atomically',
 test('Activity detail exposes practical dates, participants, editing, plans and countdowns', () => {
   assert.match(container, /participants\?: string/);
   assert.match(container, /onEdit/);
-  assert.match(container, /编辑\{modelKey === 'activity'/);
+  assert.match(container, /编辑活动/);
+  assert.match(container, /<RecordLifecycleMenu/);
   assert.match(container, /活动日期待定/);
   assert.match(container, /活动安排/);
   assert.match(container, /重要日子/);
