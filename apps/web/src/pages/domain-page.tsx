@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { CalendarDays, Check, Clock3, Gift, Pause, Play, Plus, RefreshCw, Target, Trash2, X } from 'lucide-react';
+import { CalendarDays, Check, Clock3, Gift, Minus, Pause, Play, Plus, RefreshCw, Search, SlidersHorizontal, Target, Trash2, X } from 'lucide-react';
+import { RecordTitleField } from '../components/record-title-field';
 import { useHousehold } from '../components/household-provider';
 import { ContainerRelations } from '../components/container-relations';
-import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type IconModel, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
+import { RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type IconModel, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { PageHeader } from '../components/ui/page-header';
@@ -10,12 +11,13 @@ import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { apiRequest } from '../lib/api-client';
 import { householdErrorMessage } from '../lib/user-facing-error';
-import { queryModelRecords } from '../lib/canonical-query';
+import { queryModelRecords, type CanonicalQuery, type CanonicalQueryFilter, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type ModelKey = 'activity' | 'goal' | 'anniversary' | 'habit';
 type Status = 'active' | 'paused' | 'achieved' | 'abandoned' | 'ended';
+type ActivityPeriod = 'all' | 'upcoming' | 'ongoing' | 'past' | 'undated';
 type DomainRecord = {
-  id: string; spaceId: string; version: number; name: string; description?: string | null;
+  id: string; spaceId: string; version: number; name: string; description?: string | null; createdAt?: string;
   presentation?: { icon?: RecordIcon | null }; status?: Status;
   attendeePersonIds?: string[]; subjectPersonIds?: string[]; personIds?: string[];
   startDate?: string | null; endDate?: string | null; targetDate?: string | null;
@@ -32,10 +34,10 @@ type Draft = {
 };
 type HistoryItem = { id: string; checkedOn?: string; checkedOnDate?: string; recordedByNameSnapshot?: string };
 const settings = {
-  activity: { title: '活动', icon: CalendarDays, people: '参与人员', description: '组织家庭旅行、兴趣活动、比赛等持续性事项。' },
-  goal: { title: '目标', icon: Target, people: '目标相关成员', description: '记录希望达成的结果，并跟踪状态。' },
-  anniversary: { title: '纪念日', icon: Gift, people: '相关成员', description: '每年的特别日子，也会显示在日程中。' },
-  habit: { title: '习惯', icon: Clock3, people: '习惯所属人', description: '为家人建立习惯；只有所属人可以打卡和管理。' },
+  activity: { title: '活动', icon: CalendarDays, people: '参与人员' },
+  goal: { title: '目标', icon: Target, people: '目标相关成员' },
+  anniversary: { title: '纪念日', icon: Gift, people: '相关成员' },
+  habit: { title: '习惯', icon: Clock3, people: '习惯所属人' },
 } as const;
 const statusText: Record<Status, string> = {
   active: '进行中', paused: '已暂停', achieved: '已达成', abandoned: '已放弃', ended: '已结束',
@@ -105,6 +107,30 @@ async function loadRecords(spaceId: string, key: ModelKey, statusFilter: Status)
     if (!cursor) return collected;
   }
   throw new Error('记录数量超过当前页面的安全加载上限，请缩小范围或联系管理员');
+}
+function todayInZone(timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+export function stepAnniversaryYear(value: string, step: -1 | 1, currentYear = new Date().getFullYear()): string {
+  // A blank optional year must start at the current year, not at 1.
+  return value ? String(Math.max(1, Math.min(9999, Number(value) + step))) : String(currentYear);
+}
+function activityQuery(search: string, personId: string, period: ActivityPeriod, timezone: string, cursor: string | null): CanonicalQuery {
+  const filters: CanonicalQueryFilter[] = [];
+  const today = todayInZone(timezone);
+  if (personId) filters.push({ field: 'attendeePersonIds', op: 'contains', value: personId });
+  if (period === 'upcoming') filters.push({ field: 'startDate', op: 'gt', value: today });
+  if (period === 'ongoing') filters.push({ field: 'startDate', op: 'lte', value: today }, { field: 'endDate', op: 'gte', value: today });
+  if (period === 'past') filters.push({ field: 'endDate', op: 'lt', value: today });
+  if (period === 'undated') filters.push({ field: 'startDate', op: 'isNull' }, { field: 'endDate', op: 'isNull' });
+  return {
+    ...(search ? { search: { text: search } } : {}),
+    ...(filters.length ? { filter: filters.length === 1 ? filters[0] : { and: filters } } : {}),
+    sort: [{ field: 'createdAt', direction: 'desc' }],
+    page: { limit: 40, ...(cursor ? { cursor } : {}) },
+  };
 }
 function memberNames(ids: string[], names: Map<string, string>) {
   return ids.map(id => names.get(id) ?? '家庭成员').join('、');
