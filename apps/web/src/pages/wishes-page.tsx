@@ -194,7 +194,8 @@ export function WishesPage() {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <PageHeader title="许愿池"><Button variant="primary" disabled={!canWrite} onClick={openCreate}><Plus className="size-4" /> 写下愿望</Button></PageHeader>
+      <PageHeader title="许愿池" mobileActions={<Button variant="primary" size="icon" className="size-10" aria-label="写下愿望" title="写下愿望"
+        disabled={!canWrite} onClick={openCreate}><Plus className="size-4" /></Button>}><Button variant="primary" disabled={!canWrite} onClick={openCreate}><Plus className="size-4" /> 写下愿望</Button></PageHeader>
 
       {!currentFamily ? <Card className="grid min-h-72 place-items-center p-8 text-sm text-stone-500">请先创建或加入一个家庭。</Card> : (
         <>
