@@ -8,7 +8,7 @@ const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
 const LIST_KEYS = new Set(['startDate', 'endDateExclusive', 'timezone', 'attendeeId', 'status', 'q', 'cursor', 'limit']);
-const WRITE_FIELDS = ['presentation', 'summary', 'description', 'location', 'attendeeIds', 'isAllDay', 'startAt', 'endAt', 'startTimezone', 'endTimezone', 'startDate', 'endDateExclusive'];
+const WRITE_FIELDS = ['presentation', 'summary', 'description', 'location', 'locationDetail', 'attendeeIds', 'isAllDay', 'startAt', 'endAt', 'startTimezone', 'endTimezone', 'startDate', 'endDateExclusive'];
 const TIME_FIELDS = ['isAllDay', 'startAt', 'endAt', 'startTimezone', 'endTimezone', 'startDate', 'endDateExclusive'];
 
 function decodeId(value, pattern) {
@@ -141,7 +141,9 @@ export function eventDto(request, raw, list) {
   const common = {
     id: raw.id, familyId: raw.spaceId, summary: raw.summary,
     ...(raw.presentation?.icon ? { presentation: raw.presentation } : {}),
-    description: raw.description ?? null, location: eventLocationName(raw.location), status: raw.status,
+    description: raw.description ?? null, location: eventLocationName(raw.location),
+    ...(raw.location && typeof raw.location === 'object' ? { locationDetail: raw.location } : {}),
+    status: raw.status,
     attendees: (raw.attendeePersonIds ?? []).map(personId => list.find(item => item.personId === personId))
       .filter(Boolean).map(member => ({
         userId: member.userId, displayName: member.displayName,
@@ -249,10 +251,21 @@ async function writeEvent(request, env, route, method) {
     data.attendeePersonIds = resolved.data;
     delete data.attendeeIds;
   }
-  // The reviewed Mini DTO accepts only a label, never an arbitrary canonical
-  // object supplied by the browser/client. This preserves the product boundary.
+  // The legacy field stays a string. New Mini versions may supply a separate
+  // canonical WGS84 selection; older published clients need no update.
   if (Object.hasOwn(data, 'location') && data.location !== null && typeof data.location !== 'string') {
-    return errorResponse(422, 'VALIDATION_ERROR', 'Event Location must be text or null');
+    return errorResponse(422, 'VALIDATION_ERROR', 'Event Location label must be text or null');
+  }
+  const hasLocationDetail = Object.hasOwn(data, 'locationDetail');
+  if (hasLocationDetail) {
+    if (!Object.hasOwn(data, 'location') || (data.locationDetail !== null &&
+      (typeof data.locationDetail !== 'object' || Array.isArray(data.locationDetail) ||
+      typeof data.locationDetail.name !== 'string' ||
+      data.locationDetail.name.trim() !== data.location?.trim()))) {
+      return errorResponse(422, 'VALIDATION_ERROR', 'Location selection and label must match');
+    }
+    if (data.locationDetail !== null) data.location = data.locationDetail;
+    delete data.locationDetail;
   }
   const touchedTime = TIME_FIELDS.some(key => Object.hasOwn(data, key));
   let currentEvent = null;
@@ -277,7 +290,7 @@ async function writeEvent(request, env, route, method) {
   // An older Mini client submits the displayed location label again when the
   // user edits an unrelated field. Preserve richer canonical coordinates only
   // when the name is unchanged; otherwise treat this as an explicit relocation.
-  if (method === 'PATCH' && Object.hasOwn(data, 'location') && eventLocationWireFormat(env) === 'location') {
+  if (method === 'PATCH' && !hasLocationDetail && Object.hasOwn(data, 'location') && eventLocationWireFormat(env) === 'location') {
     if (!currentEvent) {
       const existing = await callJson(request, env, recordPath(route.familyId, route.recordId));
       if (!existing.ok) return existing.response;
