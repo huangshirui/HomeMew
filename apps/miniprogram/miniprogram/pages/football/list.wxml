@@ -8,7 +8,7 @@
     </view>
     <view class="football-actions">
       <view class="football-tool" bindtap="onToggleFilter" wx:if="{{mode==='record'}}">筛选 ⚙</view>
-      <view class="football-new" bindtap="{{mode==='record'?'onCreateMatch':'onCreateTeam'}}">＋ {{mode==='record'?'新建比赛':'新建球队'}}</view>
+      <view class="football-new" bindtap="onCreate">＋ {{mode==='record'?'新建比赛':'新建球队'}}</view>
     </view>
   </view>
   <view wx:if="{{filterOpen&&mode==='record'}}" class="card football-filter">
