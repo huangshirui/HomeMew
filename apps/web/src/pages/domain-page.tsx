@@ -223,7 +223,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     let cancelled = false;
     setContainerFor(null); setDetailError(''); setDetailLoading(true);
     void apiRequest<DomainRecord>(url(currentFamily.id, modelKey, recordId))
-      .then(record => { if (!cancelled) openDetail(record); })
+      .then(record => { if (!cancelled) setContainerFor(record); })
       .catch(cause => { if (!cancelled) setDetailError(message(cause)); })
       .finally(() => { if (!cancelled) setDetailLoading(false); });
     return () => { cancelled = true; };
