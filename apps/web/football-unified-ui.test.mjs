@@ -302,3 +302,11 @@ test('match record button opens a standalone routable detail, not inline selecti
   assert.match(page, /rememberFootballList\(spaceId/);
   assert.match(page, /consumeFootballList\(spaceId/);
 });
+
+test('competition labels stay on the match row beside the score, not below team names', () => {
+  const row = page.slice(page.indexOf('{matches.map(m => <div key={m.id}'), page.indexOf('!loading && !matches.length'));
+  assert.match(row, /flex min-w-0 flex-\[1_1_220px\] flex-wrap items-center/);
+  assert.match(row, /max-w-44 min-w-0 shrink-0 truncate rounded-lg bg-stone-100/);
+  assert.match(row, /competitionNames\.get\(m\.competitionActivityId\)/);
+  assert.doesNotMatch(row, /<p className="truncate text-xs text-stone-500"/);
+});
