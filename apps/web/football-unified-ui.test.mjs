@@ -232,7 +232,10 @@ test('team and competition selectors support bounded debounced server autocomple
   assert.match(referencePicker, /modelUrl\(spaceId, model, value\)/);
   assert.match(referencePicker, /role="listbox"/);
   assert.match(referencePicker, /onChange\(id\)/);
-  assert.match(referencePicker, /className="relative z-30 mt-2/); // no clipping by modal scroll container
+  assert.match(referencePicker, /overlay \? 'absolute right-0 top-full z-50 mt-2/);
+  assert.match(referencePicker, /'relative z-30 mt-2 shadow-sm'/); // flow in modal, overlay in filter
+  assert.match(page, /className="min-w-32 flex-1" overlay spaceId=\{spaceId\}/);
+  assert.equal((page.match(/className="min-w-32 flex-1" overlay spaceId=\{spaceId\}/g) ?? []).length, 3);
 });
 test('reference lookup is bounded and Activity is never preloaded as a competition directory', () => {
   assert.doesNotMatch(page, /queryAllBounded<FootballReference>/);
@@ -240,7 +243,11 @@ test('reference lookup is bounded and Activity is never preloaded as a competiti
   assert.match(referencePicker, /page: \{ limit: 20 \}/);
   assert.match(manage, /readRecentFootballReferences/);
   assert.match(manage, /page: \{ limit: 50 \}/);
-  assert.match(manage, /搜索定位球队/);
+  assert.match(manage, /aria-label="搜索球队"/);
+  assert.doesNotMatch(manage, /搜索定位球队|value=\{teamFocus\}/);
+  assert.match(manage, /queryModelRecords<FootballReference>\(spaceId, 'person_group'/);
+  assert.match(manage, /search: \{ text: term \}/);
+  assert.match(manage, /page: \{ limit: 20 \}/);
   assert.doesNotMatch(page, /queryModelRecords<FootballReference>\(spaceId, 'activity'/);
 });
 
@@ -339,4 +346,26 @@ test('team editor adds and removes PersonGroup members without deleting Person r
   assert.match(manage, /onClick=\{closeTeam\}/);
   const membershipSave = manage.slice(manage.indexOf('const startTeam ='), manage.indexOf('const deleteTeam ='));
   assert.doesNotMatch(membershipSave, /method: 'DELETE'/);
+});
+
+test('team manager searches and renders a result list without choosing an active team', () => {
+  assert.match(manage, /const \[teamSearch, setTeamSearch\] = useState\(''\)/);
+  assert.match(manage, /teamTermSufficient/);
+  assert.match(manage, /window\.setTimeout/);
+  assert.match(manage, /queryModelRecords<FootballReference>\(spaceId, 'person_group'/);
+  assert.match(manage, /sort: \[\{ field: 'name', direction: 'asc' \}\]/);
+  assert.match(manage, /page: \{ limit: 20, cursor \}/);
+  assert.match(manage, /visibleTeams\.map\(team =>/);
+  assert.match(manage, /加载更多球队/);
+  assert.match(manage, /搜索球队名称/);
+  assert.doesNotMatch(manage, /teamFocus|setTeamFocus|<FootballReferencePicker/);
+});
+
+test('three match filters open a floating panel below the clicked input', () => {
+  assert.equal((page.match(/className="min-w-32 flex-1" overlay spaceId=\{spaceId\}/g) ?? []).length, 3);
+  assert.match(referencePicker, /overlay\?: boolean/);
+  assert.match(referencePicker, /absolute right-0 top-full z-50/);
+  assert.match(referencePicker, /overlay && open \? 'relative z-40 '/);
+  assert.match(referencePicker, /max-h-\[min\(28rem,65vh\)\] overflow-y-auto/);
+  assert.match(referencePicker, /'relative z-30 mt-2 shadow-sm'/);
 });
