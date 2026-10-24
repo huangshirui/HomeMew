@@ -400,9 +400,9 @@ Page({
     void searchPlaces(value).then(result=>{
       if(this.data.location!==value)return;
       this.setData({locationCandidates:result.items,locationStructured:result.structured,
-        locationHint:result.items.length?'':'暂无更多匹配地点，可直接保存名称'});
+        locationHint:result.items.length?'':'没有找到其他地点，可以直接填写'});
     }).catch(()=>{
-      if(this.data.location===value)this.setData({locationHint:'地点搜索暂不可用，可直接保存名称'});
+      if(this.data.location===value)this.setData({locationHint:'暂时无法搜索地点，可以直接填写'});
     });
   },
 
@@ -423,12 +423,12 @@ Page({
           placeShowingRecent:false,
           locationStructured: result.structured,
           locationHint: result.available
-            ? (result.items.length ? '' : '暂无匹配地点，可直接保存名称')
-            : '地点推荐暂不可用，可直接保存名称',
+            ? (result.items.length ? '' : '没有找到合适的地点，可以直接填写')
+            : '暂时无法搜索地点，可以直接填写',
         });
       }).catch(() => {
         if (this.data.location === value) this.setData({ locationCandidates: [],
-          locationHint: '地点搜索暂不可用，可直接保存名称' });
+          locationHint: '暂时无法搜索地点，可以直接填写' });
       });
     }, 650);
   },
@@ -440,7 +440,7 @@ Page({
     this.setData({ location: selected.name,
       locationSelected: this.data.locationStructured ? selected : null,
       locationTouched: true, locationCandidates: [],placeShowingRecent:false,
-      locationHint: this.data.locationStructured ? '已选择地图地点' : '当前仅保存地点名称' });
+      locationHint: '已选定地点' });
   },
 
   onUnload(): void {

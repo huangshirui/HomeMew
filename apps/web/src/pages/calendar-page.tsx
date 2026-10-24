@@ -1106,19 +1106,19 @@ function PlaceSearchInput({name,point,existing,onChange,disabled}:{
     const timer=setTimeout(()=>{
       void apiRequest<PlaceSearchResult>(`/api/places/search?q=${encodeURIComponent(text)}`,{signal:controller.signal})
         .then(data=>{setItems(data.items);setStructured(data.structured);
-          setNote(data.available?(data.items.length?'':'没有找到匹配地点，可直接保存名称'):'地点推荐暂不可用，可直接保存名称');})
-        .catch(()=>{if(!controller.signal.aborted){setItems([]);setNote('地点搜索暂不可用，可直接保存名称');}});
+          setNote(data.available?(data.items.length?'':'没有找到合适的地点，可以直接填写'):'暂时无法搜索地点，可以直接填写');})
+        .catch(()=>{if(!controller.signal.aborted){setItems([]);setNote('暂时无法搜索地点，可以直接填写');}});
     },650);
     return ()=>{clearTimeout(timer);controller.abort();};
   },[name,active,disabled,cached,searchMore]);
   return <div className="grid gap-1.5 text-sm font-medium text-stone-700">
     <label htmlFor="event-location" className="flex items-center gap-1.5"><MapPin className="size-3.5" /> 地点</label>
     <input id="event-location" className={inputClass} disabled={disabled} maxLength={500}
-      autoComplete="off" value={name} placeholder="输入地点名称或自由填写"
+      autoComplete="off" value={name} placeholder="搜索或输入地点"
       onFocus={()=>setActive(true)}
       onChange={event=>{onChange(event.target.value,null);setSearchMore(false);setActive(true);}} />
     {active&&!disabled&&cached?<div className="max-h-44 overflow-y-auto rounded-xl border border-emerald-100 bg-white shadow-sm">
-      <span className="block px-3 pt-2 text-xs text-emerald-700">最近使用 · 无需地图搜索</span>
+      <span className="block px-3 pt-2 text-xs text-emerald-700">最近使用</span>
       {recentMatches.map((item,index)=><button type="button" key={index}
         className="block w-full px-3 py-2 text-left hover:bg-stone-50"
         onClick={()=>{onChange(item.name,structured?item:null);setItems([]);setActive(false);}}>
@@ -1126,7 +1126,7 @@ function PlaceSearchInput({name,point,existing,onChange,disabled}:{
         {item.address?<span className="block text-xs text-stone-500">{item.address}</span>:null}
       </button>)}
       <button type="button" className="w-full border-t border-stone-100 px-3 py-2 text-left text-xs text-emerald-700"
-        onClick={()=>setSearchMore(true)}>搜索更多地点…</button>
+        onClick={()=>setSearchMore(true)}>搜索其他地点…</button>
     </div>:null}
     {active&&!disabled&&!cached&&items.length>0?<div className="max-h-44 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-sm">
       {items.map((item,index)=><button type="button" key={index}
@@ -1138,12 +1138,12 @@ function PlaceSearchInput({name,point,existing,onChange,disabled}:{
     </div>:null}
     {active&&!disabled&&note?<p className="text-xs font-normal text-stone-400">{note}</p>:null}
     {point?.coordinates&&point.name===name.trim()?
-      <p className="text-xs font-normal text-emerald-700">已选择精确地点，将保存地址与 WGS84 坐标</p>:null}
+      <p className="text-xs font-normal text-emerald-700">已选定地点</p>:null}
     {links?<div className="flex flex-wrap gap-3 text-xs font-normal">
       <a href={links.amap} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline">高德地图 ↗</a>
       <a href={links.google} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline">Google 地图 ↗</a>
       {!displayed || typeof displayed==='string' || !displayed.coordinates
-        ? <span className="text-stone-400">仅按名称搜索，位置可能不唯一</span>:null}
+        ? <span className="text-stone-400">地图会根据名称查找地点</span>:null}
     </div>:null}
   </div>;
 }
