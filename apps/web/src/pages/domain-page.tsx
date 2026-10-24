@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CalendarDays, Check, Clock3, Gift, Minus, Pause, Play, Plus, RefreshCw, Search, SlidersHorizontal, Target, Trash2, X } from 'lucide-react';
+import { CalendarDays, Check, Clock3, Gift, Minus, Plus, RefreshCw, Search, SlidersHorizontal, Target, Trash2, X } from 'lucide-react';
 import { RecordTitleField } from '../components/record-title-field';
+import { RecordLifecycleMenu } from '../components/record-lifecycle-menu';
 import { useHousehold } from '../components/household-provider';
 import { ContainerRelations } from '../components/container-relations';
 import { RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type IconModel, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
@@ -334,7 +335,8 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
         <ContainerRelations key={`${currentFamily.id}:${modelKey}:${containerFor.id}`}
           spaceId={currentFamily.id} modelKey={modelKey as 'activity'|'goal'|'habit'} record={containerFor} timezone={currentFamily.timezone}
           writable={canManage(containerFor)} participants={memberNames(containerFor.attendeePersonIds ?? containerFor.subjectPersonIds ?? (containerFor.subjectPersonId ? [containerFor.subjectPersonId] : []), names)}
-          onEdit={() => edit(containerFor)} mode="page" />
+          onEdit={() => edit(containerFor)} mode="page" status={modelKey === 'activity' ? undefined : containerFor.status}
+          lifecycleBusy={busy} onLifecycleAction={key => void action(containerFor,key)} />
         {modelKey === 'habit' && <div className="rounded-2xl border border-stone-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h2 className="font-semibold">打卡记录</h2><p className="text-xs text-stone-500">最近打卡日期（按时间排序）</p></div>
@@ -359,17 +361,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
               onClick={() => void loadHistory(containerFor, historyCursor, true)}>加载更多打卡记录</Button> : null}
           </div> : null}
         </div>}
-        {(modelKey === 'goal' || modelKey === 'habit') && <div className="flex flex-wrap gap-2">
-          {containerFor.status && <span className="rounded-xl bg-stone-100 px-3 py-2 text-sm">{statusText[containerFor.status]}</span>}
-          {canManage(containerFor) && containerFor.status === 'active' && <Button variant="secondary" disabled={busy} onClick={() => void action(containerFor,'pause')}>暂停</Button>}
-          {canManage(containerFor) && containerFor.status === 'paused' && <Button variant="secondary" disabled={busy} onClick={() => void action(containerFor,'resume')}>继续</Button>}
-          {canManage(containerFor) && modelKey === 'goal' && ['active','paused'].includes(containerFor.status ?? '') && <>
-            <Button variant="secondary" disabled={busy} onClick={() => void action(containerFor,'achieve')}>标记达成</Button>
-            <Button variant="ghost" disabled={busy} onClick={() => void action(containerFor,'abandon')}>放弃目标</Button>
-          </>}
-          {canManage(containerFor) && modelKey === 'habit' && ['active','paused'].includes(containerFor.status ?? '') && <Button variant="ghost" disabled={busy} onClick={() => void action(containerFor,'end')}>结束习惯</Button>}
-          {canManage(containerFor) && ['achieved','abandoned','ended'].includes(containerFor.status ?? '') && <Button variant="secondary" disabled={busy} onClick={() => void action(containerFor,'reopen')}>重新开始</Button>}
-        </div>}
+
       </div>
     : !currentFamily ? <Card className="p-6 text-sm text-stone-500">请先选择家庭。</Card>
       : loading ? <Card className="p-6 text-sm text-stone-500">正在加载{spec.title}…</Card>
@@ -412,22 +404,15 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
           <div className="flex flex-wrap gap-2 border-t border-stone-100 pt-3">
             {modelKey !== 'anniversary' ? <Button variant="secondary" onClick={() => openDetail(record)}>查看内容</Button> : null}
              {modelKey === 'habit' ? <Button variant="secondary" onClick={() => { setHistoryFor(record); setHistory([]); setHistoryCursor(null); void loadHistory(record, null, false); }}>打卡历史</Button> : null}
-            {canManage(record) ? <>
-              <Button variant="secondary" onClick={() => edit(record)}>编辑</Button>
-              {modelKey === 'habit' && record.status === 'active' ?
-                <Button variant="primary" disabled={busy || record.computed?.checkIn?.checkedInToday} onClick={() => void action(record,'check-in')}>
-                  <Check className="size-4" />{record.computed?.checkIn?.checkedInToday ? '今日已打卡' : '打卡'}
-                </Button> : null}
-              {record.status === 'active' ? <Button variant="ghost" disabled={busy} onClick={() => void action(record, 'pause')}><Pause className="size-4" /> 暂停</Button> : null}
-              {record.status === 'paused' ? <Button variant="ghost" disabled={busy} onClick={() => void action(record,'resume')}><Play className="size-4" /> 恢复</Button> : null}
-              {modelKey === 'goal' && record.status && ['active','paused'].includes(record.status) ? <>
-                <Button variant="ghost" disabled={busy} onClick={() => void action(record,'achieve')}>达成</Button>
-                <Button variant="ghost" disabled={busy} onClick={() => void action(record,'abandon')}>放弃</Button>
-              </> : null}
-              {modelKey === 'habit' && ['active','paused'].includes(record.status ?? '') ? <Button variant="ghost" disabled={busy} onClick={() => void action(record,'end')}>结束</Button> : null}
-              {record.status && (['achieved','abandoned','ended'].includes(record.status)) ?
-                <Button variant="ghost" disabled={busy} onClick={() => void action(record,'reopen')}>重新开始</Button> : null}
-            </> : modelKey === 'habit' ? <span className="text-xs text-stone-400">仅所属人可管理及打卡</span> : null}
+            {canManage(record) && modelKey === 'anniversary' ? <Button variant="secondary" onClick={() => edit(record)}>编辑</Button> : null}
+            {canManage(record) && modelKey === 'habit' && record.status === 'active' ?
+              <Button variant="primary" disabled={busy || record.computed?.checkIn?.checkedInToday} onClick={() => void action(record,'check-in')}>
+                <Check className="size-4" />{record.computed?.checkIn?.checkedInToday ? '今日已打卡' : '今天打卡'}
+              </Button> : null}
+            {canManage(record) && (modelKey === 'goal' || modelKey === 'habit') && record.status ?
+              <RecordLifecycleMenu model={modelKey} status={record.status} recordName={record.name}
+                disabled={busy} onEdit={() => edit(record)} onAction={key => void action(record,key)} /> : null}
+            {!canManage(record) && modelKey === 'habit' ? <span className="text-xs text-stone-400">仅所属人可管理及打卡</span> : null}
           </div>
         </Card>)}
       </div>}
