@@ -25,7 +25,7 @@ Component({
       { pagePath: '/pages/home/home', text: '首页', icon: 'home' },
       { pagePath: '/pages/events/events', text: '日程', icon: 'calendar' },
       { pagePath: '/pages/tasks/tasks', text: '待办', icon: 'list-checks' },
-      { pagePath: '/pages/profile/profile', text: '我的', icon: 'user' },
+      { pagePath: '/pages/more/more', text: '更多', icon: 'grid' },
     ] as TabItem[],
     actions: [
       { key: 'event', text: '新建日程', icon: '📅', path: '/pages/events/edit', disabled: false },
