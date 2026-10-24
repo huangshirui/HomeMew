@@ -4,6 +4,7 @@ import { handleMiniProgramFinalEventBff } from './miniprogram-final-event-bff.mj
 import { handleMiniProgramFamilyBff } from './miniprogram-family-bff.mjs';
 import { handleMiniProgramTaskWishBff } from './miniprogram-task-wish-bff.mjs';
 import { handleMiniProgramDayDiagnosticBff } from './miniprogram-day-diagnostic-bff.mjs';
+import { handleMiniPlaceSearch } from './map-places.mjs';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -50,6 +51,9 @@ export function createFrontDoorHandler({ app = webHandler } = {}) {
       if (new URL(request.url).pathname.startsWith('/_stage/')) {
         return json({ error: { code: 'NOT_FOUND', message: 'Legacy staging route is retired' } }, 404);
       }
+      const placeBffResponse = await handleMiniPlaceSearch(request, env);
+      if (placeBffResponse) return placeBffResponse;
+
       const eventBffResponse = await handleMiniProgramFinalEventBff(request, env);
       if (eventBffResponse) return eventBffResponse;
 

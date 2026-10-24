@@ -29,7 +29,11 @@
     <!-- 地点 -->
     <view class="card section">
       <text class="section-label">地点</text>
-      <text class="section-value">{{locationText}}</text>
+      <view wx:if="{{locationClickable}}" class="location-open" bindtap="onOpenLocation">
+        <text class="section-value">{{locationText}}</text>
+        <text class="location-open-hint">{{event.locationDetail && event.locationDetail.coordinates ? '查看地图 ›' : '复制地点 ›'}}</text>
+      </view>
+      <text wx:else class="section-value">{{locationText}}</text>
     </view>
 
     <!-- 备注 -->

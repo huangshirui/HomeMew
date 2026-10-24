@@ -28,6 +28,7 @@ import { currentFamilyStore, familiesStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { setCloneSource } from '../../stores/clone-buffer';
 import { downloadRecordIconImage } from '../../services/record-icons';
+import { wgs84ToGcj02 } from '../../utils/map-coordinates';
 
 Page({
   data: {
@@ -44,6 +45,7 @@ Page({
     timeText: '',
     location: '',
     locationText: '无',
+    locationClickable: false,
     attendeeNames: '',
     createdByText: '',
     createdBySystem: false,
@@ -141,6 +143,7 @@ Page({
       timeText,
       location: event.location || '',
       locationText: event.location ? event.location : '无',
+      locationClickable: Boolean(event.location),
       attendeeNames: attendees.length ? attendees.map(a => a.displayName).join('、') : '未指定',
       createdByText: event.createdBy?.name || '',
       createdBySystem: event.createdBy?.type === 'system',
@@ -158,6 +161,22 @@ Page({
             && this.data.event.presentation.icon.fileId === fileId) this.setData({ iconImagePath });
         }).catch(() => undefined);
     }
+  },
+
+  onOpenLocation(): void {
+    const event=this.data.event;
+    if(!event?.location)return;
+    const point=event.locationDetail?.coordinates;
+    if(!point) {
+      wx.showActionSheet({itemList:['复制地点名称'],success:res=>{
+        if(res.tapIndex===0)wx.setClipboardData({data:event.location || ''});
+      }});
+      return;
+    }
+    const gcj=wgs84ToGcj02(point.latitude,point.longitude);
+    wx.openLocation({latitude:gcj.latitude,longitude:gcj.longitude,
+      name:event.location,address:event.locationDetail?.address || '',scale:16,
+      fail:()=>wx.showToast({title:'地图无法打开，请稍后重试',icon:'none'})});
   },
 
   onEdit(): void {

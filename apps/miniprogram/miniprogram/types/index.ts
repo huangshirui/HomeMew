@@ -214,6 +214,13 @@ export interface Actor {
   avatarUrl: string | null;
 }
 
+/** Optional rich selection in the stable Mini Event DTO; legacy location remains text. */
+export interface LocationDetail {
+  name: string;
+  address?: string;
+  coordinates?: { latitude: number; longitude: number }; // WGS84
+}
+
 export interface EventCommon {
   presentation?: { icon: RecordIcon | null };
   id: string;
@@ -221,6 +228,7 @@ export interface EventCommon {
   summary: string;
   description: string | null;
   location: string | null;
+  locationDetail?: LocationDetail;
   status: EventStatus;
   attendees: PersonRef[];
   createdBy: Actor;
@@ -255,6 +263,7 @@ export interface EventWriteCommon {
   description?: string | null;
   attendeeIds?: string[];
   location?: string | null;
+  locationDetail?: LocationDetail | null;
 }
 
 export interface CreateTimedEventRequest extends EventWriteCommon {
@@ -285,6 +294,7 @@ export interface EventUpdateFields {
   description?: string | null;
   attendeeIds?: string[];
   location?: string | null;
+  locationDetail?: LocationDetail | null;
 }
 
 type RequireAtLeastOne<T> = {

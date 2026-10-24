@@ -1,4 +1,5 @@
 import { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
+import { adaptEventWritePayload, eventLocationName, eventLocationWireFormat } from './event-location-compat.mjs';
 
 const ROUTE = /^\/api\/v1\/miniprogram\/families\/([^/]+)\/events(?:\/([^/]+))?$/u;
 const SPACE_ID = /^spc_[A-Za-z0-9_-]+$/u;
@@ -7,7 +8,7 @@ const USER_ID = /^(?:me|usr_[A-Za-z0-9_-]+)$/u;
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
 const LIST_KEYS = new Set(['startDate', 'endDateExclusive', 'timezone', 'attendeeId', 'status', 'q', 'cursor', 'limit']);
-const WRITE_FIELDS = ['presentation', 'summary', 'description', 'location', 'attendeeIds', 'isAllDay', 'startAt', 'endAt', 'startTimezone', 'endTimezone', 'startDate', 'endDateExclusive'];
+const WRITE_FIELDS = ['presentation', 'summary', 'description', 'location', 'locationDetail', 'attendeeIds', 'isAllDay', 'startAt', 'endAt', 'startTimezone', 'endTimezone', 'startDate', 'endDateExclusive'];
 const TIME_FIELDS = ['isAllDay', 'startAt', 'endAt', 'startTimezone', 'endTimezone', 'startDate', 'endDateExclusive'];
 
 function decodeId(value, pattern) {
@@ -140,7 +141,9 @@ export function eventDto(request, raw, list) {
   const common = {
     id: raw.id, familyId: raw.spaceId, summary: raw.summary,
     ...(raw.presentation?.icon ? { presentation: raw.presentation } : {}),
-    description: raw.description ?? null, location: raw.location ?? null, status: raw.status,
+    description: raw.description ?? null, location: eventLocationName(raw.location),
+    ...(raw.location && typeof raw.location === 'object' ? { locationDetail: raw.location } : {}),
+    status: raw.status,
     attendees: (raw.attendeePersonIds ?? []).map(personId => list.find(item => item.personId === personId))
       .filter(Boolean).map(member => ({
         userId: member.userId, displayName: member.displayName,
@@ -248,14 +251,32 @@ async function writeEvent(request, env, route, method) {
     data.attendeePersonIds = resolved.data;
     delete data.attendeeIds;
   }
+  // The legacy field stays a string. New Mini versions may supply a separate
+  // canonical WGS84 selection; older published clients need no update.
+  if (Object.hasOwn(data, 'location') && data.location !== null && typeof data.location !== 'string') {
+    return errorResponse(422, 'VALIDATION_ERROR', 'Event Location label must be text or null');
+  }
+  const hasLocationDetail = Object.hasOwn(data, 'locationDetail');
+  if (hasLocationDetail) {
+    if (!Object.hasOwn(data, 'location') || (data.locationDetail !== null &&
+      (typeof data.locationDetail !== 'object' || Array.isArray(data.locationDetail) ||
+      typeof data.locationDetail.name !== 'string' ||
+      data.locationDetail.name.trim() !== data.location?.trim()))) {
+      return errorResponse(422, 'VALIDATION_ERROR', 'Location selection and label must match');
+    }
+    if (data.locationDetail !== null) data.location = data.locationDetail;
+    delete data.locationDetail;
+  }
   const touchedTime = TIME_FIELDS.some(key => Object.hasOwn(data, key));
+  let currentEvent = null;
   if (method === 'POST' && !touchedTime) return errorResponse(422, 'VALIDATION_ERROR', 'Event time is required');
   if (touchedTime) {
     let complete = data;
     if (method === 'PATCH') {
       const current = await callJson(request, env, recordPath(route.familyId, route.recordId));
       if (!current.ok) return current.response;
-      const currentTemporal = stableTemporal(current.data);
+      currentEvent = current.data;
+      const currentTemporal = stableTemporal(currentEvent);
       if (!currentTemporal) {
         return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'LifeSpace returned an invalid Event temporal range');
       }
@@ -266,8 +287,30 @@ async function writeEvent(request, env, route, method) {
     for (const key of TIME_FIELDS) delete data[key];
     data.when = when;
   }
+  // An older Mini client submits the displayed location label again when the
+  // user edits an unrelated field. Preserve richer canonical coordinates only
+  // when the name is unchanged; otherwise treat this as an explicit relocation.
+  if (method === 'PATCH' && !hasLocationDetail && Object.hasOwn(data, 'location') && eventLocationWireFormat(env) === 'location') {
+    if (!currentEvent) {
+      const existing = await callJson(request, env, recordPath(route.familyId, route.recordId));
+      if (!existing.ok) return existing.response;
+      currentEvent = existing.data;
+    }
+    try {
+      const oldName = eventLocationName(currentEvent.location);
+      const newName = data.location === null ? null : data.location.trim() || null;
+      if (oldName && oldName === newName && currentEvent.location && typeof currentEvent.location === 'object') {
+        data.location = currentEvent.location;
+      }
+    } catch {
+      return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'LifeSpace Event Location is invalid');
+    }
+  }
+  let adapted;
+  try { adapted = adaptEventWritePayload(data, env); }
+  catch { return errorResponse(422, 'VALIDATION_ERROR', 'Event Location is invalid for this LifeSpace release'); }
   const path = method === 'POST' ? collection(route.familyId) : recordPath(route.familyId, route.recordId);
-  const result = await callJson(request, env, path, { method, data });
+  const result = await callJson(request, env, path, { method, data: adapted });
   if (!result.ok) return result.response;
   try { return json({ data: eventDto(request, result.data, memberResult.data) }, result.status, result.requestId); }
   catch { return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'LifeSpace returned an invalid Event resource'); }

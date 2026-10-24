@@ -1,4 +1,8 @@
 /* 日程详情页样式 */
+.location-open { display:flex;align-items:center;justify-content:space-between;gap:16rpx;min-height:64rpx; }
+.location-open .section-value { flex:1; }
+.location-open-hint {flex-shrink:0;color:var(--color-primary);font-size:24rpx;}
+
 
 /* 操作主体来源标记 */
 .actor-value {

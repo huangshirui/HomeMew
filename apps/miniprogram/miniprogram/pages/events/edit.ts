@@ -46,6 +46,8 @@ import {
 import { markDirty } from '../../stores/dirty';
 import { consumeCloneSource } from '../../stores/clone-buffer';
 import { downloadRecordIconImage } from '../../services/record-icons';
+import { searchPlaces } from '../../services/places';
+import type { LocationDetail } from '../../types/index';
 import { originalIconState, prepareRecordIcon, pickerChangeState, type RecordIconPickerChange } from '../../utils/record-icon-edit';
 
 /** 新增日程（非全天）的默认时间：开始取当前时间的下一个整点，结束 +1 小时；跨天则顺延日期 */
@@ -70,6 +72,7 @@ type MemberOption = {
 };
 
 type Mode = 'create' | 'edit';
+let placeSearchTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** 批量创建时保留失败项，便于用户显式重试 */
 
@@ -108,6 +111,11 @@ Page({
     startTime: '09:00',
     endTime: '10:00',
     location: '',
+    locationSelected: null as LocationDetail | null,
+    locationTouched: false,
+    locationCandidates: [] as LocationDetail[],
+    locationStructured: false,
+    locationHint: '',
     /** 重复创建：连续 N 天（1 表示不重复），最长 7 天 */
     repeatDays: 1,
     repeatOptions: ['1', '2', '3', '4', '5', '6', '7'],
@@ -273,6 +281,10 @@ Page({
       timezoneOptions,
       filteredTimezoneOptions: timezoneOptions,
       location: source.location || '',
+      locationSelected: source.locationDetail || null,
+      locationTouched: false,
+      locationCandidates: [],
+      locationHint: '',
       members: this.data.members.map((m) => ({
         ...m,
         selected: selectedIds.has(m.userId),
@@ -332,6 +344,10 @@ Page({
       timezoneOptions,
       filteredTimezoneOptions: timezoneOptions,
       location: event.location || '',
+      locationSelected: event.locationDetail || null,
+      locationTouched: false,
+      locationCandidates: [],
+      locationHint: '',
       version: event.version,
       members: members.map(m => ({
         userId: m.userId,
@@ -367,7 +383,40 @@ Page({
   },
 
   onLocationInput(e: WechatMiniprogram.Input): void {
-    this.setData({ location: e.detail.value });
+    const value = e.detail.value;
+    this.setData({ location: value, locationSelected: null, locationTouched: true,
+      locationCandidates: [], locationHint: '' });
+    if (placeSearchTimer) clearTimeout(placeSearchTimer);
+    if (value.trim().length < 2) return;
+    placeSearchTimer = setTimeout(() => {
+      void searchPlaces(value).then(result => {
+        if (this.data.location !== value) return;
+        this.setData({
+          locationCandidates: result.items,
+          locationStructured: result.structured,
+          locationHint: result.available
+            ? (result.items.length ? '' : '暂无匹配地点，可直接保存名称')
+            : '地点推荐暂不可用，可直接保存名称',
+        });
+      }).catch(() => {
+        if (this.data.location === value) this.setData({ locationCandidates: [],
+          locationHint: '地点搜索暂不可用，可直接保存名称' });
+      });
+    }, 350);
+  },
+
+  onLocationSelect(e: WechatMiniprogram.BaseEvent): void {
+    const index = Number(e.currentTarget.dataset.index);
+    const selected = this.data.locationCandidates[index];
+    if (!selected) return;
+    this.setData({ location: selected.name,
+      locationSelected: this.data.locationStructured ? selected : null,
+      locationTouched: true, locationCandidates: [],
+      locationHint: this.data.locationStructured ? '已选择地图地点' : '当前仅保存地点名称' });
+  },
+
+  onUnload(): void {
+    if (placeSearchTimer) clearTimeout(placeSearchTimer);
   },
 
   onAllDayChange(e: WechatMiniprogram.SwitchChange): void {
@@ -540,6 +589,9 @@ Page({
       description: this.data.description.trim() || null,
       attendeeIds,
       location: this.data.location.trim() || null,
+      ...(this.data.locationTouched || this.data.locationSelected
+        ? { locationDetail: this.data.locationSelected?.name === this.data.location.trim()
+          ? this.data.locationSelected : null } : {}),
     };
     if (this.data.isAllDay) {
       return {
