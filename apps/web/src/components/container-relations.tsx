@@ -11,10 +11,23 @@ import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { apiRequest } from '../lib/api-client';
 import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
+import { RecordLifecycleMenu, type LifecycleAction, type LifecycleStatus } from './record-lifecycle-menu';
 
 type ContainerModel = 'activity' | 'goal' | 'habit';
 type EntityRef = { kind: 'record'; modelKey: string; recordId: string };
-type Relation = { id: string; source: EntityRef; target: EntityRef; sourceLabel?: string; targetLabel?: string };
+type RelatedRecord = { name?: string | null; summary?: string | null; title?: string | null; displayName?: string | null };
+type Relation = { id: string; source: EntityRef; target: EntityRef; sourceLabel?: string; targetLabel?: string;
+  sourceRecord?: RelatedRecord; targetRecord?: RelatedRecord };
+
+/** Hydration includes record data even if the model's referenceLabel resolves to rec_*. */
+export function relatedRecordTitle(label: string | undefined, record: RelatedRecord | undefined, id: string): string {
+  const values = [record?.name, record?.summary, record?.title, record?.displayName, label];
+  for (const value of values) {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    if (normalized && normalized !== id && !/^rec_[A-Za-z0-9_-]+$/.test(normalized)) return normalized;
+  }
+  return '名称暂不可用';
+}
 type Page<T> = { items: T[]; nextCursor: string | null };
 type Candidate = { id: string; name?: string; summary?: string };
 type Countdown = { name: string; anchorDate: string; kind: string };
@@ -29,6 +42,7 @@ const models = [
   { key: 'wish', title: '许愿池', route: '/wishes' },
 ] as const;
 const modelName = (key: string) => models.find(model => model.key === key)?.title ?? '其他内容';
+const statusText: Record<LifecycleStatus,string> = { active:'进行中', paused:'已暂停', achieved:'已达成', abandoned:'已放弃', ended:'已结束' };
 const core = (spaceId: string) => `/api/lifespace/core/v1/spaces/${encodeURIComponent(spaceId)}`;
 const ref = (modelKey: string, recordId: string): EntityRef => ({ kind: 'record', modelKey, recordId });
 const explain = (reason: unknown) => householdErrorMessage(reason, '操作失败，请稍后再试。');
@@ -43,7 +57,7 @@ function daysUntil(anchorDate: string, timezone: string): number {
   return Math.round((anchor - today) / 86_400_000);
 }
 
-export function ContainerRelations({ spaceId, modelKey, record, timezone, writable, participants, onEdit, onClose, mode = 'page' }: {
+export function ContainerRelations({ spaceId, modelKey, record, timezone, writable, participants, onEdit, onClose, mode = 'page', status, lifecycleBusy, onLifecycleAction }: {
   spaceId: string;
   modelKey: ContainerModel;
   record: { id: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; targetDate?: string | null };
@@ -53,6 +67,9 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
   onEdit?: () => void;
   onClose?: () => void;
   mode?: 'page' | 'modal';
+  status?: LifecycleStatus;
+  lifecycleBusy?: boolean;
+  onLifecycleAction?: (action: LifecycleAction) => void;
 }) {
   const { members } = useHousehold();
   const [tab, setTab] = useState<'overview' | 'events' | 'tasks' | 'more'>('overview');
@@ -301,15 +318,22 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
     return <div className="space-y-2">
       {edges.map(edge => {
         const target = outgoingDirection ? edge.target : edge.source;
-        const title = outgoingDirection ? edge.targetLabel : edge.sourceLabel;
+        const title = relatedRecordTitle(outgoingDirection ? edge.targetLabel : edge.sourceLabel,
+          outgoingDirection ? edge.targetRecord : edge.sourceRecord, target.recordId);
         const model = models.find(item => item.key === target.modelKey);
+        const destination = model && ['activity','goal','habit'].includes(target.modelKey)
+          ? `${model.route}/${encodeURIComponent(target.recordId)}`
+          : model?.route;
         return <div key={edge.id} className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2">
           <Link2 className="size-4 shrink-0 text-stone-400" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-stone-800">{title || target.recordId}</div>
+            <div className="truncate text-sm font-medium text-stone-800">{title}</div>
             <div className="text-xs text-stone-500">{modelName(target.modelKey)}{!outgoingDirection ? ' · 此记录关联了当前容器' : ''}</div>
           </div>
-          {model ? <a href={model.route} aria-label={`查看${model.title}列表`} className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100"><ArrowUpRight className="size-4" /></a> : null}
+          {destination ? <a href={destination}
+            aria-label={['activity','goal','habit'].includes(target.modelKey) ? `查看${title}详情` : `前往${model!.title}列表`}
+            title={['activity','goal','habit'].includes(target.modelKey) ? '打开详情' : '查看所属列表'}
+            className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100"><ArrowUpRight className="size-4" /></a> : null}
           {outgoingDirection && writable ? <button type="button" aria-label={`取消关联${title || target.recordId}`}
             disabled={working} onClick={() => void unlink(edge)} className="rounded-lg p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600">
             <Trash2 className="size-4" /></button> : null}
@@ -335,14 +359,20 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
         : 'w-full space-y-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200 sm:p-6'}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-2">
-          <h2 className="break-words text-xl font-semibold text-stone-900">{record.name}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="break-words text-xl font-semibold text-stone-900">{record.name}</h2>
+            {status ? <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600" aria-label={`当前状态：${statusText[status]}`}>{statusText[status]}</span> : null}
+          </div>
           {modelKey === 'activity' ? <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-stone-500">
             <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-4" />
               {record.startDate || record.endDate ? `${record.startDate || '开始日期待定'} → ${record.endDate || '结束日期待定'}` : '活动日期待定'}</span>
             {participants ? <span className="inline-flex items-center gap-1.5"><Users className="size-4" /> {participants}</span> : null}
           </div> : null}
         </div>
-        {writable && onEdit ? <Button variant="secondary" onClick={onEdit}><Pencil className="size-4" /> 编辑{modelKey === 'activity' ? '活动' : modelKey === 'goal' ? '目标' : '习惯'}</Button> : null}
+        {writable && onEdit && modelKey === 'activity' ? <Button variant="secondary" onClick={onEdit}><Pencil className="size-4" /> 编辑活动</Button> : null}
+        {writable && status && onLifecycleAction && modelKey !== 'activity' ?
+          <RecordLifecycleMenu model={modelKey} status={status} recordName={record.name}
+            disabled={lifecycleBusy} onAction={onLifecycleAction} onEdit={onEdit} /> : null}
         {mode === 'modal' ? <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose} disabled={working}><X className="size-4" /></Button> : null}
       </div>
       {record.description ? <p className="whitespace-pre-wrap text-sm text-stone-600">{record.description}</p> : null}
