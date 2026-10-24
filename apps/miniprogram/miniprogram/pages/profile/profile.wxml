@@ -1,6 +1,6 @@
 <!-- 我的页面 -->
 <view class="container">
-  <nav-bar title="我的" />
+  <nav-bar title="我的" showBack="true" />
 
   <!-- 用户信息卡片 -->
   <block wx:if="{{userInfo}}">
