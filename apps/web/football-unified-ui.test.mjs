@@ -65,10 +65,15 @@ test('statistics use filtered LifeSpace records with a natural-month dashboard',
   assert.doesNotMatch(page, /label="图表分组"|>图表分组/);
   assert.match(stats, /buildFootballStats/);
   assert.match(dashboard, /总体数据/);
+  assert.match(dashboard, /label="胜率"/);
+  assert.match(dashboard, /stats\.winRate/);
+  assert.match(dashboard, /有比分 /);
+  assert.match(stats, /scoredMatches/);
+  assert.match(stats, /wins/);
   assert.match(dashboard, /专项趋势/);
-  assert.match(dashboard, /进攻场均/);
-  assert.match(dashboard, /进攻时间/);
-  assert.match(dashboard, /防守场均/);
+  assert.match(dashboard, /场均进攻/);
+  assert.match(dashboard, /进攻效率/);
+  assert.match(dashboard, /场均防守/);
   assert.match(dashboard, /每月参赛场次/);
   assert.match(dashboard, /已记时长 /);
   assert.match(stats, /goalsInTimedMatches/);
