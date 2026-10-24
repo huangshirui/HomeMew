@@ -66,6 +66,7 @@ Page({
   },
   onPullDownRefresh():void{this.load(true).finally(()=>wx.stopPullDownRefresh());},
   onReachBottom():void{if(!this.data.loadingMore && !this.data.loading)this.load(false);},
+  onLoadMore():void{this.onReachBottom();},
   onFilterTap(e:WechatMiniprogram.TouchEvent):void{this.setData({filter:String(e.currentTarget.dataset.key),records:[],nextCursor:null});this.load(true);},
   onToggleSearch():void{this.setData({searchOpen:!this.data.searchOpen});},
   onSearchInput(e:WechatMiniprogram.Input):void{this.setData({search:e.detail.value});},
