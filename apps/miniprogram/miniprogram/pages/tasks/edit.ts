@@ -11,6 +11,7 @@
  * 遵循 SPEC 10.3、10.5。
  */
 
+import { createLinkedRecord } from '../../services/domains';
 import { getTask, createTask, updateTask } from '../../services/tasks';
 import { listFamilyMembers } from '../../services/families';
 import {
@@ -39,6 +40,8 @@ type Mode = 'create' | 'edit';
 Page({
   data: {
     mode: 'create' as Mode,
+    sourceKind: '' as 'activities'|'goals'|'habits'|'',
+    sourceId: '',
     familyId: '',
     taskId: '',
     version: 0,
@@ -61,7 +64,7 @@ Page({
     showCalendar: false,
   },
 
-  async onLoad(options: { familyId?: string; id?: string }): Promise<void> {
+  async onLoad(options: { familyId?: string; id?: string; sourceKind?:string; sourceId?:string }): Promise<void> {
     const familyId = options?.familyId;
     if (!familyId) {
       showError('缺少家庭参数');
@@ -77,6 +80,8 @@ Page({
     const today = formatYmd(new Date());
     this.setData({
       familyId,
+      sourceKind: ['activities','goals','habits'].includes(options.sourceKind || '') ? options.sourceKind as 'activities'|'goals'|'habits' : '',
+      sourceId: options.sourceId || '',
       mode: options?.id ? 'edit' : 'create',
       taskId: options?.id || '',
       minDate: today,
@@ -258,7 +263,13 @@ Page({
         const updatePayload: UpdateTaskRequest = { ...payload, ...(presentation ? { presentation } : {}), version: this.data.version };
         await updateTask(this.data.familyId, this.data.taskId, updatePayload);
       } else {
-        await createTask(this.data.familyId, { ...payload, ...(presentation ? { presentation } : {}) });
+        if (this.data.sourceKind && this.data.sourceId) {
+          await createLinkedRecord(this.data.familyId,this.data.sourceKind,this.data.sourceId,'task',{
+            ...payload,...(presentation ? { presentation } : {}),
+          } as unknown as Record<string,unknown>);
+        } else {
+          await createTask(this.data.familyId, { ...payload, ...(presentation ? { presentation } : {}) });
+        }
       }
       hideLoading();
       showSuccess(this.data.mode === 'edit' ? '已保存' : '已创建');
