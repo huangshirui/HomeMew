@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, Plus, Search, Trash2, X } from 'lucide-react';
 import { useHousehold } from '../components/household-provider';
 import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
@@ -11,7 +11,6 @@ import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
 import { useModalScrollLock } from '../lib/modal-scroll';
 import { type FootballMatch, type FootballPerformance, type FootballPerson, type FootballReference, modelUrl } from './football-domain';
-import { FootballReferencePicker } from './football-reference-picker';
 import { FootballPersonPicker } from './football-person-picker';
 import { fetchUniqueFootballReferences } from './football-reference-hydration';
 import { readRecentFootballReferences, rememberFootballReference } from './football-recent-references';
@@ -33,7 +32,13 @@ export function FootballManagePage() {
   const canWrite = Boolean(currentFamily && currentFamily.role !== 'viewer');
   const [tab, setTab] = useState<'teams' | 'players'>('teams');
   const [teams, setTeams] = useState<FootballReference[]>([]);
-  const [teamFocus, setTeamFocus] = useState('');
+  const [teamSearch, setTeamSearch] = useState('');
+  const [teamSearchResults, setTeamSearchResults] = useState<FootballReference[]>([]);
+  const [teamSearchedTerm, setTeamSearchedTerm] = useState('');
+  const [teamSearchCursor, setTeamSearchCursor] = useState<string | null>(null);
+  const [teamSearching, setTeamSearching] = useState(false);
+  const [teamSearchError, setTeamSearchError] = useState('');
+  const teamSearchReq = useRef(0);
   const [players, setPlayers] = useState<EditablePerson[]>([]);
   const [playerSearch, setPlayerSearch] = useState('');
   const [playerCursor, setPlayerCursor] = useState<string | null>(null);
@@ -50,6 +55,11 @@ export function FootballManagePage() {
   const [success, setSuccess] = useState('');
   const familyPersonIds = useMemo(() => new Set(members.map(item => item.personId).filter(Boolean)), [members]);
   const editablePlayers = players.filter(p => !p.linkedUser && !familyPersonIds.has(p.id));
+  const teamTerm = teamSearch.trim();
+  const teamTermSufficient = [...teamTerm].length >= 2;
+  const visibleTeams = teamTermSufficient
+    ? (teamSearchedTerm === teamTerm ? teamSearchResults : [])
+    : teams.filter(team => !teamTerm || team.name.toLocaleLowerCase().includes(teamTerm.toLocaleLowerCase()));
   useModalScrollLock(Boolean(teamDraft || personDialogOpen));
 
   // Show actual football-used and device-recent teams, not every PersonGroup in the Space.
@@ -70,6 +80,54 @@ export function FootballManagePage() {
     void hydrate();
     return () => { alive = false; };
   }, [spaceId, user?.id]);
+
+  // Search only when the name is specific enough; never scan all PersonGroups.
+  useEffect(() => {
+    const request = ++teamSearchReq.current;
+    const term = teamSearch.trim();
+    setTeamSearchResults([]); setTeamSearchedTerm('');
+    setTeamSearchCursor(null); setTeamSearchError('');
+    if (!spaceId || tab !== 'teams' || [...term].length < 2) {
+      setTeamSearching(false);
+      return;
+    }
+    setTeamSearching(true);
+    const timer = window.setTimeout(() => {
+      queryModelRecords<FootballReference>(spaceId, 'person_group', {
+        search: { text: term }, sort: [{ field: 'name', direction: 'asc' }],
+        page: { limit: 20 },
+      }).then(result => {
+        if (teamSearchReq.current !== request) return;
+        setTeamSearchResults(result.items); setTeamSearchedTerm(term);
+        setTeamSearchCursor(result.nextCursor);
+      }).catch(cause => {
+        if (teamSearchReq.current !== request) return;
+        setTeamSearchError(failure(cause)); setTeamSearchResults([]);
+      }).finally(() => {
+        if (teamSearchReq.current === request) setTeamSearching(false);
+      });
+    }, 320);
+    return () => { window.clearTimeout(timer); ++teamSearchReq.current; };
+  }, [spaceId, tab, teamSearch]);
+  const loadMoreTeamResults = async () => {
+    if (!spaceId || !teamSearchCursor || teamSearching || teamSearchedTerm !== teamTerm) return;
+    const request = teamSearchReq.current;
+    const cursor = teamSearchCursor;
+    setTeamSearching(true);
+    setTeamSearchError('');
+    try {
+      const result = await queryModelRecords<FootballReference>(spaceId, 'person_group', {
+        search: { text: teamSearchedTerm }, sort: [{ field: 'name', direction: 'asc' }],
+        page: { limit: 20, cursor },
+      });
+      if (teamSearchReq.current !== request) return;
+      setTeamSearchResults(prev =>
+        [...new Map([...prev, ...result.items].map(item => [item.id, item])).values()]);
+      setTeamSearchCursor(result.nextCursor);
+    } catch (cause) {
+      if (teamSearchReq.current === request) setTeamSearchError(failure(cause));
+    } finally { if (teamSearchReq.current === request) setTeamSearching(false); }
+  };
 
   const fetchPlayers = useCallback(async (query: string, cursor: string | null, append: boolean) => {
     if (!spaceId) return;
@@ -129,8 +187,13 @@ export function FootballManagePage() {
         method: editingTeam ? 'PATCH' : 'POST', body: JSON.stringify(payload),
       });
       setTeams(prev => [...new Map([...prev.filter(x => x.id !== ref.id), ref].map(x => [x.id, x])).values()]);
+      setTeamSearchResults(prev => {
+        const next = prev.filter(x => x.id !== ref.id);
+        return teamTermSufficient && ref.name.toLocaleLowerCase().includes(teamTerm.toLocaleLowerCase())
+          ? [...next, ref] : next;
+      });
       rememberFootballReference(user?.id ?? '', spaceId, 'person_group', ref);
-      setTeamFocus(ref.id); closeTeam(); setSuccess('球队已保存');
+      closeTeam(); setSuccess('球队已保存');
     } catch (cause) { setError(failure(cause)); }
     finally { setBusy(false); }
   };
@@ -147,7 +210,9 @@ export function FootballManagePage() {
       await apiRequest(modelUrl(spaceId, 'person_group', ref.id), {
         method: 'DELETE', body: JSON.stringify({ version: ref.version }),
       });
-      setTeams(prev => prev.filter(x => x.id !== ref.id)); setTeamFocus(''); setSuccess('球队已删除');
+      setTeams(prev => prev.filter(x => x.id !== ref.id));
+      setTeamSearchResults(prev => prev.filter(x => x.id !== ref.id));
+      setSuccess('球队已删除');
     } catch (cause) { setError(failure(cause)); }
     finally { setBusy(false); }
   };
@@ -216,14 +281,19 @@ export function FootballManagePage() {
           <p className="text-sm text-stone-500">这里显示你最近选过或在比赛中用过的球队，也可以搜索其他球队。</p>
           {canWrite && <Button variant="primary" onClick={() => startTeam()}><Plus className="size-4"/> 新建球队</Button>}
         </div>
-        <FootballReferencePicker userId={user?.id ?? ''} spaceId={spaceId} model="person_group"
-          label="搜索定位球队" optional known={teams} value={teamFocus}
-          onChange={id => {setTeamFocus(id); if (id && !teams.some(item => item.id === id)) {
-            void apiRequest<FootballReference>(modelUrl(spaceId, 'person_group', id))
-              .then(item => setTeams(prev => [...prev, item])).catch(cause => setError(failure(cause)));
-          }}}/>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-3 size-4 text-stone-400"/>
+          <input type="search" aria-label="搜索球队" autoComplete="off"
+            className={input + ' pl-9 pr-9'} placeholder="搜索球队名称" value={teamSearch}
+            onChange={e => setTeamSearch(e.target.value)}/>
+          {teamSearch && <button type="button" aria-label="清除球队搜索" onClick={() => setTeamSearch('')}
+            className="absolute right-3 top-2.5 text-stone-500"><X className="size-4"/></button>}
+        </div>
+        {teamSearching && <p role="status" className="text-xs text-stone-500">正在搜索球队…</p>}
+        {teamSearchError && <p role="alert" className="text-xs text-red-700">{teamSearchError}</p>}
+        {teamTerm && !teamTermSufficient && <p className="text-xs text-stone-500">输入至少两个字可搜索更多球队</p>}
         <div className="divide-y divide-stone-100">
-          {teams.filter(item => !teamFocus || item.id === teamFocus).map(team =>
+          {visibleTeams.map(team =>
             <div key={team.id} className="flex items-center gap-3 py-3">
               {team.presentation?.icon && <RecordIconMark icon={team.presentation.icon}
                 spaceId={spaceId} modelKey="person_group" recordId={team.id}/>}
@@ -236,8 +306,15 @@ export function FootballManagePage() {
                   disabled={busy} onClick={() => void deleteTeam(team)}><Trash2 className="size-4"/></Button>
               </>}
             </div>)}
-          {!teams.length && <p className="p-4 text-sm text-stone-500">还没有常用球队，可以搜索或新建。</p>}
+          {!teamSearching && !teamSearchError && !visibleTeams.length &&
+            <p className="p-4 text-sm text-stone-500">
+              {teamTermSufficient ? (teamSearchedTerm === teamTerm ? '没有找到匹配的球队' : '输入球队名称开始搜索')
+                : teamTerm ? '当前常用球队中没有匹配结果，请继续输入' : '还没有常用球队，可以搜索或新建。'}
+            </p>}
         </div>
+        {teamTermSufficient && teamSearchedTerm === teamTerm && teamSearchCursor &&
+          <Button variant="secondary" className="w-full" disabled={teamSearching}
+            onClick={() => void loadMoreTeamResults()}>加载更多球队</Button>}
       </Card> : <Card className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-stone-500">这里管理其他球员；家庭成员的信息请到家庭管理中修改。</p>
