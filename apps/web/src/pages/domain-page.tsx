@@ -374,11 +374,10 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
         <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">{editing ? '编辑' : '新建'}{spec.title}</h2>
           <button type="button" aria-label="关闭" onClick={() => setDraft(null)} disabled={busy}><X className="size-5" /></button>
         </div>
-        <div className="flex items-center gap-3">
-          <RecordIconField icon={draft.icon} onChange={icon => setDraft(d => d ? { ...d, icon } : d)}
-            spaceId={currentFamily.id} modelKey={modelKey as IconModel} recordId={editing?.id} original={editing?.presentation?.icon} disabled={busy} />
-          <label className={`${field} flex-1`}>名称 *<input className={inputClass} required maxLength={150} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>
-        </div>
+        <RecordTitleField label="名称 *" icon={draft.icon} onIconChange={icon => setDraft(d => d ? { ...d, icon } : d)}
+          spaceId={currentFamily.id} modelKey={modelKey as IconModel} recordId={editing?.id} original={editing?.presentation?.icon} disabled={busy}>
+          <input className={inputClass} required maxLength={150} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />
+        </RecordTitleField>
         <label className={`${field} block`}>说明<textarea value={draft.description} maxLength={5000} onChange={e => setDraft({ ...draft, description: e.target.value })}
           className="min-h-20 w-full rounded-xl border border-stone-200 p-3 text-sm" /></label>
         {modelKey === 'habit' ? <>
@@ -396,9 +395,18 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
               {m.displayName || '家庭成员'}</label>)}</div>
           </fieldset>
           {modelKey === 'anniversary' ? <div className="grid grid-cols-3 gap-2">
-            {(['month','day','year'] as const).map(k => <label key={k} className={field}>{k === 'month' ? '月份 *' : k === 'day' ? '日期 *' : '原始年份'}
-              <input type="number" className={inputClass} required={k !== 'year'} min={k === 'month' ? 1 : k === 'day' ? 1 : 1}
-                max={k === 'month' ? 12 : k === 'day' ? 31 : 9999} value={draft[k]} onChange={e => setDraft({ ...draft, [k]: e.target.value })} /></label>)}
+            {(['year','month','day'] as const).map(k => <label key={k} className={field}>{k === 'year' ? '年' : k === 'month' ? '月 *' : '日 *'}
+              {k === 'year' ? <span className="relative block">
+                <input type="number" inputMode="numeric" min={1} max={9999} className={`${inputClass} pr-[4.4rem] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                  value={draft.year} onChange={e => setDraft({ ...draft, year: e.target.value })} />
+                <span className="absolute inset-y-0 right-1 flex items-center gap-0.5">
+                  <button type="button" aria-label="年减一" className="rounded p-1 text-stone-500 hover:bg-stone-100"
+                    onClick={() => setDraft(d => d ? { ...d, year: stepAnniversaryYear(d.year, -1) } : d)}><Minus className="size-3.5" /></button>
+                  <button type="button" aria-label="年加一" className="rounded p-1 text-stone-500 hover:bg-stone-100"
+                    onClick={() => setDraft(d => d ? { ...d, year: stepAnniversaryYear(d.year, 1) } : d)}><Plus className="size-3.5" /></button>
+                </span>
+              </span> : <input type="number" className={inputClass} required min={1} max={k === 'month' ? 12 : 31}
+                value={draft[k]} onChange={e => setDraft({ ...draft, [k]: e.target.value })} />}</label>)}
           </div> : <div className="grid grid-cols-2 gap-2">
             <label className={field}>开始日期<input type="date" className={inputClass} value={draft.startDate} onChange={e => setDraft({ ...draft, startDate: e.target.value })} /></label>
             <label className={field}>{modelKey === 'activity' ? '结束日期' : '目标日期'}<input type="date" className={inputClass}
