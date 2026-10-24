@@ -20,7 +20,7 @@ export function PageHeader({ title, mobileTitle, compactMobile = false, children
         )}>
           {mobileTitle ? <><span className="sm:hidden">{mobileTitle}</span><span className="hidden sm:inline">{title}</span></> : title}
         </h1>
-        <div className={cn('min-w-0 lg:hidden', compactMobile && 'ml-auto')}>
+        <div className={cn('w-28 min-w-0 lg:hidden', compactMobile && 'ml-auto w-[min(7rem,35vw)]')}>
           <FamilyIdentity mobile />
         </div>
       </div>
