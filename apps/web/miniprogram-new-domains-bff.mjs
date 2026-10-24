@@ -20,7 +20,7 @@ const KINDS = Object.freeze({
   'football-teams': { model: 'person_group', fields: ['name','description','memberPersonIds','presentation','version'] },
 });
 const TARGETS = new Set(['task','event','day_record','activity','goal','habit','anniversary','wish']);
-const ACTIONS = new Set(['pause','resume','achieve','abandon','end','restart','check-in']);
+const ACTIONS = new Set(['pause','resume','achieve','abandon','end','reopen','check-in']);
 const PARAMS = new Set(['limit','cursor','q','status','period','today','personId','year','matchType','matchId','playerPersonId','representativeTeamId','opponentTeamId','competitionActivityId']);
 const safeDecode = (raw, pattern) => {
   try { const decoded = decodeURIComponent(raw); return decoded.length <= 200 && pattern.test(decoded) ? decoded : null; }
