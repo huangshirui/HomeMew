@@ -1,4 +1,5 @@
 import { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
+import { adaptEventWritePayload, eventLocationName } from './event-location-compat.mjs';
 
 const ROUTE = /^\/api\/v1\/miniprogram\/families\/([^/]+)\/events(?:\/([^/]+))?$/u;
 const SPACE_ID = /^spc_[A-Za-z0-9_-]+$/u;
@@ -140,7 +141,7 @@ export function eventDto(request, raw, list) {
   const common = {
     id: raw.id, familyId: raw.spaceId, summary: raw.summary,
     ...(raw.presentation?.icon ? { presentation: raw.presentation } : {}),
-    description: raw.description ?? null, location: raw.location ?? null, status: raw.status,
+    description: raw.description ?? null, location: eventLocationName(raw.location), status: raw.status,
     attendees: (raw.attendeePersonIds ?? []).map(personId => list.find(item => item.personId === personId))
       .filter(Boolean).map(member => ({
         userId: member.userId, displayName: member.displayName,
@@ -266,8 +267,11 @@ async function writeEvent(request, env, route, method) {
     for (const key of TIME_FIELDS) delete data[key];
     data.when = when;
   }
+  let adapted;
+  try { adapted = adaptEventWritePayload(data, env); }
+  catch { return errorResponse(422, 'VALIDATION_ERROR', 'Event Location is invalid for this LifeSpace release'); }
   const path = method === 'POST' ? collection(route.familyId) : recordPath(route.familyId, route.recordId);
-  const result = await callJson(request, env, path, { method, data });
+  const result = await callJson(request, env, path, { method, data: adapted });
   if (!result.ok) return result.response;
   try { return json({ data: eventDto(request, result.data, memberResult.data) }, result.status, result.requestId); }
   catch { return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'LifeSpace returned an invalid Event resource'); }
