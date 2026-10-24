@@ -193,3 +193,10 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 - **球队管理 UX**：`/football/manage` 的球队页不再使用 `FootballReferencePicker` 的「先指定某支球队」交互或「全部／不指定」候选，改为单一搜索框 + 下方可操作的球队列表。空查询展示最近选择或实际比赛使用过的球队；输入少于两个字符只筛选已载入的常用球队，输入两个字符或以上后通过 LifeSpace Canonical Query 的 `search.text` 实时名称查询，320ms 防抖、单页 `limit=20`、支持 cursor 加载更多。新/修改/删除球队在列表与搜索结果中同步变化；不同家庭及输入变化时旧异步响应不得覆盖新结果，不依赖全量 PersonGroup 扫描。
 - **筛选展开原因与修复**：足球比赛列表的“赛事／代表球队／对手球队”都复用通用 Reference Picker，原下拉内容采用 `position: relative` 留在父级 flex 行的文档流中；父行 `items-end` 底部对齐，弹出列表增加高度时会把其他筛选控件整体顶上去。现在新增专用于筛选的 `overlay` 布局（`position: absolute; top: 100%`，右对齐、有最大高度和独立滚动），不改变外层筛选行高度，始终从对应输入框下方悬浮展开。其他模态表单中的 Picker 保持原有 flow 布局，避免其弹层被表单滚动容器裁剪。点击外部或 Escape 关闭。
 - **范围与测试**：只改 HomeMew Web 应用，不涉及 LifeSpace 模型、权限或额外业务存储；已增加测试约束球队搜索没有单选焦点、服务端搜索分页及三个筛选框均使用悬浮弹层。归入 [HomeMew Draft PR #142](https://github.com/huangshirui/HomeMew/pull/142)，无自动合并或部署。
+
+## 2026-10-24 · 足球筛选年份与球队搜索双叉体验修复
+
+- **双清除图标**：球队管理页原搜索字段使用 `type="search"`，Chrome 等浏览器会绘制内置清除叉号，页面又绘制了自定义 × 按钮，出现双叉。将该框改为 `type="text" inputMode="search"` 并保留唯一的显式清除按钮；保留移动端搜索键盘和搜索体验，不依赖浏览器自带的取消图标。
+- **年份筛选 UX**：原代码硬编码 `currentYear - 0..34`，所以 2026 年会列出 1992–2026 共 35 年，即使没有任何比赛。现改为仅显示浏览器当前年与往前四年（2026 年为 2026–2022），以及“其他年份…”入口，用户可在下方不影响布局的悬浮小表单中输入任意 1900–9999 四位年份。选中的自定义年份保留在下拉选项中；“全部年份”清除过滤。每次页面渲染基于当前年份产生选项，2027 年自动变为 2027–2023，无需每年发布代码。未来年份也可通过自定义入口指定。
+- **性能与准确性**：不以当前页的 40 场比赛推断全库有哪些年份，也不为动态年份请求执行 D1 全表 `DISTINCT`/扫描；已有 LifeSpace Canonical Query 的 `matchDate >= YYYY-01-01 && < (YYYY+1)-01-01` 过滤不变。更早年份的比赛仍可按确切年份访问。
+- **代码与测试**：HomeMew Draft PR #142 修改球队管理输入框、足球筛选器、增加 `football-year-filter.tsx` 和纯逻辑 `football-year-options.ts`、单元测试 `football-year-options.test.mjs` 及 UI 回归断言。Web 与 Mini Check 当前提交成功，暂未合并或部署 Preview/Production。
