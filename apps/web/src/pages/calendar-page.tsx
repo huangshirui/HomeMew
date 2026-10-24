@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ChevronLeft, ChevronRight, Clock3, Gift, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { RecordTitleField } from '../components/record-title-field';
 import { useHousehold } from '../components/household-provider';
-import { RecordIconField, RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
+import { RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
 import { Button } from '../components/ui/button';
 import { PageHeader } from '../components/ui/page-header';
 import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
@@ -949,14 +950,9 @@ function EventEditor({
         </div>
 
         <div className="mt-5 grid gap-4">
-          <div className="flex items-end gap-3">
-            <RecordIconField icon={draft.icon} onChange={icon => set('icon', icon)} disabled={readOnly || saving}
-            original={editing?.presentation?.icon} spaceId={spaceId} modelKey="event" recordId={editing?.id} />
-            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium text-stone-700">
-            日程名称
+          <RecordTitleField label="日程名称" icon={draft.icon} onIconChange={icon => set('icon', icon)} disabled={readOnly || saving} original={editing?.presentation?.icon} spaceId={spaceId} modelKey="event" recordId={editing?.id}>
             <input className={inputClass} disabled={readOnly} maxLength={100} value={draft.summary} onChange={(event) => set('summary', event.target.value)} autoFocus={!editing} />
-          </label>
-          </div>
+          </RecordTitleField>
 
           <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-stone-200">
             <input id="calendar-all-day" type="checkbox" className="size-4 accent-emerald-600" disabled={readOnly} checked={draft.isAllDay} onChange={(event) => set('isAllDay', event.target.checked)} />
