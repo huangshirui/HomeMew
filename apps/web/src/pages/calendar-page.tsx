@@ -13,7 +13,7 @@ import { Card } from '../components/ui/card';
 import { apiRequest } from '../lib/api-client';
 import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
-import { eventLocationDraftValue, eventLocationLabel, type EventLocation } from '../lib/location-value';
+import { eventLocationDraftValue, eventLocationLabel, type EventLocation, type LocationValue } from '../lib/location-value';
 
 type TemporalRange =
   | { kind: 'date'; start: string; endExclusive: string }
@@ -57,6 +57,7 @@ export type EventDraft = {
   summary: string;
   description: string;
   location: string;
+  locationPoint?: LocationValue | null;
   isAllDay: boolean;
   startDate: string;
   endDate: string;
@@ -213,7 +214,8 @@ export function eventPayload(draft: EventDraft, previousLocation?: EventLocation
   const common = {
     summary: draft.summary.trim(),
     description: draft.description.trim() || null,
-    location: eventLocationDraftValue(draft.location, previousLocation),
+    location: draft.locationPoint && draft.locationPoint.name === draft.location.trim()
+      ? draft.locationPoint : eventLocationDraftValue(draft.location, previousLocation),
     attendeePersonIds: draft.attendeePersonIds,
   };
   if (draft.isAllDay) {
@@ -972,10 +974,9 @@ export function EventEditor({
             </div>
           ) : null}
 
-          <label className="grid gap-1.5 text-sm font-medium text-stone-700">
-            <span className="flex items-center gap-1.5"><MapPin className="size-3.5" /> 地点</span>
-            <input className={inputClass} disabled={readOnly} maxLength={500} value={draft.location} onChange={(event) => set('location', event.target.value)} />
-          </label>
+          <PlaceSearchInput name={draft.location} point={draft.locationPoint}
+            existing={editing?.location} disabled={readOnly}
+            onChange={(name, point) => onChange({ ...draft, location: name, locationPoint: point })} />
 
           <label className="grid gap-1.5 text-sm font-medium text-stone-700">
             说明
@@ -1021,4 +1022,71 @@ export function EventEditor({
       </form>
     </div>
   );
+}
+
+
+type PlaceSearchResult = { items: LocationValue[]; available: boolean; structured: boolean };
+function locationMapLinks(value: EventLocation) {
+  const name=eventLocationLabel(value);
+  if (!name) return null;
+  const point=value && typeof value==='object' ? value.coordinates : undefined;
+  const amap=new URL(point ? 'https://uri.amap.com/marker' : 'https://uri.amap.com/search');
+  if(point) {
+    amap.searchParams.set('position', `${point.longitude},${point.latitude}`);
+    amap.searchParams.set('name', name);
+    amap.searchParams.set('coordinate','wgs84');
+  } else amap.searchParams.set('keyword',name);
+  amap.searchParams.set('src','homemew');
+  const google=new URL('https://www.google.com/maps/search/');
+  google.searchParams.set('api','1');
+  google.searchParams.set('query',point ? `${point.latitude},${point.longitude}` : name);
+  return {amap:amap.toString(),google:google.toString()};
+}
+function PlaceSearchInput({name,point,existing,onChange,disabled}:{
+  name:string;point?:LocationValue|null;existing?:EventLocation;
+  onChange:(name:string,point:LocationValue|null)=>void;disabled:boolean;
+}) {
+  const [items,setItems]=useState<LocationValue[]>([]);
+  const [active,setActive]=useState(false);
+  const [note,setNote]=useState('');
+  const [structured,setStructured]=useState(false);
+  const displayed=point?.name===name.trim()?point:
+    eventLocationLabel(existing??null)===name.trim()?existing:null;
+  const links=locationMapLinks(displayed??name);
+  useEffect(()=>{
+    const text=name.trim();
+    if(disabled||!active||text.length<2){setItems([]);setNote('');return;}
+    const controller=new AbortController();
+    const timer=setTimeout(()=>{
+      void apiRequest<PlaceSearchResult>(`/api/places/search?q=${encodeURIComponent(text)}`,{signal:controller.signal})
+        .then(data=>{setItems(data.items);setStructured(data.structured);
+          setNote(data.available?(data.items.length?'':'没有找到匹配地点，可直接保存名称'):'地点推荐暂不可用，可直接保存名称');})
+        .catch(()=>{if(!controller.signal.aborted){setItems([]);setNote('地点搜索暂不可用，可直接保存名称');}});
+    },350);
+    return ()=>{clearTimeout(timer);controller.abort();};
+  },[name,active,disabled]);
+  return <div className="grid gap-1.5 text-sm font-medium text-stone-700">
+    <label htmlFor="event-location" className="flex items-center gap-1.5"><MapPin className="size-3.5" /> 地点</label>
+    <input id="event-location" className={inputClass} disabled={disabled} maxLength={500}
+      autoComplete="off" value={name} placeholder="输入地点名称或自由填写"
+      onFocus={()=>setActive(true)}
+      onChange={event=>{onChange(event.target.value,null);setActive(true);}} />
+    {active&&!disabled&&items.length>0?<div className="max-h-44 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-sm">
+      {items.map((item,index)=><button type="button" key={index}
+        className="block w-full border-b border-stone-100 px-3 py-2 text-left last:border-0 hover:bg-stone-50"
+        onClick={()=>{onChange(item.name,structured?item:null);setItems([]);setActive(false);}}>
+        <span className="block text-sm font-medium text-stone-800">{item.name}</span>
+        {item.address?<span className="block text-xs text-stone-500">{item.address}</span>:null}
+      </button>)}
+    </div>:null}
+    {active&&!disabled&&note?<p className="text-xs font-normal text-stone-400">{note}</p>:null}
+    {point?.coordinates&&point.name===name.trim()?
+      <p className="text-xs font-normal text-emerald-700">已选择精确地点，将保存地址与 WGS84 坐标</p>:null}
+    {links?<div className="flex flex-wrap gap-3 text-xs font-normal">
+      <a href={links.amap} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline">高德地图 ↗</a>
+      <a href={links.google} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline">Google 地图 ↗</a>
+      {!displayed || typeof displayed==='string' || !displayed.coordinates
+        ? <span className="text-stone-400">仅按名称搜索，位置可能不唯一</span>:null}
+    </div>:null}
+  </div>;
 }
