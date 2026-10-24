@@ -13,6 +13,7 @@ import { Card } from '../components/ui/card';
 import { apiRequest } from '../lib/api-client';
 import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords } from '../lib/canonical-query';
+import { eventLocationDraftValue, eventLocationLabel, type EventLocation } from '../lib/location-value';
 
 type TemporalRange =
   | { kind: 'date'; start: string; endExclusive: string }
@@ -26,7 +27,7 @@ type EventRecord = {
   modelVersion: number;
   summary: string;
   description: string | null;
-  location: string | null;
+  location: EventLocation;
   when: TemporalRange;
   attendeePersonIds: string[];
   status: 'active' | 'cancelled';
@@ -179,7 +180,7 @@ function draftFromEvent(event: EventRecord, viewingTimezone: string): EventDraft
       summary: event.summary,
       icon: iconDraftFor(event.presentation?.icon),
       description: event.description ?? '',
-      location: event.location ?? '',
+      location: eventLocationLabel(event.location),
       isAllDay: true,
       startDate: event.when.start,
       endDate: addDays(event.when.endExclusive, -1),
@@ -195,7 +196,7 @@ function draftFromEvent(event: EventRecord, viewingTimezone: string): EventDraft
     summary: event.summary,
     icon: iconDraftFor(event.presentation?.icon),
     description: event.description ?? '',
-    location: event.location ?? '',
+    location: eventLocationLabel(event.location),
     isAllDay: false,
     startDate: start.date,
     endDate: end.date,
@@ -206,13 +207,13 @@ function draftFromEvent(event: EventRecord, viewingTimezone: string): EventDraft
   };
 }
 
-export function eventPayload(draft: EventDraft) {
+export function eventPayload(draft: EventDraft, previousLocation?: EventLocation) {
   if (!draft.summary.trim()) throw new Error('请输入日程名称');
   if (!draft.startDate || !draft.endDate) throw new Error('请选择日期');
   const common = {
     summary: draft.summary.trim(),
     description: draft.description.trim() || null,
-    location: draft.location.trim() || null,
+    location: eventLocationDraftValue(draft.location, previousLocation),
     attendeePersonIds: draft.attendeePersonIds,
   };
   if (draft.isAllDay) {
@@ -494,7 +495,7 @@ export function CalendarPage() {
     setSaving(true);
     setError(null);
     try {
-      const payload = { ...eventPayload(draft), ...await presentationToSave(currentFamily.id, 'event', draft.icon, editing?.presentation?.icon) };
+      const payload = { ...eventPayload(draft, editing?.location), ...await presentationToSave(currentFamily.id, 'event', draft.icon, editing?.presentation?.icon) };
       if (editing) {
         await apiRequest<EventRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/event/records/${encodeURIComponent(editing.id)}`, {
           method: 'PATCH',
@@ -686,7 +687,7 @@ export function CalendarPage() {
                     <span className="min-w-0 flex-1">
                       <span className="block break-words text-sm font-semibold text-stone-900"><RecordIconMark
               icon={event.presentation?.icon} spaceId={event.spaceId} modelKey="event" recordId={event.id} className="mr-1" />{event.summary}</span>
-                      {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{event.location}</span> : null}
+                      {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{eventLocationLabel(event.location)}</span> : null}
                       {span.endInclusive > span.start ? <span className="mt-1 block text-xs text-stone-400">持续至 {span.endInclusive}</span> : null}
                     </span>
                   </button>
@@ -879,7 +880,7 @@ function CalendarAgenda({ events, timeZone, onOpen }: {
             <span className="block break-words text-sm font-semibold text-stone-900"><RecordIconMark
               icon={event.presentation?.icon} spaceId={event.spaceId} modelKey="event" recordId={event.id}
               className="mr-1" />{event.summary}</span>
-            {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{event.location}</span> : null}
+            {event.location ? <span className="mt-1 block break-words text-xs text-stone-500">{eventLocationLabel(event.location)}</span> : null}
           </span>
         </button>
       ))}
