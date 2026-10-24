@@ -1,5 +1,5 @@
 import { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
-import { adaptEventWritePayload, eventLocationName } from './event-location-compat.mjs';
+import { adaptEventWritePayload, eventLocationName, eventLocationWireFormat } from './event-location-compat.mjs';
 
 const ROUTE = /^\/api\/v1\/miniprogram\/families\/([^/]+)\/events(?:\/([^/]+))?$/u;
 const SPACE_ID = /^spc_[A-Za-z0-9_-]+$/u;
@@ -249,14 +249,21 @@ async function writeEvent(request, env, route, method) {
     data.attendeePersonIds = resolved.data;
     delete data.attendeeIds;
   }
+  // The reviewed Mini DTO accepts only a label, never an arbitrary canonical
+  // object supplied by the browser/client. This preserves the product boundary.
+  if (Object.hasOwn(data, 'location') && data.location !== null && typeof data.location !== 'string') {
+    return errorResponse(422, 'VALIDATION_ERROR', 'Event Location must be text or null');
+  }
   const touchedTime = TIME_FIELDS.some(key => Object.hasOwn(data, key));
+  let currentEvent = null;
   if (method === 'POST' && !touchedTime) return errorResponse(422, 'VALIDATION_ERROR', 'Event time is required');
   if (touchedTime) {
     let complete = data;
     if (method === 'PATCH') {
       const current = await callJson(request, env, recordPath(route.familyId, route.recordId));
       if (!current.ok) return current.response;
-      const currentTemporal = stableTemporal(current.data);
+      currentEvent = current.data;
+      const currentTemporal = stableTemporal(currentEvent);
       if (!currentTemporal) {
         return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'LifeSpace returned an invalid Event temporal range');
       }
@@ -266,6 +273,25 @@ async function writeEvent(request, env, route, method) {
     if (!when) return errorResponse(422, 'VALIDATION_ERROR', 'Event time range is invalid');
     for (const key of TIME_FIELDS) delete data[key];
     data.when = when;
+  }
+  // An older Mini client submits the displayed location label again when the
+  // user edits an unrelated field. Preserve richer canonical coordinates only
+  // when the name is unchanged; otherwise treat this as an explicit relocation.
+  if (method === 'PATCH' && Object.hasOwn(data, 'location') && eventLocationWireFormat(env) === 'location') {
+    if (!currentEvent) {
+      const existing = await callJson(request, env, recordPath(route.familyId, route.recordId));
+      if (!existing.ok) return existing.response;
+      currentEvent = existing.data;
+    }
+    try {
+      const oldName = eventLocationName(currentEvent.location);
+      const newName = data.location === null ? null : data.location.trim() || null;
+      if (oldName && oldName === newName && currentEvent.location && typeof currentEvent.location === 'object') {
+        data.location = currentEvent.location;
+      }
+    } catch {
+      return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'LifeSpace Event Location is invalid');
+    }
   }
   let adapted;
   try { adapted = adaptEventWritePayload(data, env); }
