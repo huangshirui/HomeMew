@@ -25,7 +25,15 @@
     "pages/days/edit",
     "pages/wishes/list",
     "pages/wishes/detail",
-    "pages/wishes/edit"
+    "pages/wishes/edit",
+    "pages/more/more",
+    "pages/domains/list",
+    "pages/domains/edit",
+    "pages/domains/detail",
+    "pages/football/list",
+    "pages/football/detail",
+    "pages/football/edit",
+    "pages/football/stats"
   ],
   "usingComponents": {
     "user-avatar": "/components/user-avatar/index",
@@ -64,8 +72,8 @@
         "selectedIconPath": "assets/icons/task-active.png"
       },
       {
-        "pagePath": "pages/profile/profile",
-        "text": "我的",
+        "pagePath": "pages/more/more",
+        "text": "更多",
         "iconPath": "assets/icons/profile.png",
         "selectedIconPath": "assets/icons/profile-active.png"
       }
