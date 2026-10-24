@@ -121,7 +121,8 @@
         "ENVIRONMENT": "production",
         "WECHAT_APP_ID": "wxfd143b71ac6ace74",
         "LIFESPACE_IDENTITY_URL": "https://auth.aisr.online",
-        "LIFESPACE_CORE_URL": "https://core.aisr.online"
+        "LIFESPACE_CORE_URL": "https://core.aisr.online",
+        "RECENT_PLACES_PERSISTENCE_ALLOWED": "true"
       },
       "durable_objects": {
         "bindings": [

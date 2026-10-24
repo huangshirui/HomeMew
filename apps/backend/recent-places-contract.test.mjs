@@ -11,8 +11,9 @@ test('RecentPlaces has versioned SQLite DO and isolated bindings',()=>{
  assert.match(worker,/RECENT_PLACES_PERSISTENCE_ALLOWED !== 'true'/);
 });
 
-test('RecentPlaces persistence opt-in matches Staging worker only',()=>{
+test('RecentPlaces app feature is enabled for both staging and production, independent of provider',()=>{
  assert.equal(cfg.env.staging.vars.RECENT_PLACES_PERSISTENCE_ALLOWED,'true');
- assert.equal(cfg.env.production.vars.RECENT_PLACES_PERSISTENCE_ALLOWED,undefined);
+ assert.equal(cfg.env.production.vars.RECENT_PLACES_PERSISTENCE_ALLOWED,'true');
  assert.equal(cfg.vars?.RECENT_PLACES_PERSISTENCE_ALLOWED,undefined);
+ assert.doesNotMatch(worker,/AMap 3\.5 prohibits caching provider data/);
 });
