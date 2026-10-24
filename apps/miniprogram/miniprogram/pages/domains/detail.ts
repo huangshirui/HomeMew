@@ -68,7 +68,7 @@ Page({
       const ids=record.attendeePersonIds||record.subjectPersonIds||(record.subjectPersonId?[record.subjectPersonId]:[]);
       const dateLabel=[record.startDate,record.endDate||record.targetDate].filter(Boolean).join(' — ');
       const subjectOwner=Boolean(kind==='habits'&&people.find(p=>p.userId===userStore.value?.id)?.personId===record.subjectPersonId);
-      const canWrite=currentFamilyStore.value?.role!=='viewer'&&(kind!=='habits'||subjectOwner);
+      const canWrite=(currentFamilyStore.value?.role as string)!=='viewer'&&(kind!=='habits'||subjectOwner);
       this.setData({record,title:record.name||DOMAIN_COPY[kind].title,
         icon:record.presentation?.icon?.type==='emoji'?record.presentation.icon.value:DOMAIN_COPY[kind].symbol,
         statusLabel:record.status?STATUS_COPY[record.status]:'',dateLabel,
@@ -79,6 +79,7 @@ Page({
     finally{if(generation===this._generation)this.setData({loading:false});}
   },
   onRetry():void{void this.refresh();},
+  noop():void{},
   onTab(e:WechatMiniprogram.TouchEvent):void{this.setData({tab:String(e.currentTarget.dataset.key) as Tab});},
   onEdit():void{
     if(!this.data.canWrite)return;
