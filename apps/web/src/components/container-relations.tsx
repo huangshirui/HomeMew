@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { ArrowUpRight, CalendarClock, CalendarDays, Link2, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react';
+import { ArrowUpRight, CalendarClock, CalendarDays, CheckSquare, Link2, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { useHousehold } from './household-provider';
+import { eventPayload, defaultDraft, EventEditor, type EventDraft } from '../pages/calendar-page';
+import { presentationToSave } from './record-icon';
+import { useModalScrollLock } from '../lib/modal-scroll';
 import { showScrollbarWhileScrolling } from '../components/ui/modal-behavior';
 import { apiRequest } from '../lib/api-client';
 import { householdErrorMessage } from '../lib/user-facing-error';
@@ -37,7 +41,7 @@ function daysUntil(anchorDate: string, timezone: string): number {
   return Math.round((anchor - today) / 86_400_000);
 }
 
-export function ContainerRelations({ spaceId, modelKey, record, timezone, writable, participants, onEdit, onClose }: {
+export function ContainerRelations({ spaceId, modelKey, record, timezone, writable, participants, onEdit, onClose, mode = 'page' }: {
   spaceId: string;
   modelKey: ContainerModel;
   record: { id: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; targetDate?: string | null };
@@ -45,8 +49,12 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
   writable: boolean;
   participants?: string;
   onEdit?: () => void;
-  onClose: () => void;
+  onClose?: () => void;
+  mode?: 'page' | 'modal';
 }) {
+  const { members } = useHousehold();
+  const [tab, setTab] = useState<'overview' | 'events' | 'tasks' | 'more'>('overview');
+  const [eventDraft, setEventDraft] = useState<EventDraft | null>(null);
   const [outgoing, setOutgoing] = useState<Relation[]>([]);
   const [incoming, setIncoming] = useState<Relation[]>([]);
   const [outCursor, setOutCursor] = useState<string | null>(null);
@@ -68,6 +76,7 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
   const [countdownDate, setCountdownDate] = useState('');
   const [countdowns, setCountdowns] = useState<Record<string, Countdown>>({});
   const relationsUrl = `${core(spaceId)}/semantic-relations`;
+  useModalScrollLock(Boolean(eventDraft));
 
   const queryRelations = useCallback(async (direction: 'source' | 'target', cursor: string | null) => {
     const params = new URLSearchParams({
@@ -208,6 +217,38 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
     finally { setWorking(false); }
   }
 
+  function startEvent() {
+    const draft = defaultDraft(timezone, record.startDate || undefined);
+    setEventDraft(draft);
+    setTaskOpen(false); setCountdownOpen(false); setPickerOpen(false);
+  }
+
+  async function addEvent(event: FormEvent) {
+    event.preventDefault();
+    if (!writable || !eventDraft || working) return;
+    setWorking(true); setError('');
+    try {
+      const payload = {
+        ...eventPayload(eventDraft),
+        ...await presentationToSave(spaceId, 'event', eventDraft.icon),
+      };
+      await apiRequest(`${core(spaceId)}/models/batch`, {
+        method: 'POST', body: JSON.stringify({
+          atomicConsistency: true,
+          operations: [
+            { operation: 'create', modelKey: 'event', clientRef: 'new_event', data: payload },
+            { operation: 'relation_create', predicate: 'relates_to',
+              source: ref(modelKey, record.id),
+              target: { kind: 'record', modelKey: 'event', clientRef: 'new_event' } },
+          ],
+        }),
+      });
+      setEventDraft(null);
+      await refreshRelations();
+    } catch (cause) { setError(explain(cause)); }
+    finally { setWorking(false); }
+  }
+
   function startTask() {
     setTaskName(''); setTaskDueDate('');
     setTaskOpen(true); setPickerOpen(false); setCountdownOpen(false);
@@ -246,10 +287,21 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
     </div>;
   }
 
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6"
-    role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !working) onClose(); }}>
-    <div role="dialog" aria-modal="true" aria-label={`${record.name}关联内容`} onScroll={showScrollbarWhileScrolling}
-      className="max-h-[92dvh] w-full max-w-2xl space-y-5 overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-white p-5 shadow-xl sm:rounded-3xl sm:p-6">
+  const filteredEdges = mode === 'modal' || tab === 'overview' ? outgoing
+    : tab === 'events' ? outgoing.filter(edge => edge.target.modelKey === 'event')
+      : tab === 'tasks' ? outgoing.filter(edge => edge.target.modelKey === 'task')
+        : outgoing.filter(edge => !['event','task'].includes(edge.target.modelKey));
+  return <>
+  <div className={mode === 'modal'
+      ? 'fixed inset-0 z-50 flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6'
+      : 'w-full'} role={mode === 'modal' ? 'presentation' : undefined}
+    onMouseDown={event => { if (mode === 'modal' && event.target === event.currentTarget && !working) onClose?.(); }}>
+    <div role={mode === 'modal' ? 'dialog' : undefined} aria-modal={mode === 'modal' ? true : undefined}
+      aria-label={mode === 'modal' ? `${record.name}关联内容` : undefined}
+      onScroll={mode === 'modal' ? showScrollbarWhileScrolling : undefined}
+      className={mode === 'modal'
+        ? 'max-h-[92dvh] w-full max-w-2xl space-y-5 overflow-y-auto overscroll-contain scrollbar-overlay rounded-t-3xl bg-white p-5 shadow-xl sm:rounded-3xl sm:p-6'
+        : 'w-full space-y-5 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200 sm:p-6'}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-2">
           <h2 className="break-words text-xl font-semibold text-stone-900">{record.name}</h2>
@@ -259,13 +311,28 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
             {participants ? <span className="inline-flex items-center gap-1.5"><Users className="size-4" /> {participants}</span> : null}
           </div> : null}
         </div>
-        {modelKey === 'activity' && writable && onEdit ? <Button variant="secondary" onClick={onEdit}><Pencil className="size-4" /> 编辑活动</Button> : null}
-        <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose} disabled={working}><X className="size-4" /></Button>
+        {writable && onEdit ? <Button variant="secondary" onClick={onEdit}><Pencil className="size-4" /> 编辑{modelKey === 'activity' ? '活动' : modelKey === 'goal' ? '目标' : '习惯'}</Button> : null}
+        {mode === 'modal' ? <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose} disabled={working}><X className="size-4" /></Button> : null}
       </div>
       {record.description ? <p className="whitespace-pre-wrap text-sm text-stone-600">{record.description}</p> : null}
+      {mode === 'page' && writable ? <div className="flex flex-wrap gap-2 rounded-2xl bg-emerald-50/60 p-3">
+        {modelKey === 'activity' ? <Button variant="secondary" onClick={startEvent}><CalendarDays className="size-4" /> 新建日程</Button> : null}
+        <Button variant="secondary" onClick={startTask}><CheckSquare className="size-4" /> 新建待办</Button>
+        {modelKey === 'activity' ? <Button variant="secondary" onClick={startCountdown}><CalendarClock className="size-4" /> 添加倒计时</Button> : null}
+        <Button variant="secondary" onClick={openPicker}><Link2 className="size-4" /> 关联已有内容</Button>
+        {modelKey === 'activity' && onEdit ? <Button variant="ghost" onClick={onEdit}><Users className="size-4" /> 管理参与人</Button> : null}
+      </div> : null}
+      {mode === 'page' ? <div role="tablist" aria-label="详情内容" className="flex flex-wrap gap-2 border-b border-stone-100 pb-3">
+        {(modelKey === 'activity' ? [['overview','概览'],['events','日程'],['tasks','待办'],['more','更多内容']]
+          : modelKey === 'goal' ? [['overview','概览'],['tasks','行动计划'],['more','相关内容']]
+          : [['overview','概览'],['more','相关内容']] as string[][]).map(([value,label]) =>
+          <button key={value} role="tab" type="button" aria-selected={tab === value}
+            onClick={() => setTab(value as typeof tab)}
+            className={`rounded-lg px-4 py-2 text-sm ${tab === value ? 'bg-emerald-100 font-semibold text-emerald-800' : 'text-stone-500 hover:bg-stone-50'}`}>{label}</button>)}
+      </div> : null}
       {error ? <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
 
-      {modelKey === 'activity' ? <section className="space-y-3">
+      {modelKey === 'activity' && (mode === 'modal' || tab === 'overview' || tab === 'more') ? <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">重要日子</h3>
           {writable ? <Button variant="secondary" onClick={startCountdown}><CalendarClock className="size-4" /> 添加倒计时</Button> : null}
@@ -284,17 +351,17 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
       </section> : null}
 
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">{modelKey === 'activity' ? '活动安排' : '相关内容'}</h3>
-          {writable ? <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">{modelKey === 'activity' ? (tab === 'events' ? '活动日程' : tab === 'tasks' ? '活动待办' : '活动安排') : modelKey === 'goal' ? (tab === 'tasks' ? '行动计划' : '相关内容') : '相关内容'}</h3>
+          {writable && mode === 'modal' ? <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={startTask}><Plus className="size-4" /> 添加待办</Button>
             <Button variant="secondary" onClick={openPicker}><Link2 className="size-4" /> 添加已有内容</Button>
           </div> : null}</div>
         {loading && !outgoing.length ? <p className="text-sm text-stone-500">正在加载…</p> : null}
-        {!outgoing.length && !loading ? <p className="text-sm text-stone-500">还没有安排。可以先添加准备待办，也可以把已有日程或其他内容放进来。</p> : listing(outgoing, true)}
+        {!filteredEdges.length && !loading ? <p className="text-sm text-stone-500">{tab === 'events' ? '还没有关联日程，可以使用上面的“新建日程”。' : tab === 'tasks' ? '还没有关联待办，可以使用上面的“新建待办”。' : '还没有相关安排，从上面的快捷按钮开始添加吧。'}</p> : listing(filteredEdges, true)}
         {outCursor ? <Button variant="ghost" disabled={loading} onClick={() => void moreRelations('source')}>加载更多关联</Button> : null}
       </section>
 
-      {incoming.length || inCursor ? <section className="space-y-3 border-t border-stone-100 pt-4">
+      {(mode === 'modal' || tab === 'more') && (incoming.length || inCursor) ? <section className="space-y-3 border-t border-stone-100 pt-4">
         <h3 className="text-sm font-semibold">其他相关内容</h3>
         {listing(incoming, false)}
         {inCursor ? <Button variant="ghost" disabled={loading} onClick={() => void moreRelations('target')}>加载更多</Button> : null}
@@ -343,5 +410,10 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
           <Button variant="primary" type="submit" disabled={working}>{working ? '创建中…' : '创建倒计时'}</Button></div>
       </form> : null}
     </div>
-  </div>;
+  </div>
+  {eventDraft ? <EventEditor draft={eventDraft} spaceId={spaceId} editing={null}
+    members={members.filter(member => member.personId)} canWrite={writable} saving={working}
+    onChange={setEventDraft} onClose={() => { if (!working) setEventDraft(null); }}
+    onSave={event => void addEvent(event)} /> : null}
+  </>;
 }
