@@ -95,3 +95,53 @@ test('duplicate match rows do not inflate game counts and stats are null when no
   assert.equal(empty.matches,0);
   assert.equal(empty.knownMinutes,0);
 });
+
+test('win rate uses only played matches with complete scores, counting draws and losses', () => {
+  const scored = (id, home, away, players=['p1']) =>
+    ({...match(id, '2026-09-12', players), representativeTeamScore: home, opponentTeamScore: away});
+  const games=[
+    scored('win',3,1),
+    scored('draw',2,2),
+    scored('loss',0,1),
+    scored('missing',null,null),
+    scored('incomplete',1,null),
+    scored('unscored',undefined,undefined),
+    scored('unrelated',9,0,['p2']),
+    scored('win',3,1), // duplicate listing must not affect totals
+  ];
+  const stats=buildFootballStats(games, [], 'p1');
+  assert.equal(stats.matches, 6);
+  assert.equal(stats.scoredMatches, 3);
+  assert.equal(stats.wins, 1);
+  assert.equal(stats.winRate, 1/3);
+  assert.equal(stats.completeMinutesMatches, 0); // No clock recording required for win rate.
+});
+
+test('zero-zero draw is a completed score, zero wins display as 0%; no score displays as dash', () => {
+  const score = (home,away) => ({
+    ...match('m','2026-10-24'),representativeTeamScore:home,opponentTeamScore:away,
+  });
+  const draw=buildFootballStats([score(0,0)], [], 'p1');
+  assert.equal(draw.scoredMatches,1);
+  assert.equal(draw.wins,0);
+  assert.equal(draw.winRate,0);
+  const unscored=buildFootballStats([score(null,null)], [], 'p1');
+  assert.equal(unscored.scoredMatches,0);
+  assert.equal(unscored.winRate,null);
+  const none=buildFootballStats([], [], 'p1');
+  assert.equal(none.winRate,null);
+  assert.equal(none.wins,0);
+});
+
+test('win rate is from the representative team perspective and excludes malformed scores', () => {
+  const testCases=[
+    [4,0], [0,2], [2,2],[-1,0], [Number.NaN, 2], [1.5,0],
+  ].map(([representativeTeamScore,opponentTeamScore],index)=>({
+    ...match('match_'+index,'2026-04-01'),representativeTeamScore,opponentTeamScore,
+  }));
+  const stats=buildFootballStats(testCases,[],'p1');
+  assert.equal(stats.matches,6);
+  assert.equal(stats.scoredMatches,3);
+  assert.equal(stats.wins,1);
+  assert.equal(stats.winRate,1/3);
+});
