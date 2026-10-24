@@ -10,3 +10,9 @@ test('RecentPlaces has versioned SQLite DO and isolated bindings',()=>{
  assert.match(worker,/resolveCurrentLifeSpaceUser\(request,env\)/);
  assert.match(worker,/RECENT_PLACES_PERSISTENCE_ALLOWED !== 'true'/);
 });
+
+test('RecentPlaces persistence opt-in matches Staging worker only',()=>{
+ assert.equal(cfg.env.staging.vars.RECENT_PLACES_PERSISTENCE_ALLOWED,'true');
+ assert.equal(cfg.env.production.vars.RECENT_PLACES_PERSISTENCE_ALLOWED,undefined);
+ assert.equal(cfg.vars?.RECENT_PLACES_PERSISTENCE_ALLOWED,undefined);
+});
