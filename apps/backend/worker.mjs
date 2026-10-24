@@ -545,7 +545,7 @@ async function handleRecentPlaces(request, env) {
   const url=new URL(request.url);
   if (url.search || !['GET','POST','DELETE'].includes(request.method))
     throw new HttpError(405,'METHOD_NOT_ALLOWED','Method not allowed');
-  // AMap 3.5 prohibits caching provider data without separate permission.
+  // Provider-independent HomeMew Recent Places feature switch; it does not grant data licenses.
   if (env.RECENT_PLACES_PERSISTENCE_ALLOWED !== 'true')
     return json({data:{items:[],enabled:false}});
   const userId=await resolveCurrentLifeSpaceUser(request,env);
