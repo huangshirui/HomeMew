@@ -265,8 +265,30 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   }
   if (householdLoading) return <Card className="p-8 text-sm text-stone-500">正在加载家庭信息…</Card>;
   return <div className="space-y-4">
-    <PageHeader title={spec.title}>{canCreate ? <Button variant="primary" onClick={newRecord}><Plus className="size-4" /> 新建{spec.title}</Button> : null}</PageHeader>
-    <p className="text-sm text-stone-500">{spec.description}</p>
+    <PageHeader title={spec.title}>
+      {modelKey === 'activity' ? <Button variant="secondary" onClick={() => setActivityFilterOpen(value => !value)}>
+        <SlidersHorizontal className="size-4" /> 搜索与筛选{activityFiltersActive ? ' · 已筛选' : ''}
+      </Button> : null}
+      {canCreate ? <Button variant="primary" onClick={newRecord}><Plus className="size-4" /> 新建{spec.title}</Button> : null}
+    </PageHeader>
+    {modelKey === 'activity' && activityFilterOpen ? <div className="grid gap-3 rounded-2xl border border-stone-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+      <label className={field}>搜索活动
+        <span className="relative block"><Search className="pointer-events-none absolute left-3 top-3 size-4 text-stone-400" />
+          <input type="search" aria-label="搜索活动" placeholder="搜索活动名称或说明" className={`${inputClass} pl-9`} value={activitySearchInput}
+            onChange={event => setActivitySearchInput(event.target.value)} /></span>
+      </label>
+      <label className={field}>参与成员
+        <select className={inputClass} value={activityPerson} onChange={event => setActivityPerson(event.target.value)}>
+          <option value="">全部成员</option>{members.filter(item => item.personId).map(item => <option key={item.personId} value={item.personId}>{item.displayName}</option>)}
+        </select>
+      </label>
+      <label className={field}>活动时间
+        <select className={inputClass} value={activityPeriod} onChange={event => setActivityPeriod(event.target.value as ActivityPeriod)}>
+          <option value="all">全部</option><option value="upcoming">即将开始</option><option value="ongoing">进行中</option><option value="past">已结束</option><option value="undated">未定日期</option>
+        </select>
+      </label>
+      {activityFiltersActive ? <button type="button" className="w-fit text-xs text-emerald-700 hover:underline" onClick={() => { setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('all'); }}>清除筛选</button> : null}
+    </div> : null}
     {modelKey === 'goal' || modelKey === 'habit' ? <div className="flex flex-wrap items-center gap-2">
       {(['active','paused',...(modelKey === 'goal' ? ['achieved','abandoned'] : ['ended'])] as Status[]).map(key =>
         <button key={key} type="button" aria-pressed={statusFilter === key} onClick={() => setStatusFilter(key)}
@@ -277,10 +299,26 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     {error ? <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
     {!currentFamily ? <Card className="p-6 text-sm text-stone-500">请先选择家庭。</Card>
       : loading ? <Card className="p-6 text-sm text-stone-500">正在加载{spec.title}…</Card>
-      : !visible.length ? <Card className="p-8 text-center text-sm text-stone-500">{modelKey === 'goal' || modelKey === 'habit' ? `暂无${statusText[statusFilter]}的${spec.title}` : `还没有${spec.title}记录。`}</Card>
-      : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      : !visible.length ? <Card className="p-8 text-center text-sm text-stone-500">{modelKey === 'activity' && activityFiltersActive ? '没有找到符合条件的活动。' : modelKey === 'goal' || modelKey === 'habit' ? `暂无${statusText[statusFilter]}的${spec.title}` : `还没有${spec.title}记录。`}</Card>
+      : modelKey === 'activity' ? <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm divide-y divide-stone-100">
+        {visible.map(record => <div key={record.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:gap-4">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-lg text-emerald-700">
+            {record.presentation?.icon ? <RecordIconMark icon={record.presentation.icon} spaceId={currentFamily.id} modelKey="activity" recordId={record.id} /> : <CalendarDays className="size-5" />}
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <button type="button" className="block max-w-full truncate text-left font-semibold text-stone-900 hover:text-emerald-700" onClick={() => setContainerFor(record)}>{record.name}</button>
+            {record.description ? <p className="truncate text-sm text-stone-500">{record.description}</p> : null}
+            <p className="text-xs text-stone-500">{record.startDate || record.endDate ? `${record.startDate || '开始时间待定'} → ${record.endDate || '结束时间待定'}` : '日期待定'}
+              {record.attendeePersonIds?.length ? ` · ${memberNames(record.attendeePersonIds, names)}` : ''}</p>
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <Button variant="secondary" onClick={() => setContainerFor(record)}>查看活动</Button>
+            {canManage(record) ? <Button variant="ghost" onClick={() => edit(record)}>编辑</Button> : null}
+          </div>
+        </div>)}
+      </div> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map(record => <Card key={record.id} className="space-y-3 p-4">
-          <div className="flex items-start gap-2">
+          <div className="flex items-center gap-2">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
               {record.presentation?.icon ? <RecordIconMark icon={record.presentation.icon} spaceId={currentFamily.id} modelKey={modelKey as IconModel} recordId={record.id} /> : <Icon className="size-4" />}
             </div>
@@ -290,7 +328,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
             </div>
           </div>
           {record.description ? <p className="line-clamp-2 text-sm text-stone-500">{record.description}</p> : null}
-          {modelKey === 'anniversary' ? <p className="text-sm text-violet-700">🎁 {record.month}月{record.day}日{record.year ? ` · 始于 ${record.year} 年` : ''}</p>
+          {modelKey === 'anniversary' ? <p className="text-sm text-violet-700">{record.month}月{record.day}日{record.year ? ` · ${record.year} 年` : ''}</p>
             : modelKey === 'habit' ? <>
               <p className="text-sm text-stone-600">所属人：{record.subjectPersonId ? names.get(record.subjectPersonId) ?? '家庭成员' : '未关联'}</p>
               <p className="text-sm text-stone-600">每 {record.intervalDays ?? 1} 天打卡 · 连续 {record.computed?.checkIn?.streakDays ?? 0} 天</p>
@@ -319,11 +357,15 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
           </div>
         </Card>)}
       </div>}
-    <div className="flex justify-end"><Button variant="ghost" disabled={loading} onClick={() => setRefresh(v => v + 1)}><RefreshCw className="size-4" /> 刷新</Button></div>
+    <div className="flex items-center justify-between gap-3">
+      {modelKey === 'activity' && activityCursor ? <Button variant="secondary" disabled={activityLoadingMore || loading} onClick={() => void moreActivities()}>{activityLoadingMore ? '正在加载…' : '加载更多活动'}</Button> : <span />}
+      <Button variant="ghost" disabled={loading || activityLoadingMore} onClick={() => setRefresh(v => v + 1)}><RefreshCw className="size-4" /> 刷新</Button>
+    </div>
 
     {containerFor && currentFamily && modelKey !== 'anniversary' ? <ContainerRelations key={`${modelKey}:${containerFor.id}`}
       spaceId={currentFamily.id} modelKey={modelKey} record={containerFor} timezone={currentFamily.timezone}
-      writable={canManage(containerFor)} onClose={() => setContainerFor(null)} /> : null}
+      writable={canManage(containerFor)} participants={memberNames(containerFor.attendeePersonIds ?? [], names)}
+      onEdit={() => { const record = containerFor; setContainerFor(null); edit(record); }} onClose={() => setContainerFor(null)} /> : null}
     {draft && currentFamily ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/45 sm:items-center sm:p-6"
       role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setDraft(null); }}>
       <form onSubmit={save} role="dialog" aria-modal="true" aria-label={editing ? '编辑' + spec.title : '新建' + spec.title}
