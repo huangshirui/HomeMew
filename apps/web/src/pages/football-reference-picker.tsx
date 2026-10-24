@@ -21,6 +21,7 @@ type Props = {
   disabled?: boolean;
   className?: string;
   onCreate?: (name: string) => void;
+  overlay?: boolean;
 };
 
 const inputClass = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-500';
@@ -28,7 +29,7 @@ const inputClass = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-3
 // Keep the named-record search in LifeSpace; never derive options from an unbounded local table scan.
 // Canonical Query search is substring LIKE today: debounce and require two characters to limit cost.
 export function FootballReferencePicker({
-  spaceId, userId, model, value, onChange, label, known, optional = false, disabled = false, className = '', onCreate,
+  spaceId, userId, model, value, onChange, label, known, optional = false, disabled = false, className = '', onCreate, overlay = false,
 }: Props) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -127,7 +128,7 @@ export function FootballReferencePicker({
     if (!open) setRecent(readRecentFootballReferences(userId, spaceId, model));
     setOpen(v => !v);
   };
-  return <div className={className}>
+  return <div className={(overlay && open ? 'relative z-40 ' : '') + className}>
     <label id={id + '-label'} className="mb-1 block text-sm font-medium text-stone-700">
       {label}{!optional && ' *'}
     </label>
@@ -142,7 +143,10 @@ export function FootballReferencePicker({
         <ChevronDown className="size-4 shrink-0 text-stone-500"/>
       </button>
       {open && <div id={id + '-options'} role="listbox" aria-labelledby={id + '-label'}
-        className="relative z-30 mt-2 rounded-2xl border border-stone-200 bg-white p-2 shadow-sm">
+        className={(overlay
+          ? 'absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] max-h-[min(28rem,65vh)] overflow-y-auto shadow-xl'
+          : 'relative z-30 mt-2 shadow-sm') +
+          ' rounded-2xl border border-stone-200 bg-white p-2'}>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 size-4 text-stone-400"/>
           <input autoFocus autoComplete="off" value={search}
