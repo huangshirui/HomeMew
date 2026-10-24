@@ -30,6 +30,39 @@ const col = (space, model) => `/api/v1/spaces/${encodeURIComponent(space)}/model
 const recordRef = (model, recordId) => ({ kind: 'record', modelKey: model, recordId });
 
 export function matchMiniNewDomainRoute(pathname) {
+  const people = new RegExp(`^${PREFIX}/([^/]+)/domain-people/**
+ * Bounded product contract for newly shipped HomeMew Mini domains.
+ * The Mini never supplies a LifeSpace model key, query AST or upstream path.
+ * All domain truth, versions, actions and policy checks stay in LifeSpace.
+ */
+import { errorResponse, forwardLifeSpace } from './miniprogram-upstream.mjs';
+
+const PREFIX = '/api/v1/miniprogram/families';
+const ID = /^spc_[a-zA-Z0-9_-]+$/u;
+const RECORD = /^rec_[a-zA-Z0-9_-]+$/u;
+const EDGE = /^[a-z]{2,8}_[a-zA-Z0-9_-]+$/u;
+const DAY = /^\d{4}-\d{2}-\d{2}$/u;
+const KINDS = Object.freeze({
+  activities: { model: 'activity', fields: ['name','description','attendeePersonIds','startDate','endDate','presentation','version'] },
+  goals: { model: 'goal', fields: ['name','description','subjectPersonIds','startDate','targetDate','presentation','version'] },
+  habits: { model: 'habit', fields: ['name','description','subjectPersonId','intervalDays','presentation','version'] },
+  anniversaries: { model: 'anniversary', fields: ['name','description','month','day','year','personIds','presentation','version'] },
+  'football-matches': { model: 'football_match', fields: ['matchDate','matchType','competitionActivityId','representativeTeamId','opponentTeamId','representativeTeamScore','opponentTeamScore','playerPersonIds','notes','version'] },
+  'football-performances': { model: 'football_performance', fields: ['matchId','playerPersonId','performanceType','goalMethod','shotOutcome','minutesPlayed','position','entryMode','notes','version'] },
+  'football-teams': { model: 'person_group', fields: ['name','description','memberPersonIds','presentation','version'] },
+});
+const TARGETS = new Set(['task','event','day_record','activity','goal','habit','anniversary','wish']);
+const ACTIONS = new Set(['pause','resume','achieve','abandon','end','restart','check-in']);
+const PARAMS = new Set(['limit','cursor','q','status','period','today','personId','year','matchType','matchId','playerPersonId','representativeTeamId','opponentTeamId','competitionActivityId']);
+const safeDecode = (raw, pattern) => {
+  try { const decoded = decodeURIComponent(raw); return decoded.length <= 200 && pattern.test(decoded) ? decoded : null; }
+  catch { return null; }
+};
+const col = (space, model) => `/api/v1/spaces/${encodeURIComponent(space)}/models/${model}/records`;
+const recordRef = (model, recordId) => ({ kind: 'record', modelKey: model, recordId });
+
+, 'u').exec(pathname);
+  if (people) { const familyId = safeDecode(people[1], ID); return familyId ? { familyId, people: true } : null; }
   const relation = new RegExp(`^${PREFIX}/([^/]+)/containers/(activities|goals|habits)/([^/]+)/relations(?:/([^/]+))?$`, 'u').exec(pathname);
   if (relation) {
     const space = safeDecode(relation[1], ID), recordId = safeDecode(relation[3], RECORD);
@@ -161,6 +194,10 @@ export async function handleMiniNewDomainBff(request, env) {
   if (!url.pathname.startsWith(PREFIX + '/')) return null;
   const route = matchMiniNewDomainRoute(url.pathname);
   if (!route) return null; // Other existing bounded Mini routes handle their paths.
+  if (route.people) {
+    if (request.method !== 'GET' || url.search) return bad();
+    return forward(request,env,`/api/v1/spaces/${encodeURIComponent(route.familyId)}/members`);
+  }
   if (route.relation) return relations(request,env,route,url);
   const { kind, familyId, recordId, action, history } = route;
   const collection = col(familyId,KINDS[kind].model);
