@@ -84,3 +84,12 @@ export function readableRelationTitle(edge: DomainRelation, direction: 'outgoing
   }
   return '名称暂不可用';
 }
+
+/** Native container workspace operations; all write paths remain atomic at LifeSpace. */
+const containerBase=(familyId:string,kind:'activities'|'goals'|'habits',id:string) =>
+  root(familyId)+'/containers/'+kind+'/'+encodeURIComponent(id);
+export const searchLinkedCandidates=(familyId:string,kind:'activities'|'goals'|'habits',id:string,model:string,q:string,cursor?:string) =>
+  request<DomainPage<DomainRecord>>(containerBase(familyId,kind,id)+'/candidates'+productQuery({model,q,cursor}));
+export const createLinkedRecord=(familyId:string,kind:'activities'|'goals'|'habits',id:string,
+  targetType:'task'|'event'|'countdown',draft:Record<string,unknown>) =>
+  request(containerBase(familyId,kind,id)+'/quick-create',{method:'POST',data:{targetType,draft},skipRetry:true});
