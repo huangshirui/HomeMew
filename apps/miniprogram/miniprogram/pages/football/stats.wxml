@@ -1,0 +1,48 @@
+<view class="container football-stats">
+  <nav-bar title="足球统计" showBack="true" />
+  <view class="card">
+    <view class="stats-head">个人表现统计</view>
+    <picker mode="selector" range="{{people}}" range-key="displayName" value="{{personIndex}}" bindchange="onPerson">
+      <view class="stats-person">球员：{{people[personIndex].displayName||'请选择球员'}} ▾</view>
+    </picker>
+    <view wx:if="{{loading}}" class="loading-state">统计中…</view>
+    <view wx:elif="{{error}}" class="load-error-state">
+      <text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onRetry">重新加载</button>
+    </view>
+    <block wx:else>
+      <view class="stats-metrics">
+        <view class="metric"><text class="metric-label">参赛场次</text><text class="metric-value">{{matchCount}}</text></view>
+        <view class="metric"><text class="metric-label">胜率</text><text class="metric-value">{{winRate}}</text></view>
+        <view class="metric"><text class="metric-label">进球</text><text class="metric-value">{{goalCount}}</text></view>
+        <view class="metric"><text class="metric-label">助攻</text><text class="metric-value">{{assistCount}}</text></view>
+        <view class="metric"><text class="metric-label">记录出场时间</text><text class="metric-value">{{minutes}}<text wx:if="{{minutes!=='—'}}" class="metric-unit"> 分钟</text></text></view>
+      </view>
+      <view class="stats-footnote">{{coverage}}</view>
+    </block>
+  </view>
+  <view wx:if="{{!loading&&!error}}" class="card">
+    <view class="stats-head">专项趋势</view>
+    <scroll-view scroll-x show-scrollbar="{{false}}" class="trend-tabs">
+      <view class="trend-row">
+        <view wx:for="{{trends}}" wx:key="key" data-key="{{item.key}}"
+          class="trend-tab {{trend===item.key?'active':''}}" bindtap="onTrend">{{item.name}}</view>
+      </view>
+    </scroll-view>
+    <view class="trend-legend"><text>{{activeTrend.labelA}}</text><text>{{activeTrend.labelB}}</text><text>{{activeTrend.unit}}</text></view>
+    <scroll-view class="trend-chart" scroll-x show-scrollbar="{{false}}">
+      <view class="trend-columns">
+        <view wx:for="{{months}}" wx:key="month" class="trend-column">
+          <view class="trend-top">{{item.first}} / {{item.second}}</view>
+          <view class="bars">
+            <view class="bar-a" style="height:{{item.heightA}}rpx"></view>
+            <view class="bar-b" style="height:{{item.heightB}}rpx"></view>
+          </view>
+          <text class="trend-date">{{item.dateLabel}}</text>
+          <text class="trend-count">{{item.matchCount}} 场</text>
+        </view>
+      </view>
+    </scroll-view>
+    <view wx:if="{{!months.length}}" class="stats-footnote">该球员暂无比赛统计</view>
+    <view class="stats-footnote">月份取当前球员最近 18 个有比赛记录的月份。未记录的比赛动作不计入统计，缺失时间数据不推断效率。</view>
+  </view>
+</view>
