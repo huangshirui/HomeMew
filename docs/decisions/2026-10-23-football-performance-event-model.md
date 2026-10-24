@@ -166,3 +166,11 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 - **赛事关联名称**：FootballMatch 只保存 `competitionActivityId`，比赛列表显示对应 Activity 的 `name`，禁止遍历通用 Activity 目录。对**当前已加载比赛**的非空关联活动 ID 去重，只为缺失且未尝试 ID 发起 `GET /spaces/{spaceId}/models/activity/records/{id}`；同页引用同一个活动只读一次，活动请求最多 4 并发；球队引用同样限制 4 并发。数据保存在当前页面内存、切换家庭时清除。手动刷新允许重新尝试曾经失败的 ID；失败/无读取权限时显示“赛事暂不可查看”，请求中显示“正在加载赛事…”，不能假装“关联赛事”是赛事真实名称，也不伪造 Activity 数据。 
 - **性能边界**：这种做法成本随**当前页面的去重关联 ID 数**变化，而非当前家庭所有 Activity 总量。属于应用 UI 读取优化；若未来单页关联种类急剧增加，再评估平台正式批量 read 能力，HomeMew 不自建影子业务表。
 - **验收**：新增 `football-reference-hydration.ts` 与回归测试（同赛事多场复用、最多 4 并发、部分失败不遮蔽成功），以及 Web UI 结构测试。代码在 HomeMew Draft PR #142，尚未合并/部署 Preview。
+
+## 2026-10-24 · 比赛记录改为独立详情子页面
+
+- **用户决策**：比赛列表「记录」必须进入独立详情路由，不是在列表页中切换内部 selected 区块，以免比赛搜索筛选、列表操作和主记录/统计 tab 残留在详情页。
+- **Web 路由**：新增可直接打开/刷新/分享的 `/football/:matchId` 路由，复用既有足球交互逻辑但以 `isDetail` 显式渲染仅详情内容。详情页通过 LifeSpace `GET football_match/{matchId}` 按 ID 读取，有加载、失败及返回列表状态；不需要先访问/加载列表。比赛球员为家庭成员简洁下拉，其余显示比分、双方球队、快捷记录、出场片段/已记表现、删除与编辑。列表级「搜索与筛选」「新建比赛」「记录/统计 Tab」「球队球员管理」以及比赛列表仅在 /football 显示。
+- **返回体验**：返回按钮和浏览器后退都回到 /football。浏览器 sessionStorage 临时保存本次用户与家庭隔离的列表 UI 状态（筛选、搜索、Tab、折叠状态、滚动 Y，30 分钟内有效、单次消费），属于非权威界面偏好，不存业务记录或权限。载入列表后尝试恢复滚动；列表更多分页未被存档，超出首批比赛时尽力恢复。切回列表清空之前详情的 `selected` 和表现查询，防止过滤条件继续隐藏。
+- **保存行为**：从列表新建/编辑比赛后进入对应独立详情地址；从详情编辑仍停留详情并按 ID 刷新。详情删除比赛后返回列表；快捷表现记录在详情完成，仍需确认后保存。不改变 FootballMatch/FootballPerformance schema、Identity 或平台授权。
+- **验证**：增加 `football-list-navigation.test.mjs` 及更新足球 UI 测试，覆盖深链、列表/详情隔离、缓存作用域/过期/失败、URL 直接加载、页面切换与赛事引用按需读取。仍位于 HomeMew Draft PR #142，等待 CI 与 Preview 验收后再合并。
