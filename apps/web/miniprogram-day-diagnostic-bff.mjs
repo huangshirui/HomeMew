@@ -24,12 +24,12 @@ function decodeId(value, pattern) {
 
 export function matchMiniProgramDayDiagnosticRoute(pathname) {
   if (pathname === `${MINI_PREFIX}/diagnostics/lifespace-core`) return { kind: 'diagnostic' };
-  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/record-icons/(day_record|event|task|wish)/image$`, 'u').exec(pathname);
+  let match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/record-icons/(day_record|event|task|wish|activity|goal|habit|anniversary|person_group)/image$`, 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
     return familyId ? { kind: 'icon-upload', familyId, modelKey: match[2] } : null;
   }
-  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/record-icons/(day_record|event|task|wish)/records/([^/]+)/image$`, 'u').exec(pathname);
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/record-icons/(day_record|event|task|wish|activity|goal|habit|anniversary|person_group)/records/([^/]+)/image$`, 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
     const recordId = decodeId(match[3], RECORD_ID);
