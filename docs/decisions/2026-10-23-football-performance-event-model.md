@@ -158,3 +158,11 @@ User-confirmed eight HomeMew quick actions, in order: `goal`, `assist`, `shot`, 
 - 场均次数仍为当月全部实际参赛场次中的已记录相应事件数 ÷ 当月参赛场次，包含无时间记录的比赛；不得用时间样本代替场均分母。没有比赛则场均为 null 而不是 0；尚未录入表现不可误称为真实 0。
 - 复用现有 LifeSpace FootballMatch / FootballPerformance Canonical Query 筛选、权限和分页上限，不新增数据、模型字段、影子缓存或外部依赖；展示组件由 Web 内置 SVG 绘制，月份时间轴同步滚动，图表旁显示有效时长覆盖。新增纯聚合模块及回归测试验证无分钟、片段缺失、同一批时间样本、跨月空月份和其他球员过滤。
 - 项目内代码属于 HomeMew Draft PR #142，需 Web CI / Preview 验收后再合并，未擅自部署生产。
+
+## 2026-10-24 · 足球比赛列表：家庭球员选择、球队图标和赛事名称按需读取
+
+- **全局球员上下文**：足球页右侧的球员切换只显示当前家庭成员（来自已验证的 HomeMew Family members / Space Person 映射），不再在主页面同时呈现“查找球员／新建球员”。这是**当前统计和快捷记录的家庭球员选择**；比赛编辑表单中的参赛球员仍可复用已有 Space Person 搜索和零结果创建，足球管理子页仍可维护未关联账户的其他球员，不能误将它们强行加入家庭。
+- **比赛行展示**：双方球队都展示 PersonGroup presentation.icon；缺少自定义 icon 时使用统一的中性占位 Shield 图标，避免代表球队有图标而对手没有。比赛日期保持单行，正式比赛为琥珀色奖杯、友谊赛为蓝色握手图标，配合 tooltip/无障碍名称，移除单独占一行的“正式/友谊赛”文字。
+- **赛事关联名称**：FootballMatch 只保存 `competitionActivityId`，比赛列表显示对应 Activity 的 `name`，禁止遍历通用 Activity 目录。对**当前已加载比赛**的非空关联活动 ID 去重，只为缺失且未尝试 ID 发起 `GET /spaces/{spaceId}/models/activity/records/{id}`；同页引用同一个活动只读一次，活动请求最多 4 并发；球队引用同样限制 4 并发。数据保存在当前页面内存、切换家庭时清除。手动刷新允许重新尝试曾经失败的 ID；失败/无读取权限时显示“赛事暂不可查看”，请求中显示“正在加载赛事…”，不能假装“关联赛事”是赛事真实名称，也不伪造 Activity 数据。 
+- **性能边界**：这种做法成本随**当前页面的去重关联 ID 数**变化，而非当前家庭所有 Activity 总量。属于应用 UI 读取优化；若未来单页关联种类急剧增加，再评估平台正式批量 read 能力，HomeMew 不自建影子业务表。
+- **验收**：新增 `football-reference-hydration.ts` 与回归测试（同赛事多场复用、最多 4 并发、部分失败不遮蔽成功），以及 Web UI 结构测试。代码在 HomeMew Draft PR #142，尚未合并/部署 Preview。
