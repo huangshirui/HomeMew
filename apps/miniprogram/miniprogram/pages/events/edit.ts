@@ -47,7 +47,7 @@ import {
 import { markDirty } from '../../stores/dirty';
 import { consumeCloneSource } from '../../stores/clone-buffer';
 import { downloadRecordIconImage } from '../../services/record-icons';
-import { searchPlaces } from '../../services/places';
+import { searchPlaces, listRecentPlaces, rememberRecentPlace } from '../../services/places';
 import type { LocationDetail } from '../../types/index';
 import { originalIconState, prepareRecordIcon, pickerChangeState, type RecordIconPickerChange } from '../../utils/record-icon-edit';
 
@@ -117,6 +117,8 @@ Page({
     locationSelected: null as LocationDetail | null,
     locationTouched: false,
     locationCandidates: [] as LocationDetail[],
+    recentLocations: [] as LocationDetail[],
+    placeShowingRecent: false,
     locationStructured: false,
     locationHint: '',
     /** 重复创建：连续 N 天（1 表示不重复），最长 7 天 */
@@ -154,6 +156,9 @@ Page({
     // 新增日程默认非全天时间：当前时间的下一个整点，结束 +1 小时
     const times = nextWholeHourDefaults(now);
     const startDate = times.dayOffset ? addDaysToDateOnly(initialDate, times.dayOffset) : initialDate;
+    void listRecentPlaces().then(result=>{
+      this.setData({recentLocations:result.items.map(x=>x.location),locationStructured:result.structured});
+    }).catch(()=>{});
     this.setData({
       familyId,
       sourceKind: ['activities','goals','habits'].includes(options.sourceKind || '') ? options.sourceKind as 'activities'|'goals'|'habits' : '',
@@ -387,17 +392,34 @@ Page({
     this.setData({ description: e.detail.value });
   },
 
+  onLocationSearchMore(): void {
+    const value=this.data.location;
+    this.setData({placeShowingRecent:false,locationCandidates:[],locationHint:''});
+    if(value.trim().length<2)return;
+    void searchPlaces(value).then(result=>{
+      if(this.data.location!==value)return;
+      this.setData({locationCandidates:result.items,locationStructured:result.structured,
+        locationHint:result.items.length?'':'暂无更多匹配地点，可直接保存名称'});
+    }).catch(()=>{
+      if(this.data.location===value)this.setData({locationHint:'地点搜索暂不可用，可直接保存名称'});
+    });
+  },
+
   onLocationInput(e: WechatMiniprogram.Input): void {
     const value = e.detail.value;
+    const matches=this.data.recentLocations.filter(x=>
+      x.name.toLocaleLowerCase().includes(value.trim().toLocaleLowerCase())).slice(0,8);
+    const useRecent=value.trim().length>0&&matches.length>0;
     this.setData({ location: value, locationSelected: null, locationTouched: true,
-      locationCandidates: [], locationHint: '' });
+      locationCandidates:useRecent?matches:[],placeShowingRecent:useRecent,locationHint:'' });
     if (placeSearchTimer) clearTimeout(placeSearchTimer);
-    if (value.trim().length < 2) return;
+    if (value.trim().length < 2 || useRecent) return;
     placeSearchTimer = setTimeout(() => {
       void searchPlaces(value).then(result => {
         if (this.data.location !== value) return;
         this.setData({
           locationCandidates: result.items,
+          placeShowingRecent:false,
           locationStructured: result.structured,
           locationHint: result.available
             ? (result.items.length ? '' : '暂无匹配地点，可直接保存名称')
@@ -407,7 +429,7 @@ Page({
         if (this.data.location === value) this.setData({ locationCandidates: [],
           locationHint: '地点搜索暂不可用，可直接保存名称' });
       });
-    }, 350);
+    }, 650);
   },
 
   onLocationSelect(e: WechatMiniprogram.BaseEvent): void {
@@ -416,7 +438,7 @@ Page({
     if (!selected) return;
     this.setData({ location: selected.name,
       locationSelected: this.data.locationStructured ? selected : null,
-      locationTouched: true, locationCandidates: [],
+      locationTouched: true, locationCandidates: [],placeShowingRecent:false,
       locationHint: this.data.locationStructured ? '已选择地图地点' : '当前仅保存地点名称' });
   },
 
@@ -724,6 +746,8 @@ Page({
             await createEvent(this.data.familyId, payloadWithIcon);
           }
         }
+        if(this.data.locationSelected?.name===this.data.location.trim())
+          void rememberRecentPlace(this.data.locationSelected).catch(()=>{});
         hideLoading();
         showSuccess(this.data.mode === 'edit' ? '已保存' : '已创建');
         markDirty('events');
@@ -763,6 +787,8 @@ Page({
         concurrency: 3,
         onProgress: (done, total) => showLoading(`创建中 ${done}/${total}`),
       });
+      if(result.succeeded.length>0&&this.data.locationSelected?.name===this.data.location.trim())
+        void rememberRecentPlace(this.data.locationSelected).catch(()=>{});
       hideLoading();
       if (result.failed.length === 0) {
         showSuccess(`已创建 ${result.succeeded.length} 条日程`);

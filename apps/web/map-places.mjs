@@ -49,13 +49,49 @@ export function parseAmapSuggestions(payload) {
     return [{name,...(address?{address}:{}),...(coordinates?{coordinates}: {})}];
   }).slice(0,8);
 }
-export async function searchPlaces(request,env,{fetcher=fetch}={}) {
+
+/**
+ * Budget protection without storing AMap response data. Both bindings are
+ * Cloudflare location-local approximate limits, NOT a strict monthly budget.
+ * Actor identifiers are verified by the caller and immediately hashed.
+ */
+export async function enforcePlaceRateLimits(env, actorKey) {
+  if (typeof actorKey !== 'string' || !actorKey.trim())
+    return errorResponse(401, 'PLACE_SEARCH_UNAUTHENTICATED', 'Place search requires authentication');
+  const required = [
+    ['PLACE_SEARCH_USER_LIMIT', null],
+    ['PLACE_SEARCH_BURST_LIMIT', 'amap-inputtips'],
+  ];
+  if (required.some(([name]) => typeof env[name]?.limit !== 'function')) {
+    console.error('[HomeMew place search] rate limits not configured');
+    return errorResponse(503, 'PLACE_SEARCH_NOT_READY', 'Place search is temporarily unavailable');
+  }
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(actorKey));
+  const actor = Array.from(new Uint8Array(hash).slice(0, 16), value => value.toString(16).padStart(2, '0')).join('');
+  try {
+    for (const [name, constantKey] of required) {
+      const { success } = await env[name].limit({ key: constantKey || actor });
+      if (!success) {
+        console.info('[HomeMew place search] rate_limited', name);
+        return errorResponse(429, 'PLACE_SEARCH_RATE_LIMITED', '地点查询过于频繁，请稍后再试');
+      }
+    }
+  } catch (error) {
+    console.error('[HomeMew place search] rate limit unavailable');
+    return errorResponse(503, 'PLACE_SEARCH_NOT_READY', 'Place search is temporarily unavailable');
+  }
+  return null;
+}
+
+export async function searchPlaces(request,env,{fetcher=fetch, actorKey}={}) {
   const url=new URL(request.url), query=url.searchParams.get('q')?.trim()||'';
   if([...url.searchParams.keys()].some(k=>k!=='q')||query.length>100) return errorResponse(400,'INVALID_QUERY','Invalid place query');
   if(query.length<2) return json({data:{items:[],available:false,structured:eventLocationWireFormat(env)==='location'}});
   const structured=eventLocationWireFormat(env)==='location';
   const key=env.AMAP_WEB_SERVICE_KEY;
   if(typeof key!=='string'||!key.trim())return json({data:{items:[],available:false,structured}});
+  const blocked = await enforcePlaceRateLimits(env, actorKey);
+  if (blocked) return blocked;
   const target=new URL('https://restapi.amap.com/v3/assistant/inputtips');
   target.searchParams.set('key',key);
   target.searchParams.set('keywords',query);
@@ -63,10 +99,17 @@ export async function searchPlaces(request,env,{fetcher=fetch}={}) {
   target.searchParams.set('output','json');
   try{
     const res=await fetcher(target.toString(),{signal:AbortSignal.timeout(4000),redirect:'error'});
-    if(!res.ok)return errorResponse(502,'PLACE_SEARCH_UNAVAILABLE','Place search is temporarily unavailable');
+    if(!res.ok) {
+      console.warn('[HomeMew place search] provider_http_error', res.status);
+      return errorResponse(502,'PLACE_SEARCH_UNAVAILABLE','Place search is temporarily unavailable');
+    }
     const items=parseAmapSuggestions(await res.json());
+    console.info('[HomeMew place search] provider_success');
     return json({data:{items,available:true,structured}});
-  }catch{return errorResponse(502,'PLACE_SEARCH_UNAVAILABLE','Place search is temporarily unavailable');}
+  }catch{
+    console.warn('[HomeMew place search] provider_failed');
+    return errorResponse(502,'PLACE_SEARCH_UNAVAILABLE','Place search is temporarily unavailable');
+  }
 }
 export async function handleMiniPlaceSearch(request,env,options={}) {
   if(new URL(request.url).pathname!=='/api/v1/miniprogram/places/search')return null;
@@ -75,5 +118,5 @@ export async function handleMiniPlaceSearch(request,env,options={}) {
   const auth=await forwardLifeSpace(new Request(request.url,{headers:request.headers}),env,{
     target:'identity',upstreamPath:'/api/v1/me'});
   if(!auth.ok)return auth;
-  return searchPlaces(request,env,options);
+  return searchPlaces(request,env,{...options,actorKey:request.headers.get('authorization')});
 }

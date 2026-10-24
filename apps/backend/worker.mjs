@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { upsertRecentPlace, pruneRecentPlaces, validRecentLocation } from './recent-place-value.mjs';
 
 const USER_SCOPES = [
   'profile:read', 'profile:write', 'spaces:read', 'spaces:write', 'spaces:manage',
@@ -321,6 +322,23 @@ export class FamilyJoinCoordinator extends DurableObject {
   }
 }
 
+// Per authenticated LifeSpace user; entries copy the canonical Location value only.
+export class RecentPlaces extends DurableObject {
+  async list() {
+    return pruneRecentPlaces(await this.ctx.storage.get('recent'));
+  }
+  async remember(location) {
+    return this.ctx.storage.transaction(async tx => {
+      const next=upsertRecentPlace(await tx.get('recent'),location);
+      await tx.put('recent',next);
+      return next;
+    });
+  }
+  async clear() {
+    await this.ctx.storage.delete('recent');
+  }
+}
+
 export class MemberActivity extends DurableObject {
   async report(channel, occurredAt) {
     const field = ACTIVITY_CHANNEL_FIELDS[channel];
@@ -517,6 +535,29 @@ async function queryActivity(request, env, url) {
   return json({ data: { activities } });
 }
 
+function recentPlacesStub(env, userId) {
+  if (!env.RECENT_PLACES || typeof env.RECENT_PLACES.getByName !== 'function')
+    throw new HttpError(503,'RECENT_PLACES_NOT_CONFIGURED','最近地点服务未配置');
+  return env.RECENT_PLACES.getByName('recent-places:' + userId);
+}
+async function handleRecentPlaces(request, env) {
+  requireInternalFamilyCatalogRequest(request);
+  const url=new URL(request.url);
+  if (url.search || !['GET','POST','DELETE'].includes(request.method))
+    throw new HttpError(405,'METHOD_NOT_ALLOWED','Method not allowed');
+  // AMap 3.5 prohibits caching provider data without separate permission.
+  if (env.RECENT_PLACES_PERSISTENCE_ALLOWED !== 'true')
+    return json({data:{items:[],enabled:false}});
+  const userId=await resolveCurrentLifeSpaceUser(request,env);
+  const stub=recentPlacesStub(env,userId);
+  if (request.method==='GET')return json({data:{items:await stub.list(),enabled:true}});
+  if (request.method==='DELETE'){await stub.clear();return json({data:{items:[],enabled:true}});}
+  const input=await readJson(request);
+  if (Object.keys(input).length!==1 || !validRecentLocation(input.location))
+    throw new HttpError(422,'INVALID_LOCATION','Invalid canonical Location');
+  return json({data:{items:await stub.remember(input.location),enabled:true}});
+}
+
 async function registerFamilyCatalog(request, env) {
   requireInternalFamilyCatalogRequest(request);
   const input = await readJson(request);
@@ -594,6 +635,7 @@ export default {
           activityReady: isActivityReady(env),
           externalActivityReady: isExternalActivityReady(env),
           familyCatalogReady: isFamilyCatalogReady(env),
+          recentPlacesReady: Boolean(env.RECENT_PLACES && env.RECENT_PLACES_PERSISTENCE_ALLOWED === 'true'),
           identityBootstrapConfigured: Boolean(env.WECHAT_IDENTITY_BOOTSTRAP_MAP),
         });
       }
@@ -601,6 +643,7 @@ export default {
       if (request.method === 'POST' && url.pathname === '/api/v1/activity/me') return await reportOwnActivity(request, env);
       if (request.method === 'POST' && url.pathname === '/api/v1/activity/report') return await reportExternalActivity(request, env);
       if (request.method === 'GET' && url.pathname === '/api/v1/activity') return await queryActivity(request, env, url);
+      if (url.pathname === '/internal/v1/recent-places') return await handleRecentPlaces(request, env);
       if (request.method === 'POST' && url.pathname === '/internal/v1/family-catalog/register') return await registerFamilyCatalog(request, env);
       if (request.method === 'POST' && url.pathname === '/internal/v1/family-catalog/reconcile') return await reconcileFamilyCatalog(request, env);
       if (request.method === 'POST' && url.pathname === '/internal/v1/family-catalog/import') return await importFamilyCatalog(request, env);

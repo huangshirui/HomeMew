@@ -25,6 +25,10 @@
       {
         "name": "EXTERNAL_SYSTEM_CATALOG",
         "class_name": "ExternalSystemCatalog"
+      },
+      {
+        "name": "RECENT_PLACES",
+        "class_name": "RecentPlaces"
       }
     ]
   },
@@ -57,6 +61,12 @@
       "tag": "v5",
       "new_sqlite_classes": [
         "ExternalSystemCatalog"
+      ]
+    },
+    {
+      "tag": "v6",
+      "new_sqlite_classes": [
+        "RecentPlaces"
       ]
     }
   ],
@@ -96,6 +106,10 @@
           {
             "name": "EXTERNAL_SYSTEM_CATALOG",
             "class_name": "ExternalSystemCatalog"
+          },
+          {
+            "name": "RECENT_PLACES",
+            "class_name": "RecentPlaces"
           }
         ]
       }
@@ -129,6 +143,10 @@
           {
             "name": "EXTERNAL_SYSTEM_CATALOG",
             "class_name": "ExternalSystemCatalog"
+          },
+          {
+            "name": "RECENT_PLACES",
+            "class_name": "RecentPlaces"
           }
         ]
       }

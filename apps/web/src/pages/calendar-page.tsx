@@ -509,6 +509,8 @@ export function CalendarPage() {
           body: JSON.stringify(payload),
         });
       }
+      if (draft.locationPoint?.name === draft.location.trim())
+        void apiRequest('/api/places/recent',{method:'POST',body:JSON.stringify({location:draft.locationPoint})}).catch(()=>{});
       setEditing(null);
       setDraft(null);
       setRefreshToken((value) => value + 1);
@@ -1048,6 +1050,7 @@ export function EventEditor({
 
 
 type PlaceSearchResult = { items: LocationValue[]; available: boolean; structured: boolean };
+type RecentPlaceResult = { items: { location: LocationValue; useCount: number; lastUsedAt: string }[]; enabled: boolean; structured: boolean };
 function locationMapLinks(value: EventLocation) {
   const name=eventLocationLabel(value);
   if (!name) return null;
@@ -1072,28 +1075,51 @@ function PlaceSearchInput({name,point,existing,onChange,disabled}:{
   const [active,setActive]=useState(false);
   const [note,setNote]=useState('');
   const [structured,setStructured]=useState(false);
+  const [recent,setRecent]=useState<LocationValue[]>([]);
+  const [searchMore,setSearchMore]=useState(false);
+  useEffect(()=>{
+    if(!active||disabled)return;
+    let cancelled=false;
+    void apiRequest<RecentPlaceResult>('/api/places/recent').then(r=>{
+      if(!cancelled){setRecent(r.items.map(x=>x.location));setStructured(r.structured);}
+    }).catch(()=>{if(!cancelled)setRecent([]);});
+    return()=>{cancelled=true;};
+  },[active,disabled]);
+  const recentMatches=recent.filter(item=>item.name.toLocaleLowerCase().includes(name.trim().toLocaleLowerCase())).slice(0,8);
+  const cached=active&&!searchMore&&recentMatches.length>0;
   const displayed=point?.name===name.trim()?point:
     eventLocationLabel(existing??null)===name.trim()?existing:null;
   const links=locationMapLinks(displayed??name);
   useEffect(()=>{
     const text=name.trim();
-    if(disabled||!active||text.length<2){setItems([]);setNote('');return;}
+    if(disabled||!active||text.length<2||cached){setItems([]);setNote('');return;}
     const controller=new AbortController();
     const timer=setTimeout(()=>{
       void apiRequest<PlaceSearchResult>(`/api/places/search?q=${encodeURIComponent(text)}`,{signal:controller.signal})
         .then(data=>{setItems(data.items);setStructured(data.structured);
           setNote(data.available?(data.items.length?'':'没有找到匹配地点，可直接保存名称'):'地点推荐暂不可用，可直接保存名称');})
         .catch(()=>{if(!controller.signal.aborted){setItems([]);setNote('地点搜索暂不可用，可直接保存名称');}});
-    },350);
+    },650);
     return ()=>{clearTimeout(timer);controller.abort();};
-  },[name,active,disabled]);
+  },[name,active,disabled,cached,searchMore]);
   return <div className="grid gap-1.5 text-sm font-medium text-stone-700">
     <label htmlFor="event-location" className="flex items-center gap-1.5"><MapPin className="size-3.5" /> 地点</label>
     <input id="event-location" className={inputClass} disabled={disabled} maxLength={500}
       autoComplete="off" value={name} placeholder="输入地点名称或自由填写"
       onFocus={()=>setActive(true)}
-      onChange={event=>{onChange(event.target.value,null);setActive(true);}} />
-    {active&&!disabled&&items.length>0?<div className="max-h-44 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-sm">
+      onChange={event=>{onChange(event.target.value,null);setSearchMore(false);setActive(true);}} />
+    {active&&!disabled&&cached?<div className="max-h-44 overflow-y-auto rounded-xl border border-emerald-100 bg-white shadow-sm">
+      <span className="block px-3 pt-2 text-xs text-emerald-700">最近使用 · 无需地图搜索</span>
+      {recentMatches.map((item,index)=><button type="button" key={index}
+        className="block w-full px-3 py-2 text-left hover:bg-stone-50"
+        onClick={()=>{onChange(item.name,structured?item:null);setItems([]);setActive(false);}}>
+        <span className="block text-sm text-stone-800">{item.name}</span>
+        {item.address?<span className="block text-xs text-stone-500">{item.address}</span>:null}
+      </button>)}
+      <button type="button" className="w-full border-t border-stone-100 px-3 py-2 text-left text-xs text-emerald-700"
+        onClick={()=>setSearchMore(true)}>搜索更多地点…</button>
+    </div>:null}
+    {active&&!disabled&&!cached&&items.length>0?<div className="max-h-44 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-sm">
       {items.map((item,index)=><button type="button" key={index}
         className="block w-full border-b border-stone-100 px-3 py-2 text-left last:border-0 hover:bg-stone-50"
         onClick={()=>{onChange(item.name,structured?item:null);setItems([]);setActive(false);}}>
