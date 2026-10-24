@@ -1,0 +1,124 @@
+<view class="container workspace">
+  <nav-bar title="{{title}}" showBack="true" />
+  <view wx:if="{{loading}}" class="loading-state"><text class="loading-text">正在加载详情…</text></view>
+  <view wx:elif="{{error && !record}}" class="load-error-state">
+    <text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onRetry">重新加载</button>
+  </view>
+  <block wx:else>
+    <view wx:if="{{error}}" class="thin-error">{{error}}</view>
+    <view class="card workspace-summary">
+      <view class="workspace-head">
+        <view class="workspace-icon">{{icon}}</view>
+        <view class="workspace-name">{{record.name}}</view>
+        <view wx:if="{{canWrite}}" class="menu-dot" bindtap="onMenu">···</view>
+      </view>
+      <view wx:if="{{statusLabel}}" class="workspace-status">{{statusLabel}}</view>
+      <view wx:if="{{dateLabel}}" class="workspace-muted">📅 {{dateLabel}}</view>
+      <view wx:if="{{peopleLabel}}" class="workspace-muted">👥 {{peopleLabel}}</view>
+      <view wx:if="{{record.description}}" class="workspace-description">{{record.description}}</view>
+      <view wx:if="{{kind==='habits' && record.computed.checkIn}}" class="streak-row">
+        <view><text class="streak-value">{{record.computed.checkIn.streakDays}}</text><text class="streak-unit">连续天数</text></view>
+        <button wx:if="{{subjectOwner && record.status==='active'}}" class="check-btn"
+          disabled="{{busy || record.computed.checkIn.checkedInToday}}" bindtap="onCheckIn">
+          {{record.computed.checkIn.checkedInToday?'今天已打卡':'✓ 今天打卡'}}
+        </button>
+      </view>
+    </view>
+    <scroll-view scroll-x class="workspace-tabs" show-scrollbar="{{false}}">
+      <view class="workspace-tabs-inner">
+        <view wx:for="{{tabs}}" wx:key="key" class="workspace-tab {{tab===item.key?'active':''}}"
+          data-key="{{item.key}}" bindtap="onTab">{{item.label}}</view>
+      </view>
+    </scroll-view>
+    <view wx:if="{{kind==='habits'&&tab==='overview'}}" class="card">
+      <view class="workspace-section">打卡记录 <text class="soft-link" bindtap="onToggleHistory">{{historyOpen?'收起':'查看历史 ›'}}</text></view>
+      <view wx:if="{{historyOpen}}">
+        <view wx:for="{{checkIns}}" wx:key="id" class="history-item">{{item.checkedOn||item.checkedOnDate}} ✓</view>
+        <view wx:if="{{historyError}}" class="thin-error">{{historyError}}</view>
+        <view wx:if="{{historyLoading}}" class="workspace-muted">正在加载…</view>
+        <view wx:elif="{{historyCursor}}" class="soft-link more" bindtap="onMoreHistory">加载更多</view>
+        <view wx:elif="{{!checkIns.length}}" class="workspace-muted">还没有打卡记录</view>
+      </view>
+    </view>
+    <view wx:if="{{kind==='activities'&&tab==='overview'}}" class="card">
+      <view class="workspace-section">活动计划 <text class="workspace-count">{{outgoing.length}} 条关联</text></view>
+      <view class="shortcut-grid" wx:if="{{canWrite}}">
+        <view class="shortcut" data-type="event" bindtap="onOpenQuick"><text>📅</text><text>新建日程</text></view>
+        <view class="shortcut" data-type="task" bindtap="onOpenQuick"><text>✓</text><text>新建待办</text></view>
+        <view class="shortcut" data-type="countdown" bindtap="onOpenQuick"><text>⏱</text><text>倒计时</text></view>
+      </view>
+      <view class="soft-link" bindtap="onOpenLink" wx:if="{{canWrite}}">＋ 关联已有内容</view>
+    </view>
+    <view wx:if="{{kind==='goals'&&tab==='overview'}}" class="card">
+      <view class="workspace-section">目标概览</view>
+      <view class="workspace-muted">相关计划和待办展示在「行动计划」中；目标状态由操作菜单单独管理。</view>
+      <view class="shortcut-grid" wx:if="{{canWrite}}">
+        <view class="shortcut" data-type="task" bindtap="onOpenQuick"><text>✓</text><text>新增行动待办</text></view>
+        <view class="shortcut" data-type="event" bindtap="onOpenQuick"><text>📅</text><text>安排日程</text></view>
+      </view>
+    </view>
+    <view wx:if="{{kind==='habits'&&tab==='related'}}" class="card">
+      <view class="workspace-section">关联内容</view>
+      <view wx:if="{{canWrite}}" class="soft-link" bindtap="onOpenLink">＋ 关联已有内容</view>
+    </view>
+    <view wx:if="{{kind==='goals'&&tab==='tasks'}}" class="card">
+      <view class="workspace-section">行动计划</view>
+      <view wx:if="{{canWrite}}" class="soft-link" data-type="task" bindtap="onOpenQuick">＋ 新建待办</view>
+      <view wx:if="{{canWrite}}" class="soft-link" bindtap="onOpenLink">＋ 关联已有内容</view>
+    </view>
+    <view wx:if="{{kind==='activities'&&tab==='calendar'}}" class="card">
+      <view class="workspace-section">活动日程</view>
+      <view wx:if="{{canWrite}}" class="soft-link" data-type="event" bindtap="onOpenQuick">＋ 新建日程</view>
+    </view>
+    <view wx:if="{{kind==='activities'&&tab==='tasks'}}" class="card">
+      <view class="workspace-section">活动待办</view>
+      <view wx:if="{{canWrite}}" class="soft-link" data-type="task" bindtap="onOpenQuick">＋ 新建待办</view>
+    </view>
+    <view class="card" wx:if="{{tab!=='overview'||kind==='activities'}}">
+      <view class="workspace-section">{{tab==='calendar'?'相关日程':tab==='tasks'?'相关待办':'相关内容'}}</view>
+      <view wx:for="{{outgoing}}" wx:key="id" wx:if="{{(tab==='calendar'&&item.modelKey==='event')||(tab==='tasks'&&item.modelKey==='task')||tab==='related'||tab==='overview'}}" class="relation-row">
+        <view class="relation-body" data-model="{{item.modelKey}}" data-id="{{item.recordId}}" bindtap="onRelatedTap">
+          <text class="relation-type">{{item.category}}</text><text class="relation-title">{{item.title}}</text>
+        </view>
+        <view wx:if="{{canWrite}}" class="unlink" data-id="{{item.id}}" catchtap="onUnlink">×</view>
+      </view>
+      <view wx:if="{{nextOut}}" class="soft-link more" data-direction="outgoing" bindtap="onMoreRelations">加载更多关联</view>
+      <view wx:if="{{relationError}}" class="thin-error">{{relationError}}</view>
+      <view wx:if="{{relationLoading}}" class="workspace-muted">正在读取关联内容…</view>
+    </view>
+    <view wx:if="{{tab==='related'}}" class="card">
+      <view class="workspace-section">被其他内容关联</view>
+      <view wx:for="{{incoming}}" wx:key="id" class="relation-row">
+        <view class="relation-body" data-model="{{item.modelKey}}" data-id="{{item.recordId}}" bindtap="onRelatedTap">
+          <text class="relation-type">{{item.category}}</text><text class="relation-title">{{item.title}}</text>
+        </view>
+      </view>
+      <view wx:if="{{nextIn}}" class="soft-link more" data-direction="incoming" bindtap="onMoreRelations">加载更多</view>
+    </view>
+    <view wx:if="{{quickOpen}}" class="mini-mask" catchtap="onQuickClose">
+      <view class="mini-sheet" catchtap="noop">
+        <view class="sheet-bar"></view><text class="workspace-section">新增{{quickType==='task'?'待办':'倒计时'}}</text>
+        <input class="sheet-input" value="{{quickName}}" bindinput="onQuickName" placeholder="请输入名称"/>
+        <picker wx:if="{{quickType==='countdown'}}" mode="date" value="{{quickDate}}" bindchange="onQuickDate">
+          <view class="sheet-input">{{quickDate||'选择倒计时日期'}} ›</view>
+        </picker>
+        <button class="btn-primary" disabled="{{busy||!quickName}}" loading="{{busy}}" bindtap="onQuickConfirm">确认创建并关联</button>
+        <view class="cancel" bindtap="onQuickClose">取消</view>
+      </view>
+    </view>
+    <view wx:if="{{linkOpen}}" class="mini-mask" catchtap="onLinkClose">
+      <view class="mini-sheet" catchtap="noop">
+        <view class="sheet-bar"></view><text class="workspace-section">关联已有内容</text>
+        <picker mode="selector" range="{{linkTypes}}" range-key="label" value="{{linkIndex}}" bindchange="onLinkType">
+          <view class="sheet-input">类型：{{linkTypes[linkIndex].label}} ▾</view>
+        </picker>
+        <view class="link-search"><input value="{{linkTerm}}" placeholder="输入至少两个字搜索" bindinput="onLinkTerm" confirm-type="search" bindconfirm="onSearchLink"/><text bindtap="onSearchLink">搜索</text></view>
+        <scroll-view scroll-y class="candidates">
+          <view wx:for="{{linkItems}}" wx:key="id" class="candidate" data-id="{{item.id}}" bindtap="onLinkSelect">{{item.name}}</view>
+          <view wx:if="{{candidateCursor}}" class="soft-link more" bindtap="onMoreCandidates">加载更多结果</view>
+        </scroll-view>
+        <view class="cancel" bindtap="onLinkClose">取消</view>
+      </view>
+    </view>
+  </block>
+</view>
