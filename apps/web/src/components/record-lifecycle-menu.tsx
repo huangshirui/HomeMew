@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 
 export type LifecycleModel = 'goal' | 'habit';
@@ -43,6 +43,21 @@ export function RecordLifecycleMenu({ model, status, recordName, disabled, onAct
 }) {
   const menu = useRef<HTMLDetailsElement>(null);
   const options = lifecycleOptions(model, status);
+  useEffect(() => {
+    function closeOutside(event: PointerEvent) {
+      if (menu.current && !menu.current.contains(event.target as Node)) menu.current.removeAttribute('open');
+    }
+    function closeEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') menu.current?.removeAttribute('open');
+    }
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeEscape);
+    };
+  }, []);
+  useEffect(() => { if (disabled) menu.current?.removeAttribute('open'); }, [disabled]);
   if (!onEdit && !options.length) return null;
 
   function choose(action: MenuAction) {
@@ -53,6 +68,8 @@ export function RecordLifecycleMenu({ model, status, recordName, disabled, onAct
 
   return <details ref={menu} className="relative shrink-0">
     <summary aria-label={`更多操作：${recordName}`} aria-disabled={disabled}
+      onClick={event => { if (disabled) event.preventDefault(); }}
+      onKeyDown={event => { if (disabled && (event.key === 'Enter' || event.key === ' ')) event.preventDefault(); }}
       className={`flex size-9 cursor-pointer list-none items-center justify-center rounded-xl text-stone-600 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 [&::-webkit-details-marker]:hidden ${disabled ? 'pointer-events-none opacity-50' : ''}`}>
       <MoreHorizontal className="size-5" />
     </summary>
