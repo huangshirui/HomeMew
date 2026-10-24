@@ -283,7 +283,7 @@ export function FootballManagePage() {
         </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 size-4 text-stone-400"/>
-          <input type="search" aria-label="搜索球队" autoComplete="off"
+          <input type="text" inputMode="search" aria-label="搜索球队" autoComplete="off"
             className={input + ' pl-9 pr-9'} placeholder="搜索球队名称" value={teamSearch}
             onChange={e => setTeamSearch(e.target.value)}/>
           {teamSearch && <button type="button" aria-label="清除球队搜索" onClick={() => setTeamSearch('')}
