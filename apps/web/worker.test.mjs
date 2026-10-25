@@ -462,3 +462,23 @@ test('cached Web session revalidates mailbox authorization before reusing user a
 });
 
 
+test('Web Event writes always normalize locations without an upstream format switch', async () => {
+  const selected = { name: '人民公园', address: '上海', coordinates: { latitude: 31.2, longitude: 121.4 } };
+  for (const [location, expected] of [['人民公园', { name: '人民公园' }], [selected, selected], [null, null]]) {
+    let writes = 0;
+    const handler = createWebHandler({ now: () => NOW, fetcher: async (input, init = {}) => {
+      const url = String(input);
+      if (url.endsWith('/internal/v1/access/tokens')) return jsonResponse(200, { data: { accessToken: 'life-token-a', expiresIn: 900 } });
+      assert.equal(url, 'https://core.example.test/api/v1/spaces/spc_family/models/event/records');
+      assert.equal(init.headers.get('authorization'), 'Bearer life-token-a');
+      assert.deepEqual(JSON.parse(init.body).location, expected);
+      writes++;
+      return jsonResponse(201, { data: { id: 'rec_event', location: expected } });
+    } });
+    const response = await handler.fetch(request('/api/lifespace/core/v1/spaces/spc_family/models/event/records', {
+      method: 'POST', body: { summary: '测试', location },
+    }), ENV);
+    assert.equal(response.status, 201);
+    assert.equal(writes, 1);
+  }
+});

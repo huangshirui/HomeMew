@@ -4,7 +4,7 @@
  * All domain truth, versions, actions and policy checks stay in LifeSpace.
  */
 import { errorResponse, forwardLifeSpace } from './miniprogram-upstream.mjs';
-import { eventLocationToLifeSpace } from './event-location-compat.mjs';
+import { eventLocationToLifeSpace } from './event-location.mjs';
 
 const PREFIX = '/api/v1/miniprogram/families';
 const ID = /^spc_[a-zA-Z0-9_-]+$/u;
@@ -198,7 +198,7 @@ async function quickCreate(request,env,route,url) {
         selectedLocation = detail;
       }
       let location;
-      try { location = eventLocationToLifeSpace(selectedLocation, env); }
+      try { location = eventLocationToLifeSpace(selectedLocation); }
       catch { return errorResponse(422, 'VALIDATION_ERROR', '日程地点不符合当前 LifeSpace Location 版本'); }
       model='event';data={summary:d.summary.trim(),description:d.description??null,location,
         attendeePersonIds:people,when,...(d.presentation?{presentation:d.presentation}:{})};

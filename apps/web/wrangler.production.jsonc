@@ -19,8 +19,7 @@
   "vars": {
     "ENVIRONMENT": "production",
     "LIFESPACE_IDENTITY_URL": "https://auth.aisr.online",
-    "LIFESPACE_CORE_URL": "https://core.aisr.online",
-    "LIFESPACE_EVENT_LOCATION_FORMAT": "string"
+    "LIFESPACE_CORE_URL": "https://core.aisr.online"
   },
   "services": [
     {
@@ -65,8 +64,7 @@
     "vars": {
       "ENVIRONMENT": "staging",
       "LIFESPACE_IDENTITY_URL": "https://auth-staging.aisr.online",
-      "LIFESPACE_CORE_URL": "https://core-staging.aisr.online",
-      "LIFESPACE_EVENT_LOCATION_FORMAT": "location"
+      "LIFESPACE_CORE_URL": "https://core-staging.aisr.online"
     },
     "services": [
       {

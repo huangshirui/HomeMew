@@ -21,7 +21,6 @@ test('one Worker codebase has production-only production bindings', () => {
     ENVIRONMENT: 'production',
     LIFESPACE_IDENTITY_URL: 'https://auth.aisr.online',
     LIFESPACE_CORE_URL: 'https://core.aisr.online',
-    LIFESPACE_EVENT_LOCATION_FORMAT: 'string',
   });
 });
 
@@ -35,7 +34,6 @@ test('same Worker Preview is bound only to staging services and hosts', () => {
     ENVIRONMENT: 'staging',
     LIFESPACE_IDENTITY_URL: 'https://auth-staging.aisr.online',
     LIFESPACE_CORE_URL: 'https://core-staging.aisr.online',
-    LIFESPACE_EVENT_LOCATION_FORMAT: 'location',
   });
   assert.deepEqual(config.assets.run_worker_first, ['/api/*', '/_stage/*', '/health']);
   assert.equal(JSON.stringify(config).includes('STAGING_LIFESPACE_APPLICATION_CREDENTIAL'), false);

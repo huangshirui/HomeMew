@@ -1,5 +1,4 @@
 // Stateless HomeMew map provider adapter. LifeSpace stores only WGS84.
-import { eventLocationWireFormat } from './event-location-compat.mjs';
 import { json, errorResponse, forwardLifeSpace } from './miniprogram-upstream.mjs';
 
 const PI = Math.PI, A = 6378245, EE = 0.00669342162296594323;
@@ -86,8 +85,8 @@ export async function enforcePlaceRateLimits(env, actorKey) {
 export async function searchPlaces(request,env,{fetcher=fetch, actorKey}={}) {
   const url=new URL(request.url), query=url.searchParams.get('q')?.trim()||'';
   if([...url.searchParams.keys()].some(k=>k!=='q')||query.length>100) return errorResponse(400,'INVALID_QUERY','Invalid place query');
-  if(query.length<2) return json({data:{items:[],available:false,structured:eventLocationWireFormat(env)==='location'}});
-  const structured=eventLocationWireFormat(env)==='location';
+  if(query.length<2) return json({data:{items:[],available:false,structured:true}});
+  const structured=true;
   const key=env.AMAP_WEB_SERVICE_KEY;
   if(typeof key!=='string'||!key.trim())return json({data:{items:[],available:false,structured}});
   const blocked = await enforcePlaceRateLimits(env, actorKey);
