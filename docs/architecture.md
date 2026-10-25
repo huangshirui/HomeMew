@@ -372,3 +372,8 @@ Detailed decision: `docs/decisions/2026-10-09-external-system-capability-contain
 ## 13. LifeSpace change boundary
 
 If HomeMew discovers a missing platform capability, finish independent HomeMew work and document the gap. Any LifeSpace repository modification requires explicit user approval first and must then follow LifeSpace's own `AGENTS.md`.
+
+
+## Explicit Web mailbox authorization rollout
+
+Accepted decision: `docs/decisions/2026-10-25-miniprogram-2-navigation-email.md`. Identity 0.13/schema 12 owns authenticated Application-scoped mailbox consent and audit. Fixed Mini GET/PATCH `/api/v1/miniprogram/me/web-login` forwards to Identity; cached Web sessions revalidate via `/internal/v1/access/session-check`. No HomeMew mailbox persistence or email OTP. Release Identity Staging first, then Web Preview acceptance, then Identity Production and Web Production. Mini upload is separate. Tracking: HomeMew #153 / LifeSpace #408.

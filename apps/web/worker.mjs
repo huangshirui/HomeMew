@@ -291,7 +291,18 @@ async function identityUserRequest(env, fetcher, path, token, id) {
 
 async function ensureSession(request, env, fetcher, assertion, id, nowMs) {
   const existing = await readSession(request, env, assertion, nowMs);
-  if (existing) return { ...existing, cookie: null };
+  if (existing) {
+    const { response, payload } = await identityApplicationRequest(env, fetcher, '/internal/v1/access/session-check', {
+      accessAssertion: assertion,
+    }, id);
+    if (response.status !== 200 || typeof payload?.data?.userId !== 'string') {
+      throw upstreamError(response, payload, 'LIFESPACE_SESSION_CHECK_FAILED');
+    }
+    // Token came from our verified signed cookie, never from browser input.
+    let subject;
+    try { subject = JSON.parse(decoder.decode(base64UrlToBytes(existing.accessToken.split('.')[1]))).sub; } catch { /* exchange below */ }
+    if (subject === payload.data.userId) return { ...existing, cookie: null };
+  }
 
   const exchanged = await exchangeAccess(env, fetcher, assertion, id);
   return {

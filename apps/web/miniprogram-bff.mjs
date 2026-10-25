@@ -21,6 +21,7 @@ function idSegment(value, pattern) {
 export function matchMiniProgramBffRoute(pathname) {
   if (pathname === `${MINI_PREFIX}/me`) return { kind: 'me' };
   if (pathname === `${MINI_PREFIX}/me/avatar`) return { kind: 'me-avatar' };
+  if (pathname === `${MINI_PREFIX}/me/web-login`) return { kind: 'web-login' };
 
   let match = new RegExp(`^${MINI_PREFIX}/me/access-link-challenges/([^/]+)/confirm$`, 'u').exec(pathname);
   if (match) {
@@ -55,6 +56,8 @@ function routeDefinition(route) {
       return { methods: ['GET', 'PATCH'], target: 'identity', path: '/api/v1/me', rewriteAvatars: true };
     case 'me-avatar':
       return { methods: ['PUT'], target: 'identity', path: '/api/v1/me/avatar', rewriteAvatars: true };
+    case 'web-login':
+      return { methods: ['GET', 'PATCH'], target: 'identity', path: '/api/v1/me/web-login' };
     case 'access-link-confirm':
       return {
         methods: ['POST'],

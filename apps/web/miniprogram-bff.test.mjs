@@ -129,3 +129,15 @@ test('shared adapter rejects unsafe target/path configuration', async () => {
   assert.equal(badTarget.status, 500);
   assert.equal(badPath.status, 500);
 });
+
+test('mailbox settings use only the fixed Identity binding and preserve write errors',async()=>{
+  const env={LIFESPACE_IDENTITY:service(async incoming=>{
+    assert.equal(new URL(incoming.url).pathname,'/api/v1/me/web-login');
+    assert.equal(incoming.headers.get('authorization'),TOKEN);
+    assert.equal(incoming.method,'PATCH');
+    assert.deepEqual(await incoming.json(),{email:'me@example.com',version:2});
+    return new Response(JSON.stringify({error:{code:'EMAIL_VERSION_CONFLICT',message:'reload',requestId:'req_email'}}),{status:409,headers:{'content-type':'application/json','x-request-id':'req_email'}});
+  })};
+  const response=await handleMiniProgramBff(request('/api/v1/miniprogram/me/web-login',{method:'PATCH',body:JSON.stringify({email:'me@example.com',version:2})}),env);
+  assert.equal(response.status,409);assert.equal((await response.json()).error.code,'EMAIL_VERSION_CONFLICT');
+});

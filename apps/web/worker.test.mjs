@@ -438,3 +438,27 @@ test('Core proxy obtains a LifeSpace session and forwards only the user bearer',
   assert.ok(response.headers.get('set-cookie'));
   assert.equal(calls.length, 2);
 });
+
+test('cached Web session revalidates mailbox authorization before reusing user authority', async () => {
+  const token=`header.${Buffer.from(JSON.stringify({sub:'usr_1'})).toString('base64url')}.signature`;
+  let revoked=false, exchanges=0, checks=0;
+  const handler=createWebHandler({now:()=>NOW,fetcher:async(input)=>{
+    const url=String(input);
+    if(url.endsWith('/internal/v1/access/tokens')){exchanges++;return jsonResponse(200,{data:{accessToken:token,expiresIn:900}});}
+    if(url.endsWith('/internal/v1/access/session-check')){checks++;return revoked
+      ?jsonResponse(403,{error:{code:'ACCESS_EMAIL_REVOKED',message:'邮箱登录授权已更改'}})
+      :jsonResponse(200,{data:{userId:'usr_1'}});}
+    if(url.endsWith('/api/v1/me'))return jsonResponse(200,{data:{id:'usr_1'}});
+    assert.fail(`unexpected upstream ${url}`);
+  }});
+  const first=await handler.fetch(request('/api/session'),ENV);
+  const cookie=cookiePair(first);
+  assert.equal((await handler.fetch(request('/api/session',{cookie}),ENV)).status,200);
+  assert.equal(exchanges,1);assert.equal(checks,1);
+  revoked=true;
+  const denied=await handler.fetch(request('/api/session',{cookie}),ENV);
+  assert.equal(denied.status,403);assert.equal((await denied.json()).error.code,'ACCESS_EMAIL_REVOKED');
+  assert.equal(exchanges,1);
+});
+
+
