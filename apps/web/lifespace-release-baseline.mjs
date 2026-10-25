@@ -3,10 +3,10 @@ import { fileURLToPath } from 'node:url';
 
 export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
   identity: Object.freeze({
-    contractVersion: '0.13.0',
-    compatibleContractVersions: Object.freeze(['0.11.0', '0.12.0', '0.13.0']),
-    minimumSchemaVersion: 10,
-    minimumSchemaByContract: Object.freeze({ '0.11.0': 10, '0.12.0': 11, '0.13.0': 12 }),
+    contractVersion: '0.14.0',
+    compatibleContractVersions: Object.freeze(['0.14.0']),
+    minimumSchemaVersion: 13,
+    minimumSchemaByContract: Object.freeze({ '0.14.0': 13 }),
   }),
   core: Object.freeze({
     contractVersion: '0.53.0',

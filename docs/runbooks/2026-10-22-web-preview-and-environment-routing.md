@@ -52,7 +52,7 @@ Older STAGING_LIFESPACE_APPLICATION_CREDENTIAL and STAGING_WEB_SESSION_SECRET se
 
 1. Once CI passes and the feature PR merges to main, enable Worker **Preview URLs** for the existing homemew-web Worker in Cloudflare Dashboard → Workers & Pages → Domains, without replacing the current Production code. The production workers.dev route can remain disabled.
 2. **Before publishing a Preview**, protect this Worker's Preview hostnames/wildcard with Cloudflare Access. Register the resulting Access audience in LifeSpace **Staging** for the staging HomeMew Application. Review GitHub preview Environment branch/approver restrictions.
-3. GitHub Actions → Deploy HomeMew Web Preview → choose a reviewed trusted code branch, confirm DEPLOY_HOMEMEW_WEB_PREVIEW. This creates/updates the named staging Preview under the same Worker, **without changing Production code**.
+3. GitHub Actions → Deploy HomeMew Web Preview → select main at the reviewed merge commit, confirm DEPLOY_HOMEMEW_WEB_PREVIEW. This creates/updates the named staging Preview under the same Worker, **without changing Production code**.
 4. Add TWO Preview-scoped secrets to the named staging Preview from a secure terminal or Preview settings. Wrangler >= 4.135.0 commands from repository root:
    - corepack pnpm dlx wrangler@4.135.0 preview secret put LIFESPACE_APPLICATION_CREDENTIAL --name staging --config apps/web/wrangler.production.jsonc
    - corepack pnpm dlx wrangler@4.135.0 preview secret put WEB_SESSION_SECRET --name staging --config apps/web/wrangler.production.jsonc
@@ -72,3 +72,7 @@ Cloudflare Preview URLs can be enabled through the dashboard, without first depl
 - A LifeSpace breaking upgrade is ready for production only after verified Web Preview tests **and** backward compatibility checks with deployed Mini BFF + existing Mini clients. football_match/football_goal remain ordinary models and must be manually published in LifeSpace Console as needed.
 - Once live and verified, delete the obsolete Cloudflare Access bypass app covering /_stage paths and remove unused Production Worker STAGING_* secrets. Keep homemew-backend-staging and its Durable Objects.
 - Roll back a broken Preview independently; Production rollback follows its existing guarded GitHub deployment/release procedure.
+
+## Hard release provenance (2026-10-26)
+
+Normal releases require a merged same-repository PR whose required CI succeeded on its exact head. Checkouts pin dispatch-time github.sha. The read-only release gate verifies this before any deployment mutation. Web Production additionally requires successful named Preview for that same merge SHA; Backend Production requires successful Backend Staging for the same SHA. Backend Staging is manual-only. Do not upload local working-tree bundles, mutate remote D1 directly or use direct Cloudflare content APIs as substitutes for the normal pipeline. Preserve existing manual confirmations, Access protection and environment isolation.
