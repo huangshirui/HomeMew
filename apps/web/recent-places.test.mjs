@@ -6,7 +6,7 @@ test('mini route must supply bearer and delegates to internal-only Backend',asyn
  const no=await handleMiniRecentPlaces(new Request(url),{});
  assert.equal(no.status,401);
  let endpoint='',auth='';
- const env={LIFESPACE_EVENT_LOCATION_FORMAT:'location',HOMEMEW_BACKEND:{fetch:async req=>{
+ const env={HOMEMEW_BACKEND:{fetch:async req=>{
   endpoint=req.url;auth=req.headers.get('authorization');
   return Response.json({data:{enabled:true,items:[{location:{name:'School'},useCount:1}]}});
  }}};

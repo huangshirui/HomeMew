@@ -8,10 +8,9 @@ const selection = {
   coordinates: { latitude: 39.99, longitude: 116.4 },
 };
 
-async function createQuickEvent(format, location, locationDetail) {
+async function createQuickEvent(location, locationDetail) {
   const batches = [];
   const env = {
-    LIFESPACE_EVENT_LOCATION_FORMAT: format,
     LIFESPACE_CORE: {
       async fetch(incoming) {
         const url = new URL(incoming.url);
@@ -40,32 +39,30 @@ async function createQuickEvent(format, location, locationDetail) {
   return { response, batches };
 }
 
-test('legacy and upgraded Event Location formats are honored inside atomic quick-create', async () => {
-  for (const format of ['string', 'location']) {
-    const { response, batches } = await createQuickEvent(format, '足球公园');
+test('old Mini label writes use canonical Location inside atomic quick-create', async () => {
+  {
+    const { response, batches } = await createQuickEvent('足球公园');
     assert.equal(response.status, 200);
     assert.equal(batches.length, 1);
     assert.equal(batches[0].atomicConsistency, true);
     assert.deepEqual(batches[0].operations[0].data.location,
-      format === 'string' ? '足球公园' : { name: '足球公园' });
+      { name: '足球公园' });
     assert.equal(batches[0].operations[1].operation, 'relation_create');
   }
 });
 
 test('explicit WGS84 selection is preserved in canonical quick-create only', async () => {
-  const good = await createQuickEvent('location', selection.name, selection);
+  const good = await createQuickEvent(selection.name, selection);
   assert.equal(good.response.status, 200);
   assert.deepEqual(good.batches[0].operations[0].data.location, selection);
-  const old = await createQuickEvent('string', selection.name, selection);
-  assert.equal(old.response.status, 422);
-  assert.equal(old.batches.length, 0);
+
 });
 
 test('quick-create rejects mismatched names and malformed coordinates instead of fabricating points', async () => {
-  const mismatched = await createQuickEvent('location', '另一个地方', selection);
+  const mismatched = await createQuickEvent('另一个地方', selection);
   assert.equal(mismatched.response.status, 400);
   assert.equal(mismatched.batches.length, 0);
-  const invalid = await createQuickEvent('location', selection.name, { ...selection, coordinates: { latitude: 999, longitude: 116.4 } });
+  const invalid = await createQuickEvent(selection.name, { ...selection, coordinates: { latitude: 999, longitude: 116.4 } });
   assert.equal(invalid.response.status, 422);
   assert.equal(invalid.batches.length, 0);
 });
