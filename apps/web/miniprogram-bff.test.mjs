@@ -141,3 +141,35 @@ test('mailbox settings use only the fixed Identity binding and preserve write er
   const response=await handleMiniProgramBff(request('/api/v1/miniprogram/me/web-login',{method:'PATCH',body:JSON.stringify({email:'me@example.com',version:2})}),env);
   assert.equal(response.status,409);assert.equal((await response.json()).error.code,'EMAIL_VERSION_CONFLICT');
 });
+
+test('LifeSpace Identity 0.15 global mailbox is projected unchanged through stable Mini BFF', async () => {
+  const state = { email: 'me@example.com', version: 3, linked: true, status: 'linked' };
+  const env = { LIFESPACE_IDENTITY: service(async incoming => {
+    assert.equal(new URL(incoming.url).pathname, '/api/v1/me/web-login');
+    assert.equal(incoming.headers.get('authorization'), TOKEN);
+    assert.equal(incoming.method, 'GET');
+    return new Response(JSON.stringify({ data: state }), {
+      status: 200, headers: { 'content-type': 'application/json', 'x-request-id': 'req_mailbox' },
+    });
+  }) };
+  const response = await handleMiniProgramBff(request('/api/v1/miniprogram/me/web-login'), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data, state);
+  assert.equal(response.headers.get('x-request-id'), 'req_mailbox');
+});
+
+test('Identity 0.15 global mailbox uniqueness conflict remains 409 for existing Mini clients', async () => {
+  const env = { LIFESPACE_IDENTITY: service(async incoming => {
+    assert.equal(new URL(incoming.url).pathname, '/api/v1/me/web-login');
+    assert.deepEqual(await incoming.json(), { email: 'taken@example.com', version: 2 });
+    return new Response(JSON.stringify({
+      error: { code: 'EMAIL_ALREADY_LINKED', message: 'This email is linked to another LifeSpace user', requestId: 'req_conflict' },
+    }), { status: 409, headers: { 'content-type': 'application/json', 'x-request-id': 'req_conflict' } });
+  }) };
+  const response = await handleMiniProgramBff(request('/api/v1/miniprogram/me/web-login', {
+    method: 'PATCH', body: JSON.stringify({ email: 'taken@example.com', version: 2 }),
+  }), env);
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error.code, 'EMAIL_ALREADY_LINKED');
+  assert.equal(response.headers.get('x-request-id'), 'req_conflict');
+});
