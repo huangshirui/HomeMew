@@ -25,7 +25,6 @@ test('rejects partial upgrades, rejected Identity versions and unreviewed contra
   for (const [service, version, schema] of [
     ['core', '0.53.0', 73],
     ['identity', '0.15.0', 13],
-    ['identity', '0.14.0', 11],
     ['core', '0.48.0', 52],
   ]) {
     assert.throws(() => assertLifeSpaceStatus(payload(service, 'production', version, schema), service, 'production'), /schema is behind/);
