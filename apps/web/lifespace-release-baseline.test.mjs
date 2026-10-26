@@ -9,9 +9,9 @@ function payload(service, environment, contractVersion, schemaVersion) {
 test('release pins global mailbox Identity 0.15 and reviewed Core 0.53', () => {
   assert.equal(LIFESPACE_RELEASE_BASELINE.core.contractVersion, '0.53.0');
   assert.equal(LIFESPACE_RELEASE_BASELINE.identity.contractVersion, '0.15.0');
-  assert.equal(assertLifeSpaceStatus(payload('core', 'production', '0.53.0', 74), 'core', 'production').schemaVersion, 72);
+  assert.equal(assertLifeSpaceStatus(payload('core', 'production', '0.53.0', 74), 'core', 'production').schemaVersion, 74);
 
-  assert.equal(assertLifeSpaceStatus(payload('core', 'staging', '0.53.0', '74'), 'core', 'staging').schemaVersion, '72');
+  assert.equal(assertLifeSpaceStatus(payload('core', 'staging', '0.53.0', '74'), 'core', 'staging').schemaVersion, '74');
 });
 
 test('allows reviewed older Core contract revisions with their schema floors', () => {
@@ -49,7 +49,7 @@ test('rejects partial upgrades, rejected Identity versions and unreviewed contra
 
 test('global mailbox release requires Identity 0.15 schema 14 in each matching environment', () => {
   for (const environment of ['staging', 'production']) {
-    assert.equal(assertLifeSpaceStatus(payload('identity', environment, '0.15.0', 14), 'identity', environment).schemaVersion, 13);
+    assert.equal(assertLifeSpaceStatus(payload('identity', environment, '0.15.0', 14), 'identity', environment).schemaVersion, 14);
     assert.throws(() => assertLifeSpaceStatus(payload('identity', environment, '0.15.0', 13), 'identity', environment), /schema is behind/);
   }
 });
