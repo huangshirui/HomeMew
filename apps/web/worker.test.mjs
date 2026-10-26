@@ -446,7 +446,7 @@ test('cached Web session revalidates mailbox authorization before reusing user a
     const url=String(input);
     if(url.endsWith('/internal/v1/access/tokens')){exchanges++;return jsonResponse(200,{data:{accessToken:token,expiresIn:900}});}
     if(url.endsWith('/internal/v1/access/session-check')){checks++;return revoked
-      ?jsonResponse(403,{error:{code:'ACCESS_EMAIL_REVOKED',message:'邮箱登录授权已更改'}})
+      ?jsonResponse(409,{error:{code:'ACCESS_PRINCIPAL_UNLINKED',message:'邮箱登录授权已更改'}})
       :jsonResponse(200,{data:{userId:'usr_1'}});}
     if(url.endsWith('/api/v1/me'))return jsonResponse(200,{data:{id:'usr_1'}});
     assert.fail(`unexpected upstream ${url}`);
@@ -457,7 +457,7 @@ test('cached Web session revalidates mailbox authorization before reusing user a
   assert.equal(exchanges,1);assert.equal(checks,1);
   revoked=true;
   const denied=await handler.fetch(request('/api/session',{cookie}),ENV);
-  assert.equal(denied.status,403);assert.equal((await denied.json()).error.code,'ACCESS_EMAIL_REVOKED');
+  assert.equal(denied.status,409);assert.equal((await denied.json()).error.code,'ACCESS_PRINCIPAL_UNLINKED');
   assert.equal(exchanges,1);
 });
 
