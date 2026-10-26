@@ -1,7 +1,7 @@
 # Unified Access account linking and release discipline
 
 Date: 2026-10-26
-Status: Accepted by direct user clarification; implementation awaiting PR/CI
+Status: Accepted by direct user clarification; implementation delivered through PR/CI, deployment separate
 Scope: Mini/Web account linking, Identity contract consumption, deployment provenance
 
 ## One identity relation, two entry points
@@ -23,3 +23,5 @@ Required order: commit -> PR -> required CI -> merge -> exact-candidate Staging/
 The workflow must verify before any environment mutation that its immutable SHA is a merged PR candidate with successful required head CI. Production additionally requires successful Staging/Preview for the same SHA. Existing manual owner/confirmation, Access, isolation and performance gates remain. Backend Staging is manual-only rather than deploying automatically on push.
 
 This correction implements code/docs/tests and PRs. It does not dispatch deployment, run remote migrations, upload Mini packages, or assert that already-interrupted Staging is corrected. Recorded state at stop: Staging Identity 0.13/schema 12; Production Identity 0.12/schema 11.
+
+Required Web and Backend CI runs on every PR, including documentation-only changes. Otherwise a reviewed docs merge could become main without the evidence required by the exact-candidate release gate. This broadens validation only; deployments remain manual-only.

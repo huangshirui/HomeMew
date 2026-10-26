@@ -2,14 +2,6 @@ name: Web check
 
 on:
   pull_request:
-    paths:
-      - apps/web/**
-      - package.json
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
-      - .github/workflows/web-check.yml
-      - .github/workflows/web-production-deploy.yml
-      - .github/workflows/web-preview-deploy.yml
 
 permissions:
   contents: read
