@@ -9,9 +9,13 @@ export type HomeLifeRow = DomainRecord & {
 export function homeLifeRows(
   records: DomainRecord[], kind: LifeKind, people: PersonOption[], personId: string,
 ): HomeLifeRow[] {
-  return records.filter(record => kind === 'activities' ||
-    (record.status === 'active' && (kind !== 'habits' || Boolean(personId) && record.subjectPersonId === personId)))
-    .slice().sort((a, b) => {
+  return records.filter(record => {
+    if (kind === 'activities') return true;
+    if (record.status !== 'active') return false;
+    // 仅在指定了 personId（只看我的）时才按成员过滤；看全家时不限定成员
+    if (kind === 'habits' && personId && record.subjectPersonId !== personId) return false;
+    return true;
+  }).slice().sort((a, b) => {
       if (kind === 'habits') return Number(Boolean(a.computed?.checkIn?.checkedInToday)) -
         Number(Boolean(b.computed?.checkIn?.checkedInToday));
       const left = (kind === 'activities' ? a.endDate : a.targetDate) || '9999-12-31';

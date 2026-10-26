@@ -32,10 +32,12 @@ export async function listCurrentLifeRecords(
   const visited = new Set<string>();
   do {
     const options: DomainListOptions = kind === 'activities'
-      ? { period: 'current', today, limit: 100, cursor }
-      : { status: 'active', limit: 100, cursor };
+      ? { period: 'current', today, limit: 100, cursor, ...(personId ? { personId } : {}) }
+      : { status: 'active', limit: 100, cursor, ...(personId ? { personId } : {}) };
     const page = kind === 'habits'
-      ? await listPersonalHabitPage(familyId, personId, options, isCurrent)
+      ? (personId
+          ? await listPersonalHabitPage(familyId, personId, options, isCurrent)
+          : await listDomainRecords(familyId, 'habits', options))
       : await listDomainRecords(familyId, kind, options);
     if (!isCurrent()) return [];
     records.push(...page.items);

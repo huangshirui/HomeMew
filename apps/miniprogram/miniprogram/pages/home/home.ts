@@ -37,8 +37,7 @@ import { getViewingTimeZone } from '../../services/settings';
 import { eventDaysInRange } from '../../utils/event-timeline';
 import { isEventEnded, isEventOngoing, eventDisplayRank } from '../../utils/event-status';
 import { consumeAnyDirty, consumeDirtyDomains, markDirty, subscribe } from '../../stores/dirty';
-import { loadEventsScope } from '../../stores/events-scope';
-import { loadTasksScope, assigneeParamOf } from '../../stores/tasks-scope';
+import { loadHomeScope, type HomeScope } from '../../stores/home-scope';
 import { listEvents } from '../../services/events';
 import { listTasks, completeTask } from '../../services/tasks';
 import { listAttentionDayRecords } from '../../services/day-records';
@@ -152,6 +151,8 @@ Page({
 
     currentFamily: null as FamilyView | null,
     loaded: false,
+    /** 当前生效的首页数据范围（设置页「首页数据范围」）：'me' 只看我的 / 'all' 看全家 */
+    homeScope: 'me' as HomeScope,
 
     todayEvents: [] as TodayEventView[],
     todayEventCount: 0,
@@ -181,7 +182,6 @@ Page({
     lifeRecords: { habits: [], activities: [], goals: [] } as Record<LifeKind, HomeLifeRow[]>,
     lifeLoading: { habits: false, activities: false, goals: false },
     lifeErrors: { habits: false, activities: false, goals: false },
-    lifeVisible: false,
     canCheckIn: false,
   },
 
@@ -221,9 +221,13 @@ Page({
     // 首页只消费自己关心的域（events / tasks / days），不消费 wishes，
     // 避免愿望的变更导致首页全量重新请求。
     const dirty = consumeDirtyDomains(['events', 'tasks', 'days']);
-    // 首次加载、家庭在其他页被切换过、或关心的域被标记变更（新建/完成/删除后返回）时重新拉取；
-    // 普通切换 tab 不重复请求。
-    if (!this.data.loaded || (storeFamilyId && storeFamilyId !== shownFamilyId) || dirty.size > 0) {
+    // 设置页「首页数据范围」变更后，本页需重新拉取以套用新的范围。
+    const scope = loadHomeScope(storeFamilyId, userStore.value?.id || '');
+    const scopeChanged = scope !== this.data.homeScope;
+    this.setData({ homeScope: scope });
+    // 首次加载、家庭在其他页被切换过、关心的域被标记变更（新建/完成/删除后返回）、
+    // 或数据范围设置变更时重新拉取；普通切换 tab 不重复请求。
+    if (!this.data.loaded || (storeFamilyId && storeFamilyId !== shownFamilyId) || dirty.size > 0 || scopeChanged) {
       this.loadData();
     } else if (storeFamilyId) {
       // New domain edit/detail pages do not publish the legacy dirty flags.
@@ -397,7 +401,6 @@ Page({
       lifeRecords: { habits: [], activities: [], goals: [] },
       lifeLoading: { habits: false, activities: false, goals: false },
       lifeErrors: { habits: false, activities: false, goals: false },
-      lifeVisible: false,
       canCheckIn: false,
     });
   },
@@ -459,6 +462,8 @@ Page({
         app.globalData.currentFamily = current;
       }
 
+      this.setData({ homeScope: loadHomeScope(current?.id || '', userStore.value?.id || '') });
+
       if (current) {
         // 家庭发生变化时先清空旧数据，避免新家庭加载完成前残留上一个家庭的内容
         if (prevId && prevId !== current.id) {
@@ -516,9 +521,9 @@ Page({
       const viewingTimezone = getViewingTimeZone(this.data.currentFamily?.timezone);
       const start = formatInstantInTimeZone(new Date().toISOString(), viewingTimezone).date;
       const end = addDaysToDateOnly(start, 1);
-      // 跟随日程页的「成员日历范围」偏好：all 不传、me 传 'me'、其他传成员 userId
-      const scope = loadEventsScope(familyId, userStore.value?.id || '');
-      const attendeeId = scope === 'all' || scope === 'me' ? (scope === 'me' ? 'me' : undefined) : scope;
+      // 跟随设置页「首页数据范围」：all 看全家（不传 attendeeId）、me 只看我的（传 'me'）
+      const scope = loadHomeScope(familyId, userStore.value?.id || '');
+      const attendeeId = scope === 'all' ? undefined : 'me';
       const events = await listEvents(familyId, {
         startDate: start,
         endDateExclusive: end,
@@ -555,10 +560,9 @@ Page({
   /**
    * 加载待办任务（进行中的任务）。
    *
-   * 跟随待办页的「成员范围」偏好（stores/tasks-scope）：all 不传、me 传 'me'、
-   * 其他传成员 userId，与「今天安排」跟随日程页范围的做法一致。
-   * 这里拉取范围内全部进行中的待办：首页「待办提醒」再按近 3 天截止筛选，
-   * 「需要关注」的逾期汇总与问候语计数仍基于同一份数据，保证口径一致。
+   * 跟随设置页「首页数据范围」：all 看全家（不传 assigneeId）、me 只看我的（传 'me'），
+   * 与「今天安排」的做法一致。这里拉取范围内全部进行中的待办：首页「待办提醒」再按近
+   * 3 天截止筛选，「需要关注」的逾期汇总与问候语计数仍基于同一份数据，保证口径一致。
    */
   async loadTasks(familyId: string): Promise<void> {
     const hasOld = this.data.pendingTasks.length > 0;
@@ -568,7 +572,9 @@ Page({
       tasksError: false,
     });
     try {
-      const assigneeId = assigneeParamOf(loadTasksScope(familyId, userStore.value?.id || ''));
+      // 跟随设置页「首页数据范围」：all 看全家（不传 assigneeId）、me 只看我的（传 'me'）
+      const scope = loadHomeScope(familyId, userStore.value?.id || '');
+      const assigneeId = scope === 'all' ? undefined : 'me';
       const tasks = await listTasks(familyId, {
         status: 'pending',
         includeNoDue: true,
@@ -604,7 +610,10 @@ Page({
       daysError: false,
     });
     try {
-      const records = await listAttentionDayRecords(familyId);
+      // 跟随设置页「首页数据范围」：all 看全家（不过滤）、me 只看我的（按当前用户过滤）
+      const scope = loadHomeScope(familyId, userStore.value?.id || '');
+      const subjectUserId = scope === 'all' ? undefined : (userStore.value?.id || undefined);
+      const records = await listAttentionDayRecords(familyId, subjectUserId);
       if (this.data.currentFamily?.id !== familyId) return;
       const userId = userStore.value?.id;
       if (userId) cacheHomeAttentionDays(userId, familyId, records);
@@ -636,7 +645,6 @@ Page({
       generations[kind] = ++this._lifeGeneration[kind];
       this.setData({ [`lifeLoading.${kind}`]: true, [`lifeErrors.${kind}`]: false });
     }
-    this.updateLifeVisible();
     const isCurrent = (kind: LifeKind) => this.data.currentFamily?.id === familyId &&
       this._lifeGeneration[kind] === generations[kind];
     let people: PersonOption[];
@@ -647,37 +655,32 @@ Page({
       for (const kind of kinds) {
         if (isCurrent(kind)) this.setData({ [`lifeLoading.${kind}`]: false, [`lifeErrors.${kind}`]: true });
       }
-      this.updateLifeVisible();
       return;
     }
-    const personId = people.find(person => person.userId === userStore.value?.id)?.personId || '';
-    if (kinds.includes('habits') && isCurrent('habits')) this._lifePersonId = personId;
+    const myPersonId = people.find(person => person.userId === userStore.value?.id)?.personId || '';
+    // 跟随设置页「首页数据范围」：all 看全家（不限定成员，family-wide）、me 只看我的
+    const scope = loadHomeScope(familyId, userStore.value?.id || '');
+    const fetchPersonId = scope === 'all' ? '' : myPersonId;
+    if (kinds.includes('habits') && isCurrent('habits')) this._lifePersonId = fetchPersonId;
     const today = formatInstantInTimeZone(new Date().toISOString(), this.data.currentFamily?.timezone || 'Asia/Shanghai').date;
     await Promise.all(kinds.map(async kind => {
       if (!isCurrent(kind)) return;
       try {
-        const records = await listCurrentLifeRecords(familyId, kind, personId, today, () => isCurrent(kind));
+        const records = await listCurrentLifeRecords(familyId, kind, fetchPersonId, today, () => isCurrent(kind));
         if (!isCurrent(kind)) return;
-        const rows = homeLifeRows(records, kind, people, personId);
+        const rows = homeLifeRows(records, kind, people, fetchPersonId);
         // A poll may finish while a check-in is pending. Keep its button locked.
         rows.forEach(row => { row.checking = this._checkingHabits.has(row.id); });
         this.setData({ [`lifeRecords.${kind}`]: rows, [`lifeErrors.${kind}`]: false,
-          canCheckIn: Boolean(personId) && (this.data.currentFamily?.role as string) !== 'viewer' });
+          canCheckIn: Boolean(fetchPersonId) && (this.data.currentFamily?.role as string) !== 'viewer' });
       } catch {
         if (isCurrent(kind)) this.setData({ [`lifeErrors.${kind}`]: true });
       } finally {
         if (isCurrent(kind)) {
           this.setData({ [`lifeLoading.${kind}`]: false });
-          this.updateLifeVisible();
         }
       }
     }));
-  },
-
-  updateLifeVisible(): void {
-    const kinds: LifeKind[] = ['habits', 'activities', 'goals'];
-    this.setData({ lifeVisible: kinds.some(kind => this.data.lifeRecords[kind].length > 0 ||
-      this.data.lifeLoading[kind] || this.data.lifeErrors[kind]) });
   },
 
   onLifeTab(e: WechatMiniprogram.TouchEvent): void {

@@ -71,4 +71,28 @@
       <text class="tz-current-text">当前展示时区：{{displayTimeZone || '未指定'}}</text>
     </view>
   </view>
+
+  <view class="section card">
+    <view class="section-header">
+      <text class="section-title">首页数据范围</text>
+    </view>
+    <view class="mode-row">
+      <view
+        class="mode-item {{homeScope === 'me' ? 'mode-active' : ''}}"
+        bindtap="onHomeScopeChange"
+        data-scope="me"
+      >
+        <text class="mode-title">只看我的</text>
+        <text class="mode-desc">首页只展示与我自己相关的内容</text>
+      </view>
+      <view
+        class="mode-item {{homeScope === 'all' ? 'mode-active' : ''}}"
+        bindtap="onHomeScopeChange"
+        data-scope="all"
+      >
+        <text class="mode-title">看全家</text>
+        <text class="mode-desc">首页展示全家的日程、待办与动态</text>
+      </view>
+    </view>
+  </view>
 </view>
