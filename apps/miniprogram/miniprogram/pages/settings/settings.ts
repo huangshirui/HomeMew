@@ -1,3 +1,5 @@
+import { getWebLogin } from '../../services/web-login';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 /**
  * 设置页
  *
@@ -17,6 +19,7 @@ import {
 
 Page({
   data: {
+    accountLoaded:false,accountError:false,loginEmail:'',emailAvailable:false,linkStatus:'unlinked',
     mode: 'system' as 'system' | 'custom',
     customTimeZone: '',
     systemTimeZone: '',
@@ -25,6 +28,16 @@ Page({
     preferredTimeZones: [] as string[],
   },
 
+  onShow():void {void this.loadAccount();},
+  async loadAccount():Promise<void> {
+    this.setData({accountLoaded:false,accountError:false});
+    try {
+      await ensureRuntimeReady();
+      const account=await getWebLogin();
+      this.setData({accountLoaded:true,emailAvailable:account.available!==false,linkStatus:account.status,
+        loginEmail:account.email?account.email.replace(/^(.).*(@.*)$/,'$1***$2'):''});
+    }catch{this.setData({accountError:true});}
+  },
   onLoad(): void {
     const pref = loadTimeZonePreference();
     const systemTz = resolveDisplayTimeZone({ mode: 'system', customTimeZone: '' });

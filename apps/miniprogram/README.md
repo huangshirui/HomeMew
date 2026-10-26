@@ -1752,3 +1752,8 @@ JWT 签发
 ### 足球最近选择候选（为后续页面预留）
 Native 小程序提供 utils/football-recent-cache.ts 及 components/football-recent-picker：按用户、家庭、球队/赛事隔离，12 条上限、90 天过期、× 仅移除本机缓存。目前小程序没有足球比赛页面或相关 Mini BFF 路由，因此该组件尚未出现在导航界面。未来接入时只能通过稳定 HomeMew Mini BFF 验证选择 ID，再调用组件的 rememberVerifiedSelection；不可直连 LifeSpace Core。
 
+
+
+## 2026-10-26: unified Access account linking
+
+The accepted correction in `docs/decisions/2026-10-26-unified-access-account-link.md` supersedes the independent mailbox-authorization design. Email entry and one-time code confirmation bind the same existing LifeSpace user through Identity 0.14/schema 13 and one access_principals relation. Pending email is not proof; Access completes the verified subject in the same record. Mini settings show both code-linked and pre-linked email with pending/linked status. Code linking remains an alternative. Confirmed login resolves issuer/subject only. HomeMew stores no identity authority. The correction is implemented for PR/CI; no deployment or Mini upload has been performed by this task.

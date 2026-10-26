@@ -5,12 +5,18 @@ on:
     paths:
       - apps/backend/**
       - .github/workflows/backend-check.yml
+      - .github/workflows/backend-staging-deploy.yml
+      - .github/workflows/backend-production-deploy.yml
+      - apps/web/verify-release-candidate*
   push:
     branches:
       - main
     paths:
       - apps/backend/**
       - .github/workflows/backend-check.yml
+      - .github/workflows/backend-staging-deploy.yml
+      - .github/workflows/backend-production-deploy.yml
+      - apps/web/verify-release-candidate*
 
 permissions:
   contents: read

@@ -353,3 +353,8 @@ Web 足球表单/筛选的球队、赛事支持最近使用候选。按登录用
 ## Explicit Web mailbox authorization rollout
 
 Accepted decision: `docs/decisions/2026-10-25-miniprogram-2-navigation-email.md`. Identity 0.13/schema 12 owns authenticated Application-scoped mailbox consent and audit. Fixed Mini GET/PATCH `/api/v1/miniprogram/me/web-login` forwards to Identity; cached Web sessions revalidate via `/internal/v1/access/session-check`. No HomeMew mailbox persistence or email OTP. Release Identity Staging first, then Web Preview acceptance, then Identity Production and Web Production. Mini upload is separate. Tracking: HomeMew #153 / LifeSpace #408.
+
+
+## 2026-10-26: unified Access account linking
+
+The accepted correction in `docs/decisions/2026-10-26-unified-access-account-link.md` supersedes the independent mailbox-authorization design. Email entry and one-time code confirmation bind the same existing LifeSpace user through Identity 0.14/schema 13 and one access_principals relation. Pending email is not proof; Access completes the verified subject in the same record. Mini settings show both code-linked and pre-linked email with pending/linked status. Code linking remains an alternative. Confirmed login resolves issuer/subject only. HomeMew stores no identity authority. The correction is implemented for PR/CI; no deployment or Mini upload has been performed by this task.

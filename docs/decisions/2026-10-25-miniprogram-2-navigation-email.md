@@ -14,21 +14,13 @@ Normal startup, invitation/deep-link targets and no-family Home stay unchanged. 
 
 Family switching uses a bottom sheet, matching the Mini calendar/task chooser pattern: avatar/name rows, current-family indication, a bounded scrollable list, safe-area padding, backdrop/cancel dismissal and downward dismissal from the header. Background page scrolling is locked while open. Selecting another family closes the sheet and refreshes management in place; selecting the current family only closes it.
 
-## Explicit mailbox authorization; no email OTP
+## Account linking correction
 
-The authenticated user enters a syntactically valid mailbox and explicitly authorizes its holder to access the current account through Web. No mail is sent; no mailbox ownership verification is claimed. Cloudflare Access still proves the Web identity using the trusted issuer and registered Application audience. This is an explicit application-scoped Authority grant, not contact metadata or implicit account merge.
-
-LifeSpace Identity 0.13 owns the authorization and audit. Mini GET/PATCH `/api/v1/miniprogram/me/web-login` forwards through the fixed Identity binding to `/api/v1/me/web-login`. Response is `{data:{email,version,linked}}`; version 0 means no mailbox authorization exists. PATCH accepts only `{email,version}`, requires profile:write and optimistic concurrency, and is never blindly replayed. HomeMew does not store identity mappings.
-
-With a mailbox configured, Settings shows masked email and 修改邮箱, hides the one-time code flow, and Identity rejects challenge confirmation for that user/Application. Legacy code-linked users retain access until they explicitly configure a mailbox. Existing principals are never reassigned or merged because of email. Conflicts are rejected; unsigned/raw claims grant nothing.
-
-Changing the mailbox atomically replaces its authority after explicit confirmation. Old Access principals cannot bypass the new Application restriction. Cached HomeMew Web sessions call `/internal/v1/access/session-check` before reuse, compare the resolved user to the subject in their signed cached token, and fail closed on denial/unavailability. Existing bearer credentials outside this BFF retain their short TTL; this is not platform-wide JWT revocation and does not modify Core.
-
-This supersedes the code-only onboarding restriction in `2026-08-25-web-existing-user-link-only.md` for explicitly authorized mailboxes. Web still cannot create HomeMew users. Access remains the IdP; no parallel password/email-OTP service is introduced.
+The email authorization model originally recorded here was rejected by the user on 2026-10-26. It is superseded by `2026-10-26-unified-access-account-link.md`: email-first and code-first linking complete the same Access principal relation. There is no separate mailbox authorization table or permanent email-based login path. The navigation decisions above remain in scope and unchanged.
 
 ## Release
 
-Mini package metadata, lockfile and About advance to 2.0.0. Release Identity migration 0012 and 0.13 on Staging and verify first, then HomeMew BFF/Web, then Mini upload/review. Old Mini contracts and users without mailbox authorization remain compatible. Production migrations, deployment and Mini upload have not been performed.
+Mini package metadata, lockfile and About advance to 2.0.0. The interrupted rollout applied Identity migration 0012/0.13 to Staging. The correction adds 0013/0.14 through a new PR. Deploy only after required CI and merge, then exact-candidate Staging/Preview acceptance before Production. Mini upload/review remains separate. Old Mini contracts and users without mailbox authorization remain compatible. Production migrations, deployment and Mini upload have not been performed.
 
 ## Mini UI follow-up
 

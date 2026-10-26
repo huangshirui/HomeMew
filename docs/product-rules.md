@@ -315,3 +315,8 @@ Detailed decision: `docs/decisions/2026-10-09-external-system-capability-contain
 - 该边界不得演变为通用 AI proxy、任意上游代理或第二个 HomeMew business Core。
 
 详细决定见 `docs/decisions/2026-09-16-meow-bff-ownership-and-temporary-offline.md`。
+
+
+## 2026-10-26: unified Access account linking
+
+The accepted correction in `docs/decisions/2026-10-26-unified-access-account-link.md` supersedes the independent mailbox-authorization design. Email entry and one-time code confirmation bind the same existing LifeSpace user through Identity 0.14/schema 13 and one access_principals relation. Pending email is not proof; Access completes the verified subject in the same record. Mini settings show both code-linked and pre-linked email with pending/linked status. Code linking remains an alternative. Confirmed login resolves issuer/subject only. HomeMew stores no identity authority. The correction is implemented for PR/CI; no deployment or Mini upload has been performed by this task.
