@@ -567,18 +567,20 @@ export function FootballPage() {
             <t.icon className="size-4"/>{t.name}
           </button>)}
       </div>
-      <div className="ml-auto flex min-w-0 items-center gap-2">
-        <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm text-stone-600">球员
-          <select aria-label="球员" className={input + ' w-28 shrink-0 sm:w-36'} value={personId} onChange={e => selectPerson(e.target.value)}>
+      <div className="flex w-full min-w-0 flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
+        <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-sm text-stone-600">球员
+          <select aria-label="球员" className={input + ' min-w-0 flex-1 sm:w-36 sm:flex-none'} value={personId} onChange={e => selectPerson(e.target.value)}>
             {familyPeople.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
-        <Button variant="ghost" className="shrink-0" onClick={() => navigate('/football/manage')}>
-          <Shield className="size-4"/> <span className="hidden sm:inline">球队与球员</span><span className="sm:hidden">管理</span>
-        </Button>
-        <Button variant="ghost" className="shrink-0" onClick={() => navigate('/activities')}>
-          <CalendarDays className="size-4"/> <span className="hidden sm:inline">赛事 → 活动</span><span className="sm:hidden">活动</span>
-        </Button>
+        <div className="grid grid-cols-2 gap-2 sm:flex">
+          <Button variant="ghost" className="min-w-0 justify-center whitespace-nowrap" onClick={() => navigate('/football/manage')}>
+            <Shield className="size-4 shrink-0"/> <span className="hidden sm:inline">球队与球员</span><span className="sm:hidden">管理</span>
+          </Button>
+          <Button variant="ghost" className="min-w-0 justify-center whitespace-nowrap" onClick={() => navigate('/activities')}>
+            <CalendarDays className="size-4 shrink-0"/> <span className="hidden sm:inline">赛事 → 活动</span><span className="sm:hidden">活动</span>
+          </Button>
+        </div>
       </div>
     </div>}
     {success && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>}

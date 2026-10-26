@@ -451,6 +451,10 @@ Page({
     const isAllDay = e.detail.value;
     this.setData(isAllDay ? { isAllDay } : {
       isAllDay,
+      // The default end clock can wrap past midnight (23:00 -> 00:00).
+      // Establish a valid timed range before start/end duration linking runs.
+      endDate: this.data.endDate === this.data.startDate && this.data.endTime <= this.data.startTime
+        ? addDaysToDateOnly(this.data.endDate, 1) : this.data.endDate,
       startTimezone: this.data.deviceTimezone,
       endTimezone: this.data.deviceTimezone,
       startTimezoneMetadata: this.data.deviceTimezone,

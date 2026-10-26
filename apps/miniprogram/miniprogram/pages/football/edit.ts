@@ -1,52 +1,47 @@
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
-import { currentFamilyStore } from '../../stores/index';
-import { listDomainRecords,getDomainRecord,type DomainRecord } from '../../services/domains';
-import { getMatch,getTeam,saveTeam,saveMatch,removeMatch,listTeams,listFootballPeople,saveFootballPerson,
-  type FootballPerson,type Match } from '../../services/football';
+import { currentFamilyStore,userStore } from '../../stores/index';
+import { deleteDomainRecord,listDomainPeople } from '../../services/domains';
+import { getMatch,getTeam,saveTeam,saveMatch,removeMatch,listMatches,listFootballPeople,saveFootballPerson,getFootballPerson,
+  type FootballPerson } from '../../services/football';
 import { originalIconState,prepareRecordIcon,pickerChangeState,type RecordIconPickerChange } from '../../utils/record-icon-edit';
 import { downloadRecordIconImage } from '../../services/record-icons';
 
-type Label={id:string;name:string};
 const now=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');};
 Page({
   data:{
-    familyId:'',kind:'match' as 'match'|'team',recordId:'',loading:true,saving:false,error:'',version:0,
+    userId:'',familyId:'',kind:'match' as 'match'|'team',recordId:'',loading:true,saving:false,error:'',version:0,
     name:'',description:'',matchDate:now(),matchType:'official',matchTypeIndex:0,matchTypes:[
       {key:'official',name:'正式比赛'},{key:'friendly',name:'友谊赛'},
-    ],teams:[] as Label[],representativeTeamId:'',opponentTeamId:'',representativeTeamIndex:0,opponentTeamIndex:0,
-    competition:[] as Label[],competitionActivityId:'',competitionIndex:0,
+    ],representativeTeamId:'',opponentTeamId:'',competitionActivityId:'',
     representativeTeamScore:'',opponentTeamScore:'',notes:'',
     people:[] as (FootballPerson&{selected:boolean})[],playerPersonIds:[] as string[],teamMemberPersonIds:[] as string[],
-    personSearch:'',peopleCursor:null as string|null,teamSearch:'',teamCursor:null as string|null,
+    personCanCreate:false,personSearch:'',peopleCursor:null as string|null,
     iconEmoji:'',iconImagePath:'',iconFileId:'',iconTouched:false,
   },
   async onLoad(opts:{familyId?:string;kind?:string;id?:string}):Promise<void>{
     const kind=opts.kind==='team'?'team':'match',familyId=opts.familyId||currentFamilyStore.value?.id||'';
     this.setData({kind,familyId,recordId:opts.id||'',loading:true,error:''});
     try{
-      await ensureRuntimeReady();
-      const [record,peoplePage,teamsPage,activityPage]=await Promise.all([
+      await ensureRuntimeReady();this.setData({userId:userStore.value?.id||''});
+      const [record,family]=await Promise.all([
         opts.id?(kind==='team'?getTeam(familyId,opts.id):getMatch(familyId,opts.id)):Promise.resolve(null),
-        listFootballPeople(familyId),
-        listTeams(familyId),
-        listDomainRecords(familyId,'activities',{period:'all',limit:50}),
+        listDomainPeople(familyId),
       ]);
       const ids=kind==='team'?(record?.memberPersonIds||[]):(record?.playerPersonIds||[]);
-      const people=peoplePage.items.map(p=>({...p,selected:ids.includes(p.id)}));
-      const teams=teamsPage.items.map(t=>({id:t.id,name:t.name||'未命名球队'}));
-      const competition=[{id:'',name:'无指定赛事'},...activityPage.items.map(a=>({id:a.id,name:a.name||'未命名活动'}))];
-      const representativeTeamId=record?.representativeTeamId||teams[0]?.id||'';
-      const opponentTeamId=record?.opponentTeamId||teams[1]?.id||'';
+      const peopleMap=new Map<string,FootballPerson>();
+      const missing=[...new Set([...family.map(p=>p.personId),...ids])].filter(id=>!peopleMap.has(id));
+      await Promise.all(missing.slice(0,50).map(async id=>{const person=await getFootballPerson(familyId,id);peopleMap.set(id,person);}));
+      const familyIds=new Set(family.map(p=>p.personId));
+      const people=[...peopleMap.values()].sort((a,b)=>Number(familyIds.has(b.id))-Number(familyIds.has(a.id))).map(p=>({...p,selected:ids.includes(p.id)}));
+      const representativeTeamId=record?.representativeTeamId||'';
+      const opponentTeamId=record?.opponentTeamId||'';
       const competitionActivityId=record?.competitionActivityId||'';
-      this.setData({loading:false,people,peopleCursor:peoplePage.nextCursor,
-        teams,teamCursor:teamsPage.nextCursor,competition,version:record?.version||0,
+      this.setData({loading:false,people,peopleCursor:null,version:record?.version||0,
         name:record?.name||'',description:record?.description||'',
         matchDate:record?.matchDate||now(),matchType:record?.matchType||'official',
         matchTypeIndex:record?.matchType==='friendly'?1:0,
         representativeTeamId,opponentTeamId,
-        representativeTeamIndex:Math.max(0,teams.findIndex(t=>t.id===representativeTeamId)),
-        opponentTeamIndex:Math.max(0,teams.findIndex(t=>t.id===opponentTeamId)),
-        competitionActivityId,competitionIndex:Math.max(0,competition.findIndex(t=>t.id===competitionActivityId)),
+        competitionActivityId,
         representativeTeamScore:record?.representativeTeamScore===null||record?.representativeTeamScore===undefined?'':String(record.representativeTeamScore),
         opponentTeamScore:record?.opponentTeamScore===null||record?.opponentTeamScore===undefined?'':String(record.opponentTeamScore),
         notes:record?.notes||'',playerPersonIds:kind==='match'?ids:[],
@@ -60,24 +55,18 @@ Page({
       }
     }catch(e){this.setData({loading:false,error:(e as Error).message||'加载失败'});}
   },
+  onReferenceSelect(e:WechatMiniprogram.CustomEvent<{id:string;name:string}>):void{
+    const key=String(e.currentTarget.dataset.key);if(!['representativeTeamId','opponentTeamId','competitionActivityId'].includes(key))return;
+    this.setData({[key]:e.detail.id});
+  },
   onValue(e:WechatMiniprogram.Input):void{
     const key=String(e.currentTarget.dataset.name||'');
-    if(['name','description','notes','representativeTeamScore','opponentTeamScore','personSearch','teamSearch'].includes(key))
-      this.setData({[key]:e.detail.value});
+    if(['name','description','notes','representativeTeamScore','opponentTeamScore','personSearch'].includes(key))
+      this.setData({[key]:e.detail.value,...(key==='personSearch'?{personCanCreate:false}:{})});
   },
   onDate(e:WechatMiniprogram.CustomEvent<{value:string}>):void{this.setData({matchDate:String(e.detail.value)});},
   onMatchType(e:WechatMiniprogram.CustomEvent<{value:string}>):void{
     const i=Number(e.detail.value);this.setData({matchTypeIndex:i,matchType:this.data.matchTypes[i]?.key||'official'});
-  },
-  onTeamPicker(e:WechatMiniprogram.CustomEvent<{value:string}>):void{
-    const key=String(e.currentTarget.dataset.key),index=Number(e.detail.value),team=this.data.teams[index];
-    if(!team)return;
-    if(key==='representative'){this.setData({representativeTeamIndex:index,representativeTeamId:team.id});}
-    else{this.setData({opponentTeamIndex:index,opponentTeamId:team.id});}
-  },
-  onCompetition(e:WechatMiniprogram.CustomEvent<{value:string}>):void{
-    const index=Number(e.detail.value);
-    this.setData({competitionIndex:index,competitionActivityId:this.data.competition[index]?.id||''});
   },
   onPersonToggle(e:WechatMiniprogram.TouchEvent):void{
     const id=String(e.currentTarget.dataset.id);
@@ -87,20 +76,25 @@ Page({
   },
   async onPeopleSearch():Promise<void>{
     try{
-      const page=await listFootballPeople(this.data.familyId,this.data.personSearch.trim()||undefined);
+      const term=this.data.personSearch.trim();if(term.length<2){this.setData({error:'请输入至少两个字搜索球员',personCanCreate:false});return;}
+      const page=await listFootballPeople(this.data.familyId,term);
+      if(term!==this.data.personSearch.trim())return;
       const selected=this.data.kind==='team'?this.data.teamMemberPersonIds:this.data.playerPersonIds;
-      this.setData({people:page.items.map(p=>({...p,selected:selected.includes(p.id)})),peopleCursor:page.nextCursor});
+      const people=[...new Map([...this.data.people.filter(p=>selected.includes(p.id)),...page.items.map(p=>({...p,selected:selected.includes(p.id)}))].map(p=>[p.id,p])).values()];
+      this.setData({people,peopleCursor:page.nextCursor,personCanCreate:!page.items.length&&!page.nextCursor});
     }catch(e){this.setData({error:(e as Error).message||'查询球员失败'});}
   },
   onAddPerson():void{
-    const name=this.data.personSearch.trim();
+    const name=this.data.personSearch.trim();if(!this.data.personCanCreate||name.length<2||this.data.saving)return;
     wx.showModal({title:'新增球员',editable:true,placeholderText:'球员姓名',content:name,
       success:async r=>{
-        if(!r.confirm||!r.content?.trim())return;
+        if(!r.confirm||!r.content?.trim()||this.data.saving)return;
+        this.setData({saving:true,error:''});
         try{
           const person=await saveFootballPerson(this.data.familyId,r.content.trim());
-          this.setData({people:[{...person,selected:false},...this.data.people],personSearch:''});
-        }catch(e){this.setData({error:(e as Error).message||'添加失败'});}
+          const key=this.data.kind==='team'?'teamMemberPersonIds':'playerPersonIds';
+          this.setData({people:[{...person,selected:true},...this.data.people],[key]:[...new Set([...this.data[key],person.id])],personSearch:'',personCanCreate:false});
+        }catch(e){this.setData({error:(e as Error).message||'添加失败'});}finally{this.setData({saving:false});}
       }});
   },
   async onMorePeople():Promise<void>{
@@ -111,21 +105,6 @@ Page({
       this.setData({people:[...this.data.people,...p.items.map(x=>({...x,selected:selected.includes(x.id)}))],
         peopleCursor:p.nextCursor});
     }catch(e){this.setData({error:(e as Error).message||'加载更多球员失败'});}
-  },
-  async onTeamSearch():Promise<void>{
-    try{
-      const page=await listTeams(this.data.familyId,undefined,this.data.teamSearch.trim()||undefined);
-      const selected=new Set([this.data.representativeTeamId,this.data.opponentTeamId]);
-      const teams=[...page.items.map(t=>({id:t.id,name:t.name||'未命名球队'}))];
-      const ids=new Set(teams.map(t=>t.id));
-      for(const id of selected)if(id&&!ids.has(id)){
-        const original=this.data.teams.find(t=>t.id===id);
-        if(original)teams.push(original);
-      }
-      this.setData({teams,teamCursor:page.nextCursor,
-        representativeTeamIndex:Math.max(0,teams.findIndex(t=>t.id===this.data.representativeTeamId)),
-        opponentTeamIndex:Math.max(0,teams.findIndex(t=>t.id===this.data.opponentTeamId))});
-    }catch(e){this.setData({error:(e as Error).message||'球队搜索失败'});}
   },
   onRecordIconChange(e:WechatMiniprogram.CustomEvent<RecordIconPickerChange>):void{this.setData(pickerChangeState(e.detail));},
   async onSubmit():Promise<void>{
@@ -166,12 +145,20 @@ Page({
   },
   onDelete():void{
     const d=this.data;if(!d.recordId||d.saving)return;
-    if(d.kind==='team'){wx.showToast({title:'请在 Web 中核对引用关系后删除球队',icon:'none'});return;}
-    wx.showModal({title:'确认删除',content:'删除这场比赛？请先确认其表现记录已处理。',confirmColor:'#E85A5A',
+    wx.showModal({title:'确认删除',content:d.kind==='team'?'删除这个球队？它可能还被其他模块使用。':'删除这场比赛？请先确认其表现记录已处理。',confirmColor:'#E85A5A',
       success:async r=>{
-        if(!r.confirm)return;
-        try{await removeMatch(d.familyId,d.recordId,d.version);wx.redirectTo({url:'/pages/football/list'});}
-        catch(e){this.setData({error:(e as Error).message||'删除失败'});}
+        if(!r.confirm||this.data.saving)return;
+        this.setData({saving:true,error:''});
+        try{
+          if(d.kind==='team'){
+            for(const field of ['representativeTeamId','opponentTeamId'] as const){
+              const page=await listMatches(d.familyId,{[field]:d.recordId,limit:1});
+              if(page.items.length)throw Error('球队被比赛引用，请先修改相关比赛');
+            }
+            await deleteDomainRecord(d.familyId,'football-teams',d.recordId,d.version);wx.navigateBack();
+          }else{await removeMatch(d.familyId,d.recordId,d.version);wx.redirectTo({url:'/pages/football/list'});}
+        }
+        catch(e){this.setData({error:(e as Error).message||'删除失败'});}finally{this.setData({saving:false});}
       }});
   },
 });

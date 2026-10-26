@@ -1,15 +1,6 @@
 // HomeMew's stable event-facing Location boundary. LifeSpace owns the authoritative
-// Location schema. This module only adapts the legacy string DTO during a
-// coordinated, explicit upstream model cutover (never guesses which schema is live).
+// Location schema. Mini text DTOs are always lowered to canonical Location objects.
 const SAFE_KEYS = new Set(['name', 'address', 'coordinates']);
-
-export function eventLocationWireFormat(env) {
-  const format = env?.LIFESPACE_EVENT_LOCATION_FORMAT ?? 'string';
-  if (format !== 'string' && format !== 'location') {
-    throw new Error('LIFESPACE_EVENT_LOCATION_FORMAT must be string or location');
-  }
-  return format;
-}
 
 export function eventLocationName(value) {
   if (value === null || value === undefined) return null;
@@ -23,12 +14,12 @@ export function eventLocationName(value) {
   return name;
 }
 
-export function eventLocationToLifeSpace(value, env) {
-  const format = eventLocationWireFormat(env);
+export function eventLocationToLifeSpace(value) {
   if (value === null) return null;
   if (typeof value === 'string') {
     const name = value.trim();
-    return name ? (format === 'location' ? { name } : name) : null;
+    if (name.length > 500) throw new Error('Location name is too long');
+    return name ? { name } : null;
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || Object.keys(value).some(key => !SAFE_KEYS.has(key))
@@ -55,20 +46,15 @@ export function eventLocationToLifeSpace(value, env) {
     }
     normalized.coordinates = { latitude: coords.latitude, longitude: coords.longitude };
   }
-  if (format === 'location') return normalized;
-  // No lossy conversion of rich coordinates on a legacy string-only model.
-  if (normalized.address !== undefined || normalized.coordinates !== undefined) {
-    throw new Error('Rich Location requires a structured LifeSpace Event model');
-  }
-  return normalized.name;
+  return normalized;
 }
 
 // Used only for explicit Event CRUD writes; other generic Core operations are
 // deliberately untouched to preserve LifeSpace's platform contract.
-export function adaptEventWritePayload(payload, env) {
+export function adaptEventWritePayload(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new Error('Event payload must be an object');
   }
   if (!Object.hasOwn(payload, 'location')) return payload;
-  return { ...payload, location: eventLocationToLifeSpace(payload.location, env) };
+  return { ...payload, location: eventLocationToLifeSpace(payload.location) };
 }

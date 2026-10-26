@@ -1,21 +1,17 @@
 <view class="container more-page">
   <nav-bar title="更多" />
-  <view class="family-header card" bindtap="onSwitchFamily">
-    <view class="family-symbol">🏡</view><view class="family-info">
-      <text class="family-name">{{familyName}}</text>
-      <text class="family-subtitle">{{familyRole}} · {{familyCount}} 个家庭</text>
-    </view><text class="family-next">›</text>
-  </view>
-  <view wx:for="{{groups}}" wx:for-item="group" wx:key="key" class="more-group">
+  <view wx:if="{{loadError}}" class="load-error" bindtap="loadData" aria-role="button">加载失败，点此重试</view>
+  <view wx:for="{{groups}}" wx:for-item="group" wx:key="key" class="more-group {{group.key === 'plans' ? 'first-group' : ''}}">
     <view class="more-group-label">{{group.title}}</view>
     <view class="tile-grid">
-      <view wx:for="{{group.items}}" wx:for-item="tile" wx:key="key" class="more-tile" data-path="{{tile.path}}" bindtap="onNav">
-        <view class="tile-icon">{{tile.icon}}</view><text class="tile-name">{{tile.title}}</text>
+      <view wx:for="{{group.items}}" wx:for-item="tile" wx:key="key" class="more-tile" data-key="{{tile.key}}" data-path="{{tile.path}}" bindtap="onNav" hover-class="entry-hover" aria-role="button">
+        <view class="tile-icon">
+          <family-avatar wx:if="{{tile.key === 'family' && familyCount > 0}}" src="{{familyAvatar}}" size="{{64}}" alt="{{familyName}}" />
+          <image wx:elif="{{tile.key === 'about'}}" class="brand-icon" src="/assets/images/logo.png" mode="aspectFit" />
+          <text wx:else>{{tile.icon}}</text>
+        </view>
+        <text class="tile-name">{{tile.key === 'family' ? (familyCount > 0 ? familyName : '加入家庭') : tile.title}}</text>
       </view>
     </view>
-  </view>
-  <view class="account-link" bindtap="onProfile">
-    <lucide-icon name="user-round" size="18" color="#5f7865" />
-    <text>{{userName}} · 编辑资料</text><text>›</text>
   </view>
 </view>

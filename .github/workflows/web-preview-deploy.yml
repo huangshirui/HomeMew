@@ -10,6 +10,9 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
+  checks: read
+  actions: read
 
 concurrency:
   group: homemew-web-preview-staging
@@ -27,11 +30,18 @@ jobs:
     steps:
       - name: Checkout selected trusted revision
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
 
       - name: Set up Node.js 24
         uses: actions/setup-node@v7
         with:
           node-version: 24
+
+      - name: Verify merged PR and exact candidate provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node apps/web/verify-release-candidate.mjs preview
 
       - name: Enable Corepack
         run: corepack enable
@@ -67,6 +77,9 @@ jobs:
           if (config.previews.vars.STAGING_LIFESPACE_IDENTITY_URL || config.previews.vars.STAGING_LIFESPACE_CORE_URL) throw new Error('Preview must not support dual-environment routing');
           if (config.assets.run_worker_first.indexOf('/_stage/*') === -1) throw new Error('Legacy staging paths must be handled and rejected');
           NODE
+
+      - name: Verify LifeSpace Staging contract baseline
+        run: node apps/web/lifespace-release-baseline.mjs staging https://auth-staging.aisr.online https://core-staging.aisr.online
 
       - name: Test, typecheck and build Web
         run: |

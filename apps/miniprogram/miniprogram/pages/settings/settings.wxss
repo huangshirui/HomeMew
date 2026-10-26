@@ -118,3 +118,5 @@
   font-size: 24rpx;
   color: var(--color-text-hint);
 }
+
+.profile-copy {flex: 1; min-width: 0;}

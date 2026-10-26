@@ -22,9 +22,9 @@ test('AMap response converted and name only kept without coordinates',()=>{
 });
 test('search has no implicit geocoding and no exposed key',async()=>{
  const request=new Request('https://homemew.test/api/places/search?q=%E5%85%AC%E5%9B%AD');
- const r=await searchPlaces(request,{LIFESPACE_EVENT_LOCATION_FORMAT:'string'});
- assert.deepEqual((await r.json()).data,{items:[],available:false,structured:false});
- const response=await searchPlaces(request,{LIFESPACE_EVENT_LOCATION_FORMAT:'location',AMAP_WEB_SERVICE_KEY:'private',...fakeLimits()},{
+ const r=await searchPlaces(request,{});
+ assert.deepEqual((await r.json()).data,{items:[],available:false,structured:true});
+ const response=await searchPlaces(request,{AMAP_WEB_SERVICE_KEY:'private',...fakeLimits()},{
   actorKey:'access-assertion',fetcher:async url=>{assert.ok(url.includes('key=private'));return new Response(JSON.stringify({status:'1',tips:[{name:'公园',location:'116.397,39.908'}]}));}
  });
  const body=await response.json();assert.equal(body.data.items.length,1);assert.equal(body.data.structured,true);
@@ -40,7 +40,7 @@ test('rate limits prevent provider requests and do not cache POI data',async()=>
  const url='https://homemew.test/api/places/search?q=%E5%85%AC%E5%9B%AD';
  let called=0;
  const fetcher=async()=>{called++;return Response.json({status:'1',tips:[]});};
- const env={AMAP_WEB_SERVICE_KEY:'private',LIFESPACE_EVENT_LOCATION_FORMAT:'location',
+ const env={AMAP_WEB_SERVICE_KEY:'private',
    PLACE_SEARCH_USER_LIMIT:{limit:async()=>({success:false})},
    PLACE_SEARCH_BURST_LIMIT:{limit:async()=>({success:true})}};
  const denied=await searchPlaces(new Request(url),env,{actorKey:'verified-user',fetcher});
@@ -59,7 +59,7 @@ test('rate limits prevent provider requests and do not cache POI data',async()=>
 test('rate binding must be configured before paid provider traffic and keys are pseudonymous',async()=>{
  const url='https://homemew.test/api/places/search?q=%E8%B6%B3%E7%90%83';
  let invoked=0;const seen=[];
- const env={AMAP_WEB_SERVICE_KEY:'private',LIFESPACE_EVENT_LOCATION_FORMAT:'location',
+ const env={AMAP_WEB_SERVICE_KEY:'private',
    PLACE_SEARCH_USER_LIMIT:{limit:async input=>{seen.push(input.key);return {success:true};}},
    PLACE_SEARCH_BURST_LIMIT:{limit:async input=>{seen.push(input.key);return {success:true};}}};
  const noBind=await searchPlaces(new Request(url),{AMAP_WEB_SERVICE_KEY:'private'},
@@ -80,7 +80,7 @@ test('rate binding must be configured before paid provider traffic and keys are 
 
 test('Worker-compatible manual redirect handling never forwards an AMap key',async()=>{
  const request=new Request('https://homemew.test/api/places/search?q=%E6%98%8E%E5%BC%BA%E5%B0%8F%E5%AD%A6');
- const env={AMAP_WEB_SERVICE_KEY:'private-test-key',LIFESPACE_EVENT_LOCATION_FORMAT:'location',...fakeLimits()};
+ const env={AMAP_WEB_SERVICE_KEY:'private-test-key',...fakeLimits()};
  let calls=0;
  const redirected=await searchPlaces(request,env,{
    actorKey:'verified-actor',fetcher:async(url,init)=>{
@@ -98,7 +98,7 @@ test('Worker-compatible manual redirect handling never forwards an AMap key',asy
 
 test('AMap business errors are handled without disclosing provider data',async()=>{
  const request=new Request('https://homemew.test/api/places/search?q=%E5%AD%A6%E6%A0%A1');
- const env={AMAP_WEB_SERVICE_KEY:'private-test-key',LIFESPACE_EVENT_LOCATION_FORMAT:'location',...fakeLimits()};
+ const env={AMAP_WEB_SERVICE_KEY:'private-test-key',...fakeLimits()};
  const response=await searchPlaces(request,env,{
    actorKey:'verified-actor',fetcher:async(url,init)=>{
      assert.equal(init.redirect,'manual');

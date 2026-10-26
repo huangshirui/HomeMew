@@ -2,17 +2,32 @@
 <view class="container">
   <nav-bar title="设置" showBack="true" />
 
+  <navigator class="card settings-link" url="/pages/profile-setup/profile-setup?mode=edit" hover-class="settings-link-active">
+    <user-avatar user-id="{{user.id}}" src="{{user.avatarUrl}}" size="{{88}}" alt="我的头像" />
+    <view class="profile-copy"><text class="settings-link-title">{{user.displayName || '个人资料'}}</text><text class="settings-link-desc">头像与昵称</text></view>
+    <text class="settings-link-arrow">›</text>
+  </navigator>
+
   <view class="section card account-section">
     <view class="section-header">
       <text class="section-title">账号与登录</text>
     </view>
+    <view wx:if="{{accountError}}" class="settings-link" bindtap="loadAccount">账号信息加载失败，点此重试</view>
+    <view wx:elif="{{!accountLoaded}}" class="settings-link">正在加载账号信息…</view>
+    <block wx:else>
+    <navigator wx:if="{{emailAvailable}}" class="settings-link" url="/pages/account-email/account-email" hover-class="settings-link-active">
+      <view><text class="settings-link-title">{{loginEmail ? '修改邮箱' : '绑定邮箱'}}</text>
+        <text class="settings-link-desc">{{loginEmail || '设置邮箱，让 Web 使用当前账号'}}{{linkStatus === 'pending' ? ' · 待 Web 登录验证' : ''}}</text></view><text class="settings-link-arrow">›</text>
+    </navigator>
+    <view wx:else class="settings-link"><view><text class="settings-link-title">邮箱绑定暂不可用</text><text class="settings-link-desc">可以先使用一次性关联码登录 Web</text></view></view>
     <navigator class="settings-link" url="/pages/account-link/account-link" hover-class="settings-link-active">
       <view>
-        <text class="settings-link-title">关联 Web 登录</text>
+        <text class="settings-link-title">使用一次性关联码</text>
         <text class="settings-link-desc">确认浏览器中的一次性关联码，让 Web 使用当前账号</text>
       </view>
       <text class="settings-link-arrow">›</text>
     </navigator>
+    </block>
   </view>
 
   <view class="section card">

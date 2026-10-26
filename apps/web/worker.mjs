@@ -1,5 +1,5 @@
 import { handleIntegrationRequest, integrationsReady } from './integration-api.mjs';
-import { adaptEventWritePayload, eventLocationWireFormat } from './event-location-compat.mjs';
+import { adaptEventWritePayload } from './event-location.mjs';
 import { searchPlaces } from './map-places.mjs';
 import { recentPlacesRequest } from './recent-places.mjs';
 
@@ -291,7 +291,18 @@ async function identityUserRequest(env, fetcher, path, token, id) {
 
 async function ensureSession(request, env, fetcher, assertion, id, nowMs) {
   const existing = await readSession(request, env, assertion, nowMs);
-  if (existing) return { ...existing, cookie: null };
+  if (existing) {
+    const { response, payload } = await identityApplicationRequest(env, fetcher, '/internal/v1/access/session-check', {
+      accessAssertion: assertion,
+    }, id);
+    if (response.status !== 200 || typeof payload?.data?.userId !== 'string') {
+      throw upstreamError(response, payload, 'LIFESPACE_SESSION_CHECK_FAILED');
+    }
+    // Token came from our verified signed cookie, never from browser input.
+    let subject;
+    try { subject = JSON.parse(decoder.decode(base64UrlToBytes(existing.accessToken.split('.')[1]))).sub; } catch { /* exchange below */ }
+    if (subject === payload.data.userId) return { ...existing, cookie: null };
+  }
 
   const exchanged = await exchangeAccess(env, fetcher, assertion, id);
   return {
@@ -520,11 +531,11 @@ async function proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, servi
   const eventWrite = service === 'core'
     && /\/v1\/spaces\/spc_[A-Za-z0-9_-]+\/models\/event\/records(?:\/rec_[A-Za-z0-9_-]+)?$/u.test(suffix)
     && (request.method === 'POST' || request.method === 'PATCH');
-  if (eventWrite && eventLocationWireFormat(env) === 'location') {
+  if (eventWrite) {
     let payload;
     try { payload = await request.clone().json(); }
     catch { throw new HttpError(400, 'INVALID_REQUEST', '日程数据格式无效'); }
-    try { body = JSON.stringify(adaptEventWritePayload(payload, env)); }
+    try { body = JSON.stringify(adaptEventWritePayload(payload)); }
     catch { throw new HttpError(422, 'VALIDATION_ERROR', '日程地点格式无效'); }
   }
   const response = await fetcher(target, {

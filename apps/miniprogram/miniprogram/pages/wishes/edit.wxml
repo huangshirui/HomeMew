@@ -18,17 +18,17 @@
     </view>
 
     <view class="card">
-      <view style="display:flex;align-items:center">
-        <record-icon-picker emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{submitting}}" bind:change="onRecordIconChange" />
-        <view class="field-row" style="flex:1;min-width:0">
-        <text class="field-label">愿望标题</text>
-        <input
-          class="field-input"
-          value="{{title}}"
-          bindinput="onTitleInput"
-          placeholder="例如：一起去看海"
-          maxlength="100"
-        />
+      <view class="record-title-field">
+        <text class="record-title-label">愿望标题</text>
+        <view class="record-title-row">
+          <record-icon-picker class="record-title-picker" emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{submitting}}" bind:change="onRecordIconChange" />
+          <input
+            class="record-title-input"
+            value="{{title}}"
+            bindinput="onTitleInput"
+            placeholder="例如：一起去看海"
+            maxlength="100"
+          />
         </view>
       </view>
     </view>

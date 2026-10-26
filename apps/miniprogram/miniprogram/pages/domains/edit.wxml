@@ -4,9 +4,12 @@
   <block wx:else>
     <view wx:if="{{error}}" class="thin-error">{{error}}</view>
     <view class="card">
-      <view class="icon-name">
-        <record-icon-picker emoji="{{iconEmoji}}" image-file-id="{{iconFileId}}" image-path="{{iconImagePath}}" disabled="{{submitting}}" bind:change="onRecordIconChange"/>
-        <view class="input-grow"><text class="field-label">名称</text><input value="{{name}}" maxlength="150" placeholder="请输入{{title}}名称" data-name="name" bindinput="onFieldInput"/></view>
+      <view class="record-title-field">
+        <text class="record-title-label">名称</text>
+        <view class="record-title-row">
+          <record-icon-picker class="record-title-picker" emoji="{{iconEmoji}}" image-file-id="{{iconFileId}}" image-path="{{iconImagePath}}" disabled="{{submitting}}" bind:change="onRecordIconChange"/>
+          <input class="record-title-input" value="{{name}}" maxlength="150" placeholder="请输入{{title}}名称" data-name="name" bindinput="onFieldInput"/>
+        </view>
       </view>
       <text class="field-label">说明（可选）</text>
       <textarea class="description-input" value="{{description}}" maxlength="3000" placeholder="补充说明或计划…" data-name="description" bindinput="onFieldInput" auto-height />

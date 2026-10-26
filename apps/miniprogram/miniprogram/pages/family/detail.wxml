@@ -1,17 +1,18 @@
 <!-- 家庭详情页 -->
+<page-meta page-style="{{choosingFamily ? 'overflow: hidden;' : ''}}" />
 <view class="container">
-  <nav-bar title="家庭详情" showBack="true" />
+  <nav-bar title="家庭管理" showBack="{{true}}" />
+  <view wx:if="{{loadError}}" class="card" bindtap="loadManagement">家庭加载失败，点此重试</view>
+  <view wx:elif="{{!loaded && !detail}}" class="card">正在加载家庭…</view>
+  <block wx:if="{{detail}}">
 
   <!-- 家庭资料卡 -->
   <view class="card family-card">
-    <image
-      class="family-avatar"
-      src="{{detail.avatarUrl || '/assets/images/default-family.png'}}"
-      mode="aspectFill"
-    />
+    <family-avatar src="{{detail.avatarUrl}}" size="{{120}}" alt="{{detail.name}}" />
     <text class="family-name">{{detail.name}}</text>
     <text class="family-sub">{{detail.memberCount}} 位成员 · {{detail.currentUserRole === 'admin' ? '管理员' : '成员'}}</text>
     <text class="family-sub">家庭时区：{{detail.timezone}}</text>
+    <button class="action-link" bindtap="onSwitchFamily">切换家庭</button>
 
     <view wx:if="{{detail.currentUserRole === 'admin'}}" class="edit-profile-btn" bindtap="onEditProfile">
       <text class="edit-profile-text">编辑家庭资料</text>
@@ -43,5 +44,33 @@
       <text class="menu-text text-danger">{{closing ? '注销中...' : '注销家庭'}}</text>
       <text class="arrow">›</text>
     </view>
+  </view>
+  </block>
+  <view wx:if="{{loaded && !loadError && !families.length}}" class="card empty-family">
+    <image src="/assets/images/empty-family.png" mode="aspectFit" />
+    <text>还没有加入任何家庭</text>
+    <text class="family-sub">加入或创建家庭，和家人一起使用</text>
+  </view>
+  <view class="card family-actions">
+    <button class="btn-primary" bindtap="onJoinFamily">加入家庭</button>
+    <button class="btn-outline" bindtap="onCreateFamily">创建家庭</button>
+  </view>
+</view>
+
+<view wx:if="{{choosingFamily}}" class="family-sheet-layer">
+  <view class="family-sheet-mask" bindtap="onCloseFamilySheet" catchtouchmove="noop" aria-role="button" aria-label="关闭家庭选择" />
+  <view class="family-sheet" aria-role="dialog" aria-label="切换家庭">
+    <view class="family-sheet-header" bindtouchstart="onSheetTouchStart" bindtouchend="onSheetTouchEnd" bindtouchcancel="onCloseFamilySheet" catchtouchmove="noop">
+      <view class="family-sheet-handle" />
+      <text class="family-sheet-title">切换家庭</text>
+    </view>
+    <scroll-view scroll-y class="family-sheet-list" style="height: {{families.length > 5 ? 600 : families.length * 120}}rpx;" catchtouchmove="noop">
+      <view wx:for="{{families}}" wx:key="id" class="family-choice {{item.id === familyId ? 'family-choice-current' : ''}}" data-id="{{item.id}}" bindtap="onSelectFamily" hover-class="family-choice-hover" aria-role="button" aria-label="{{item.name}}{{item.id === familyId ? '，当前家庭' : ''}}">
+        <family-avatar src="{{item.avatarUrl}}" size="{{64}}" alt="{{item.name}}" />
+        <text class="family-choice-name">{{item.name}}</text>
+        <text wx:if="{{item.id === familyId}}" class="family-choice-check">当前 ✓</text>
+      </view>
+    </scroll-view>
+    <button class="family-sheet-cancel" bindtap="onCloseFamilySheet">取消</button>
   </view>
 </view>

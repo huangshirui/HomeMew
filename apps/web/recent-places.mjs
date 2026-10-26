@@ -1,5 +1,4 @@
 /** Authenticated, bounded app-usage cache proxy. Never address LifeSpace Event for this. */
-import { eventLocationWireFormat } from './event-location-compat.mjs';
 const endpoint='https://homemew-backend.internal/internal/v1/recent-places';
 function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{
   'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});}
@@ -7,7 +6,7 @@ export async function recentPlacesRequest(request,env,token){
  if(!['GET','POST','DELETE'].includes(request.method))return json({error:{code:'METHOD_NOT_ALLOWED'}},405);
  if(typeof token!=='string'||!token.startsWith('Bearer ')&&token.length<10)return json({error:{code:'UNAUTHORIZED'}},401);
  if(!env.HOMEMEW_BACKEND || typeof env.HOMEMEW_BACKEND.fetch!=='function')
-  return json({data:{items:[],enabled:false,structured:eventLocationWireFormat(env)==='location'}});
+  return json({data:{items:[],enabled:false,structured:true}});
  let body;
  if(request.method==='POST'){
   body=await request.text();
@@ -24,7 +23,7 @@ export async function recentPlacesRequest(request,env,token){
   if(!res.ok)return json({error:{code:'RECENT_PLACES_UNAVAILABLE'}},res.status===401?401:503);
   if(!payload || !Array.isArray(payload.data?.items))return json({error:{code:'RECENT_PLACES_UNAVAILABLE'}},503);
   return json({data:{items:payload.data.items,enabled:payload.data.enabled===true,
-    structured:eventLocationWireFormat(env)==='location'}});
+    structured:true}});
  }catch{return json({error:{code:'RECENT_PLACES_UNAVAILABLE'}},503);}
 }
 export async function handleMiniRecentPlaces(request,env) {

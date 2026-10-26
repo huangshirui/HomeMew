@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 
-const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const page = read('./src/pages/football-page.tsx');
 const form = read('./src/pages/football-performance-sheet.tsx');
 const domain = read('./src/pages/football-domain.ts');

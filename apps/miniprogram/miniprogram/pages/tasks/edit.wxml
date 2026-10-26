@@ -15,17 +15,17 @@
   <block wx:else>
     <!-- 任务名称 -->
     <view class="card section">
-      <view style="display:flex;align-items:center">
-        <record-icon-picker emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{submitting}}" bind:change="onRecordIconChange" />
-        <view class="field-row" style="flex:1;min-width:0">
-        <text class="field-label">任务名称</text>
-        <input
-          class="field-input"
-          value="{{name}}"
-          bindinput="onNameInput"
-          placeholder="例如：购买日用品"
-          maxlength="60"
-        />
+      <view class="record-title-field">
+        <text class="record-title-label">任务名称</text>
+        <view class="record-title-row">
+          <record-icon-picker class="record-title-picker" emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{submitting}}" bind:change="onRecordIconChange" />
+          <input
+            class="record-title-input"
+            value="{{name}}"
+            bindinput="onNameInput"
+            placeholder="例如：购买日用品"
+            maxlength="60"
+          />
         </view>
       </view>
     </view>

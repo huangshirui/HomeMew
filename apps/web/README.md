@@ -348,3 +348,12 @@ Web 足球表单/筛选的球队、赛事支持最近使用候选。按登录用
 ### 足球年份筛选 / 搜索框
 
 球队管理的搜索框使用 `type="text" inputMode="search"` 和一枚清除按钮，避免浏览器内置搜索叉号与自定义 × 重复。足球比赛年份筛选默认仅显示当前年份及之前四年（每年自动滚动），支持「其他年份…」浮层输入任意有效四位年份（1900–9999）；选中值保留在下拉中，可选择「全部年份」清空。避免把最近一页比赛年份误当作完整年份列表，也不执行全表扫描或新增业务缓存。
+
+### 日程地点格式（2026-10-26）
+
+LifeSpace Event 已使用结构化 Location。Web 与 Mini BFF 固定通过 `event-location.mjs` 转换到当前对象格式，不再配置 `LIFESPACE_EVENT_LOCATION_FORMAT`。旧版 Mini 的文字地点与新版显式地点选择均由稳定应用边界处理；地点未改名时保留已有地址/坐标，改名时不继承旧坐标。
+
+
+## 2026-10-26 unified Access link correction
+
+The user rejected the independent mailbox authorization model. The accepted `docs/decisions/2026-10-26-unified-access-account-link.md` supersedes that wording: email-first and code-first bind one LifeSpace Access principal, and confirmed login resolves issuer/subject only. The correction is in normal PR/CI, not deployed. See the fix plan and require merged-PR/exact-candidate release provenance; no working-tree or direct Cloudflare deployment.

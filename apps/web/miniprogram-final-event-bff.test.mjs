@@ -87,16 +87,15 @@ test('new LifeSpace Location objects are projected into the stable Mini string E
   assert.deepEqual(result.payload.data.items[0].locationDetail, source.location);
 });
 
-test('Mini string write converts to canonical Location only after explicit upstream cutover', async () => {
-  for (const format of ['string', 'location']) {
+test('old Mini string writes always convert to canonical Location without a switch', async () => {
+  {
     const calls = [];
     const env = {
-      LIFESPACE_EVENT_LOCATION_FORMAT: format,
       LIFESPACE_CORE: { fetch: async incoming => {
         calls.push(incoming);
         if (new URL(incoming.url).pathname.endsWith('/members')) return response(members);
         return response(common({ ...temporalItems[0],
-          location: format === 'location' ? { name: '球场' } : '球场',
+          location: { name: '球场' },
         }), 201);
       } },
     };
@@ -108,7 +107,7 @@ test('Mini string write converts to canonical Location only after explicit upstr
     }), env);
     assert.equal(result.status, 201);
     const body = await calls[1].json();
-    assert.deepEqual(body.location, format === 'location' ? { name: '球场' } : '球场');
+    assert.deepEqual(body.location, { name: '球场' });
     assert.equal((await result.json()).data.location, '球场');
   }
 });
@@ -117,7 +116,6 @@ test('new Mini selection keeps precise WGS84 value while older Mini still uses a
   const selection = { name: '奥体中心', address: '北京市朝阳区', coordinates: { latitude: 39.992, longitude: 116.39 } };
   const calls = [];
   const env = {
-    LIFESPACE_EVENT_LOCATION_FORMAT: 'location',
     LIFESPACE_CORE: { fetch: async incoming => {
       if (new URL(incoming.url).pathname.endsWith('/members')) return response(members);
       const data = await incoming.clone().json();
@@ -150,7 +148,6 @@ test('older Mini title edits preserve rich coordinates when location name is unc
   });
   const calls = [];
   const env = {
-    LIFESPACE_EVENT_LOCATION_FORMAT: 'location',
     LIFESPACE_CORE: { fetch: async incoming => {
       calls.push(incoming);
       if (new URL(incoming.url).pathname.endsWith('/members')) return response(members);
@@ -176,7 +173,6 @@ test('older Mini explicit rename drops outdated coordinates and rejects structur
   });
   const calls = [];
   const env = {
-    LIFESPACE_EVENT_LOCATION_FORMAT: 'location',
     LIFESPACE_CORE: { fetch: async incoming => {
       calls.push(incoming);
       if (new URL(incoming.url).pathname.endsWith('/members')) return response(members);

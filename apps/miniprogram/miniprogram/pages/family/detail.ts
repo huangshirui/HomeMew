@@ -20,7 +20,10 @@ import { closeFamily, getFamily, isFamilyOwner, leaveFamily } from '../../servic
 import {
   loadFamilies,
   refreshFamilyState,
+  currentFamilyStore, setCurrentFamily,
 } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { FamilyListItem } from '../../types/index';
 import {
   showError,
   showSuccess,
@@ -32,6 +35,9 @@ import {
 import { FamilyDetail } from '../../types/index';
 
 Page({
+  _managementRequest:0,
+  _detailRequest:0,
+  _sheetStartY:null as number|null,
   data: {
     familyId: '',
     detail: null as FamilyDetail | null,
@@ -39,38 +45,89 @@ Page({
     leaving: false,
     closing: false,
     loaded: false,
+    loadError: false,
+    families: [] as FamilyListItem[],
+    choosingFamily: false,
   },
 
   onLoad(options: { familyId?: string }): void {
     const familyId = options?.familyId;
-    if (!familyId) {
-      showError('缺少家庭参数');
-      setTimeout(() => wx.navigateBack(), 1200);
-      return;
-    }
-    this.setData({ familyId });
-    this.loadDetail();
+    if (familyId) this.setData({ familyId });
   },
 
   onShow(): void {
-    // 从子页面（成员 / 邀请 / 编辑）返回时刷新角色、Owner 身份与成员数
-    if (this.data.familyId && this.data.detail) {
-      this.loadDetail();
+    void this.loadManagement();
+  },
+  onHide(): void { this.onCloseFamilySheet(); },
+
+  async loadManagement(): Promise<void> {
+    const generation=++this._managementRequest;
+    this.setData({loadError:false});
+    try {
+      await ensureRuntimeReady();
+      const families = await loadFamilies({force:true});
+      if(generation!==this._managementRequest) return;
+      const target = families.find(f=>f.id===this.data.familyId)
+        || families.find(f=>f.id===currentFamilyStore.value?.id) || families[0];
+      this.setData({families, familyId:target?.id||'', detail:null, isOwner:false});
+      if(target) {
+        setCurrentFamily(target);
+        await this.loadDetail();
+      } else refreshFamilyState(families);
+      this.setData({loaded:true});
+    } catch {
+      if(generation!==this._managementRequest) return;
+      this.setData({loaded:true,loadError:true});
     }
   },
 
+  onSwitchFamily(): void {
+    if(this.data.leaving || this.data.closing || !this.data.families.length) return;
+    this.setData({choosingFamily:true});
+  },
+  onCloseFamilySheet(): void {
+    this._sheetStartY=null;
+    this.setData({choosingFamily:false});
+  },
+  noop(): void {},
+  onSheetTouchStart(e: WechatMiniprogram.TouchEvent): void {
+    this._sheetStartY=e.touches[0]?.clientY??null;
+  },
+  onSheetTouchEnd(e: WechatMiniprogram.TouchEvent): void {
+    const start=this._sheetStartY, end=e.changedTouches[0]?.clientY;
+    this._sheetStartY=null;
+    if(start!==null && end!==undefined && end-start>60) this.onCloseFamilySheet();
+  },
+  async onSelectFamily(e: WechatMiniprogram.TouchEvent): Promise<void> {
+    const target=this.data.families.find(f=>f.id===e.currentTarget.dataset.id);
+    if(!target || this.data.leaving || this.data.closing) return;
+    this.onCloseFamilySheet();
+    if(target.id===this.data.familyId) return;
+    this._managementRequest++;
+    setCurrentFamily(target);
+    this.setData({familyId:target.id, detail:null, isOwner:false, choosingFamily:false});
+    await this.loadDetail();
+  },
+  onCreateFamily(): void { wx.navigateTo({url:'/pages/family/create'}); },
+  onJoinFamily(): void { wx.navigateTo({url:'/pages/family/join'}); },
+
   async loadDetail(): Promise<void> {
+    const generation=++this._detailRequest;
+    const familyId=this.data.familyId;
+    this.setData({loadError:false});
     try {
       const [detail, isOwner] = await Promise.all([
-        getFamily(this.data.familyId),
-        isFamilyOwner(this.data.familyId),
+        getFamily(familyId),
+        isFamilyOwner(familyId),
       ]);
+      if(this.data.familyId!==familyId || generation!==this._detailRequest) return;
       this.setData({ detail, isOwner, loaded: true });
     } catch (error: unknown) {
+      if(this.data.familyId!==familyId || generation!==this._detailRequest) return;
       console.error('[FamilyDetail] Load failed:', error);
       const err = error as { code?: string; message?: string };
       showError(getErrorMessage(err.code, err.message));
-      this.setData({ loaded: true });
+      if(this.data.familyId===familyId) this.setData({ loaded: true, loadError:true });
     }
   },
 

@@ -1,10 +1,10 @@
-import { userStore,currentFamilyStore,familiesStore,loadCurrentUser,loadFamilies } from '../../stores/index';
+import { currentFamilyStore,familiesStore,loadFamilies,refreshFamilyState } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 
-type Shortcut={key:string;title:string;icon:string;path:string};
 Page({
   data:{
-    userName:'',familyName:'',familyRole:'',familyCount:0,
+    familyName:'尚未加入家庭',familyAvatar:null as string|null,familyCount:0,
+    loadError:false,
     groups:[
       {key:'plans',title:'计划与成长',items:[
         {key:'activity',title:'活动',icon:'🗓️',path:'/pages/domains/list?kind=activities'},
@@ -18,28 +18,40 @@ Page({
         {key:'football',title:'足球比赛',icon:'⚽',path:'/pages/football/list'},
       ]},
       {key:'management',title:'家庭管理',items:[
-        {key:'family',title:'家庭与成员',icon:'🏡',path:'/pages/profile/profile'},
+        {key:'family',title:'加入家庭',icon:'🏡',path:'/pages/family/detail'},
         {key:'setting',title:'设置',icon:'⚙️',path:'/pages/settings/settings'},
-        {key:'about',title:'关于家事喵',icon:'🐱',path:'/pages/about/about'},
+        {key:'about',title:'关于',icon:'🐱',path:'/pages/about/about'},
       ]},
     ],
   },
   onShow():void{
     this.getTabBar()?.setData({selected:3});
     this.showStores();
-    void ensureRuntimeReady().then(async()=>{await Promise.all([loadCurrentUser(),loadFamilies()]);this.showStores();})
-      .catch(()=>{this.showStores();});
+    void this.loadData();
+  },
+  async loadData():Promise<void>{
+    this.setData({loadError:false});
+    try{
+      await ensureRuntimeReady();
+      const families=await loadFamilies();
+      refreshFamilyState(families);
+      this.showStores();
+    }catch{
+      this.showStores();
+      this.setData({loadError:true});
+    }
   },
   showStores():void{
-    const family=currentFamilyStore.value,role=family?.role||'';
-    this.setData({userName:userStore.value?.displayName||'我的资料',familyName:family?.name||'尚未加入家庭',
-      familyCount:familiesStore.value.length,
-      familyRole:(role as string)==='owner'?'创建者':role==='admin'?'管理员':(role as string)==='viewer'?'只读成员':'家庭成员'});
+    const family=currentFamilyStore.value;
+    this.setData({familyName:family?.name||'尚未加入家庭',familyAvatar:family?.avatarUrl||null,
+      familyCount:familiesStore.value.length});
   },
   onNav(e:WechatMiniprogram.TouchEvent):void{
+    if(e.currentTarget.dataset.key==='family'){
+      wx.navigateTo({url:'/pages/family/detail'});
+      return;
+    }
     const path=String(e.currentTarget.dataset.path||'');
     if(path.startsWith('/pages/'))wx.navigateTo({url:path});
   },
-  onProfile():void{wx.navigateTo({url:'/pages/profile/profile'});},
-  onSwitchFamily():void{wx.navigateTo({url:'/pages/profile/profile'});},
 });

@@ -35,17 +35,17 @@
   <block wx:else>
     <!-- 名称 -->
     <view class="card">
-      <view style="display:flex;align-items:center">
-        <record-icon-picker emoji="{{icon}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{submitting}}" bind:change="onRecordIconChange" />
-        <view class="field-row" style="flex:1;min-width:0">
-        <text class="field-label">名称</text>
-        <input
-          class="field-input"
-          value="{{name}}"
-          bindinput="onNameInput"
-          placeholder="{{kind === 'countdown' ? '例如：英国旅行' : '例如：清理滤水器'}}"
-          maxlength="100"
-        />
+      <view class="record-title-field">
+        <text class="record-title-label">名称</text>
+        <view class="record-title-row">
+          <record-icon-picker class="record-title-picker" emoji="{{icon}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{submitting}}" bind:change="onRecordIconChange" />
+          <input
+            class="record-title-input"
+            value="{{name}}"
+            bindinput="onNameInput"
+            placeholder="{{kind === 'countdown' ? '例如：英国旅行' : '例如：清理滤水器'}}"
+            maxlength="100"
+          />
         </view>
       </view>
     </view>

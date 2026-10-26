@@ -14,15 +14,39 @@ import {
   resolveDisplayTimeZone,
   TimeZonePreference,
 } from '../../services/settings';
+import { userStore, loadCurrentUser } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { getWebLogin } from '../../services/web-login';
 
 Page({
   data: {
+    user: userStore.value,
+    accountLoaded:false,
+    accountError:false,
+    loginEmail:'',
+    linked:false,
+    linkStatus:'unlinked',
+    emailAvailable:false,
     mode: 'system' as 'system' | 'custom',
     customTimeZone: '',
     systemTimeZone: '',
     displayTimeZone: '',
     /** 优先展示家庭/系统时区，交给 timezone-picker 组件处理 */
     preferredTimeZones: [] as string[],
+  },
+
+  onShow(): void { void this.loadAccount(); },
+  async loadAccount(): Promise<void> {
+    this.setData({accountLoaded:false,accountError:false,user:userStore.value});
+    try {
+      await ensureRuntimeReady();
+      const user=await loadCurrentUser();
+      this.setData({user});
+      const account=await getWebLogin();
+      const email=account.email;
+      this.setData({user,accountLoaded:true,linked:account.linked,linkStatus:account.status,emailAvailable:account.available!==false,
+        loginEmail:email?email.replace(/^(.).*(@.*)$/,'$1***$2'):''});
+    }catch { this.setData({accountError:true}); }
   },
 
   onLoad(): void {

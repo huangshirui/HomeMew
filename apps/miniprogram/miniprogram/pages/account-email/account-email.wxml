@@ -1,0 +1,13 @@
+<view class="container">
+  <nav-bar title="{{originalEmail ? '修改邮箱' : '绑定邮箱'}}" showBack="{{true}}" />
+  <view wx:if="{{loadError}}" class="card" bindtap="loadAccount">账号信息加载失败，点此重试</view>
+  <view wx:elif="{{!loaded}}" class="card">正在加载…</view>
+  <view wx:elif="{{!available}}" class="card">邮箱绑定暂不可用，请稍后再试。也可返回设置，使用一次性关联码登录 Web。</view>
+  <view wx:else class="card">
+    <text wx:if="{{linkStatus === 'pending'}}" class="email-hint">邮箱已设置，等待首次 Web 登录验证。</text>
+    <text class="email-label">Web 登录邮箱</text>
+    <input class="email-input" value="{{email}}" bindinput="onEmailInput" maxlength="254" placeholder="请输入你的邮箱地址" disabled="{{submitting}}" />
+    <text class="email-hint">设置邮箱和一次性关联码是绑定同一账号的两种方式。用该邮箱通过 Web 登录验证后，即可使用当前小程序账号。无需在小程序中输入邮箱验证码，请仔细核对地址。</text>
+    <button class="btn-primary" bindtap="onSave" loading="{{submitting}}" disabled="{{submitting}}">{{originalEmail ? '保存修改' : '绑定邮箱'}}</button>
+  </view>
+</view>

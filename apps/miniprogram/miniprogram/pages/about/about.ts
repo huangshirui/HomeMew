@@ -39,9 +39,12 @@ function formatLocalTime(iso: string): string {
 }
 
 Page({
+  _logoTapCount:0,
+  _lastLogoTapAt:0,
   data: {
-    version: '1.7.1',
+    version: '2.0.0',
     testing: false,
+    diagnosticsVisible:false,
     errorText: '',
     latency: null as LatencyView | null,
   },
@@ -49,13 +52,27 @@ Page({
   onLoad(): void {
     // 响应时间测试改为手动点击开始，不再在页面加载时自动触发。
   },
+  onHide():void {
+    this._logoTapCount=0;
+    this._lastLogoTapAt=0;
+  },
+  onLogoTap():void {
+    if(this.data.diagnosticsVisible) return;
+    const now=Date.now();
+    this._logoTapCount=now-this._lastLogoTapAt<=1500?this._logoTapCount+1:1;
+    this._lastLogoTapAt=now;
+    if(this._logoTapCount>=5) {
+      this._logoTapCount=0;
+      this.setData({diagnosticsVisible:true});
+    }
+  },
 
   onStartLatency(): void {
     this.runLatencyTest();
   },
 
   async runLatencyTest(): Promise<void> {
-    if (this.data.testing) return;
+    if (!this.data.diagnosticsVisible || this.data.testing) return;
     this.setData({ testing: true, errorText: '' });
     try {
       const report = await runCoreLatencyTest();

@@ -1,5 +1,5 @@
 import { errorResponse, forwardLifeSpace, json } from './miniprogram-upstream.mjs';
-import { adaptEventWritePayload, eventLocationName, eventLocationWireFormat } from './event-location-compat.mjs';
+import { adaptEventWritePayload, eventLocationName } from './event-location.mjs';
 
 const ROUTE = /^\/api\/v1\/miniprogram\/families\/([^/]+)\/events(?:\/([^/]+))?$/u;
 const SPACE_ID = /^spc_[A-Za-z0-9_-]+$/u;
@@ -290,7 +290,7 @@ async function writeEvent(request, env, route, method) {
   // An older Mini client submits the displayed location label again when the
   // user edits an unrelated field. Preserve richer canonical coordinates only
   // when the name is unchanged; otherwise treat this as an explicit relocation.
-  if (method === 'PATCH' && !hasLocationDetail && Object.hasOwn(data, 'location') && eventLocationWireFormat(env) === 'location') {
+  if (method === 'PATCH' && !hasLocationDetail && Object.hasOwn(data, 'location')) {
     if (!currentEvent) {
       const existing = await callJson(request, env, recordPath(route.familyId, route.recordId));
       if (!existing.ok) return existing.response;
@@ -307,7 +307,7 @@ async function writeEvent(request, env, route, method) {
     }
   }
   let adapted;
-  try { adapted = adaptEventWritePayload(data, env); }
+  try { adapted = adaptEventWritePayload(data); }
   catch { return errorResponse(422, 'VALIDATION_ERROR', 'Event Location is invalid for this LifeSpace release'); }
   const path = method === 'POST' ? collection(route.familyId) : recordPath(route.familyId, route.recordId);
   const result = await callJson(request, env, path, { method, data: adapted });

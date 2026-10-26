@@ -59,6 +59,46 @@ page {
   box-shadow: 0 4rpx 16rpx rgba(67, 160, 71, 0.06);
 }
 
+/* Record editors: full-width label above an aligned icon and name input. */
+.record-title-field {
+  min-width: 0;
+  padding: 12rpx 0;
+}
+
+.record-title-label {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+}
+
+.record-title-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-width: 0;
+}
+
+.record-title-picker {
+  flex: 0 0 72rpx;
+  width: 72rpx;
+  height: 72rpx;
+}
+
+.record-title-input {
+  flex: 1;
+  min-width: 0;
+  height: 72rpx;
+  box-sizing: border-box;
+  padding: 0 20rpx;
+  border: 2rpx solid var(--color-border);
+  border-radius: 18rpx;
+  background: var(--color-bg-white);
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  text-align: left;
+}
+
 /* 文本工具类 */
 .text-primary {
   color: var(--color-primary);

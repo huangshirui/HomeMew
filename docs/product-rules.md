@@ -110,13 +110,13 @@ The reviewed Mini Program intentionally keeps a stable HomeMew-owned Event DTO t
 - The first version may filter by attendee and status.
 - Mini callers continue using the stable HomeMew query DTO; the BFF lowers it to the active LifeSpace Canonical Query without exposing Canonical Query structure to the Mini Program.
 
-### 5.7 Location compatibility during the coordinated release
+### 5.7 Canonical Event Location after cutover
 
-The published LifeSpace Event model currently owns `location: string | null`; the approved target is one canonical nullable `location` object with required `name` and optional `address`/WGS84 `coordinates`. This is a breaking LifeSpace Model Registry migration, **not** a new HomeMew business model.
+The published LifeSpace Event model owns one canonical nullable `location` object with required `name` and optional `address`/WGS84 `coordinates`. The schema-74 cutover is complete; HomeMew always writes this canonical shape and owns no second Location model.
 
 The Mini Program retains its stable `location: string | null` Event DTO; its BFF maps text to canonical `{name}` on writes and reads `location.name` after the platform cutover. HomeMew Web accepts either upstream representation, and preserves an existing rich Location only if its name has not changed. No service silently geocodes a name or copies previous coordinates to another named place. Search by explicit Location name remains part of LifeSpace's declared Event search semantics.
 
-The trusted Web Worker `LIFESPACE_EVENT_LOCATION_FORMAT` records the *deployed upstream* representation (`string` before cutover, `location` afterwards), per environment. It is never a Mini/browser-selected option and must change only during the reviewed LifeSpace/HomeMew release process in `docs/decisions/2026-10-24-event-location-coordinated-release.md`.
+The temporary `LIFESPACE_EVENT_LOCATION_FORMAT` switch and old string write path are retired. Both Web and Mini BFF always submit canonical Location objects; the Mini text DTO remains an application boundary, not an old LifeSpace contract. See `docs/decisions/2026-10-26-canonical-event-location.md`.
 
 ### 5.8 Out of first scope
 
@@ -238,6 +238,8 @@ The first version has one task-level completion state. It does not track complet
 
 ## 10. Mini Program behavior
 
+- Home orders 需要关注, 今天安排, 待办提醒, 生活进行时. Successfully empty task reminders hide without changing the existing due-date/member-scope rules. 生活进行时 projects personal active Habits, current household Activities and active Goals; personal Habit ownership uses the authenticated user's mapped Space Person, not creator identity. Check-in today/streak/version/policy remain LifeSpace truth. See `docs/decisions/2026-10-26-miniprogram-home-life.md`.
+
 - Login and external identity mapping occur through trusted WeChat Cloud Functions.
 - After login, every normal Mini Program runtime call uses the stable HomeMew Mini BFF contract with the short-lived LifeSpace user bearer. The BFF maps product DTOs deterministically to the active LifeSpace contract; LifeSpace remains authoritative for identity, model, Space/Grant and policy checks.
 - On a `401`, the client refreshes through the login Cloud Function and retries once.
@@ -315,3 +317,8 @@ Detailed decision: `docs/decisions/2026-10-09-external-system-capability-contain
 - 该边界不得演变为通用 AI proxy、任意上游代理或第二个 HomeMew business Core。
 
 详细决定见 `docs/decisions/2026-09-16-meow-bff-ownership-and-temporary-offline.md`。
+
+
+## 2026-10-26 unified Access link correction
+
+The user rejected the independent mailbox authorization model. The accepted `docs/decisions/2026-10-26-unified-access-account-link.md` supersedes that wording: email-first and code-first bind one LifeSpace Access principal, and confirmed login resolves issuer/subject only. The correction is in normal PR/CI, not deployed. See the fix plan and require merged-PR/exact-candidate release provenance; no working-tree or direct Cloudflare deployment.

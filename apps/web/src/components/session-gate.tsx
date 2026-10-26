@@ -158,10 +158,10 @@ export function SessionGate({ children }: PropsWithChildren) {
             <div>
               <h2 className="text-lg font-semibold text-stone-900">关联已有家事喵账号</h2>
               <p className="mt-2 text-sm leading-6 text-stone-600">
-                首次使用网页版时，请关联你在微信小程序中使用的家事喵账号。
+                在小程序「更多 → 设置 → 绑定邮箱」设置当前 Web 登录邮箱，然后重新检查即可进入。
               </p>
               <p className="mt-2 text-sm leading-6 text-stone-500">
-                还没有账号？请先打开微信小程序使用家事喵，再回到这里关联。
+                也可使用下方的一次性关联码，在小程序确认同一个账号的身份关联。首次使用家事喵，请先打开微信小程序。
               </p>
             </div>
 

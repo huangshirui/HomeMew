@@ -1,7 +1,8 @@
 <view class="container account-link-page">
   <nav-bar title="关联 Web 登录" showBack="true" />
 
-  <view class="card link-card">
+  <view wx:if="{{!ready}}" class="card" bindtap="onShow">正在确认账号状态，未能加载时点此重试</view>
+  <view wx:if="{{ready}}" class="card link-card">
     <view class="link-header">
       <text class="link-title">关联 Web 登录</text>
       <text class="link-desc">将浏览器中的 Cloudflare Access 登录关联到你当前的家事喵账号。</text>

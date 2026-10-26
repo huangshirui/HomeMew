@@ -14,6 +14,7 @@
     "pages/about/about",
     "pages/settings/settings",
     "pages/account-link/account-link",
+    "pages/account-email/account-email",
     "pages/family/join",
     "pages/family/detail",
     "pages/family/members",
@@ -33,7 +34,8 @@
     "pages/football/list",
     "pages/football/detail",
     "pages/football/edit",
-    "pages/football/stats"
+    "pages/football/stats",
+    "pages/football/manage"
   ],
   "usingComponents": {
     "user-avatar": "/components/user-avatar/index",

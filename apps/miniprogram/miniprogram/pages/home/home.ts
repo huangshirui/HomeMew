@@ -2,7 +2,7 @@
  * 首页 —— 今天的家庭工作台
  *
  * 首页顺序（见需求「11. 首页需求」）：
- *   导航栏显示当前家庭名称 → 需要关注 → 今天安排 → 待办提醒 → 常用工具
+ *   导航栏显示当前家庭名称 → 需要关注 → 今天安排 → 待办提醒 → 生活进行时
  *
  * 设计目标：
  * - 删除两个统计数字卡片；
@@ -12,7 +12,7 @@
  * - 「需要关注」保持简洁：区块底色为浅绿、内部卡片为浅白（与原配色互换），
  *   critical 卡片整卡高亮并放大数字，让逾期/紧急真正跳出来；
  * - 没有关注项时整个「需要关注」区域隐藏；
- * - 家庭管理统一收归「我的」，首页只展示常用工具入口。
+ * - 完整功能与家庭管理入口统一收归「更多」。
  */
 
 import {
@@ -51,6 +51,9 @@ import {
 import { mapDayRecordView, DayRecordView } from '../../utils/day-record-view';
 import { DayRecordKind } from '../../types/index';
 import { Event, Task, FamilyRole } from '../../types/index';
+import { listDomainPeople, performDomainAction, type PersonOption } from '../../services/domains';
+import { listCurrentLifeRecords, type LifeKind } from '../../services/life-records';
+import { homeLifeRows, type HomeLifeRow } from '../../utils/home-life';
 
 type FamilyView = {
   id: string;
@@ -173,7 +176,19 @@ Page({
 
     /** 下拉刷新指示器状态（scroll-view refresher） */
     refreshing: false,
+    lifeTab: 'habits' as LifeKind,
+    lifeTabs: [{ key: 'habits', label: '我的习惯' }, { key: 'activities', label: '活动' }, { key: 'goals', label: '目标' }],
+    lifeRecords: { habits: [], activities: [], goals: [] } as Record<LifeKind, HomeLifeRow[]>,
+    lifeLoading: { habits: false, activities: false, goals: false },
+    lifeErrors: { habits: false, activities: false, goals: false },
+    lifeVisible: false,
+    canCheckIn: false,
   },
+
+  _lifeGeneration: { habits: 0, activities: 0, goals: 0 },
+  _lifePersonId: '',
+  _lifeContext: 0,
+  _checkingHabits: new Set<string>(),
 
   // 原始列表（不参与渲染，仅用于派生视图与排序）
   _todayEvents: [] as Event[],
@@ -210,6 +225,9 @@ Page({
     // 普通切换 tab 不重复请求。
     if (!this.data.loaded || (storeFamilyId && storeFamilyId !== shownFamilyId) || dirty.size > 0) {
       this.loadData();
+    } else if (storeFamilyId) {
+      // New domain edit/detail pages do not publish the legacy dirty flags.
+      void this.loadLife(storeFamilyId);
     }
 
     this._familyUnsubscribe = currentFamilyStore.subscribe((family) => {
@@ -219,16 +237,18 @@ Page({
         this.applyNavTitle(newFamily);
       });
       const newId = newFamily?.id;
-      if (newId && newId !== prevId) {
+      if (newId !== prevId) {
         // 家庭切换：先清空旧家庭的所有缓存与派生展示数据，避免「需要关注」、
         // 今天安排、待办提醒等仍短暂显示上一个家庭的内容；随后再以新家庭重新拉取。
         this._resetFamilyData();
+        if (!newId) return;
         this._hydrateHomeStartupCache(newId);
         // 重置轮询节流窗口，避免下一轮轮询紧接着又对新家庭重复请求一次
         this._markFetched();
         this.loadTodayEvents(newId);
         this.loadTasks(newId);
         this.loadAttentionDays(newId);
+        void this.loadLife(newId);
       }
     });
     this._familiesUnsubscribe = familiesStore.subscribe((families) => {
@@ -250,11 +270,15 @@ Page({
   onHide(): void {
     if (this._familyUnsubscribe) this._familyUnsubscribe();
     if (this._familiesUnsubscribe) this._familiesUnsubscribe();
+    this._unsubscribeDirty();
     this._stopTick();
     this._stopPoll();
   },
 
   onUnload(): void {
+    if (this._familyUnsubscribe) this._familyUnsubscribe();
+    if (this._familiesUnsubscribe) this._familiesUnsubscribe();
+    this._unsubscribeDirty();
     this._stopTick();
     this._stopPoll();
   },
@@ -309,6 +333,7 @@ Page({
     this.loadTodayEvents(familyId);
     this.loadTasks(familyId);
     this.loadAttentionDays(familyId);
+    void this.loadLife(familyId);
   },
 
   /** 记录一次后台拉取时间，供轮询节流使用 */
@@ -356,6 +381,10 @@ Page({
     this._completingIds.clear();
     this._statusFingerprint = '';
     this._homeCacheHydratedFamilyId = '';
+    for (const kind of ['habits', 'activities', 'goals'] as LifeKind[]) this._lifeGeneration[kind]++;
+    this._lifePersonId = '';
+    this._lifeContext++;
+    this._checkingHabits.clear();
     this.setData({
       todayEvents: [],
       todayEventCount: 0,
@@ -364,6 +393,12 @@ Page({
       pendingTaskMore: 0,
       attentionDays: [],
       attentionCards: [],
+      lifeTab: 'habits',
+      lifeRecords: { habits: [], activities: [], goals: [] },
+      lifeLoading: { habits: false, activities: false, goals: false },
+      lifeErrors: { habits: false, activities: false, goals: false },
+      lifeVisible: false,
+      canCheckIn: false,
     });
   },
 
@@ -433,6 +468,9 @@ Page({
         this.loadTodayEvents(current.id);
         this.loadTasks(current.id);
         this.loadAttentionDays(current.id);
+        await this.loadLife(current.id);
+      } else {
+        this._resetFamilyData();
       }
     } catch (e) {
       console.error('[Home] Load data failed:', e);
@@ -587,6 +625,121 @@ Page({
 
   onRetryDays(): void {
     if (this.data.currentFamily) this.loadAttentionDays(this.data.currentFamily.id);
+  },
+
+  async loadLife(familyId: string, onlyKind?: LifeKind): Promise<void> {
+    const kinds: LifeKind[] = (onlyKind ? [onlyKind] : ['habits', 'activities', 'goals'] as LifeKind[])
+      .filter(kind => kind !== 'habits' || this._checkingHabits.size === 0);
+    if (!kinds.length) return;
+    const generations = { ...this._lifeGeneration };
+    for (const kind of kinds) {
+      generations[kind] = ++this._lifeGeneration[kind];
+      this.setData({ [`lifeLoading.${kind}`]: true, [`lifeErrors.${kind}`]: false });
+    }
+    this.updateLifeVisible();
+    const isCurrent = (kind: LifeKind) => this.data.currentFamily?.id === familyId &&
+      this._lifeGeneration[kind] === generations[kind];
+    let people: PersonOption[];
+    try {
+      await this.ensureUser();
+      people = await listDomainPeople(familyId);
+    } catch {
+      for (const kind of kinds) {
+        if (isCurrent(kind)) this.setData({ [`lifeLoading.${kind}`]: false, [`lifeErrors.${kind}`]: true });
+      }
+      this.updateLifeVisible();
+      return;
+    }
+    const personId = people.find(person => person.userId === userStore.value?.id)?.personId || '';
+    if (kinds.includes('habits') && isCurrent('habits')) this._lifePersonId = personId;
+    const today = formatInstantInTimeZone(new Date().toISOString(), this.data.currentFamily?.timezone || 'Asia/Shanghai').date;
+    await Promise.all(kinds.map(async kind => {
+      if (!isCurrent(kind)) return;
+      try {
+        const records = await listCurrentLifeRecords(familyId, kind, personId, today, () => isCurrent(kind));
+        if (!isCurrent(kind)) return;
+        const rows = homeLifeRows(records, kind, people, personId);
+        // A poll may finish while a check-in is pending. Keep its button locked.
+        rows.forEach(row => { row.checking = this._checkingHabits.has(row.id); });
+        this.setData({ [`lifeRecords.${kind}`]: rows, [`lifeErrors.${kind}`]: false,
+          canCheckIn: Boolean(personId) && (this.data.currentFamily?.role as string) !== 'viewer' });
+      } catch {
+        if (isCurrent(kind)) this.setData({ [`lifeErrors.${kind}`]: true });
+      } finally {
+        if (isCurrent(kind)) {
+          this.setData({ [`lifeLoading.${kind}`]: false });
+          this.updateLifeVisible();
+        }
+      }
+    }));
+  },
+
+  updateLifeVisible(): void {
+    const kinds: LifeKind[] = ['habits', 'activities', 'goals'];
+    this.setData({ lifeVisible: kinds.some(kind => this.data.lifeRecords[kind].length > 0 ||
+      this.data.lifeLoading[kind] || this.data.lifeErrors[kind]) });
+  },
+
+  onLifeTab(e: WechatMiniprogram.TouchEvent): void {
+    const kind = e.currentTarget.dataset.kind as LifeKind;
+    if (['habits', 'activities', 'goals'].includes(kind)) this.setData({ lifeTab: kind });
+  },
+
+  onRetryLife(): void {
+    if (this.data.currentFamily) void this.loadLife(this.data.currentFamily.id, this.data.lifeTab);
+  },
+
+  onViewLife(): void {
+    if (!this.data.currentFamily) return;
+    const kind = this.data.lifeTab;
+    wx.navigateTo({ url: '/pages/domains/list?kind=' + kind + '&familyId=' + this.data.currentFamily.id +
+      (kind === 'habits' ? '&mine=1' : '') });
+  },
+
+  onLifeRecordTap(e: WechatMiniprogram.TouchEvent): void {
+    const id = String(e.currentTarget.dataset.id || '');
+    if (!id || !this.data.currentFamily) return;
+    wx.navigateTo({ url: '/pages/domains/detail?kind=' + this.data.lifeTab + '&familyId=' +
+      this.data.currentFamily.id + '&id=' + encodeURIComponent(id) });
+  },
+
+  async onHabitCheckIn(e: WechatMiniprogram.TouchEvent): Promise<void> {
+    const id = String(e.currentTarget.dataset.id || '');
+    const habit = this.data.lifeRecords.habits.find(record => record.id === id);
+    const familyId = this.data.currentFamily?.id;
+    if (!familyId || !habit || !this.data.canCheckIn || !this._lifePersonId ||
+      habit.subjectPersonId !== this._lifePersonId || habit.status !== 'active' ||
+      !habit.computed?.checkIn || habit.checkedInToday || this._checkingHabits.has(id)) return;
+    this._checkingHabits.add(id);
+    ++this._lifeGeneration.habits;
+    const context = this._lifeContext;
+    let reload = false;
+    this.setData({ 'lifeLoading.habits': false, 'lifeRecords.habits': this.data.lifeRecords.habits.map(row =>
+      row.id === id ? { ...row, checking: true } : row) });
+    try {
+      const updated = await performDomainAction(familyId, 'habits', id, 'check-in', habit.version);
+      if (this.data.currentFamily?.id !== familyId || this._lifeContext !== context) return;
+      // Update in place: don't move the tapped row out from under the user's finger.
+      this.setData({ 'lifeRecords.habits': this.data.lifeRecords.habits.map(row => row.id === id ? {
+        ...row, ...updated, checkedInToday: Boolean(updated.computed?.checkIn?.checkedInToday),
+        streakDays: updated.computed?.checkIn?.streakDays || 0, checking: false,
+      } : row) });
+      showSuccess('打卡成功');
+    } catch (error) {
+      if (this.data.currentFamily?.id !== familyId || this._lifeContext !== context) return;
+      const err = error as { code?: string; message?: string };
+      showError(isVersionConflict(err.code) ? '习惯已更新，请查看最新状态后重试' :
+        getErrorMessage(err.code, err.message) || '打卡失败，请重试');
+      // Refresh for review, never replay the write automatically.
+      reload = true;
+    } finally {
+      if (this.data.currentFamily?.id === familyId && this._lifeContext === context) {
+        this._checkingHabits.delete(id);
+        this.setData({ 'lifeRecords.habits': this.data.lifeRecords.habits.map(row =>
+          row.id === id ? { ...row, checking: false } : row) });
+        if (reload) void this.loadLife(familyId, 'habits');
+      }
+    }
   },
 
   /** 点击「需要关注」的横向卡片进入对应页面（见 onAttentionCardTap） */

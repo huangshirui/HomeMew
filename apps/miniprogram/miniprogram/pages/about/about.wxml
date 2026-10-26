@@ -1,8 +1,8 @@
 <view class="container about-page">
-  <nav-bar title="关于家事喵" showBack="true" />
+  <nav-bar title="关于" showBack="true" />
 
   <view class="card brand-card">
-    <view class="brand-mark">喵</view>
+    <image class="brand-mark" src="/assets/images/logo.png" mode="aspectFit" bindtap="onLogoTap" />
     <view class="brand-copy">
       <text class="brand-title">家事喵</text>
       <text class="brand-version">v{{version}}</text>
@@ -10,7 +10,7 @@
     </view>
   </view>
 
-  <view class="card latency-card">
+  <view wx:if="{{diagnosticsVisible}}" class="card latency-card">
     <view class="latency-header">
       <view>
         <text class="section-title">响应时间测试</text>
@@ -91,7 +91,7 @@
     </block>
   </view>
 
-  <view class="card note-card">
+  <view wx:if="{{diagnosticsVisible}}" class="card note-card">
     <text class="note-title">怎么看这些数字</text>
     <text class="note-text">Core /health 不访问 D1，反映 BFF 通过 Service Binding 调用 Core 的基线，不包含设备到 HomeMew 的网络耗时。</text>
     <text class="note-text">/api/v1/status 会读取 LifeSpace Core 的 schema metadata，因此包含一次真实 D1 往返。</text>

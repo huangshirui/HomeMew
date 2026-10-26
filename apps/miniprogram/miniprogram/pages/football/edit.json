@@ -1,1 +1,9 @@
-{"navigationStyle":"custom","usingComponents":{"record-icon-picker":"/components/record-icon-picker/index"}}
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "record-icon-picker": "/components/record-icon-picker/index",
+    "lucide-icon": "/components/lucide-icon/index",
+    "football-record-icon": "/components/football-record-icon/index",
+    "football-reference-field": "/components/football-reference-field/index"
+  }
+}

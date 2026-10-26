@@ -414,45 +414,43 @@
   background: #f0f2f1;
 }
 
-/* 常用工具 */
-.tools-section {
-  margin-top: 22rpx;
-}
-
-.tools-row {
+/* 生活进行时：紧凑切换与列表，沿用首页绿色主题。 */
+.life-tabs {
   display: flex;
-  gap: 18rpx;
-  padding-top: 8rpx;
+  gap: 12rpx;
+  margin: 8rpx 0 10rpx;
 }
-
-.tool-card {
+.life-tab {
   flex: 1;
   display: flex;
   align-items: center;
-  background: var(--home-primary-tint);
-  border-radius: 22rpx;
-  padding: 26rpx 24rpx;
+  justify-content: center;
+  min-height: 64rpx;
+  border-radius: 14rpx;
+  color: var(--home-secondary);
+  font-size: 26rpx;
 }
-
-.tool-emoji {
-  font-size: 44rpx;
-  margin-right: 18rpx;
+.life-tab-active { background: var(--home-primary-tint); color: var(--home-primary); font-weight: 600; }
+.life-error-dot { width: 10rpx; height: 10rpx; margin-left: 8rpx; border-radius: 50%; background: var(--home-danger); }
+.life-row { display: flex; align-items: center; padding: 22rpx 0; border-bottom: 2rpx solid #f2f4f3; }
+.life-row:last-child { border-bottom: none; }
+.life-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64rpx;
+  height: 64rpx;
+  margin-right: 16rpx;
+  border-radius: 16rpx;
+  background: var(--home-primary-tint);
+  font-size: 32rpx;
   flex-shrink: 0;
 }
-
-.tool-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.tool-title {
-  display: block;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--home-text);
-}
-
-.tool-desc {
+.life-body { flex: 1; min-width: 0; }
+.life-name-row { display: flex; align-items: center; gap: 10rpx; }
+.life-name { min-width: 0; font-size: 28rpx; color: var(--home-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.life-personal-tag { flex-shrink: 0; font-size: 20rpx; color: var(--home-primary); }
+.life-meta {
   display: block;
   margin-top: 6rpx;
   font-size: 22rpx;
@@ -461,6 +459,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.life-check {
+  flex-shrink: 0;
+  margin: 0 0 0 14rpx;
+  padding: 0 20rpx;
+  min-height: 64rpx;
+  line-height: 64rpx;
+  border-radius: 16rpx;
+  background: var(--home-primary);
+  color: #fff;
+  font-size: 24rpx;
+}
+.life-check::after { border: none; }
+.life-check[disabled] { background: #f2f4f3; color: var(--home-secondary); }
+.life-check.life-check-done { background: var(--home-primary-tint); color: var(--home-primary); }
+.life-chevron { margin-left: 14rpx; color: var(--home-hint); font-size: 34rpx; }
 
 /* 首页导航栏左侧：家庭圆形徽章 + 家庭名称（统一 nav-bar 组件的 left slot） */
 .home-nav-left {
