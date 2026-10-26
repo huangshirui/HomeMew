@@ -3,10 +3,13 @@ import { fileURLToPath } from 'node:url';
 
 export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
   identity: Object.freeze({
-    contractVersion: '0.14.0',
-    compatibleContractVersions: Object.freeze(['0.14.0']),
-    minimumSchemaVersion: 13,
-    minimumSchemaByContract: Object.freeze({ '0.14.0': 13 }),
+    contractVersion: '0.15.0',
+    // Global mailbox ownership and other independently linked Access identities
+    // are preserved by LifeSpace Identity 0.15/schema 14. Never infer compatibility
+    // from numeric version ordering or accept the superseded 0.14 semantics.
+    compatibleContractVersions: Object.freeze(['0.15.0']),
+    minimumSchemaVersion: 14,
+    minimumSchemaByContract: Object.freeze({ '0.15.0': 14 }),
   }),
   core: Object.freeze({
     contractVersion: '0.53.0',
@@ -14,7 +17,7 @@ export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
     // future Kernel version as compatible merely because its number is higher.
     compatibleContractVersions: Object.freeze(['0.48.0', '0.49.0', '0.53.0']),
     minimumSchemaVersion: 53,
-    minimumSchemaByContract: Object.freeze({ '0.48.0': 53, '0.49.0': 53, '0.53.0': 72 }),
+    minimumSchemaByContract: Object.freeze({ '0.48.0': 53, '0.49.0': 53, '0.53.0': 74 }),
   }),
 });
 
