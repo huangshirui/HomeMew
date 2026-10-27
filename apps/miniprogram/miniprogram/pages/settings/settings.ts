@@ -64,6 +64,9 @@ Page({
       displayTimeZone: resolveDisplayTimeZone(pref),
       preferredTimeZones: [pref.customTimeZone, systemTz].filter(Boolean) as string[],
     });
+    // 进入页面时同步读取已保存的「数据范围」，避免在首屏先用默认『只看我的』渲染，
+    // 等异步 loadAccount 完成后才切换到『看全家』造成闪动
+    this.refreshHomeScope();
   },
 
   /** 切换「跟随系统时区 / 指定时区」 */
