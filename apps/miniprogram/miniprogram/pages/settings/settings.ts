@@ -39,7 +39,7 @@ Page({
     homeScope: 'me' as HomeScope,
   },
 
-  onShow(): void { this.refreshHomeScope(); void this.loadAccount(); },
+  onShow(): void { void this.loadAccount(); },
   async loadAccount(): Promise<void> {
     this.setData({accountLoaded:false,accountError:false,user:userStore.value});
     try {
@@ -50,6 +50,7 @@ Page({
       const email=account.email;
       this.setData({user,accountLoaded:true,linked:account.linked,linkStatus:account.status,emailAvailable:account.available!==false,
         loginEmail:email?email.replace(/^(.).*(@.*)$/,'$1***$2'):''});
+      this.refreshHomeScope();
     }catch { this.setData({accountError:true}); }
   },
 
