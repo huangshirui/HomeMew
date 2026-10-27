@@ -64,11 +64,14 @@ test('Settings keeps profile usable when mailbox loading fails and distinguishes
   const user={id:'usr_one',displayName:'新昵称'};
   let available=true,fail=false;
   const page=loadPage('pages/settings/settings',{
-    userStore:{value:null},ensureRuntimeReady:async()=>{},loadCurrentUser:async()=>user,
+    userStore:{value:{id:'usr_one'}},currentFamilyStore:{value:{id:'spc_a'}},
+    STORAGE_KEYS:{currentFamilyId:'currentFamilyId'},wx:{getStorageSync:()=>''},loadHomeScope:()=> 'all',
+    ensureRuntimeReady:async()=>{},loadCurrentUser:async()=>user,
     getWebLogin:async()=>{if(fail)throw new AppError('TIMEOUT');return{email:null,linked:false,available};},
   });
   fail=true;await page.loadAccount();
   assert.equal(page.data.user,user);assert.equal(page.data.accountError,true);
   fail=false;available=false;await page.loadAccount();
   assert.equal(page.data.accountError,false);assert.equal(page.data.accountLoaded,true);assert.equal(page.data.emailAvailable,false);
+  assert.equal(page.data.homeScope,'all');
 });
