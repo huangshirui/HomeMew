@@ -123,8 +123,8 @@
       </view>
     </view>
 
-    <!-- 待办提醒（即使空也保留区块，仅隐藏内容区） -->
-    <view class="card section">
+    <!-- 仅在有提醒、加载中或失败时展示；成功且无待办时隐藏整个区块 -->
+    <view wx:if="{{pendingTasks.length > 0 || tasksLoading || tasksError}}" class="card section">
       <view class="section-header" bindtap="onViewTasks">
         <text class="section-title">待办提醒</text>
         <view class="section-header-right">
@@ -179,8 +179,8 @@
       <text>关注信息更新失败，点击重试</text>
     </view>
 
-    <!-- 生活进行时：个人习惯 + 家庭活动 / 目标（即使空也保留区块） -->
-    <view class="card section life-section">
+    <!-- 生活进行时：三类均成功加载为空时隐藏，加载中/失败时保留提示与重试 -->
+    <view wx:if="{{lifeVisible}}" class="card section life-section">
       <view class="section-header">
         <text class="section-title">生活进行时</text>
         <text class="section-more" bindtap="onViewLife" aria-role="button">查看全部 ›</text>
