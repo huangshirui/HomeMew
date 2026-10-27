@@ -1,10 +1,16 @@
 import { AppError } from '../../services/api';
 import { confirmWebAccessLink, normalizeAccessLinkChallengeId } from '../../services/account-link';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 
 Page({
   data: {
     challengeId: '',
     submitting: false,
+    ready:false,
+  },
+  onShow():void {
+    this.setData({ready:false});
+    void ensureRuntimeReady().then(()=>{this.setData({ready:true});}).catch(()=>wx.showToast({title:'账号信息加载失败，请重试',icon:'none'}));
   },
 
   onChallengeInput(event: WechatMiniprogram.Input): void {
@@ -23,7 +29,7 @@ Page({
   },
 
   async confirmLink(): Promise<void> {
-    if (this.data.submitting) return;
+    if (this.data.submitting || !this.data.ready) return;
 
     let challengeId: string;
     try {

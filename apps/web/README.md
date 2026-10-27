@@ -349,12 +349,11 @@ Web 足球表单/筛选的球队、赛事支持最近使用候选。按登录用
 
 球队管理的搜索框使用 `type="text" inputMode="search"` 和一枚清除按钮，避免浏览器内置搜索叉号与自定义 × 重复。足球比赛年份筛选默认仅显示当前年份及之前四年（每年自动滚动），支持「其他年份…」浮层输入任意有效四位年份（1900–9999）；选中值保留在下拉中，可选择「全部年份」清空。避免把最近一页比赛年份误当作完整年份列表，也不执行全表扫描或新增业务缓存。
 
+### 日程地点格式（2026-10-26）
 
-## Explicit Web mailbox authorization rollout
-
-Accepted decision: `docs/decisions/2026-10-25-miniprogram-2-navigation-email.md`. Identity 0.13/schema 12 owns authenticated Application-scoped mailbox consent and audit. Fixed Mini GET/PATCH `/api/v1/miniprogram/me/web-login` forwards to Identity; cached Web sessions revalidate via `/internal/v1/access/session-check`. No HomeMew mailbox persistence or email OTP. Release Identity Staging first, then Web Preview acceptance, then Identity Production and Web Production. Mini upload is separate. Tracking: HomeMew #153 / LifeSpace #408.
+LifeSpace Event 已使用结构化 Location。Web 与 Mini BFF 固定通过 `event-location.mjs` 转换到当前对象格式，不再配置 `LIFESPACE_EVENT_LOCATION_FORMAT`。旧版 Mini 的文字地点与新版显式地点选择均由稳定应用边界处理；地点未改名时保留已有地址/坐标，改名时不继承旧坐标。
 
 
-## 2026-10-26: unified Access account linking
+## 2026-10-26 unified Access link correction
 
 The accepted correction in `docs/decisions/2026-10-26-unified-access-account-link.md` supersedes the independent mailbox-authorization design. Email entry and one-time code confirmation bind the same existing LifeSpace user through the stable HomeMew Mini BFF, while the currently deployed LifeSpace Identity 0.15/schema 14 owns a LifeSpace-global login mailbox reservation and separate verified Access principal links. Pending email is not proof; Access independently verifies the claim before the Web session can use it. Other independently linked identities and the usr_* identity remain intact when a mailbox changes. Mini settings retain the existing pending/linked status and link-code alternative. HomeMew stores no identity authority. The 0.14/schema 13 description in the original accepted decision is historical; see the 2026-10-26 Identity 0.15 consumer compatibility addendum. HomeMew Web/Backend releases and Mini distribution remain independently gated; an Identity Production deployment is not a HomeMew production rollout.

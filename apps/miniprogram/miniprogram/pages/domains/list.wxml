@@ -1,16 +1,17 @@
 <view class="container domain-page">
-  <nav-bar title="{{title}}" showBack="true" />
+  <nav-bar title="{{title}}" showBack="{{true}}">
+    <view wx:if="{{!noFamily}}" slot="right" class="header-filter {{searchOpen || appliedSearch || personId ? 'header-filter-active' : ''}}" bindtap="onToggleSearch" hover-class="header-filter-hover" aria-role="button" aria-label="搜索与筛选{{appliedSearch || personId ? '，已启用' : ''}}">
+      <lucide-icon name="sliders-horizontal" size="20" stroke-width="{{1.75}}" color="{{searchOpen || appliedSearch || personId ? '#358539' : '#526059'}}" />
+      <view wx:if="{{appliedSearch || personId}}" class="filter-indicator" />
+    </view>
+  </nav-bar>
   <view wx:if="{{noFamily}}" class="empty-state"><text class="empty-title">先创建或加入家庭</text><button class="btn-primary" bindtap="onFamilySetup">前往首页</button></view>
   <block wx:else>
-    <view class="domain-toolbar">
-      <text class="domain-heading">{{title}}</text>
-      <view class="domain-tools">
-        <view class="tool-btn" bindtap="onToggleSearch"><lucide-icon name="sliders-horizontal" size="19" color="#43A047" /><text>筛选</text></view>
-        <view class="add-btn" bindtap="onCreate">＋ 新建</view>
-      </view>
-    </view>
     <view wx:if="{{searchOpen}}" class="card search-panel">
-      <view class="search-row"><input placeholder="搜索名称或说明" value="{{search}}" bindinput="onSearchInput" confirm-type="search" bindconfirm="onApplySearch"/><view bindtap="onApplySearch">搜索</view></view>
+      <view class="search-row">
+        <view class="search-input"><lucide-icon name="search" size="18" stroke-width="{{1.75}}" color="#9299A3" /><input placeholder="搜索名称或说明" value="{{search}}" bindinput="onSearchInput" confirm-type="search" bindconfirm="onApplySearch" /></view>
+        <button class="search-submit" bindtap="onApplySearch">搜索</button>
+      </view>
       <picker wx:if="{{kind === 'activities'}}" mode="selector" range="{{personOptions}}" range-key="label" value="{{selectedPersonIndex}}" bindchange="onPersonChange">
         <view class="search-person">参与成员：{{personOptions[selectedPersonIndex].label || '全部成员'}} ▾</view>
       </picker>
@@ -39,4 +40,7 @@
     <view class="page-footer" wx:if="{{loadingMore}}">加载更多…</view>
     <view class="page-footer" wx:elif="{{nextCursor}}" bindtap="onLoadMore">加载更多</view>
   </block>
+  <view wx:if="{{!noFamily}}" class="fab domain-fab" bindtap="onCreate" aria-role="button" aria-label="新建{{title}}">
+    <view class="fab-plus"><view class="fab-plus-line fab-plus-horizontal" /><view class="fab-plus-line fab-plus-vertical" /></view>
+  </view>
 </view>

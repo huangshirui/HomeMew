@@ -1,8 +1,10 @@
 # Decision: Event Location coordinated LifeSpace release / 地点字段协调切换
 
 Date: 2026-10-24  
-Status: Accepted for implementation; release pending verification  
+Status: Accepted; transport cutover controls superseded by 2026-10-26-canonical-event-location.md
 Tracking: LifeSpace #235 / #405 / #406; HomeMew #143 / #144; n8n nodes #113
+
+> Current transport authority: `2026-10-26-canonical-event-location.md`. The release-switch instructions below record the historical coordinated migration. The user authorized permanent canonical cleanup and production activation on 2026-10-26.
 
 ## Decision / 决策
 
@@ -20,7 +22,7 @@ The LifeSpace `Event.location` update from nullable string to nullable canonical
 
 ## Deployment bindings / 发布开关
 
-The single `homemew-web` Worker has two deployments bound to different LifeSpace environments. Production `LIFESPACE_EVENT_LOCATION_FORMAT=string` is the initial legacy setting. Preview `LIFESPACE_EVENT_LOCATION_FORMAT=location` is valid **only after** LifeSpace Staging has completed its Event schema migration.
+The single `homemew-web` Worker has two deployments bound to different LifeSpace environments. Both Production and Preview now require `LIFESPACE_EVENT_LOCATION_FORMAT=location`. Production's initial legacy `string` setting is obsolete following the verified Event model cutover (see the 2026-10-25 correction below).
 
 This is **not** a runtime client-controlled switch. The Worker / Wrangler configuration and deployed LifeSpace model schema must be explicitly matched by the release operator. The BFF never probes a write and retries with the other shape.
 
@@ -48,7 +50,7 @@ This is **not** a runtime client-controlled switch. The Worker / Wrangler config
 - Browser and Mini search share a bounded, authenticated HomeMew Worker POI adapter. `AMAP_WEB_SERVICE_KEY` is a Worker Secret; the client must never see it. The current provider is AMap Inputtips. Its GCJ-02 results are converted to WGS84 before any canonical LifeSpace write. User-supplied input alone remains name-only. Do not silently geocode any API/Agent write, and do not synthesize missing coordinates.
 - Text-entry fallback is mandatory: empty provider config, API downtime or no suggestions must never block a user from saving an Event name.
 - Web exposes AMap / Google Maps destination URLs from the chosen WGS84 point, or search links from name-only Location. Mini uses `wx.openLocation` with a WGS84→GCJ-02 presentation conversion for structured points; name-only values offer copy-name instead of opening a fictitious point. WeChat permission/real-device behavior remains a release verification item.
-- Current Worker Production format is still `string`; selecting a POI before the structured Core release cannot inject a rich object into the old Event model. The suggestion response exposes the trusted deployment format and the clients only retain rich points when `location` is enabled. Unconfigured Search Secret degrades to name-only.
+- After the structured Core release, Worker Production must use `location`. The suggestion response exposes the trusted deployment format and the clients only retain rich points when `location` is enabled. Unconfigured Search Secret degrades to name-only.
 - Release gates: provide the secret to each applicable Worker deployment, verify quotas/terms/WeChat real-device map behavior, and repeat historical Event edit preservation, rich selection, name-only writes and permission checks against real Staging after LifeSpace #406 migration. Coordinate this PR with merged Mobile Header PR #145 and in-flight native Mini UX PR #146; neither is assumed rebased or conflict-free.
 
 ## Place search provider budget and frequently used places / 输入推荐用量控制与常用地点
@@ -83,3 +85,11 @@ The user explicitly rejected storing `sourceEventId` and reading Events to hydra
 - **产品 UX 规则**：Web 与微信小程序中的地点联想必须使用面向家庭用户的自然语言。不展示 WGS84/GCJ-02、坐标持久化细节、地图搜索实现方式或“仅保存地点名称”等内部兼容术语。
 - **统一用语**：输入框“搜索或输入地点”；匹配曾用地点标题“最近使用”；显式发起 Provider 查询用“搜索其他地点”；选定明确地点后用“已选定地点”；无匹配、服务暂不可用时分别使用“没有找到合适的地点，可以直接填写”和“暂时无法搜索地点，可以直接填写”。没有坐标的地图链接可提示“地图会根据名称查找地点”，不让用户处理坐标系。
 - **范围和边界**：本变更仅修改人可见的表单/提示文字，无业务契约、Provider Key、API、Recent Places Durable Object、LifeSpace Location 的坐标处理及权限变更。保留 Web 和 Mini 各自 UI 组件风格；通过独立回归测试守护文案。
+
+
+## 2026-10-25 · Production Location configuration mismatch verified
+
+- Read-only Cloudflare inspection confirmed the production `lifespace-core` database publishes Event `fields.location.type=location`, schema hash `7b189b870a3da40ecc6d4ae7926c600f8beec5bc3af342539279d934da3243c6` (the schema-74 contract). No household records were read or written.
+- The deployed `homemew-web` binding still had `LIFESPACE_EVENT_LOCATION_FORMAT=string`. This makes the otherwise-correct Mini adapter forward a text label to the structured Core model, producing `location must be a valid Location object` during Event creation.
+- Repository Production configuration and its deployment regression assertion now require `location`, matching Preview and the production Core contract. Existing conversion preserves stable Mini text DTOs, selected rich Locations and unchanged historical coordinates. No Mini protocol or LifeSpace changes are required.
+- Validation: 34 targeted tests passed across deployment configuration, Location conversion, Mini Event CRUD/quick-create, recent places and map search. Live configuration correction and an authenticated Mini save still require the explicitly approved production release window above. Do not publish unrelated working-tree changes as part of this correction.

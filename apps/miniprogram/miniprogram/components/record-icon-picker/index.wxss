@@ -1,5 +1,5 @@
 /* Shared, compact Notion-inspired Icon picker for all Native Record editors. */
-.icon-trigger{width:72rpx;height:72rpx;flex:0 0 72rpx;border-radius:18rpx;display:flex;align-items:center;justify-content:center;background:var(--color-primary-tint,#e8f5ef);margin-right:18rpx}
+.icon-trigger{width:72rpx;height:72rpx;flex:0 0 72rpx;border-radius:18rpx;display:flex;align-items:center;justify-content:center;background:var(--color-primary-tint,#e8f5ef)}
 .icon-trigger:active{opacity:.78}
 .icon-disabled{opacity:.5}
 .trigger-emoji{font-size:44rpx;line-height:1}

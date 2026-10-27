@@ -123,7 +123,7 @@
       </view>
     </view>
 
-    <!-- 待办提醒 -->
+    <!-- 待办提醒（即使空也保留区块，仅隐藏内容区） -->
     <view class="card section">
       <view class="section-header" bindtap="onViewTasks">
         <text class="section-title">待办提醒</text>
@@ -165,12 +165,12 @@
         <view wx:if="{{pendingTaskMore > 0}}" class="task-more" bindtap="onViewTasks">
           <text class="task-more-text">还有 {{pendingTaskMore}} 条待办 ›</text>
         </view>
-      </view>
-      <view wx:elif="{{tasksError}}" class="thin-error" bindtap="onRetryTasks">
-        <text>更新失败，点击重试</text>
+        <view wx:elif="{{tasksError}}" class="thin-error" bindtap="onRetryTasks">
+          <text>更新失败，点击重试</text>
+        </view>
       </view>
       <view wx:else class="empty-hint">
-        <text class="empty-link" bindtap="onCreateTask">最近 3 天没有到期的待办 ＋ 添加待办</text>
+        <text class="empty-link" bindtap="onCreateTask">还没有待办 ＋ 添加待办</text>
       </view>
     </view>
 
@@ -179,25 +179,52 @@
       <text>关注信息更新失败，点击重试</text>
     </view>
 
-    <!-- 常用工具 -->
-    <view class="card section tools-section">
+    <!-- 生活进行时：个人习惯 + 家庭活动 / 目标（即使空也保留区块） -->
+    <view class="card section life-section">
       <view class="section-header">
-        <text class="section-title">常用工具</text>
+        <text class="section-title">生活进行时</text>
+        <text class="section-more" bindtap="onViewLife" aria-role="button">查看全部 ›</text>
       </view>
-      <view class="tools-row">
-        <view class="tool-card" bindtap="onViewDays">
-          <text class="tool-emoji">🗓️</text>
-          <view class="tool-body">
-            <text class="tool-title">日子</text>
-            <text class="tool-desc">记录倒计时与周期</text>
-          </view>
+      <view class="life-tabs">
+        <view wx:for="{{lifeTabs}}" wx:key="key" class="life-tab {{lifeTab === item.key ? 'life-tab-active' : ''}}"
+          data-kind="{{item.key}}" bindtap="onLifeTab" aria-role="button" aria-label="{{item.label}}">
+          <text>{{item.label}}</text>
+          <view wx:if="{{lifeErrors[item.key]}}" class="life-error-dot" />
         </view>
-        <view class="tool-card" bindtap="onViewWishes">
-          <text class="tool-emoji">🌟</text>
-          <view class="tool-body">
-            <text class="tool-title">许愿池</text>
-            <text class="tool-desc">看看家人的愿望</text>
+      </view>
+      <view wx:if="{{lifeLoading[lifeTab] && !lifeRecords[lifeTab].length}}" class="empty-hint">
+        <text class="empty-text">加载中...</text>
+      </view>
+      <view wx:elif="{{lifeErrors[lifeTab] && !lifeRecords[lifeTab].length}}" class="empty-hint" bindtap="onRetryLife" aria-role="button">
+        <text class="empty-text">加载失败，点击重试</text>
+      </view>
+      <view wx:elif="{{!lifeRecords[lifeTab].length}}" class="empty-hint">
+        <text class="empty-text">{{lifeTab === 'habits' ? '暂无进行中的本人习惯' : lifeTab === 'activities' ? '暂无进行中的活动' : '暂无进行中的目标'}}</text>
+      </view>
+      <view wx:else>
+        <view wx:for="{{lifeRecords[lifeTab]}}" wx:key="id" class="life-row" data-id="{{item.id}}" bindtap="onLifeRecordTap">
+          <view class="life-symbol">{{item.icon}}</view>
+          <view class="life-body">
+            <view class="life-name-row">
+              <text class="life-name">{{item.name}}</text>
+              <text wx:if="{{item.relatedToMe}}" class="life-personal-tag">{{lifeTab === 'activities' ? '我参与' : '与我相关'}}</text>
+            </view>
+            <text wx:if="{{lifeTab === 'habits'}}" class="life-meta">连续 {{item.streakDays}} 天</text>
+            <block wx:else>
+              <text class="life-meta">{{item.meta}}</text>
+              <text wx:if="{{item.peopleLabel}}" class="life-meta">{{item.peopleLabel}}</text>
+            </block>
           </view>
+          <button wx:if="{{lifeTab === 'habits'}}" class="life-check {{item.checkedInToday ? 'life-check-done' : ''}}"
+            data-id="{{item.id}}" catchtap="onHabitCheckIn" loading="{{item.checking}}"
+            disabled="{{!canCheckIn || !item.computed.checkIn || item.checkedInToday || item.checking}}"
+            aria-label="{{item.name}}，{{item.checkedInToday ? '今日已打卡' : '打卡'}}">
+            {{item.checkedInToday ? '今日已打卡' : '打卡'}}
+          </button>
+          <text wx:else class="life-chevron">›</text>
+        </view>
+        <view wx:if="{{lifeErrors[lifeTab]}}" class="thin-error" bindtap="onRetryLife" aria-role="button">
+          <text>更新失败，点击重试</text>
         </view>
       </view>
     </view>

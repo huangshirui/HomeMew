@@ -32,7 +32,7 @@ function relationDisplays(relations:DomainRelation[],direction:'incoming'|'outgo
 Page({
   data:{
     kind:'activities' as Kind, familyId:'', recordId:'',loading:true,busy:false,error:'',record:null as DomainRecord|null,
-    title:'',statusLabel:'',dateLabel:'',peopleLabel:'',icon:'',subjectOwner:false,canWrite:false,
+    navigationTitle:'详情',title:'',statusLabel:'',dateLabel:'',peopleLabel:'',icon:'',subjectOwner:false,canWrite:false,
     tabs:[] as {key:Tab;label:string}[],tab:'overview' as Tab,menuActions:[] as {key:string;title:string;danger:boolean}[],
     outgoing:[] as RelationDisplay[],incoming:[] as RelationDisplay[],nextOut:null as string|null,nextIn:null as string|null,
     relationLoading:false,relationError:'',checkIns:[] as CheckInHistory[],historyCursor:null as string|null,
@@ -49,7 +49,7 @@ Page({
   async onLoad(opts:{kind?:string;familyId?:string;id?:string}):Promise<void>{
     const kind=['activities','goals','habits'].includes(opts.kind||'')?opts.kind as Kind:'activities';
     const familyId=opts.familyId||currentFamilyStore.value?.id||'',recordId=opts.id||'';
-    this.setData({kind,familyId,recordId,title:DOMAIN_COPY[kind].title,
+    this.setData({kind,familyId,recordId,navigationTitle:DOMAIN_COPY[kind].title+'详情',title:DOMAIN_COPY[kind].title,
       tabs:kind==='activities'?[
         {key:'overview',label:'概览'},{key:'calendar',label:'日程'},{key:'tasks',label:'待办'},{key:'related',label:'更多'}]:
         kind==='goals'?[{key:'overview',label:'概览'},{key:'tasks',label:'行动计划'},{key:'related',label:'其他关联'}]:

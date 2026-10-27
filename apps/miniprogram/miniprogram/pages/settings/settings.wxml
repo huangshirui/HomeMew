@@ -2,6 +2,12 @@
 <view class="container">
   <nav-bar title="设置" showBack="true" />
 
+  <navigator class="card settings-link" url="/pages/profile-setup/profile-setup?mode=edit" hover-class="settings-link-active">
+    <user-avatar user-id="{{user.id}}" src="{{user.avatarUrl}}" size="{{88}}" alt="我的头像" />
+    <view class="profile-copy"><text class="settings-link-title">{{user.displayName || '个人资料'}}</text><text class="settings-link-desc">头像与昵称</text></view>
+    <text class="settings-link-arrow">›</text>
+  </navigator>
+
   <view class="section card account-section">
     <view class="section-header">
       <text class="section-title">账号与登录</text>
@@ -10,9 +16,10 @@
     <view wx:elif="{{!accountLoaded}}" class="settings-link">正在加载账号信息…</view>
     <block wx:else>
     <navigator wx:if="{{emailAvailable}}" class="settings-link" url="/pages/account-email/account-email" hover-class="settings-link-active">
-      <view><text class="settings-link-title">{{loginEmail ? '修改邮箱' : '绑定邮箱'}}</text><text class="settings-link-desc">{{loginEmail || '设置邮箱，让 Web 使用当前账号'}}{{linkStatus === 'pending' ? ' · 待 Web 登录验证' : ''}}</text></view><text class="settings-link-arrow">›</text>
+      <view><text class="settings-link-title">{{loginEmail ? '修改邮箱' : '绑定邮箱'}}</text>
+        <text class="settings-link-desc">{{loginEmail || '设置邮箱，让 Web 使用当前账号'}}{{linkStatus === 'pending' ? ' · 待 Web 登录验证' : ''}}</text></view><text class="settings-link-arrow">›</text>
     </navigator>
-    <view wx:else class="settings-link">邮箱设置暂不可用，可先使用一次性关联码</view>
+    <view wx:else class="settings-link"><view><text class="settings-link-title">邮箱绑定暂不可用</text><text class="settings-link-desc">可以先使用一次性关联码登录 Web</text></view></view>
     <navigator class="settings-link" url="/pages/account-link/account-link" hover-class="settings-link-active">
       <view>
         <text class="settings-link-title">使用一次性关联码</text>
@@ -62,6 +69,30 @@
     <!-- 当前生效提示 -->
     <view class="tz-current">
       <text class="tz-current-text">当前展示时区：{{displayTimeZone || '未指定'}}</text>
+    </view>
+  </view>
+
+  <view class="section card">
+    <view class="section-header">
+      <text class="section-title">首页数据范围</text>
+    </view>
+    <view class="mode-row">
+      <view
+        class="mode-item {{homeScope === 'me' ? 'mode-active' : ''}}"
+        bindtap="onHomeScopeChange"
+        data-scope="me"
+      >
+        <text class="mode-title">只看我的</text>
+        <text class="mode-desc">首页只展示与我自己相关的内容</text>
+      </view>
+      <view
+        class="mode-item {{homeScope === 'all' ? 'mode-active' : ''}}"
+        bindtap="onHomeScopeChange"
+        data-scope="all"
+      >
+        <text class="mode-title">看全家</text>
+        <text class="mode-desc">首页展示全家的日程、待办与动态</text>
+      </view>
     </view>
   </view>
 </view>

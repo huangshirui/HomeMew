@@ -21,12 +21,12 @@ const record = (familyId: string, dayRecordId: string) => `${collection(familyId
 export function listDayRecords(familyId: string, params: ListDayRecordsParams = {}): Promise<Page<DayRecord>> {
   return request(`${collection(familyId)}${productQuery(params)}`);
 }
-export async function listAttentionDayRecords(familyId: string, maxItems = 100): Promise<DayRecord[]> {
+export async function listAttentionDayRecords(familyId: string, subjectUserId?: string, maxItems = 100): Promise<DayRecord[]> {
   const items: DayRecord[] = [];
   let cursor: string | null = null;
   const seenCursors = new Set<string>();
   for (let page = 0; page < 10; page++) {
-    const result = await listDayRecords(familyId, { status: 'active', attentionOnly: true, sort: 'attention', limit: 50, cursor });
+    const result = await listDayRecords(familyId, { status: 'active', attentionOnly: true, sort: 'attention', limit: 50, cursor, ...(subjectUserId ? { subjectUserId } : {}) });
     items.push(...result.items);
     if (items.length >= maxItems) return items.slice(0, maxItems);
     cursor = result.nextCursor;

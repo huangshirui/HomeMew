@@ -1,0 +1,18 @@
+<view class="fd-view dashboard">
+  <view wx:if="{{loading}}" class="fd-view status">正在统计已筛选比赛…</view>
+  <view wx:elif="{{error}}" class="fd-view status error"><text class="fd-text">{{error}}</text><button class="fd-button" bindtap="onRetry" aria-label="重试统计"><lucide-icon name="refresh-cw" size="17" color="#047857"/><text class="fd-text">重试</text></button></view>
+  <block wx:else>
+    <view class="fd-view panel"><view class="fd-view heading">总体数据</view><view class="fd-view caption">当前筛选范围内的比赛</view>
+      <view class="fd-view metrics"><view class="fd-view metric"><text class="fd-text">参赛场次</text><view class="fd-view"><text class="fd-text value">{{matchCount}}</text><text class="fd-text unit">场</text></view></view><view class="fd-view metric"><text class="fd-text">胜率</text><view class="fd-view"><text class="fd-text value">{{winRate}}</text></view><text class="fd-text hint">{{scoreCoverage}}</text></view><view class="fd-view metric"><text class="fd-text">进球</text><view class="fd-view"><text class="fd-text value">{{goalCount}}</text><text class="fd-text unit">球</text></view></view><view class="fd-view metric"><text class="fd-text">助攻</text><view class="fd-view"><text class="fd-text value">{{assistCount}}</text><text class="fd-text unit">次</text></view></view><view class="fd-view metric wide"><text class="fd-text">比赛时间</text><view class="fd-view"><text class="fd-text value">{{minutes}}</text><text class="fd-text unit">分钟</text></view><text class="fd-text hint">{{coverage}}</text></view></view>
+      <view class="fd-view caption">比赛时间只统计填写了出场时长的比赛；未填写的内容不计入统计。</view>
+    </view>
+    <view class="fd-view panel"><view class="fd-view heading">专项趋势</view><view class="fd-view caption">按自然月分组 · 场均按该月实际参赛场次计算</view>
+      <view class="fd-view trend-tabs"><button wx:for="{{trends}}" wx:key="key" class="fd-button {{trend===item.key?'selected':''}}" data-key="{{item.key}}" bindtap="onTrend">{{item.name}}</button></view>
+      <view class="fd-view legend"><text class="fd-text series-a">{{activeTrend.labelA}}</text><text class="fd-text series-b">{{activeTrend.labelB}}</text><text class="fd-text">{{activeTrend.unit}}</text></view>
+      <view wx:if="{{!months.length}}" class="fd-view status">该球员暂无比赛统计</view>
+      <scroll-view wx:else scroll-x class="fd-scroll-view chart" show-scrollbar="{{false}}"><view class="fd-view plot" style="width:{{chartWidth}}px;background-image:{{chartBackground}};" aria-label="自然月表现折线与参赛场次柱状图"/></scroll-view>
+      <view wx:if="{{months.length}}" class="fd-view data-details"><text class="fd-text">月度数据</text><scroll-view class="fd-scroll-view" scroll-x show-scrollbar="{{false}}"><view class="fd-view month-values"><view class="fd-view" wx:for="{{months}}" wx:key="month"><text class="fd-text">{{item.month}}</text><text class="fd-text">{{item.first}} / {{item.second}}</text><text class="fd-text">{{item.matches}} 场</text></view></view></scroll-view></view>
+      <view class="fd-view caption">根据已记录表现计算。缺失时长显示“—”，不推断为 0；同一批完整时长比赛用于计算时间效率。</view>
+    </view>
+  </block>
+</view>

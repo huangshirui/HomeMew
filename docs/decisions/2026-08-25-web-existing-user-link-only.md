@@ -39,3 +39,7 @@ LifeSpace is expected to support user merge as a future platform capability so a
 - Keep `/api/access/link-challenge` and Mini Program confirmation as the only HomeMew Web first-link flow.
 - Update tests so registration is explicitly unavailable and link-challenge origin/security checks remain covered.
 - Do not remove LifeSpace's platform registration contract as part of this HomeMew change.
+
+## 2026-10-25 amendment
+
+The accepted Mini 2.0 navigation/email decision extends code-only first-link behavior with an explicit user-authorized Web mailbox. Cloudflare Access still verifies Web login; no application email OTP is sent. Unknown users are never auto-created and principals are never silently merged. See `2026-10-25-miniprogram-2-navigation-email.md`. Pending platform rollout.

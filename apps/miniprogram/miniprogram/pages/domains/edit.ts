@@ -3,6 +3,7 @@ import { currentFamilyStore } from '../../stores/index';
 import { getDomainRecord,createDomainRecord,updateDomainRecord,deleteDomainRecord,listDomainPeople,DOMAIN_COPY,type DomainKind,type DomainRecord,type PersonOption } from '../../services/domains';
 import { originalIconState,prepareRecordIcon,pickerChangeState,type RecordIconPickerChange } from '../../utils/record-icon-edit';
 import { downloadRecordIconImage } from '../../services/record-icons';
+import { shiftDateEndWithStart } from '../../utils/event-time-shift';
 
 type Kind='activities'|'goals'|'habits'|'anniversaries';
 const KINDS:Kind[]=['activities','goals','habits','anniversaries'];
@@ -56,7 +57,11 @@ Page({
   },
   onDateChange(e:WechatMiniprogram.PickerChange):void{
     const name=String(e.currentTarget.dataset.name||'');
-    if(['startDate','endDate','targetDate'].includes(name))this.setData({[name]:String(e.detail.value)});
+    const value=String(e.detail.value);
+    if(name==='startDate'&&(this.data.kind==='activities'||this.data.kind==='goals')){
+      const endField=this.data.kind==='activities'?'endDate':'targetDate';
+      this.setData({startDate:value,[endField]:shiftDateEndWithStart(this.data.startDate,this.data[endField],value)});
+    }else if(['endDate','targetDate'].includes(name))this.setData({[name]:value});
   },
   onTogglePerson(e:WechatMiniprogram.TouchEvent):void{
     if(this.data.kind==='habits'&&this.data.recordId)return;

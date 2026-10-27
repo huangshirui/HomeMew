@@ -5,31 +5,26 @@
     <view wx:if="{{error}}" class="thin-error">{{error}}</view>
     <block wx:if="{{kind==='team'}}">
       <view class="card">
-        <view class="team-name-row">
-          <record-icon-picker emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{saving}}" bind:change="onRecordIconChange"/>
-          <input placeholder="球队名称" class="football-input" value="{{name}}" data-name="name" bindinput="onValue"/>
+        <view class="record-title-field">
+          <text class="record-title-label">球队名称</text>
+          <view class="record-title-row">
+            <record-icon-picker class="record-title-picker" emoji="{{iconEmoji}}" image-path="{{iconImagePath}}" image-file-id="{{iconFileId}}" disabled="{{saving}}" bind:change="onRecordIconChange"/>
+            <input placeholder="球队名称" class="record-title-input" value="{{name}}" data-name="name" bindinput="onValue"/>
+          </view>
         </view>
         <textarea placeholder="球队说明（可选）" class="football-notes" value="{{description}}" data-name="description" bindinput="onValue"/>
       </view>
     </block>
     <view wx:else class="card">
-      <picker mode="date" value="{{matchDate}}" bindchange="onDate"><view class="football-field">比赛日期 <text>{{matchDate}} ›</text></view></picker>
+      <picker mode="date" value="{{matchDate}}" bindchange="onDate"><view class="football-field">比赛日期 <view class="football-field-value"><text>{{matchDate}}</text><lucide-icon name="chevron-down" size="16" color="#78716c"/></view></view></picker>
       <picker mode="selector" range="{{matchTypes}}" range-key="name" value="{{matchTypeIndex}}" bindchange="onMatchType">
-        <view class="football-field">比赛类型 <text>{{matchTypes[matchTypeIndex].name}} ▾</text></view>
+        <view class="football-field">比赛类型 <view class="football-field-value"><text>{{matchTypes[matchTypeIndex].name}}</text><lucide-icon name="chevron-down" size="16" color="#78716c"/></view></view>
       </picker>
-      <view class="football-field">
-        <input value="{{teamSearch}}" data-name="teamSearch" bindinput="onValue" placeholder="按球队名称搜索"/>
-        <text class="action-link" bindtap="onTeamSearch">查找</text>
+      <view class="football-editor-references">
+        <football-reference-field label="赛事" kind="competition" family-id="{{familyId}}" user-id="{{userId}}" value="{{competitionActivityId}}" placeholder="未指定赛事" allow-create="{{true}}" disabled="{{saving}}" data-key="competitionActivityId" bind:select="onReferenceSelect"/>
+        <football-reference-field label="代表球队" kind="team" family-id="{{familyId}}" user-id="{{userId}}" value="{{representativeTeamId}}" allow-create="{{true}}" disabled="{{saving}}" data-key="representativeTeamId" bind:select="onReferenceSelect"/>
+        <football-reference-field label="对手球队" kind="team" family-id="{{familyId}}" user-id="{{userId}}" value="{{opponentTeamId}}" allow-create="{{true}}" disabled="{{saving}}" data-key="opponentTeamId" bind:select="onReferenceSelect"/>
       </view>
-      <picker mode="selector" range="{{teams}}" range-key="name" value="{{representativeTeamIndex}}" data-key="representative" bindchange="onTeamPicker">
-        <view class="football-field">代表球队 <text>{{teams[representativeTeamIndex].name||'请选择'}} ▾</text></view>
-      </picker>
-      <picker mode="selector" range="{{teams}}" range-key="name" value="{{opponentTeamIndex}}" data-key="opponent" bindchange="onTeamPicker">
-        <view class="football-field">对方球队 <text>{{teams[opponentTeamIndex].name||'请选择'}} ▾</text></view>
-      </picker>
-      <picker mode="selector" range="{{competition}}" range-key="name" value="{{competitionIndex}}" bindchange="onCompetition">
-        <view class="football-field">赛事 <text>{{competition[competitionIndex].name||'未指定'}} ▾</text></view>
-      </picker>
       <view class="football-field">代表球队得分<input type="number" placeholder="未录入" value="{{representativeTeamScore}}" data-name="representativeTeamScore" bindinput="onValue"/></view>
       <view class="football-field">对方球队得分<input type="number" placeholder="未录入" value="{{opponentTeamScore}}" data-name="opponentTeamScore" bindinput="onValue"/></view>
       <textarea class="football-notes" placeholder="比赛备注（可选）" value="{{notes}}" data-name="notes" bindinput="onValue"/>
@@ -38,15 +33,16 @@
       <view class="football-section-title">{{kind==='team'?'球队球员':'参赛球员'}} <text>可多选</text></view>
       <view class="football-find">
         <input value="{{personSearch}}" data-name="personSearch" bindinput="onValue" placeholder="搜索家庭或其他球员"/>
-        <text bindtap="onPeopleSearch">搜索</text>
-        <text bindtap="onAddPerson">＋ 新球员</text>
+        <button class="football-icon-button" bindtap="onPeopleSearch" aria-label="搜索球员"><lucide-icon name="search" size="18" color="#57534e"/></button>
+        <button wx:if="{{personCanCreate}}" class="football-icon-button" bindtap="onAddPerson" aria-label="新建球员"><lucide-icon name="plus" size="18" color="#047857"/></button>
       </view>
+      <view wx:if="{{kind==='team'}}" class="football-help">移出球队不会删除球员档案或比赛记录。</view>
       <view class="football-people">
-        <view wx:for="{{people}}" wx:key="id" class="football-person {{item.selected?'selected':''}}" data-id="{{item.id}}" bindtap="onPersonToggle">{{item.selected?'✓ ':''}}{{item.displayName}}</view>
+        <view wx:for="{{people}}" wx:key="id" class="football-person {{item.selected?'selected':''}}" data-id="{{item.id}}" bindtap="onPersonToggle"><lucide-icon wx:if="{{item.selected}}" name="check" size="15" color="#047857"/><text>{{item.displayName}}</text></view>
       </view>
       <view wx:if="{{peopleCursor}}" class="more-people" bindtap="onMorePeople">加载更多球员</view>
     </view>
-    <button class="btn-primary" disabled="{{saving}}" loading="{{saving}}" bindtap="onSubmit">保存{{kind==='team'?'球队':'比赛'}}</button>
-    <view wx:if="{{recordId}}" class="football-delete" bindtap="onDelete">删除{{kind==='team'?'球队':'比赛'}}</view>
+    <button class="btn-primary football-save" disabled="{{saving}}" loading="{{saving}}" bindtap="onSubmit">保存{{kind==='team'?'球队':'比赛'}}</button>
+    <button wx:if="{{recordId}}" class="football-delete" bindtap="onDelete" disabled="{{saving}}"><lucide-icon name="trash-2" size="17" color="#b91c1c"/><text>删除{{kind==='team'?'球队':'比赛'}}</text></button>
   </block>
 </view>

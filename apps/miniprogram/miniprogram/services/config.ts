@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
   timeZoneMode: 'timeZoneMode',
   timeZoneCustom: 'timeZoneCustom',
   homeCache: 'homeCacheV1',
+  homeScope: 'homeScope',
 } as const;
 
 export const REQUEST_TIMEOUT = 15000;

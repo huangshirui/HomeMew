@@ -113,7 +113,7 @@ The Mini Program has no application-level Logo/splash routing page. `pages/home/
 
 `App.onShow` starts runtime preparation in parallel with the requested page. Short-lived token expiry is never modeled as a user-visible login state: all callers share one in-flight `wx.login() -> HomeMew backend -> LifeSpace token exchange` operation. User/profile and accessible-family initialization is also single-flighted so the App coordinator and the target page do not duplicate startup requests.
 
-A first-seen WeChat identity is created immediately as a usable LifeSpace user with a HomeMew-assigned placeholder display name (`微信用户xxxxxx`). A missing uploaded avatar is presented with the Mini Program's local default avatar. First entry is never blocked on profile editing: the requested business page remains visible and usable, including deep links. The user may later open “我的 → 编辑资料” to replace the nickname or avatar; a saved nickname must remain non-empty, while avatar customization is optional. Disabled accounts still use the dedicated disabled-state page; ordinary network/service failures stay on the requested page and use that page's retry/error UI.
+A first-seen WeChat identity is created immediately as a usable LifeSpace user with a HomeMew-assigned placeholder display name (`微信用户xxxxxx`). A missing uploaded avatar is presented with the Mini Program's local default avatar. First entry is never blocked on profile editing: the requested business page remains visible and usable, including deep links. The user may later open “更多 → 设置 → 个人资料” to replace the nickname or avatar; a saved nickname must remain non-empty, while avatar customization is optional. Disabled accounts still use the dedicated disabled-state page; ordinary network/service failures stay on the requested page and use that page's retry/error UI.
 
 Non-idempotent writes are never blindly replayed after a 401. The client may silently refresh credentials so the next explicit user retry uses a fresh token.
 
@@ -193,6 +193,8 @@ The HomeMew Family Catalog is the sole product-classification authority for fami
 HomeMew's eight-active-member limit is enforced only on HomeMew membership-join flows. A `FamilyJoinCoordinator` Durable Object is keyed by LifeSpace `spc_*` and serializes invite revalidation, current LifeSpace membership count, and the final LifeSpace join call. It does not persist membership truth. LifeSpace remains authoritative for membership and permission; other generic LifeSpace Spaces are not subject to this product limit.
 
 ## 7. Normal Mini Program requests
+
+The Mini Home `生活进行时` section is a transient projection of the existing product routes for personal active Habits, current Activities and active Goals. It uses verified user-to-Space-Person mapping for personal presentation; LifeSpace still authorizes reads and check-in Actions. Existing cursor pages are traversed when owner filtering or summary ordering requires it; no new persistence or server endpoint is introduced. See `docs/decisions/2026-10-26-miniprogram-home-life.md`.
 
 ```text
 Mini Program
@@ -373,14 +375,14 @@ Detailed decision: `docs/decisions/2026-10-09-external-system-capability-contain
 
 If HomeMew discovers a missing platform capability, finish independent HomeMew work and document the gap. Any LifeSpace repository modification requires explicit user approval first and must then follow LifeSpace's own `AGENTS.md`.
 
+## Mini 2.0 Web mailbox authorization
 
-## Explicit Web mailbox authorization rollout
+Accepted decision: `docs/decisions/2026-10-25-miniprogram-2-navigation-email.md`. LifeSpace Identity owns explicit application-scoped mailbox login authorization. Access proves the actual Web identity; no application email OTP is sent. HomeMew forwards fixed GET/PATCH me/web-login operations and revalidates cached Web sessions through Identity before reuse. This extends code-only onboarding without Web account creation or implicit merge. Pending deployment.
+## Canonical Event Location after cutover
 
-Accepted decision: `docs/decisions/2026-10-25-miniprogram-2-navigation-email.md`. Identity 0.13/schema 12 owns authenticated Application-scoped mailbox consent and audit. Fixed Mini GET/PATCH `/api/v1/miniprogram/me/web-login` forwards to Identity; cached Web sessions revalidate via `/internal/v1/access/session-check`. No HomeMew mailbox persistence or email OTP. Release Identity Staging first, then Web Preview acceptance, then Identity Production and Web Production. Mini upload is separate. Tracking: HomeMew #153 / LifeSpace #408.
-
-Production preservation: the accepted 2026-10-26 canonical Event Location decision is binding. The mailbox release retains the already-active Location adapter and does not restore its retired upstream format switch.
+LifeSpace Production now owns canonical Event Location objects. Web and Mini BFF always lower text labels to `{name}` and preserve validated explicit addresses/coordinates. The upstream-format switch and old string write path are retired; stable Mini `location`/`locationDetail` DTOs remain supported. See `docs/decisions/2026-10-26-canonical-event-location.md`.
 
 
-## 2026-10-26: unified Access account linking
+## 2026-10-26 unified Access link correction
 
 The accepted correction in `docs/decisions/2026-10-26-unified-access-account-link.md` supersedes the independent mailbox-authorization design. Email entry and one-time code confirmation bind the same existing LifeSpace user through the stable HomeMew Mini BFF, while the currently deployed LifeSpace Identity 0.15/schema 14 owns a LifeSpace-global login mailbox reservation and separate verified Access principal links. Pending email is not proof; Access independently verifies the claim before the Web session can use it. Other independently linked identities and the usr_* identity remain intact when a mailbox changes. Mini settings retain the existing pending/linked status and link-code alternative. HomeMew stores no identity authority. The 0.14/schema 13 description in the original accepted decision is historical; see the 2026-10-26 Identity 0.15 consumer compatibility addendum. HomeMew Web/Backend releases and Mini distribution remain independently gated; an Identity Production deployment is not a HomeMew production rollout.

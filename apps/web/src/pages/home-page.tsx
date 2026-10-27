@@ -7,11 +7,12 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { ApiError, apiRequest } from '../lib/api-client';
 import { queryModelRecords } from '../lib/canonical-query';
+import { eventLocationLabel, type EventLocation } from '../lib/location-value';
 
 type TemporalRange =
   | { kind: 'date'; start: string; endExclusive: string }
   | { kind: 'instant'; start: string; endExclusive: string };
-type EventRecord = { id: string; summary: string; location: string | null; when: TemporalRange; attendeePersonIds: string[]; version: number };
+type EventRecord = { id: string; summary: string; location: EventLocation; when: TemporalRange; attendeePersonIds: string[]; version: number };
 type TaskRecord = { id: string; name: string; dueDate: string | null; assigneePersonIds: string[]; version: number };
 type DayRecord = { id: string; name: string; kind: 'elapsed' | 'countdown' | 'cycle'; icon: string | null; computed?: { temporal?: { elapsedDays?: number; remainingDays?: number | null; nextDueDate?: string; isAttentionRequired: boolean } } };
 type List<T> = { items: T[]; nextCursor: string | null };
@@ -117,7 +118,7 @@ export function HomePage() {
         {events.length ? events.slice(0, 8).map((event) => {
           const time = event.when.kind === 'date' ? '全天' : dateParts(new Date(event.when.start), currentFamily.timezone).time;
           const people = event.attendeePersonIds.map(memberName).filter(Boolean).join('、');
-          const meta = [event.location, people].filter(Boolean).join(' · ');
+          const meta = [eventLocationLabel(event.location), people].filter(Boolean).join(' · ');
           return <div key={event.id} className="grid grid-cols-[54px_10px_1fr] items-start gap-3 rounded-2xl px-2 py-3"><span className="pt-0.5 text-sm font-semibold tabular-nums text-stone-500">{time}</span><span className="mt-1.5 size-2.5 rounded-full bg-emerald-500" /><div><p className="text-sm font-semibold text-stone-900">{event.summary}</p>{meta ? <p className="mt-1 text-xs text-stone-400">{meta}</p> : null}</div></div>;
         }) : <p className="px-2 py-8 text-center text-sm text-stone-400">今天没有日程。</p>}
       </CardContent></Card>

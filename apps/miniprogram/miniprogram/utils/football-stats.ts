@@ -5,12 +5,12 @@ export type MonthMetric={month:string;matches:number;goals:number;assists:number
 export type FootballSummary={matches:number;scoredMatches:number;wins:number;winRate:number|null;
   goals:number;assists:number;completeMinutesMatches:number;knownMinutes:number;months:MonthMetric[]};
 export function aggregateFootball(matches:Match[],events:Performance[],playerId:string):FootballSummary{
-  const played=matches.filter(m=>m.playerPersonIds?.includes(playerId));
+  const played=[...new Map(matches.filter(m=>m.playerPersonIds?.includes(playerId)&&/^\d{4}-(0[1-9]|1[0-2])$/.test(m.matchDate.slice(0,7))).map(m=>[m.id,m])).values()];
   const playedMap=new Map(played.map(m=>[m.id,m]));
   const months=new Map<string,MonthMetric>();
   let scoredMatches=0,wins=0;
   for(const m of played){
-    if(typeof m.representativeTeamScore==='number'&&typeof m.opponentTeamScore==='number'){
+    if(typeof m.representativeTeamScore==='number'&&typeof m.opponentTeamScore==='number'&&Number.isInteger(m.representativeTeamScore)&&Number.isInteger(m.opponentTeamScore)&&m.representativeTeamScore>=0&&m.opponentTeamScore>=0){
       scoredMatches++;if(m.representativeTeamScore>m.opponentTeamScore)wins++;
     }
     const key=m.matchDate.slice(0,7);
@@ -37,6 +37,15 @@ export function aggregateFootball(matches:Match[],events:Performance[],playerId:
     if(e.performanceType==='assist'){bucket.assists++;if(fullyTimed.has(e.matchId))bucket.timedAssists++;}
     if(e.performanceType==='tackle')bucket.tackles++;
     if(e.performanceType==='interception')bucket.interceptions++;
+  }
+  const keys=[...months.keys()].sort();
+  if(keys.length){
+    const index=(key:string)=>Number(key.slice(0,4))*12+Number(key.slice(5,7))-1;
+    const start=index(keys[0]),end=index(keys[keys.length-1]);
+    if(end-start<240)for(let i=start;i<=end;i++){
+      const month=String(Math.floor(i/12)).padStart(4,'0')+'-'+String(i%12+1).padStart(2,'0');
+      if(!months.has(month))months.set(month,{month,matches:0,goals:0,assists:0,tackles:0,interceptions:0,minutes:0,completeMinutesMatches:0,timedGoals:0,timedAssists:0});
+    }
   }
   const items=[...months.values()].sort((a,b)=>a.month.localeCompare(b.month));
   return{matches:played.length,scoredMatches,wins,winRate:scoredMatches?wins/scoredMatches:null,

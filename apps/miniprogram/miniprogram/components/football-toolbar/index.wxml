@@ -1,0 +1,19 @@
+<view class="ft-view toolbar">
+  <view class="ft-view toolbar-main">
+    <view class="ft-view tabs">
+      <button class="ft-button tab {{mode==='record'?'active':''}}" data-mode="record" bindtap="onMode" aria-label="记录" aria-role="tab" aria-selected="{{mode==='record'}}"><lucide-icon name="calendar-days" size="16" color="{{mode==='record'?'#ffffff':'#57534e'}}"/><text class="ft-text">记录</text></button>
+      <button class="ft-button tab {{mode==='stats'?'active':''}}" data-mode="stats" bindtap="onMode" aria-label="统计" aria-role="tab" aria-selected="{{mode==='stats'}}"><lucide-icon name="bar-chart-3" size="16" color="{{mode==='stats'?'#ffffff':'#57534e'}}"/><text class="ft-text">统计</text></button>
+    </view>
+    <view class="ft-view actions">
+      <button class="ft-button icon-button {{filterOpen||hasFilters?'filter-active':''}}" data-action="filter" bindtap="onAction" aria-label="搜索与筛选" aria-expanded="{{filterOpen}}"><lucide-icon name="sliders-horizontal" size="18" color="#57534e"/><view wx:if="{{hasFilters}}" class="ft-view filter-dot"/></button>
+      <button wx:if="{{mode==='record'}}" class="ft-button icon-button primary" data-action="create" bindtap="onAction" aria-label="新建比赛"><lucide-icon name="plus" size="21" color="#ffffff"/></button>
+    </view>
+  </view>
+  <view class="ft-view toolbar-context">
+    <picker class="player-picker" mode="selector" range="{{people}}" range-key="label" value="{{personIndex}}" bindchange="onPerson" disabled="{{!people.length}}">
+      <view class="ft-view player"><text class="ft-text player-label">球员</text><text class="ft-text player-name">{{people[personIndex].label||'暂无家庭球员'}}</text><lucide-icon name="chevron-down" size="15" color="#78716c"/></view>
+    </picker>
+    <button class="ft-button context-action" data-action="manage" bindtap="onAction" aria-label="管理球队与球员"><lucide-icon name="shield" size="17" color="#57534e"/><text class="ft-text">管理</text></button>
+    <button class="ft-button context-action" data-action="activities" bindtap="onAction" aria-label="活动与赛事"><lucide-icon name="calendar-days" size="17" color="#57534e"/><text class="ft-text">活动</text></button>
+  </view>
+</view>

@@ -1,7 +1,8 @@
-import { currentFamilyStore } from '../../stores/index';
+import { currentFamilyStore, userStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { listDomainPeople, listDomainRecords, DOMAIN_COPY, STATUS_COPY, type DomainKind, type DomainRecord, type DomainStatus, type PersonOption } from '../../services/domains';
 import { formatInstantInTimeZone } from '../../utils/index';
+import { listPersonalHabitPage } from '../../services/life-records';
 
 type Kind = 'activities' | 'goals' | 'habits' | 'anniversaries';
 type Display = DomainRecord & { icon: string; people: string; dates: string; statusLabel: string };
@@ -25,16 +26,18 @@ Page({
     records:[] as Display[],nextCursor:null as string|null,noFamily:false,
     filters:[] as {key:string;label:string}[],filter:'current',searchOpen:false,search:'',appliedSearch:'',
     people:[] as PersonOption[],personId:'',personOptions:[] as {id:string;label:string}[],selectedPersonIndex:0,
+    mine:false,
   },
   _generation:0,
-  onLoad(options:{kind?:string}):void {
+  onLoad(options:{kind?:string;mine?:string}):void {
     const kind=KINDS.includes(options.kind as Kind) ? options.kind as Kind : 'activities';
     const filters = kind==='activities' ? [
       {key:'current',label:'当前'},{key:'upcoming',label:'即将开始'},{key:'past',label:'已结束'},{key:'all',label:'全部'}]
       : kind==='anniversaries' ? [] : kind==='goals' ? [
         {key:'active',label:'进行中'},{key:'paused',label:'已暂停'},{key:'achieved',label:'已达成'},{key:'abandoned',label:'已放弃'}]
         : [{key:'active',label:'进行中'},{key:'paused',label:'已暂停'},{key:'ended',label:'已结束'}];
-    this.setData({kind,title:DOMAIN_COPY[kind].title,filters,filter:kind==='activities'?'current':'active'});
+    const mine=kind==='habits'&&options.mine==='1';
+    this.setData({kind,mine,title:mine?'我的习惯':DOMAIN_COPY[kind].title,filters,filter:kind==='activities'?'current':'active'});
   },
   async onShow():Promise<void> {
     try { await ensureRuntimeReady(); } catch {}
@@ -51,11 +54,15 @@ Page({
     try {
       const members=reset ? await listDomainPeople(familyId) : this.data.people;
       const now=localToday(currentFamilyStore.value?.timezone||'Asia/Shanghai');
-      const page=await listDomainRecords(familyId,kind,{
+      const options={
         limit:40,cursor,q:this.data.appliedSearch,
         ...(kind==='activities'?{period:this.data.filter as 'current',today:now,personId:this.data.personId}:
           kind==='goals'||kind==='habits'?{status:this.data.filter as DomainStatus}:{}),
-      });
+      };
+      const page=this.data.mine
+        ? await listPersonalHabitPage(familyId,members.find(p=>p.userId===userStore.value?.id)?.personId||'',options,
+          ()=>generation===this._generation&&this.data.familyId===familyId)
+        : await listDomainRecords(familyId,kind,options);
       if(generation!==this._generation || this.data.familyId!==familyId)return;
       const items=page.items.map(record=>formatted(record,members,kind));
       const records=reset?items:[...this.data.records,...items.filter(x=>!this.data.records.some(prev=>prev.id===x.id))];

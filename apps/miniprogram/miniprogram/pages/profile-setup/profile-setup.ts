@@ -132,7 +132,7 @@ Page({
       setTimeout(() => {
         wx.navigateBack({
           delta: 1,
-          fail: () => wx.switchTab({ url: '/pages/profile/profile' }),
+          fail: () => wx.switchTab({ url: '/pages/more/more' }),
         });
       }, 600);
     } catch (error: unknown) {

@@ -56,28 +56,20 @@
           </view>
         </view>
         <view class="empty-hint">
-          <text class="empty-link sk-transparent sk-text-16-6667-709 sk-text" style="background-position-x: 50%;">最近 3 天没有到期的待办 ＋ 添加待办</text>
+          <text class="empty-text sk-transparent sk-text-16-6667-709 sk-text" style="background-position-x: 50%;">正在加载待办提醒</text>
         </view>
       </view>
-      <view class="card section tools-section">
+      <view class="card section life-section">
         <view class="section-header">
-          <text class="section-title sk-transparent sk-text-16-6667-337 sk-text">常用工具</text>
+          <text class="section-title sk-transparent sk-text-16-6667-337 sk-text">生活进行时</text>
         </view>
-        <view class="tools-row">
-          <view class="tool-card">
-            <text class="tool-emoji sk-transparent sk-text-16-6667-408 sk-text">🗓️</text>
-            <view class="tool-body">
-              <text class="tool-title sk-transparent sk-text-16-6667-497 sk-text">日子</text>
-              <text class="tool-desc sk-transparent sk-text-16-6667-439 sk-text">记录倒计时与周期</text>
-            </view>
-          </view>
-          <view class="tool-card">
-            <text class="tool-emoji sk-transparent sk-text-16-6667-207 sk-text">🌟</text>
-            <view class="tool-body">
-              <text class="tool-title sk-transparent sk-text-16-6667-612 sk-text">许愿池</text>
-              <text class="tool-desc sk-transparent sk-text-16-6667-32 sk-text">看看家人的愿望</text>
-            </view>
-          </view>
+        <view class="life-tabs">
+          <text class="life-tab sk-transparent sk-text">我的习惯</text>
+          <text class="life-tab sk-transparent sk-text">活动</text>
+          <text class="life-tab sk-transparent sk-text">目标</text>
+        </view>
+        <view class="empty-hint">
+          <text class="empty-text sk-transparent sk-text">正在加载生活进行时</text>
         </view>
       </view>
     </view>

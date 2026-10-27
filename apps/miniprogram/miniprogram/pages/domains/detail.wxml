@@ -1,5 +1,5 @@
 <view class="container workspace">
-  <nav-bar title="{{title}}" showBack="true" />
+  <nav-bar title="{{navigationTitle}}" showBack="{{true}}" />
   <view wx:if="{{loading}}" class="loading-state"><text class="loading-text">正在加载详情…</text></view>
   <view wx:elif="{{error && !record}}" class="load-error-state">
     <text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onRetry">重新加载</button>

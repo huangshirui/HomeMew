@@ -1,1 +1,10 @@
-{"navigationStyle":"custom","usingComponents":{}}
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "lucide-icon": "/components/lucide-icon/index",
+    "football-record-icon": "/components/football-record-icon/index",
+    "football-toolbar": "/components/football-toolbar/index",
+    "football-dashboard": "/components/football-dashboard/index",
+    "football-reference-field": "/components/football-reference-field/index"
+  }
+}

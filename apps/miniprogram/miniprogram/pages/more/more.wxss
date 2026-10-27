@@ -1,1 +1,12 @@
-.more-page{padding-top:0}.family-header{display:flex;align-items:center;padding:24rpx;gap:20rpx}.family-symbol{height:80rpx;width:80rpx;background:#eaf5eb;border-radius:24rpx;display:flex;align-items:center;justify-content:center;font-size:38rpx}.family-info{flex:1;min-width:0}.family-name{font-size:32rpx;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.family-subtitle{font-size:23rpx;color:var(--color-text-secondary)}.family-next{color:#a5b1a7;font-size:32rpx}.more-group{margin-top:28rpx}.more-group-label{font-size:27rpx;font-weight:600;margin-bottom:16rpx;color:#607269;padding-left:6rpx}.tile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18rpx}.more-tile{background:#fff;border-radius:25rpx;display:flex;min-width:0;flex-direction:column;align-items:center;justify-content:center;padding:25rpx 6rpx 21rpx;box-shadow:0 4rpx 14rpx rgba(67,160,71,.045)}.tile-icon{width:79rpx;height:79rpx;display:flex;justify-content:center;align-items:center;background:#f0f7f1;border-radius:24rpx;font-size:40rpx;margin-bottom:12rpx}.tile-name{font-size:25rpx;color:#2c3f32;text-align:center}.account-link{display:flex;align-items:center;gap:15rpx;padding:24rpx;margin-top:28rpx;margin-bottom:30rpx;border-top:1rpx solid #e2ebe3;color:#6d7b71;font-size:25rpx}.account-link text:nth-child(2){flex:1}.account-link text:last-child{font-size:32rpx;color:#a3b1a5}
+.entry-hover { opacity: .65; }
+.load-error { padding: 20rpx; color: var(--color-danger); font-size: 25rpx; text-align: center; }
+.more-group { margin-top: 28rpx; }
+.more-group-label { font-size: 27rpx; font-weight: 600; margin-bottom: 16rpx; color: #607269; padding-left: 6rpx; }
+.tile-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18rpx; }
+.more-tile { background: var(--color-card); border-radius: 26rpx; display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; padding: 25rpx 6rpx 21rpx; box-shadow: 0 4rpx 16rpx rgba(67,160,71,.06); }
+.tile-icon { width: 79rpx; height: 79rpx; display: flex; justify-content: center; align-items: center; background: var(--color-bg); border-radius: 24rpx; font-size: 40rpx; margin-bottom: 12rpx; }
+.tile-name { font-size: 25rpx; color: #2c3f32; text-align: center; }
+
+.first-group { margin-top: 0; }
+.brand-icon { width: 64rpx; height: 64rpx; }
+.tile-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -85,3 +85,24 @@
 .menu-item-danger .arrow {
   color: #cccccc;
 }
+
+.family-sheet-layer { position: fixed; inset: 0; z-index: 100; }
+.family-sheet-mask { position: absolute; inset: 0; background: rgba(0,0,0,.45); animation: family-mask-in .2s ease-out; }
+.family-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: var(--color-card); border-radius: 32rpx 32rpx 0 0; padding: 0 32rpx calc(24rpx + env(safe-area-inset-bottom)); max-height: 75vh; box-sizing: border-box; animation: family-sheet-in .24s ease-out; }
+.family-sheet-header { padding: 16rpx 0 24rpx; text-align: center; }
+.family-sheet-handle { width: 64rpx; height: 8rpx; background: var(--color-border); border-radius: 8rpx; margin: 0 auto 24rpx; }
+.family-sheet-title { font-size: 32rpx; font-weight: 600; }
+.family-sheet-list { max-height: 50vh; }
+.family-choice { display: flex; align-items: center; gap: 20rpx; padding: 20rpx 16rpx; height: 120rpx; box-sizing: border-box; border-radius: 18rpx; }
+.family-choice-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 30rpx; }
+.family-choice-current, .family-choice-hover { background: var(--color-primary-tint); }
+.family-choice-check { flex-shrink: 0; color: var(--color-primary); font-size: 25rpx; }
+.family-sheet-cancel { margin-top: 24rpx; background: var(--color-bg); color: var(--color-text-secondary); border-radius: 20rpx; font-size: 28rpx; }
+.family-sheet-cancel::after { border: none; }
+@keyframes family-mask-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes family-sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.action-link { margin-top: 18rpx; background: var(--color-primary-tint); color: var(--color-primary); font-size: 26rpx; }
+.family-actions { display: flex; gap: 18rpx; }
+.family-actions button { flex: 1; font-size: 28rpx; }
+.empty-family { display: flex; flex-direction: column; align-items: center; gap: 18rpx; }
+.empty-family image { width: 220rpx; height: 180rpx; }

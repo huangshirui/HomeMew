@@ -7,7 +7,7 @@ const source=(p:string)=>readFileSync(new URL('../miniprogram/'+p,import.meta.ur
 function page(path:string,globals:Record<string,unknown>){let result:any;runInNewContext(stripTypeScriptTypes(source(path).replace(/^import[\s\S]*?from ['"][^'"]+['"];?\r?$/gm,'')),{...globals,Page:(p:any)=>{result=p;}});result.setData=(patch:any)=>Object.assign(result.data,patch);return result;}
 test('settings shows the same mailbox for code-linked and pre-linked accounts',async()=>{
  let state={email:'me@example.com',version:2,linked:true,status:'linked'};
- const settings=page('pages/settings/settings.ts',{ensureRuntimeReady:async()=>{},getWebLogin:async()=>state});
+ const settings=page('pages/settings/settings.ts',{userStore:{value:null},loadCurrentUser:async()=>({id:'usr_test'}),ensureRuntimeReady:async()=>{},getWebLogin:async()=>state});
  await settings.loadAccount();assert.equal(settings.data.loginEmail,'m***@example.com');assert.equal(settings.data.linkStatus,'linked');
  state={...state,linked:false,status:'pending'};await settings.loadAccount();assert.equal(settings.data.linkStatus,'pending');assert.equal(settings.data.accountError,false);
 });

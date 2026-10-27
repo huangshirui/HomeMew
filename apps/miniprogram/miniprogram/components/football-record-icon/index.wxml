@@ -1,0 +1,1 @@
+<view class="fi-view mark"><image class="fi-image" wx:if="{{path}}" src="{{path}}" mode="aspectFill"/><text class="fi-text" wx:elif="{{icon.type==='emoji'}}">{{icon.value}}</text><lucide-icon wx:else name="shield" size="18" color="#a8a29e"/></view>

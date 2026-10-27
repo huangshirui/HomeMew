@@ -1,5 +1,3 @@
-import { getWebLogin } from '../../services/web-login';
-import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 /**
  * 设置页
  *
@@ -16,28 +14,46 @@ import {
   resolveDisplayTimeZone,
   TimeZonePreference,
 } from '../../services/settings';
+import { userStore, currentFamilyStore, loadCurrentUser } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { getWebLogin } from '../../services/web-login';
+import { STORAGE_KEYS } from '../../services/config';
+import { loadHomeScope, saveHomeScope, type HomeScope } from '../../stores/home-scope';
 
 Page({
   data: {
-    accountLoaded:false,accountError:false,loginEmail:'',emailAvailable:false,linkStatus:'unlinked',
+    user: userStore.value,
+    accountLoaded:false,
+    accountError:false,
+    loginEmail:'',
+    linked:false,
+    linkStatus:'unlinked',
+    emailAvailable:false,
     mode: 'system' as 'system' | 'custom',
     customTimeZone: '',
     systemTimeZone: '',
     displayTimeZone: '',
     /** 优先展示家庭/系统时区，交给 timezone-picker 组件处理 */
     preferredTimeZones: [] as string[],
+    /** 首页数据范围：'me' 只看我的（默认）/ 'all' 看全家 */
+    homeScope: 'me' as HomeScope,
   },
 
-  onShow():void {void this.loadAccount();},
-  async loadAccount():Promise<void> {
-    this.setData({accountLoaded:false,accountError:false});
+  onShow(): void { void this.loadAccount(); },
+  async loadAccount(): Promise<void> {
+    this.setData({accountLoaded:false,accountError:false,user:userStore.value});
     try {
       await ensureRuntimeReady();
+      const user=await loadCurrentUser();
+      this.setData({user});
       const account=await getWebLogin();
-      this.setData({accountLoaded:true,emailAvailable:account.available!==false,linkStatus:account.status,
-        loginEmail:account.email?account.email.replace(/^(.).*(@.*)$/,'$1***$2'):''});
-    }catch{this.setData({accountError:true});}
+      const email=account.email;
+      this.setData({user,accountLoaded:true,linked:account.linked,linkStatus:account.status,emailAvailable:account.available!==false,
+        loginEmail:email?email.replace(/^(.).*(@.*)$/,'$1***$2'):''});
+      this.refreshHomeScope();
+    }catch { this.setData({accountError:true}); }
   },
+
   onLoad(): void {
     const pref = loadTimeZonePreference();
     const systemTz = resolveDisplayTimeZone({ mode: 'system', customTimeZone: '' });
@@ -72,6 +88,23 @@ Page({
     if (!id) return;
     this.setData({ customTimeZone: id, displayTimeZone: id });
     this.persistAndRefresh();
+  },
+
+  /** 读取当前生效的首页数据范围（按 家庭 + 用户 维度） */
+  refreshHomeScope(): void {
+    const familyId = currentFamilyStore.value?.id || (wx.getStorageSync(STORAGE_KEYS.currentFamilyId) as string) || '';
+    const userId = userStore.value?.id || '';
+    this.setData({ homeScope: familyId ? loadHomeScope(familyId, userId) : 'me' });
+  },
+
+  /** 切换「只看我的 / 看全家」 */
+  onHomeScopeChange(e: WechatMiniprogram.TouchEvent): void {
+    const scope = e.currentTarget.dataset.scope as HomeScope;
+    if (scope === this.data.homeScope) return;
+    this.setData({ homeScope: scope });
+    const familyId = currentFamilyStore.value?.id || (wx.getStorageSync(STORAGE_KEYS.currentFamilyId) as string) || '';
+    const userId = userStore.value?.id || '';
+    if (familyId) saveHomeScope(familyId, userId, scope);
   },
 
   persistAndRefresh(): void {

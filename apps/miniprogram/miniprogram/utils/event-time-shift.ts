@@ -22,6 +22,13 @@ function dayTimestamp(date: string): number {
   return Number.isFinite(value) && new Date(value).toISOString().slice(0,10)===date ? value : Number.NaN;
 }
 
+/** Move an optional date-only endpoint by the existing calendar-day span. */
+export function shiftDateEndWithStart(oldStart: string, oldEnd: string, newStart: string): string {
+  const start=dayTimestamp(oldStart),end=dayTimestamp(oldEnd),next=dayTimestamp(newStart);
+  if(![start,end,next].every(Number.isFinite)||end<start)return oldEnd;
+  return new Date(next+(end-start)).toISOString().slice(0,10);
+}
+
 export function shiftEndWithStart(
   draft: EditableEventRange,
   start: { date?: string; time?: string },
@@ -33,9 +40,7 @@ export function shiftEndWithStart(
   if(startDate===draft.startDate && startTime===draft.startTime)return unchanged;
 
   if(draft.isAllDay){
-    const oldStart=dayTimestamp(draft.startDate),oldEnd=dayTimestamp(draft.endDate),newStart=dayTimestamp(startDate);
-    if(![oldStart,oldEnd,newStart].every(Number.isFinite)||oldEnd<oldStart)return unchanged;
-    return {...unchanged,endDate:new Date(newStart+(oldEnd-oldStart)).toISOString().slice(0,10)};
+    return {...unchanged,endDate:shiftDateEndWithStart(draft.startDate,draft.endDate,startDate)};
   }
 
   // Preserve the previous absolute duration across midnight and DST.
