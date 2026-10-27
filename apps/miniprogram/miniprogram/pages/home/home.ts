@@ -182,6 +182,8 @@ Page({
     lifeRecords: { habits: [], activities: [], goals: [] } as Record<LifeKind, HomeLifeRow[]>,
     lifeLoading: { habits: false, activities: false, goals: false },
     lifeErrors: { habits: false, activities: false, goals: false },
+    // Stay visible while first loading; hide only after all three kinds load successfully empty.
+    lifeVisible: true,
     canCheckIn: false,
   },
 
@@ -401,6 +403,7 @@ Page({
       lifeRecords: { habits: [], activities: [], goals: [] },
       lifeLoading: { habits: false, activities: false, goals: false },
       lifeErrors: { habits: false, activities: false, goals: false },
+      lifeVisible: true,
       canCheckIn: false,
     });
   },
@@ -636,6 +639,12 @@ Page({
     if (this.data.currentFamily) this.loadAttentionDays(this.data.currentFamily.id);
   },
 
+  updateLifeVisible(): void {
+    const kinds: LifeKind[] = ['habits', 'activities', 'goals'];
+    this.setData({ lifeVisible: kinds.some(kind =>
+      this.data.lifeLoading[kind] || this.data.lifeErrors[kind] || this.data.lifeRecords[kind].length > 0) });
+  },
+
   async loadLife(familyId: string, onlyKind?: LifeKind): Promise<void> {
     const kinds: LifeKind[] = (onlyKind ? [onlyKind] : ['habits', 'activities', 'goals'] as LifeKind[])
       .filter(kind => kind !== 'habits' || this._checkingHabits.size === 0);
@@ -645,6 +654,7 @@ Page({
       generations[kind] = ++this._lifeGeneration[kind];
       this.setData({ [`lifeLoading.${kind}`]: true, [`lifeErrors.${kind}`]: false });
     }
+    this.updateLifeVisible();
     const isCurrent = (kind: LifeKind) => this.data.currentFamily?.id === familyId &&
       this._lifeGeneration[kind] === generations[kind];
     let people: PersonOption[];
@@ -655,29 +665,33 @@ Page({
       for (const kind of kinds) {
         if (isCurrent(kind)) this.setData({ [`lifeLoading.${kind}`]: false, [`lifeErrors.${kind}`]: true });
       }
+      this.updateLifeVisible();
       return;
     }
     const myPersonId = people.find(person => person.userId === userStore.value?.id)?.personId || '';
-    // 跟随设置页「首页数据范围」：all 看全家（不限定成员，family-wide）、me 只看我的
+    // 「我的习惯」始终按已映射的本人 Person 筛选；首页范围只影响活动/目标。
     const scope = loadHomeScope(familyId, userStore.value?.id || '');
-    const fetchPersonId = scope === 'all' ? '' : myPersonId;
-    if (kinds.includes('habits') && isCurrent('habits')) this._lifePersonId = fetchPersonId;
+    if (kinds.includes('habits') && isCurrent('habits')) {
+      this._lifePersonId = myPersonId;
+      this.setData({ canCheckIn: Boolean(myPersonId) && (this.data.currentFamily?.role as string) !== 'viewer' });
+    }
     const today = formatInstantInTimeZone(new Date().toISOString(), this.data.currentFamily?.timezone || 'Asia/Shanghai').date;
     await Promise.all(kinds.map(async kind => {
       if (!isCurrent(kind)) return;
       try {
-        const records = await listCurrentLifeRecords(familyId, kind, fetchPersonId, today, () => isCurrent(kind));
+        const personId = kind === 'habits' || scope === 'me' ? myPersonId : '';
+        const records = await listCurrentLifeRecords(familyId, kind, personId, today, () => isCurrent(kind));
         if (!isCurrent(kind)) return;
-        const rows = homeLifeRows(records, kind, people, fetchPersonId);
+        const rows = homeLifeRows(records, kind, people, personId);
         // A poll may finish while a check-in is pending. Keep its button locked.
         rows.forEach(row => { row.checking = this._checkingHabits.has(row.id); });
-        this.setData({ [`lifeRecords.${kind}`]: rows, [`lifeErrors.${kind}`]: false,
-          canCheckIn: Boolean(fetchPersonId) && (this.data.currentFamily?.role as string) !== 'viewer' });
+        this.setData({ [`lifeRecords.${kind}`]: rows, [`lifeErrors.${kind}`]: false });
       } catch {
         if (isCurrent(kind)) this.setData({ [`lifeErrors.${kind}`]: true });
       } finally {
         if (isCurrent(kind)) {
           this.setData({ [`lifeLoading.${kind}`]: false });
+          this.updateLifeVisible();
         }
       }
     }));
