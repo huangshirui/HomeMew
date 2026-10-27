@@ -12,8 +12,8 @@ export function homeLifeRows(
   return records.filter(record => {
     if (kind === 'activities') return true;
     if (record.status !== 'active') return false;
-    // 「我的习惯」不可用空 Person ID 放宽为全家记录；映射缺失时必须拒绝匹配。
-    if (kind === 'habits' && (!personId || record.subjectPersonId !== personId)) return false;
+    // 仅在指定了 personId（只看我的）时才按成员过滤；看全家时不限定成员
+    if (kind === 'habits' && personId && record.subjectPersonId !== personId) return false;
     return true;
   }).slice().sort((a, b) => {
       if (kind === 'habits') return Number(Boolean(a.computed?.checkIn?.checkedInToday)) -
