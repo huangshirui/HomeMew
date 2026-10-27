@@ -15,9 +15,11 @@ async function createQuickEvent(location, locationDetail) {
       async fetch(incoming) {
         const url = new URL(incoming.url);
         if (url.pathname.endsWith('/members')) {
+          assert.equal(incoming.method, 'GET', 'Family member lookup must never reuse quick-create POST');
           return Response.json({ data: [] });
         }
         if (url.pathname.endsWith('/models/batch')) {
+          assert.equal(incoming.method, 'POST');
           batches.push(await incoming.json());
           return Response.json({ data: { items: [] } });
         }
