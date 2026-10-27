@@ -21,7 +21,7 @@ type Relation = { id: string; source: EntityRef; target: EntityRef; sourceLabel?
 
 /** Hydration includes record data even if the model's referenceLabel resolves to rec_*. */
 export function relatedRecordTitle(label: string | undefined, record: RelatedRecord | undefined, id: string): string {
-  const values = [record?.name, record?.summary, record?.title, record?.displayName, label];
+  const values = [label, record?.name, record?.summary, record?.title, record?.displayName];
   for (const value of values) {
     const normalized = typeof value === 'string' ? value.trim() : '';
     if (normalized && normalized !== id && !/^rec_[A-Za-z0-9_-]+$/.test(normalized)) return normalized;
@@ -29,7 +29,7 @@ export function relatedRecordTitle(label: string | undefined, record: RelatedRec
   return '名称暂不可用';
 }
 type Page<T> = { items: T[]; nextCursor: string | null };
-type Candidate = { id: string; name?: string; summary?: string };
+type Candidate = { id: string; name?: string; summary?: string; title?: string };
 type Countdown = { name: string; anchorDate: string; kind: string };
 const models = [
   { key: 'task', title: '待办', route: '/tasks' },
@@ -441,7 +441,7 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
           <Button variant="secondary" disabled={!search.trim() || candidateLoading} onClick={() => void searchCandidates()}><Search className="size-4" /> 搜索</Button>
         </div>
         {candidates.map(item => <div key={item.id} className="flex items-center justify-between gap-2 rounded-xl bg-stone-50 p-3">
-          <span className="min-w-0 truncate text-sm">{item.name || item.summary || item.id}</span>
+          <span className="min-w-0 truncate text-sm">{item.name || item.summary || item.title || '名称暂不可用'}</span>
           <Button variant="secondary" disabled={working} onClick={() => void link(item)}>关联</Button>
         </div>)}
         {!candidates.length && !candidateLoading ? <p className="text-xs text-stone-500">输入关键词找到内容，加入这里只是建立关联，不会移动或复制原内容。</p> : null}

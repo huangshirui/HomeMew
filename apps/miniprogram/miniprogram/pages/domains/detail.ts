@@ -3,7 +3,7 @@ import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import {
   getDomainRecord,listDomainPeople,listDomainRelations,performDomainAction,listHabitHistory,
   searchLinkedCandidates,linkDomainRecord,unlinkDomainRecord,createLinkedRecord,
-  readableRelationTitle,DOMAIN_COPY,STATUS_COPY,type DomainRecord,type DomainRelation,type DomainKind,type DomainStatus,
+  readableRelationTitle,readableCandidateTitle,DOMAIN_COPY,STATUS_COPY,type DomainRecord,type DomainRelation,type DomainKind,type DomainStatus,
   type PersonOption,type CheckInHistory,
 } from '../../services/domains';
 
@@ -196,8 +196,8 @@ Page({
     this.setData({candidateLoading:true});
     try{
       const page=await searchLinkedCandidates(d.familyId,d.kind,d.recordId,d.linkType,d.linkTerm.trim(),more?d.candidateCursor||undefined:undefined);
-      this.setData({linkItems:more?[...d.linkItems,...page.items.map(x=>({id:x.id,name:x.name||'名称暂不可用'}))]:
-        page.items.map(x=>({id:x.id,name:x.name||'名称暂不可用'})),candidateCursor:page.nextCursor});
+      this.setData({linkItems:more?[...d.linkItems,...page.items.map(x=>({id:x.id,name:readableCandidateTitle(d.linkType,x)}))]:
+        page.items.map(x=>({id:x.id,name:readableCandidateTitle(d.linkType,x)})),candidateCursor:page.nextCursor});
     }catch(e){this.setData({relationError:(e as Error).message||'搜索失败'});}
     finally{this.setData({candidateLoading:false});}
   },

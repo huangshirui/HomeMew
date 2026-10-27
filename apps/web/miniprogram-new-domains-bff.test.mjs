@@ -66,3 +66,57 @@ test('quick-create rejects mismatched names and malformed coordinates instead of
   assert.equal(invalid.response.status, 422);
   assert.equal(invalid.batches.length, 0);
 });
+
+test('Mini semantic relation reads request the correct hydrated endpoint and preserve labels', async () => {
+  const paths = [];
+  const env = { LIFESPACE_CORE: { async fetch(incoming) {
+    const url = new URL(incoming.url);
+    paths.push(url);
+    assert.equal(incoming.headers.get('authorization'), 'Bearer user-token-1234567890');
+    return Response.json({ data: { items: [
+      { id: 'rel_one', source: { modelKey: 'activity', recordId: 'rec_parent' },
+        target: { modelKey: 'event', recordId: 'rec_event' },
+        targetLabel: '足球训练', targetRecord: { summary: '足球训练' } },
+    ], nextCursor: null } });
+  } } };
+  const base = '/api/v1/miniprogram/families/spc_family/containers/activities/rec_parent/relations';
+  const headers = { authorization: 'Bearer user-token-1234567890' };
+  const outgoing = await handleMiniNewDomainBff(
+    new Request('https://homemew.test' + base + '?direction=outgoing&limit=50', { headers }), env);
+  assert.equal(outgoing.status, 200);
+  const data = (await outgoing.json()).data;
+  assert.equal(data.items[0].targetLabel, '足球训练');
+  assert.equal(data.items[0].targetRecord.summary, '足球训练');
+  assert.equal(paths[0].pathname, '/api/v1/spaces/spc_family/semantic-relations');
+  assert.equal(paths[0].searchParams.get('hydrate'), 'target');
+  assert.equal(paths[0].searchParams.get('sourceRecordId'), 'rec_parent');
+  assert.equal(paths[0].searchParams.get('predicate'), 'relates_to');
+
+  const incoming = await handleMiniNewDomainBff(
+    new Request('https://homemew.test' + base + '?direction=incoming', { headers }), env);
+  assert.equal(incoming.status, 200);
+  assert.equal(paths[1].searchParams.get('hydrate'), 'source');
+  assert.equal(paths[1].searchParams.get('targetRecordId'), 'rec_parent');
+});
+
+test('candidate query passes full model fields through to Mini without dropping summary/title', async () => {
+  const upstream = [];
+  const env = { LIFESPACE_CORE: { async fetch(incoming) {
+    upstream.push({ path: new URL(incoming.url).pathname, body: await incoming.json() });
+    return Response.json({ data: { items: [
+      { id: 'rec_event', summary: '足球训练' },
+      { id: 'rec_wish', title: '去露营' },
+    ], nextCursor: null } });
+  } } };
+  const path = '/api/v1/miniprogram/families/spc_family/containers/activities/rec_parent/candidates?model=event&q=足球';
+  const response = await handleMiniNewDomainBff(
+    new Request('https://homemew.test' + path, {
+      headers: { authorization: 'Bearer user-token-1234567890' },
+    }), env);
+  assert.equal(response.status, 200);
+  const result = (await response.json()).data.items;
+  assert.equal(result[0].summary, '足球训练');
+  assert.equal(result[1].title, '去露营');
+  assert.equal(upstream[0].path, '/api/v1/spaces/spc_family/models/event/records/query');
+  assert.equal(upstream[0].body.search.text, '足球');
+});
