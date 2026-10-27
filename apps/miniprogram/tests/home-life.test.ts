@@ -71,14 +71,18 @@ test('home scans every active habit page before choosing unchecked personal habi
   assert.equal(rows[0].streakDays, 7);
 });
 
-test('missing Person mapping never matches unowned records or fetches family habits', async () => {
-  const s = service(async () => { throw new Error('must not fetch'); });
+test('empty Person skips personal pagination while all scope retains household habits', async () => {
+  let fetches = 0;
+  const s = service(async () => { fetches++; return { items: [habit('other', 'per_other')], nextCursor: null }; });
   assert.equal((await s.listPersonalHabitPage('spc_a', '')).items.length, 0);
-  assert.equal(homeLifeRows([{ id: 'missing', status: 'active' }], 'habits', [], '').length, 0);
-  assert.equal((await s.listCurrentLifeRecords('spc_a', 'habits', '', '2026-10-26')).length, 0);
+  assert.equal(fetches, 0);
+  const all = await s.listCurrentLifeRecords('spc_a', 'habits', '', '2026-10-26');
+  assert.equal(all.length, 1); assert.equal(all[0].id, 'other');
+  assert.equal(homeLifeRows(all, 'habits', [], '').length, 1);
 });
 
-test('home all-scope still keeps 我的习惯 personal and check-in enabled', async () => {
+test('home all scope shows family habits but does not grant member check-ins', async () => {
+  let checkins = 0;
   const requested: Record<string, string> = {};
   const page = home({
     loadHomeScope: () => 'all',
@@ -86,25 +90,14 @@ test('home all-scope still keeps 我的习惯 personal and check-in enabled', as
       requested[kind] = personId;
       return kind === 'habits' ? [habit('mine'), habit('other', 'per_other')] : [];
     },
+    performDomainAction: async () => { checkins++; },
   });
   await page.loadLife('spc_a');
-  assert.equal(requested.habits, 'per_me');
-  assert.equal(requested.activities, '');
-  assert.equal(requested.goals, '');
-  assert.equal(page.data.lifeRecords.habits.length, 1);
-  assert.equal(page.data.lifeRecords.habits[0].id, 'mine');
-  assert.equal(page.data.canCheckIn, true);
-});
-
-test('missing Person mapping does not surface another member habit in the home', async () => {
-  const page = home({
-    listDomainPeople: async () => [],
-    listCurrentLifeRecords: async (_family: string, kind: string) =>
-      kind === 'habits' ? [habit('other', 'per_other')] : [],
-  });
-  await page.loadLife('spc_a');
-  assert.equal(page.data.lifeRecords.habits.length, 0);
+  assert.equal(requested.habits, '');
+  assert.equal(page.data.lifeRecords.habits.length, 2);
   assert.equal(page.data.canCheckIn, false);
+  await page.onHabitCheckIn(tap('other'));
+  assert.equal(checkins, 0);
 });
 
 test('stale pagination stops, and repeated cursors fail instead of looping forever', async () => {
@@ -193,23 +186,26 @@ test('version conflict reloads for review without replaying the check-in', async
   assert.equal(page._checkingHabits.size, 0);
 });
 
-test('independent domain errors preserve other results and allow retry; truly empty module hides', async () => {
+test('independent domain errors preserve other results and do not hide empty module', async () => {
   const page = home({ listCurrentLifeRecords: async (_family: string, kind: string) => {
     if (kind === 'habits') throw new Error('offline');
     return kind === 'goals' ? [{ id: 'goal', status: 'active' }] : [];
   } });
   await page.loadLife('spc_a');
   assert.equal(page.data.lifeErrors.habits, true); assert.equal(page.data.lifeRecords.goals.length, 1);
-  assert.equal(page.data.lifeVisible, true);
-  page.data.lifeRecords = { habits: [], activities: [], goals: [] };
-  page.data.lifeErrors = { habits: false, activities: false, goals: false };
-  page.updateLifeVisible(); assert.equal(page.data.lifeVisible, false);
+  // The latest approved UX keeps this module and its empty state on the page.
+  const template = readFileSync(new URL('../miniprogram/pages/home/home.wxml', import.meta.url), 'utf8');
+  assert.match(template, /<view class="card section life-section">/);
 });
 
-test('home removes tools, keeps module order, and hides only successfully empty task reminders', () => {
+test('home removes tools, keeps module order, and retains empty reminder modules', () => {
   const template = readFileSync(new URL('../miniprogram/pages/home/home.wxml', import.meta.url), 'utf8');
   assert.doesNotMatch(template, /常用工具|tools-section/);
   const positions = ['需要关注', '今天安排', '待办提醒', '生活进行时'].map(label => template.indexOf(`>${label}</text>`));
   assert.ok(positions.every((value, index) => value >= 0 && (!index || value > positions[index - 1])));
-  assert.match(template, /wx:if="\{\{pendingTasks.length > 0 \|\| tasksLoading \|\| tasksError\}\}"/);
+  const taskMarkup = template.slice(template.indexOf('<!-- 待办提醒'), template.indexOf('<!-- 日子关注项'));
+  assert.match(taskMarkup, /<view class="card section">/);
+  assert.match(taskMarkup, /还没有待办/);
+  assert.doesNotMatch(taskMarkup, /wx:if="\\{\\{pendingTasks.length > 0/);
+  assert.match(template, /<view class="card section life-section">/);
 });
