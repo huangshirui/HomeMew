@@ -197,8 +197,6 @@ Page({
   _lifeGeneration: { habits: 0, activities: 0, goals: 0 },
   _lifePersonId: '',
   _lifeContext: 0,
-  _lifeIconPaths: {} as Record<string, string>,
-  _lifeLoadingIcons: new Set<string>(),
   _checkingHabits: new Set<string>(),
 
   // 原始列表（不参与渲染，仅用于派生视图与排序）
@@ -702,17 +700,19 @@ Page({
       const icon = row.presentation?.icon;
       if (icon?.type !== 'image') return;
       const fileId = icon.fileId;
-      const key = `${familyId}:${row.id}:${fileId}`;
-      const cached = this._lifeIconPaths[key];
-      if (cached) { row.iconImagePath = cached; return; }
-      if (this._lifeLoadingIcons.has(key)) return;
-      this._lifeLoadingIcons.add(key);
+      // An icon URL/path is only reused after an authorized request for this
+      // family; an older response must not change a newly loaded row.
       void downloadRecordIconImage(familyId, modelKey, row.id, fileId).then(path => {
-        this._lifeIconPaths[key] = path;
+        if (this.data.currentFamily?.id !== familyId ||
+            currentFamilyStore.value?.id !== familyId) return;
         const list = this.data.lifeRecords[kind];
         const i = list.findIndex(r => r.id === row.id);
-        if (i >= 0 && list[i].iconImagePath !== path) this.setData({ [`lifeRecords.${kind}[${i}].iconImagePath`]: path });
-      }).catch(() => undefined).then(() => this._lifeLoadingIcons.delete(key));
+        const current = i >= 0 ? list[i] : undefined;
+        const currentIcon = current?.presentation?.icon;
+        if (currentIcon?.type === 'image' && currentIcon.fileId === fileId &&
+            current?.iconImagePath !== path)
+          this.setData({ [`lifeRecords.${kind}[${i}].iconImagePath`]: path });
+      }).catch(() => undefined);
     });
   },
 

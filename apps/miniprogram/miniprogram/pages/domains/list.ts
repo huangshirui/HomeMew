@@ -32,8 +32,6 @@ Page({
     mine:false,
   },
   _generation:0,
-  _iconPaths: {} as Record<string,string>,
-  _loadingIcons: new Set<string>(),
   onLoad(options:{kind?:string;mine?:string}):void {
     const kind=KINDS.includes(options.kind as Kind) ? options.kind as Kind : 'activities';
     const filters = kind==='activities' ? [
@@ -83,16 +81,17 @@ Page({
       const icon=rec.presentation?.icon;
       if(icon?.type!=='image')continue;
       const fileId=icon.fileId;
-      const key=`${familyId}:${rec.id}:${fileId}`;
-      const cached=this._iconPaths[key];
-      if(cached){rec.iconImagePath=cached;continue;}
-      if(this._loadingIcons.has(key))continue;
-      this._loadingIcons.add(key);
+      // Always request through the authorized Mini BFF on refresh; never serve
+      // a previously downloaded icon after a family/grant change.
       void downloadRecordIconImage(familyId,modelKey,rec.id,fileId).then(path=>{
-        this._iconPaths[key]=path;
+        if(this.data.familyId!==familyId||this.data.kind!==kind||
+           currentFamilyStore.value?.id!==familyId)return;
         const idx=this.data.records.findIndex(r=>r.id===rec.id);
-        if(idx>=0&&this.data.records[idx].iconImagePath!==path)this.setData({[`records[${idx}].iconImagePath`]:path});
-      }).catch(()=>undefined).then(()=>this._loadingIcons.delete(key));
+        const current=idx>=0?this.data.records[idx]:undefined;
+        const currentIcon=current?.presentation?.icon;
+        if(currentIcon?.type==='image'&&currentIcon.fileId===fileId&&current?.iconImagePath!==path)
+          this.setData({[`records[${idx}].iconImagePath`]:path});
+      }).catch(()=>undefined);
     }
   },
   onPullDownRefresh():void{void this.load(true).then(()=>wx.stopPullDownRefresh(),()=>wx.stopPullDownRefresh());},

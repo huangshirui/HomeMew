@@ -83,7 +83,8 @@ Page({
         void downloadRecordIconImage(familyId,MODEL_KEYS[kind],recordId,fileId)
           .then(iconImagePath=>{
             const cur=this.data.record;
-            if(this.data.recordId===recordId&&cur?.presentation?.icon?.type==='image'&&cur.presentation.icon.fileId===fileId)
+            if(this._generation===generation&&this.data.familyId===familyId&&this.data.kind===kind&&
+               this.data.recordId===recordId&&cur?.presentation?.icon?.type==='image'&&cur.presentation.icon.fileId===fileId)
               this.setData({iconImagePath});
           }).catch(()=>{});
       }
