@@ -53,6 +53,15 @@ import { Event, Task, FamilyRole } from '../../types/index';
 import { listDomainPeople, performDomainAction, type PersonOption } from '../../services/domains';
 import { listCurrentLifeRecords, type LifeKind } from '../../services/life-records';
 import { homeLifeRows, type HomeLifeRow } from '../../utils/home-life';
+import { downloadRecordIconImage } from '../../services/record-icons';
+
+/** kind（首页生活进行时）到 LifeSpace modelKey 的映射，用于图标下载。 */
+function lifeModelKey(kind: LifeKind): 'activity' | 'goal' | 'habit' | null {
+  if (kind === 'activities') return 'activity';
+  if (kind === 'goals') return 'goal';
+  if (kind === 'habits') return 'habit';
+  return null;
+}
 
 type FamilyView = {
   id: string;
@@ -188,6 +197,8 @@ Page({
   _lifeGeneration: { habits: 0, activities: 0, goals: 0 },
   _lifePersonId: '',
   _lifeContext: 0,
+  _lifeIconPaths: {} as Record<string, string>,
+  _lifeLoadingIcons: new Set<string>(),
   _checkingHabits: new Set<string>(),
 
   // 原始列表（不参与渲染，仅用于派生视图与排序）
@@ -671,6 +682,7 @@ Page({
         const rows = homeLifeRows(records, kind, people, fetchPersonId);
         // A poll may finish while a check-in is pending. Keep its button locked.
         rows.forEach(row => { row.checking = this._checkingHabits.has(row.id); });
+        this.loadLifeIcons(kind, rows, familyId);
         this.setData({ [`lifeRecords.${kind}`]: rows, [`lifeErrors.${kind}`]: false,
           canCheckIn: Boolean(fetchPersonId) && (this.data.currentFamily?.role as string) !== 'viewer' });
       } catch {
@@ -681,6 +693,27 @@ Page({
         }
       }
     }));
+  },
+
+  loadLifeIcons(kind: LifeKind, rows: HomeLifeRow[], familyId: string): void {
+    const modelKey = lifeModelKey(kind);
+    if (!modelKey) return;
+    rows.forEach(row => {
+      const icon = row.presentation?.icon;
+      if (icon?.type !== 'image') return;
+      const fileId = icon.fileId;
+      const key = `${familyId}:${row.id}:${fileId}`;
+      const cached = this._lifeIconPaths[key];
+      if (cached) { row.iconImagePath = cached; return; }
+      if (this._lifeLoadingIcons.has(key)) return;
+      this._lifeLoadingIcons.add(key);
+      void downloadRecordIconImage(familyId, modelKey, row.id, fileId).then(path => {
+        this._lifeIconPaths[key] = path;
+        const list = this.data.lifeRecords[kind];
+        const i = list.findIndex(r => r.id === row.id);
+        if (i >= 0 && list[i].iconImagePath !== path) this.setData({ [`lifeRecords.${kind}[${i}].iconImagePath`]: path });
+      }).catch(() => undefined).then(() => this._lifeLoadingIcons.delete(key));
+    });
   },
 
   onLifeTab(e: WechatMiniprogram.TouchEvent): void {

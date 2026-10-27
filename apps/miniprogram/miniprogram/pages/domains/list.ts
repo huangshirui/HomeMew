@@ -3,10 +3,12 @@ import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { listDomainPeople, listDomainRecords, DOMAIN_COPY, STATUS_COPY, type DomainKind, type DomainRecord, type DomainStatus, type PersonOption } from '../../services/domains';
 import { formatInstantInTimeZone } from '../../utils/index';
 import { listPersonalHabitPage } from '../../services/life-records';
+import { downloadRecordIconImage } from '../../services/record-icons';
 
 type Kind = 'activities' | 'goals' | 'habits' | 'anniversaries';
-type Display = DomainRecord & { icon: string; people: string; dates: string; statusLabel: string };
+type Display = DomainRecord & { icon: string; iconImagePath: string; people: string; dates: string; statusLabel: string };
 const KINDS: Kind[] = ['activities','goals','habits','anniversaries'];
+const MODEL_KEYS={activities:'activity',goals:'goal',habits:'habit',anniversaries:'anniversary'} as const;
 function localToday(timezone: string): string {
   try { return formatInstantInTimeZone(new Date().toISOString(),timezone || 'Asia/Shanghai').date; }
   catch { return new Date().toISOString().slice(0,10); }
@@ -17,8 +19,9 @@ function formatted(record:DomainRecord,people:PersonOption[],kind:Kind):Display 
   const names = ids.map(id => people.find(person=>person.personId===id)?.displayName || '家庭成员');
   const dates = kind==='anniversaries' ? [record.year ? String(record.year)+'年' : '每年',record.month+'月',record.day+'日'].join(' ')
     : [record.startDate,record.endDate || record.targetDate].filter(Boolean).join(' — ');
-  return { ...record, icon: record.presentation?.icon?.type==='emoji' ? record.presentation.icon.value : DOMAIN_COPY[kind].symbol,
-    people:names.join('、'),dates,statusLabel:record.status ? STATUS_COPY[record.status] : '' };
+  const icon=record.presentation?.icon;
+  const iconText=icon?.type==='emoji'?icon.value:(icon?.type==='image'?'':DOMAIN_COPY[kind].symbol);
+  return { ...record, icon:iconText, iconImagePath:'', people:names.join('、'),dates,statusLabel:record.status ? STATUS_COPY[record.status] : '' };
 }
 Page({
   data:{
@@ -29,6 +32,8 @@ Page({
     mine:false,
   },
   _generation:0,
+  _iconPaths: {} as Record<string,string>,
+  _loadingIcons: new Set<string>(),
   onLoad(options:{kind?:string;mine?:string}):void {
     const kind=KINDS.includes(options.kind as Kind) ? options.kind as Kind : 'activities';
     const filters = kind==='activities' ? [
@@ -65,11 +70,30 @@ Page({
         : await listDomainRecords(familyId,kind,options);
       if(generation!==this._generation || this.data.familyId!==familyId)return;
       const items=page.items.map(record=>formatted(record,members,kind));
+      this.loadRecordIcons(items,familyId,kind);
       const records=reset?items:[...this.data.records,...items.filter(x=>!this.data.records.some(prev=>prev.id===x.id))];
       this.setData({people:members,personOptions:[{id:'',label:'全部成员'},...members.map(p=>({id:p.personId,label:p.displayName}))],
         records,nextCursor:page.nextCursor,error:''});
     }catch(error:unknown){if(generation===this._generation)this.setData({error:(error as Error).message||'加载失败'});}
     finally{if(generation===this._generation)this.setData({loading:false,loadingMore:false});}
+  },
+  loadRecordIcons(records:Display[],familyId:string,kind:Kind):void{
+    const modelKey=MODEL_KEYS[kind];
+    for(const rec of records){
+      const icon=rec.presentation?.icon;
+      if(icon?.type!=='image')continue;
+      const fileId=icon.fileId;
+      const key=`${familyId}:${rec.id}:${fileId}`;
+      const cached=this._iconPaths[key];
+      if(cached){rec.iconImagePath=cached;continue;}
+      if(this._loadingIcons.has(key))continue;
+      this._loadingIcons.add(key);
+      void downloadRecordIconImage(familyId,modelKey,rec.id,fileId).then(path=>{
+        this._iconPaths[key]=path;
+        const idx=this.data.records.findIndex(r=>r.id===rec.id);
+        if(idx>=0&&this.data.records[idx].iconImagePath!==path)this.setData({[`records[${idx}].iconImagePath`]:path});
+      }).catch(()=>undefined).then(()=>this._loadingIcons.delete(key));
+    }
   },
   onPullDownRefresh():void{void this.load(true).then(()=>wx.stopPullDownRefresh(),()=>wx.stopPullDownRefresh());},
   onReachBottom():void{if(!this.data.loadingMore && !this.data.loading)this.load(false);},

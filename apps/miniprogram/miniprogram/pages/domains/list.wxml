@@ -28,7 +28,10 @@
     </view>
     <view wx:else class="domain-list card">
       <view wx:for="{{records}}" wx:key="id" class="domain-row" data-id="{{item.id}}" bindtap="onRecordTap">
-        <view class="record-symbol">{{item.icon}}</view>
+        <view class="record-symbol">
+          <image wx:if="{{item.iconImagePath}}" src="{{item.iconImagePath}}" mode="aspectFit" class="record-symbol-img" />
+          <text wx:else>{{item.icon}}</text>
+        </view>
         <view class="record-info">
           <view class="record-title-row"><text class="record-title">{{item.name}}</text><text wx:if="{{item.statusLabel}}" class="record-status">{{item.statusLabel}}</text></view>
           <text wx:if="{{item.description}}" class="record-description">{{item.description}}</text>

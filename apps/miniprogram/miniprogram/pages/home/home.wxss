@@ -446,6 +446,7 @@
   font-size: 32rpx;
   flex-shrink: 0;
 }
+.life-symbol-img { width: 100%; height: 100%; border-radius: 16rpx; }
 .life-body { flex: 1; min-width: 0; }
 .life-name-row { display: flex; align-items: center; gap: 10rpx; }
 .life-name { min-width: 0; font-size: 28rpx; color: var(--home-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -6,11 +6,13 @@ import {
   readableRelationTitle,readableCandidateTitle,DOMAIN_COPY,STATUS_COPY,type DomainRecord,type DomainRelation,type DomainKind,type DomainStatus,
   type PersonOption,type CheckInHistory,
 } from '../../services/domains';
+import { downloadRecordIconImage } from '../../services/record-icons';
 
 type Kind='activities'|'goals'|'habits';
 type Tab='overview'|'calendar'|'tasks'|'related';
 type RelationDisplay={id:string;title:string;category:string;modelKey:string;recordId:string};
 const TITLES:Record<string,string>={task:'待办',event:'日程',day_record:'日子',activity:'活动',goal:'目标',habit:'习惯',anniversary:'纪念日',wish:'愿望'};
+const MODEL_KEYS={activities:'activity',goals:'goal',habits:'habit'} as const;
 function actions(kind:Kind,status:DomainStatus):{key:string;title:string;danger:boolean}[]{
   if(status==='active')return kind==='goals'?
     [{key:'pause',title:'暂停',danger:false},{key:'achieve',title:'标记为已达成',danger:false},{key:'abandon',title:'放弃目标',danger:true}]:
@@ -32,7 +34,7 @@ function relationDisplays(relations:DomainRelation[],direction:'incoming'|'outgo
 Page({
   data:{
     kind:'activities' as Kind, familyId:'', recordId:'',loading:true,busy:false,error:'',record:null as DomainRecord|null,
-    navigationTitle:'详情',title:'',statusLabel:'',dateLabel:'',peopleLabel:'',icon:'',subjectOwner:false,canWrite:false,
+    navigationTitle:'详情',title:'',statusLabel:'',dateLabel:'',peopleLabel:'',icon:'',iconImagePath:'',subjectOwner:false,canWrite:false,
     tabs:[] as {key:Tab;label:string}[],tab:'overview' as Tab,menuActions:[] as {key:string;title:string;danger:boolean}[],
     outgoing:[] as RelationDisplay[],incoming:[] as RelationDisplay[],nextOut:null as string|null,nextIn:null as string|null,
     relationLoading:false,relationError:'',checkIns:[] as CheckInHistory[],historyCursor:null as string|null,
@@ -69,11 +71,22 @@ Page({
       const dateLabel=[record.startDate,record.endDate||record.targetDate].filter(Boolean).join(' — ');
       const subjectOwner=Boolean(kind==='habits'&&people.find(p=>p.userId===userStore.value?.id)?.personId===record.subjectPersonId);
       const canWrite=(currentFamilyStore.value?.role as string)!=='viewer'&&(kind!=='habits'||subjectOwner);
+      const icon=record.presentation?.icon;
+      const iconText=icon?.type==='emoji'?icon.value:(icon?.type==='image'?'':DOMAIN_COPY[kind].symbol);
       this.setData({record,title:record.name||DOMAIN_COPY[kind].title,
-        icon:record.presentation?.icon?.type==='emoji'?record.presentation.icon.value:DOMAIN_COPY[kind].symbol,
+        icon:iconText,iconImagePath:'',
         statusLabel:record.status?STATUS_COPY[record.status]:'',dateLabel,
         peopleLabel:ids.map(id=>people.find(p=>p.personId===id)?.displayName||'家庭成员').join('、'),
         subjectOwner,canWrite,menuActions:kind==='activities'||!canWrite||!record.status?[]:actions(kind,record.status)});
+      if(icon?.type==='image'){
+        const fileId=icon.fileId;
+        void downloadRecordIconImage(familyId,MODEL_KEYS[kind],recordId,fileId)
+          .then(iconImagePath=>{
+            const cur=this.data.record;
+            if(this.data.recordId===recordId&&cur?.presentation?.icon?.type==='image'&&cur.presentation.icon.fileId===fileId)
+              this.setData({iconImagePath});
+          }).catch(()=>{});
+      }
       await this.loadRelations(true);
     }catch(error){if(generation===this._generation)this.setData({error:(error as Error).message||'记录不存在或没有查看权限'});}
     finally{if(generation===this._generation)this.setData({loading:false});}

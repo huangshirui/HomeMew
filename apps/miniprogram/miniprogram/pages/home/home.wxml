@@ -203,7 +203,10 @@
       </view>
       <view wx:else>
         <view wx:for="{{lifeRecords[lifeTab]}}" wx:key="id" class="life-row" data-id="{{item.id}}" bindtap="onLifeRecordTap">
-          <view class="life-symbol">{{item.icon}}</view>
+          <view class="life-symbol">
+            <image wx:if="{{item.iconImagePath}}" src="{{item.iconImagePath}}" mode="aspectFit" class="life-symbol-img" />
+            <text wx:else>{{item.icon}}</text>
+          </view>
           <view class="life-body">
             <view class="life-name-row">
               <text class="life-name">{{item.name}}</text>
