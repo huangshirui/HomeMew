@@ -41,3 +41,8 @@ test('No extra model data writes or unbounded queries for relation titles', () =
   assert.doesNotMatch(relations, /Promise\.all\(outgoing\.map\(/);
   assert.match(relations, /limit: '50'/);
 });
+test('candidate picker supports Wish title and does not expose raw IDs as labels', () => {
+  assert.match(relations, /type Candidate = \{ id: string; name\?: string; summary\?: string; title\?: string \}/);
+  assert.match(relations, /item\.name \|\| item\.summary \|\| item\.title \|\| '名称暂不可用'/);
+  assert.match(relations, /const values = \[label, record\?\.name, record\?\.summary, record\?\.title/);
+});
