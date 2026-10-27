@@ -137,7 +137,8 @@ async function writePayload(request, kind, isUpdate) {
   } catch { return null; }
 }
 async function membersForLinkedCreate(request,env,familyId) {
-  const response = await forward(request,env,`/api/v1/spaces/${encodeURIComponent(familyId)}/members`);
+  // quick-create itself is a POST; member lookup must use the Core GET contract.
+  const response = await forward(request,env,`/api/v1/spaces/${encodeURIComponent(familyId)}/members`,'GET');
   if (!response.ok) return { response };
   try {
     const envelope = await response.json();
