@@ -8,7 +8,10 @@
     <view wx:if="{{error}}" class="thin-error">{{error}}</view>
     <view class="card workspace-summary">
       <view class="workspace-head">
-        <view class="workspace-icon">{{icon}}</view>
+        <view class="workspace-icon">
+          <image wx:if="{{iconImagePath}}" src="{{iconImagePath}}" mode="aspectFit" class="workspace-icon-img" />
+          <text wx:else>{{icon}}</text>
+        </view>
         <view class="workspace-name">{{record.name}}</view>
         <view wx:if="{{canWrite}}" class="menu-dot" bindtap="onMenu">···</view>
       </view>

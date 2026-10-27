@@ -2,7 +2,7 @@ import { DOMAIN_COPY, type DomainRecord, type PersonOption } from '../services/d
 import type { LifeKind } from '../services/life-records';
 
 export type HomeLifeRow = DomainRecord & {
-  icon: string; meta: string; peopleLabel: string; relatedToMe: boolean;
+  icon: string; iconImagePath: string; meta: string; peopleLabel: string; relatedToMe: boolean;
   checkedInToday: boolean; streakDays: number; checking: boolean;
 };
 
@@ -23,9 +23,12 @@ export function homeLifeRows(
       return left.localeCompare(right);
     }).slice(0, 3).map(record => {
       const ids = record.attendeePersonIds || record.subjectPersonIds || [];
+      const icon = record.presentation?.icon;
+      const iconText = icon?.type === 'emoji' ? icon.value : (icon?.type === 'image' ? '' : DOMAIN_COPY[kind].symbol);
       return {
         ...record,
-        icon: record.presentation?.icon?.type === 'emoji' ? record.presentation.icon.value : DOMAIN_COPY[kind].symbol,
+        icon: iconText,
+        iconImagePath: '',
         meta: kind === 'habits' ? '' : kind === 'goals'
           ? (record.targetDate ? '目标日期 ' + record.targetDate : '未设置目标日期')
           : [record.startDate || '开始日期不限', record.endDate || '结束日期不限'].join(' — '),

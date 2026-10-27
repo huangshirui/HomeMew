@@ -66,3 +66,24 @@ test('slow image downloads cannot overwrite a newly selected Icon', () => {
     assert.match(source, /!this\.data\.iconTouched && this\.data\.iconFileId === fileId/, model);
   }
 });
+
+test('Mini domain list/detail and home render uploaded icons without stale family or file leakage', () => {
+  for (const page of ['domains/list', 'domains/detail']) {
+    const xml = read('pages/' + page + '.wxml');
+    assert.match(xml, /<image wx:if="\{\{(?:item\.)?iconImagePath\}\}"/, page);
+    assert.match(xml, /<text wx:else>\{\{(?:item\.)?icon\}\}<\/text>/, page);
+  }
+  const homeXml = read('pages/home/home.wxml');
+  assert.match(homeXml, /iconImagePath/);
+  const list = read('pages/domains/list.ts');
+  const home = read('pages/home/home.ts');
+  const detail = read('pages/domains/detail.ts');
+  for (const source of [list, home, detail]) {
+    assert.match(source, /downloadRecordIconImage/);
+    assert.match(source, /currentIcon\.fileId\s*===\s*fileId|cur\.presentation\.icon\.fileId\s*===\s*fileId/);
+    assert.doesNotMatch(source, /_iconPaths|_lifeIconPaths/);
+  }
+  assert.match(list, /this\.data\.familyId!==familyId/);
+  assert.match(home, /this\.data\.currentFamily\?\.id !== familyId/);
+  assert.match(detail, /this\._generation===generation/);
+});

@@ -53,6 +53,15 @@ import { Event, Task, FamilyRole } from '../../types/index';
 import { listDomainPeople, performDomainAction, type PersonOption } from '../../services/domains';
 import { listCurrentLifeRecords, type LifeKind } from '../../services/life-records';
 import { homeLifeRows, type HomeLifeRow } from '../../utils/home-life';
+import { downloadRecordIconImage } from '../../services/record-icons';
+
+/** kind（首页生活进行时）到 LifeSpace modelKey 的映射，用于图标下载。 */
+function lifeModelKey(kind: LifeKind): 'activity' | 'goal' | 'habit' | null {
+  if (kind === 'activities') return 'activity';
+  if (kind === 'goals') return 'goal';
+  if (kind === 'habits') return 'habit';
+  return null;
+}
 
 type FamilyView = {
   id: string;
@@ -671,6 +680,7 @@ Page({
         const rows = homeLifeRows(records, kind, people, fetchPersonId);
         // A poll may finish while a check-in is pending. Keep its button locked.
         rows.forEach(row => { row.checking = this._checkingHabits.has(row.id); });
+        this.loadLifeIcons(kind, rows, familyId);
         this.setData({ [`lifeRecords.${kind}`]: rows, [`lifeErrors.${kind}`]: false,
           canCheckIn: Boolean(fetchPersonId) && (this.data.currentFamily?.role as string) !== 'viewer' });
       } catch {
@@ -681,6 +691,29 @@ Page({
         }
       }
     }));
+  },
+
+  loadLifeIcons(kind: LifeKind, rows: HomeLifeRow[], familyId: string): void {
+    const modelKey = lifeModelKey(kind);
+    if (!modelKey) return;
+    rows.forEach(row => {
+      const icon = row.presentation?.icon;
+      if (icon?.type !== 'image') return;
+      const fileId = icon.fileId;
+      // An icon URL/path is only reused after an authorized request for this
+      // family; an older response must not change a newly loaded row.
+      void downloadRecordIconImage(familyId, modelKey, row.id, fileId).then(path => {
+        if (this.data.currentFamily?.id !== familyId ||
+            currentFamilyStore.value?.id !== familyId) return;
+        const list = this.data.lifeRecords[kind];
+        const i = list.findIndex(r => r.id === row.id);
+        const current = i >= 0 ? list[i] : undefined;
+        const currentIcon = current?.presentation?.icon;
+        if (currentIcon?.type === 'image' && currentIcon.fileId === fileId &&
+            current?.iconImagePath !== path)
+          this.setData({ [`lifeRecords.${kind}[${i}].iconImagePath`]: path });
+      }).catch(() => undefined);
+    });
   },
 
   onLifeTab(e: WechatMiniprogram.TouchEvent): void {
