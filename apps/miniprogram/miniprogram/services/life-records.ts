@@ -27,8 +27,6 @@ export async function listCurrentLifeRecords(
   familyId: string, kind: LifeKind, personId: string, today: string,
   isCurrent: () => boolean = () => true,
 ): Promise<DomainRecord[]> {
-  // Missing Space Person mapping is not a request to list every family member's habits.
-  if (kind === 'habits' && !personId) return [];
   const records: DomainRecord[] = [];
   let cursor: string | undefined;
   const visited = new Set<string>();
@@ -37,7 +35,9 @@ export async function listCurrentLifeRecords(
       ? { period: 'current', today, limit: 100, cursor, ...(personId ? { personId } : {}) }
       : { status: 'active', limit: 100, cursor, ...(personId ? { personId } : {}) };
     const page = kind === 'habits'
-      ? await listPersonalHabitPage(familyId, personId, options, isCurrent)
+      ? (personId
+          ? await listPersonalHabitPage(familyId, personId, options, isCurrent)
+          : await listDomainRecords(familyId, 'habits', options))
       : await listDomainRecords(familyId, kind, options);
     if (!isCurrent()) return [];
     records.push(...page.items);
