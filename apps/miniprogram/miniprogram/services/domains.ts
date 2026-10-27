@@ -1,12 +1,14 @@
 /** Stable, explicit HomeMew Mini product domain contract. No LifeSpace wire paths in client. */
 import { request } from './api';
 import { productQuery } from './product-routes';
+import { candidateDisplayName, relationDisplayName } from '../utils/relation-display';
 
 export type DomainKind = 'activities' | 'goals' | 'habits' | 'anniversaries' | 'football-matches' | 'football-performances' | 'football-teams';
 export type DomainStatus = 'active' | 'paused' | 'achieved' | 'abandoned' | 'ended';
 export type DomainIcon = { type: 'emoji'; value: string } | { type: 'image'; fileId: string };
 export type DomainRecord = {
-  id: string; version: number; spaceId?: string; name?: string; description?: string | null; createdAt?: string;
+  id: string; version: number; spaceId?: string; name?: string; summary?: string; title?: string;
+  description?: string | null; createdAt?: string;
   presentation?: { icon?: DomainIcon | null };
   status?: DomainStatus; attendeePersonIds?: string[]; subjectPersonIds?: string[]; personIds?: string[];
   startDate?: string | null; endDate?: string | null; targetDate?: string | null;
@@ -50,8 +52,8 @@ export type DomainRelation = {
   id: string;
   source: { modelKey: string; recordId: string };
   target: { modelKey: string; recordId: string };
-  sourceRecord?: { name?: string|null; summary?: string|null; title?: string|null };
-  targetRecord?: { name?: string|null; summary?: string|null; title?: string|null };
+  sourceRecord?: { name?: string|null; summary?: string|null; title?: string|null; displayName?: string|null };
+  targetRecord?: { name?: string|null; summary?: string|null; title?: string|null; displayName?: string|null };
   sourceLabel?: string; targetLabel?: string;
 };
 const relations = (familyId: string, kind: 'activities'|'goals'|'habits', id: string) =>
@@ -79,11 +81,9 @@ export function readableRelationTitle(edge: DomainRelation, direction: 'outgoing
   const obj = direction === 'outgoing' ? edge.targetRecord : edge.sourceRecord;
   const label = direction === 'outgoing' ? edge.targetLabel : edge.sourceLabel;
   const refId = direction === 'outgoing' ? edge.target.recordId : edge.source.recordId;
-  for (const value of [obj?.name,obj?.summary,obj?.title,label]) {
-    if (value && value.trim() && value !== refId && !/^rec_[\w-]+$/.test(value)) return value;
-  }
-  return '名称暂不可用';
+  return relationDisplayName(refId, label, obj);
 }
+export const readableCandidateTitle = candidateDisplayName;
 
 /** Native container workspace operations; all write paths remain atomic at LifeSpace. */
 const containerBase=(familyId:string,kind:'activities'|'goals'|'habits',id:string) =>
