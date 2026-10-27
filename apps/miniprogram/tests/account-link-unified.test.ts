@@ -7,8 +7,8 @@ const source=(p:string)=>readFileSync(new URL('../miniprogram/'+p,import.meta.ur
 function page(path:string,globals:Record<string,unknown>){let result:any;runInNewContext(stripTypeScriptTypes(source(path).replace(/^import[\s\S]*?from ['"][^'"]+['"];?\r?$/gm,'')),{...globals,Page:(p:any)=>{result=p;}});result.setData=(patch:any)=>Object.assign(result.data,patch);return result;}
 test('settings shows the same mailbox for code-linked and pre-linked accounts',async()=>{
  let state={email:'me@example.com',version:2,linked:true,status:'linked'};
- const settings=page('pages/settings/settings.ts',{userStore:{value:null},loadCurrentUser:async()=>({id:'usr_test'}),ensureRuntimeReady:async()=>{},getWebLogin:async()=>state});
- await settings.loadAccount();assert.equal(settings.data.loginEmail,'m***@example.com');assert.equal(settings.data.linkStatus,'linked');
+ const settings=page('pages/settings/settings.ts',{userStore:{value:{id:'usr_test'}},currentFamilyStore:{value:{id:'spc_test'}},STORAGE_KEYS:{currentFamilyId:'currentFamilyId'},wx:{getStorageSync:()=>''},loadHomeScope:()=> 'all',loadCurrentUser:async()=>({id:'usr_test'}),ensureRuntimeReady:async()=>{},getWebLogin:async()=>state});
+ await settings.loadAccount();assert.equal(settings.data.loginEmail,'m***@example.com');assert.equal(settings.data.linkStatus,'linked');assert.equal(settings.data.homeScope,'all');
  state={...state,linked:false,status:'pending'};await settings.loadAccount();assert.equal(settings.data.linkStatus,'pending');assert.equal(settings.data.accountError,false);
 });
 test('code linking remains reachable independently of an email declaration',()=>{
@@ -20,4 +20,16 @@ test('saving email projects pending proof rather than claiming a completed bindi
  let confirmation:any,toast='';
  const form=page('pages/account-email/account-email.ts',{ensureRuntimeReady:async()=>{},getWebLogin:async()=>({email:null,version:0,linked:false,status:'unlinked'}),saveWebLoginEmail:async(email:string,version:number)=>{assert.equal(email,'me@example.com');assert.equal(version,0);return{email,version:1,linked:false,status:'pending'};},AppError:Error,wx:{showModal:(options:any)=>{confirmation=options;options.success({confirm:true});},showToast:(options:any)=>{toast=options.title;},navigateBack:()=>{}}});
  await form.loadAccount();form.data.email='me@example.com';await form.onSave();assert.equal(form.data.linkStatus,'pending');assert.equal(toast,'邮箱已设置');assert.match(confirmation.content,/Web 登录验证后/);
+});
+
+test('settings restores saved home scope synchronously onLoad without waiting for account',()=>{
+ const settings=page('pages/settings/settings.ts',{
+   userStore:{value:{id:'usr_test'}},currentFamilyStore:{value:{id:'spc_test'}},
+   STORAGE_KEYS:{currentFamilyId:'currentFamilyId'},wx:{getStorageSync:()=>''},
+   loadHomeScope:(familyId:string,userId:string)=>{assert.equal(familyId,'spc_test');assert.equal(userId,'usr_test');return 'all';},
+   loadTimeZonePreference:()=>({mode:'system',customTimeZone:''}),resolveDisplayTimeZone:()=> 'Asia/Shanghai',
+ });
+ assert.equal(settings.data.homeScope,'me');
+ settings.onLoad();
+ assert.equal(settings.data.homeScope,'all');
 });
