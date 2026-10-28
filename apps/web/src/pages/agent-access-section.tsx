@@ -17,9 +17,11 @@ import {
   displayIntegrationError,
   familyApiBaseUrl,
   formatIntegrationTime,
-  integrationModels,
+  fetchIntegrationModels,
+  visibleIntegrationModels,
   permissionLabel,
   type PermissionMap,
+  type IntegrationModel,
 } from '../lib/integrations';
 
 type CredentialAccess = 'read' | 'write';
@@ -55,13 +57,14 @@ type AgentSecret = {
   token: string;
 };
 
-const emptyPermissions = (): PermissionMap => ({ event: null, task: null, day_record: null });
+const emptyPermissions = (): PermissionMap => ({});
 
 function accessLabel(value: CredentialAccess | null) {
   return value === 'write' ? '读取 + 写入' : value === 'read' ? '只读' : '未配置';
 }
 
-function DirectPermissionEditor({ value, onChange, credentialAccess, disabled = false }: {
+function DirectPermissionEditor({ models, value, onChange, credentialAccess, disabled = false }: {
+  models: IntegrationModel[];
   value: PermissionMap;
   onChange: (value: PermissionMap) => void;
   credentialAccess: CredentialAccess;
@@ -69,7 +72,7 @@ function DirectPermissionEditor({ value, onChange, credentialAccess, disabled = 
 }) {
   return (
     <div className="grid gap-3">
-      {integrationModels.map((model) => (
+      {models.map((model) => (
         <label key={model.key} className="flex items-center justify-between gap-4 rounded-2xl bg-stone-50 px-4 py-3">
           <span className="min-w-0">
             <span className="block text-sm font-medium text-stone-800">{model.label}</span>
@@ -77,7 +80,7 @@ function DirectPermissionEditor({ value, onChange, credentialAccess, disabled = 
           </span>
           <select
             className="h-9 shrink-0 rounded-xl border border-stone-200 bg-white px-2 text-sm text-stone-700 disabled:bg-stone-100 disabled:text-stone-400"
-            disabled={disabled}
+            disabled={disabled || model.access.length === 0}
             value={value[model.key] ?? 'none'}
             onChange={(event) => onChange({
               ...value,
@@ -85,8 +88,8 @@ function DirectPermissionEditor({ value, onChange, credentialAccess, disabled = 
             })}
           >
             <option value="none">无权限</option>
-            <option value="read">只读</option>
-            <option value="write" disabled={credentialAccess === 'read'}>读写</option>
+            <option value="read" disabled={!model.access.includes('read')}>只读</option>
+            <option value="write" disabled={credentialAccess === 'read' || !model.access.includes('write')}>读写</option>
           </select>
         </label>
       ))}
@@ -94,10 +97,10 @@ function DirectPermissionEditor({ value, onChange, credentialAccess, disabled = 
   );
 }
 
-function PermissionSummary({ value }: { value: PermissionMap }) {
+function PermissionSummary({ models, value }: { models: IntegrationModel[]; value: PermissionMap }) {
   return (
     <div className="grid gap-2 sm:grid-cols-3">
-      {integrationModels.map((model) => (
+      {models.map((model) => (
         <div key={model.key} className="rounded-2xl bg-stone-50 px-4 py-3">
           <p className="text-sm font-medium text-stone-800">{model.label}</p>
           <p className="mt-1 text-xs text-stone-500">{permissionLabel(value[model.key])}</p>
@@ -164,6 +167,9 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
   const [busy, setBusy] = useState<string | null>(null);
   const [credentialAccess, setCredentialAccess] = useState<CredentialAccess>('write');
   const [permissions, setPermissions] = useState<PermissionMap>(emptyPermissions);
+  const [models, setModels] = useState<IntegrationModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const [editingPermissions, setEditingPermissions] = useState(false);
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [rotationAccess, setRotationAccess] = useState<CredentialAccess>('write');
@@ -195,6 +201,21 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
   useEffect(() => {
     void load();
   }, [spaceId, integrationId]);
+
+  useEffect(() => {
+    let current = true;
+    setModelsLoading(true);
+    setModelsError(null);
+    setModels([]);
+    void fetchIntegrationModels()
+      .then((value) => { if (current) setModels(value); })
+      .catch((cause) => { if (current) setModelsError(displayIntegrationError(cause, '无法读取可配置模型')); })
+      .finally(() => { if (current) setModelsLoading(false); });
+    return () => { current = false; };
+  }, [spaceId]);
+
+  const editableModels = visibleIntegrationModels(models, permissions);
+  const canManageModels = !modelsLoading && !modelsError && models.length > 0;
 
   const activeCredentials = useMemo(() => agent?.credentials.filter((credential) => credential.active) ?? [], [agent]);
   const currentCredential = activeCredentials[0] ?? null;
@@ -338,6 +359,9 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
       <Card>
         <CardContent className="space-y-5 pt-6">
           {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+          {modelsLoading && <p className="text-sm text-stone-500">正在读取 LifeSpace 可配置模型…</p>}
+          {modelsError && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">模型列表获取失败，已暂停权限修改：{modelsError}</p>}
+          {!modelsLoading && !modelsError && models.length === 0 && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">当前 HomeMew Application 没有可配置的模型，请先在 LifeSpace Console 检查 Application × Model Access。</p>}
           {revealedToken && <AgentCredentialReveal token={revealedToken} spaceId={spaceId} onClose={() => setRevealedToken(null)} />}
 
           {loading ? (
@@ -374,11 +398,11 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
                   </div>
                   <span className="text-xs text-stone-400">LifeSpace Agent Data Grant</span>
                 </div>
-                <DirectPermissionEditor value={permissions} onChange={setPermissions} credentialAccess={credentialAccess} disabled={readOnly || busy !== null} />
+                <DirectPermissionEditor models={editableModels} value={permissions} onChange={setPermissions} credentialAccess={credentialAccess} disabled={!canManageModels || readOnly || busy !== null} />
               </div>
               {!readOnly && (
                 <div className="flex justify-end border-t border-stone-100 pt-4">
-                  <Button variant="primary" disabled={busy !== null} onClick={() => void createAgent()}>
+                  <Button variant="primary" disabled={!canManageModels || busy !== null} onClick={() => void createAgent()}>
                     {busy === 'create' ? <LoaderCircle className="size-4 animate-spin" /> : <Bot className="size-4" />}创建 Agent 接入
                   </Button>
                 </div>
@@ -449,24 +473,24 @@ export function AgentAccessSection({ spaceId, integrationId, integrationName, re
                     <p className="mt-1 text-xs leading-5 text-stone-400">AI 助手可以直接进行这些操作；其他操作需要用户另行授权。</p>
                   </div>
                   {!readOnly && !agent.hasWholeSpaceGrant && !editingPermissions && (
-                    <Button disabled={busy !== null || agent.rotationPending || !agent.credentialAccess} onClick={() => setEditingPermissions(true)}>编辑</Button>
+                    <Button disabled={!canManageModels || busy !== null || agent.rotationPending || !agent.credentialAccess} onClick={() => setEditingPermissions(true)}>编辑</Button>
                   )}
                 </div>
                 {editingPermissions && agent.credentialAccess ? (
                   <div className="space-y-3">
-                    <DirectPermissionEditor value={permissions} onChange={setPermissions} credentialAccess={agent.credentialAccess} disabled={busy !== null} />
+                    <DirectPermissionEditor models={editableModels} value={permissions} onChange={setPermissions} credentialAccess={agent.credentialAccess} disabled={!canManageModels || busy !== null} />
                     <div className="flex justify-end gap-2">
                       <Button disabled={busy !== null} onClick={() => {
                         setEditingPermissions(false);
                         setPermissions(agent.permissions);
                       }}>取消</Button>
-                      <Button variant="primary" disabled={busy !== null} onClick={() => void savePermissions()}>
+                      <Button variant="primary" disabled={!canManageModels || busy !== null} onClick={() => void savePermissions()}>
                         {busy === 'save' ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}保存直接权限
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <PermissionSummary value={agent.effectivePermissions} />
+                  <PermissionSummary models={visibleIntegrationModels(models, agent.effectivePermissions)} value={agent.effectivePermissions} />
                 )}
               </div>
 
