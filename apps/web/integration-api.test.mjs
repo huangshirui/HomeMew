@@ -324,3 +324,28 @@ test('integration endpoints fail closed when the dedicated application credentia
   assert.equal((await payload(result)).error.code, 'INTEGRATIONS_NOT_CONFIGURED');
   assert.equal(called, false);
 });
+
+test('Service Access accepts newly published model keys and preserves omitted model Grants on edit', async () => {
+  const state = createState();
+  const created = await handleIntegrationRequest(request('/api/integrations', {
+    method: 'POST',
+    body: {
+      spaceId: 'spc_family', displayName: 'Model-aware service', credentialMode: 'api_token',
+      permissions: { habit: 'write', activity: 'read' },
+    },
+  }), ENV, { fetcher: makeFetcher(state), assertion: ASSERTION, id: REQUEST_ID });
+  assert.equal(created.status, 201);
+  const service = (await payload(created)).data.integration;
+  assert.equal(service.permissions.habit, 'write');
+  assert.equal(service.permissions.activity, 'read');
+  assert.ok(state.grants.some((item) => item.resourceId === 'habit' && item.permission === 'write' && !item.revokedAt));
+
+  const changed = await handleIntegrationRequest(request(`/api/integrations/${service.id}`, {
+    method: 'PATCH', body: { spaceId: 'spc_family', permissions: { habit: 'read' } },
+  }), ENV, { fetcher: makeFetcher(state), assertion: ASSERTION, id: REQUEST_ID });
+  assert.equal(changed.status, 200);
+  const updated = (await payload(changed)).data;
+  assert.equal(updated.permissions.habit, 'read');
+  assert.equal(updated.permissions.activity, 'read', 'an omitted model Grant must not be revoked');
+  assert.deepEqual(state.principals.find((item) => item.id === service.id).maxScopes, ['resources:read']);
+});
