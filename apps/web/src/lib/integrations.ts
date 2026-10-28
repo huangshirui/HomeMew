@@ -2,6 +2,17 @@ import { apiRequest, ApiError } from './api-client';
 
 // LifeSpace's configuration-time Discovery is authoritative for the current
 // HomeMew Application × Model Access. Labels below are presentation only.
+export const PERSON_DIRECTORY_PERMISSION_KEY = 'person_directory';
+
+// Kernel Person Directory is not a Model Registry entry; it uses its own
+// LifeSpace Data Grant target, independent from model permissions.
+const personDirectoryPermission: IntegrationModel = {
+  key: PERSON_DIRECTORY_PERMISSION_KEY,
+  label: '人员',
+  description: '人员目录 · Person Directory',
+  access: ['read', 'write'],
+};
+
 const localModelLabels: Record<string, string> = {
   event: '日程',
   task: '待办',
@@ -47,7 +58,7 @@ export async function fetchIntegrationModels(): Promise<IntegrationModel[]> {
       access,
     }];
   });
-  return models;
+  return [personDirectoryPermission, ...models.filter((model) => model.key !== PERSON_DIRECTORY_PERMISSION_KEY)];
 }
 
 // Keep old Grants visible if a model is later retired or the Application loses
