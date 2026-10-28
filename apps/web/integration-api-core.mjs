@@ -8,7 +8,8 @@ import {
 } from './integration-binding.mjs';
 
 const MANAGER_SCOPES = ['profile:read', 'grants:manage'];
-const LEGACY_MODEL_KEYS = ['event', 'task', 'day_record'];
+const PERSON_DIRECTORY_KEY = 'person_directory';
+const LEGACY_MODEL_KEYS = ['event', 'task', 'day_record', PERSON_DIRECTORY_KEY];
 const MODEL_KEY_PATTERN = /^[a-z][a-z0-9_]{0,79}$/u;
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
 const MAX_USER_DESCRIPTION_LENGTH = 400;
@@ -190,7 +191,9 @@ function modelPermission(grants, modelKey, includeWholeSpace = false) {
   let bestRank = 0;
   for (const grant of grants) {
     if (!activeGrant(grant)) continue;
-    const matchesModel = grant.resourceType === 'model' && grant.resourceId === modelKey;
+    const matchesModel = modelKey === PERSON_DIRECTORY_KEY
+      ? grant.resourceType === 'person_directory' && grant.resourceId === null
+      : grant.resourceType === 'model' && grant.resourceId === modelKey;
     const matchesSpace = includeWholeSpace && grant.resourceType === 'space' && grant.resourceId === null;
     if (!matchesModel && !matchesSpace) continue;
     const rank = PERMISSION_RANK[grant.permission] ?? 0;
@@ -433,8 +436,8 @@ async function createGrant(env, fetcher, managerToken, spaceId, principalId, mod
     body: {
       granteeType: 'service',
       granteeId: principalId,
-      resourceType: 'model',
-      resourceId: modelKey,
+      resourceType: modelKey === PERSON_DIRECTORY_KEY ? 'person_directory' : 'model',
+      resourceId: modelKey === PERSON_DIRECTORY_KEY ? null : modelKey,
       permission,
       expiresAt: null,
     },
@@ -455,7 +458,8 @@ async function reconcileModelGrants(env, fetcher, managerToken, spaceId, princip
   const principalGrants = grantsForPrincipal(allGrants, principalId);
   for (const modelKey of Object.keys(permissions)) {
     const desired = permissions[modelKey];
-    const active = principalGrants.filter((grant) => activeGrant(grant) && grant.resourceType === 'model' && grant.resourceId === modelKey);
+    const active = principalGrants.filter((grant) => activeGrant(grant) && ((modelKey === PERSON_DIRECTORY_KEY && grant.resourceType === 'person_directory' && grant.resourceId === null)
+      || (modelKey !== PERSON_DIRECTORY_KEY && grant.resourceType === 'model' && grant.resourceId === modelKey)));
     if (!desired) {
       for (const grant of active) await revokeGrant(env, fetcher, managerToken, spaceId, grant.id, id);
       continue;
