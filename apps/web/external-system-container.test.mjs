@@ -91,3 +91,20 @@ test('football performance model key has a localized HomeMew label', () => {
   assert.match(catalog, /football_performance: '球员表现'/u);
   assert.doesNotMatch(catalog, /football_player_performance: '球员表现'/u);
 });
+
+test('Person Directory is a separate Kernel Data Grant, not a discovered model grant', () => {
+  const catalog = source('./src/lib/integrations.ts');
+  const service = source('./integration-api-core.mjs');
+  const agent = source('./external-system-agent-api.mjs');
+  const legacyAgent = source('./agent-integration-api.mjs');
+
+  assert.match(catalog, /PERSON_DIRECTORY_PERMISSION_KEY = 'person_directory'/u);
+  assert.match(catalog, /label: '人员'/u);
+  assert.match(catalog, /return \[personDirectoryPermission, \.\.\.models/u);
+  for (const sourceCode of [service, agent, legacyAgent]) {
+    assert.match(sourceCode, /PERSON_DIRECTORY_KEY = 'person_directory'/u);
+    assert.match(sourceCode, /resourceType: modelKey === PERSON_DIRECTORY_KEY \? 'person_directory' : 'model'/u);
+    assert.match(sourceCode, /resourceId: modelKey === PERSON_DIRECTORY_KEY \? null : modelKey/u);
+    assert.match(sourceCode, /grant\.resourceType === 'person_directory' && grant\.resourceId === null/u);
+  }
+});
