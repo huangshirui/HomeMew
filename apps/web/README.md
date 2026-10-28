@@ -188,7 +188,7 @@ ext_*
       -> LifeSpace Core
 ```
 
-The UI exposes `none`, `read`, or `write` for `event`, `task`, and `day_record`. Stable service credential scopes remain `resources:read` / `resources:write`; effective authority remains the intersection of credential scope, Application × Model Access and current Data Grants.
+The UI discovers currently configurable published models through LifeSpace `GET /api/v1/me/_discovery/models`, constrained by the HomeMew Application × Model Access and browser credential scopes, instead of hard-coding `event`, `task`, and `day_record`. It exposes `none`, `read` or `write` according to discovered capability; undiscoverable models with existing Grants remain visible for review but cannot be edited here. Model discovery does not itself grant Space authority. The Core validates model/Space binding when the Web orchestration writes Data Grants. Partial permission updates preserve omitted Grants, including models no longer discoverable. Stable service credential scopes remain `resources:read` / `resources:write`; effective authority remains the intersection of credential scope, Application × Model Access and current Data Grants.
 
 One Service Access has one selected authentication mode and one active credential at steady state. Rotation is a controlled temporary exception: create the replacement, update and verify the external runtime, then complete by revoking old credentials; cancel revokes the candidate and keeps the previous credential.
 
