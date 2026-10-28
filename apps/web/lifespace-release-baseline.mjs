@@ -3,13 +3,14 @@ import { fileURLToPath } from 'node:url';
 
 export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
   identity: Object.freeze({
-    contractVersion: '0.15.0',
-    // Global mailbox ownership and other independently linked Access identities
-    // are preserved by LifeSpace Identity 0.15/schema 14. Never infer compatibility
-    // from numeric version ordering or accept the superseded 0.14 semantics.
-    compatibleContractVersions: Object.freeze(['0.15.0']),
+    contractVersion: '0.17.0',
+    // 0.15/schema 14 introduced globally unique login mailboxes; 0.16 added
+    // self-only Application inspection; 0.17 moved Bootstrap operations to
+    // the separate Platform Admin OpenAPI without removing ordinary routes.
+    // Explicitly reviewed only: never accept unknown future versions by number.
+    compatibleContractVersions: Object.freeze(['0.15.0', '0.16.0', '0.17.0']),
     minimumSchemaVersion: 14,
-    minimumSchemaByContract: Object.freeze({ '0.15.0': 14 }),
+    minimumSchemaByContract: Object.freeze({ '0.15.0': 14, '0.16.0': 14, '0.17.0': 14 }),
   }),
   core: Object.freeze({
     contractVersion: '0.53.0',
