@@ -71,6 +71,9 @@ function makeFetcher({ failingEndpointId = null } = {}) {
       return response(200, { data: { id: 'usr_manager', displayName: 'Manager' } });
     }
 
+    if (url === 'https://core.example.test/api/v1/spaces/spc_family/person-directory/grants?includeRevoked=true') {
+      return response(200, { data: [] });
+    }
     if (url === 'https://core.example.test/api/v1/spaces/spc_family/grants?includeRevoked=true') {
       assert.equal(authorization, 'Bearer manager-token');
       return response(200, { data: [] });
