@@ -18,25 +18,28 @@ import {
   displayIntegrationError,
   familyApiBaseUrl,
   formatIntegrationTime,
-  integrationModels,
+  fetchIntegrationModels,
+  visibleIntegrationModels,
   oauthTokenUrl,
   permissionLabel,
   type CredentialMode,
   type CredentialSecret,
   type PermissionMap,
+  type IntegrationModel,
   type ServiceAccess,
 } from '../lib/integrations';
 
-const defaultPermissions = (): PermissionMap => ({ event: 'write', task: 'write', day_record: 'read' });
+const defaultPermissions = (): PermissionMap => ({});
 
-function PermissionEditor({ value, onChange, disabled = false }: {
+function PermissionEditor({ models, value, onChange, disabled = false }: {
+  models: IntegrationModel[];
   value: PermissionMap;
   onChange: (value: PermissionMap) => void;
   disabled?: boolean;
 }) {
   return (
     <div className="grid gap-3">
-      {integrationModels.map((model) => (
+      {models.map((model) => (
         <label key={model.key} className="flex items-center justify-between gap-4 rounded-2xl bg-stone-50 px-4 py-3">
           <span className="min-w-0">
             <span className="block text-sm font-medium text-stone-800">{model.label}</span>
@@ -44,7 +47,7 @@ function PermissionEditor({ value, onChange, disabled = false }: {
           </span>
           <select
             className="h-9 shrink-0 rounded-xl border border-stone-200 bg-white px-2 text-sm text-stone-700 disabled:bg-stone-100 disabled:text-stone-400"
-            disabled={disabled}
+            disabled={disabled || model.access.length === 0}
             value={value[model.key] ?? 'none'}
             onChange={(event) => onChange({
               ...value,
@@ -52,8 +55,8 @@ function PermissionEditor({ value, onChange, disabled = false }: {
             })}
           >
             <option value="none">无权限</option>
-            <option value="read">只读</option>
-            <option value="write">读写</option>
+            <option value="read" disabled={!model.access.includes('read')}>只读</option>
+            <option value="write" disabled={!model.access.includes('write')}>读写</option>
           </select>
         </label>
       ))}
@@ -61,10 +64,10 @@ function PermissionEditor({ value, onChange, disabled = false }: {
   );
 }
 
-function PermissionSummary({ value }: { value: PermissionMap }) {
+function PermissionSummary({ models, value }: { models: IntegrationModel[]; value: PermissionMap }) {
   return (
     <div className="grid gap-2 sm:grid-cols-3">
-      {integrationModels.map((model) => (
+      {models.map((model) => (
         <div key={model.key} className="rounded-2xl bg-stone-50 px-4 py-3">
           <p className="text-sm font-medium text-stone-800">{model.label}</p>
           <p className="mt-1 text-xs text-stone-500">{permissionLabel(value[model.key])}</p>
@@ -168,6 +171,9 @@ export function ServiceAccessSection({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<PermissionMap>(defaultPermissions);
+  const [models, setModels] = useState<IntegrationModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const [credentialMode, setCredentialMode] = useState<CredentialMode>('api_token');
   const [editingPermissions, setEditingPermissions] = useState(false);
   const [rotationMode, setRotationMode] = useState<CredentialMode>('api_token');
@@ -200,6 +206,21 @@ export function ServiceAccessSection({
   useEffect(() => {
     void load();
   }, [spaceId, externalSystemId]);
+
+  useEffect(() => {
+    let current = true;
+    setModelsLoading(true);
+    setModelsError(null);
+    setModels([]);
+    void fetchIntegrationModels()
+      .then((value) => { if (current) setModels(value); })
+      .catch((cause) => { if (current) setModelsError(displayIntegrationError(cause, '无法读取可配置模型')); })
+      .finally(() => { if (current) setModelsLoading(false); });
+    return () => { current = false; };
+  }, [spaceId]);
+
+  const editableModels = visibleIntegrationModels(models, permissions);
+  const canManageModels = !modelsLoading && !modelsError && models.length > 0;
 
   const activeCredentials = useMemo(() => service?.credentials.filter((item) => item.active) ?? [], [service]);
   const currentCredential = activeCredentials[0] ?? null;
@@ -347,6 +368,9 @@ export function ServiceAccessSection({
       <Card>
         <CardContent className="space-y-5 pt-6">
           {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+          {modelsLoading && <p className="text-sm text-stone-500">正在读取 LifeSpace 可配置模型…</p>}
+          {modelsError && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">模型列表获取失败，已暂停权限修改：{modelsError}</p>}
+          {!modelsLoading && !modelsError && models.length === 0 && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">当前 HomeMew Application 没有可配置的模型，请先在 LifeSpace Console 检查 Application × Model Access。</p>}
           {revealedCredential && <SecretReveal credential={revealedCredential} systemName={systemName} spaceId={spaceId} onClose={() => setRevealedCredential(null)} />}
 
           {loading ? (
@@ -358,7 +382,7 @@ export function ServiceAccessSection({
               </div>
               <div>
                 <p className="mb-3 text-sm font-semibold text-stone-800">数据访问</p>
-                <PermissionEditor value={permissions} onChange={setPermissions} disabled={readOnly || busy !== null} />
+                <PermissionEditor models={editableModels} value={permissions} onChange={setPermissions} disabled={!canManageModels || readOnly || busy !== null} />
               </div>
               <label className="block max-w-md text-sm font-medium text-stone-700">认证方式
                 <select
@@ -374,7 +398,7 @@ export function ServiceAccessSection({
               </label>
               {!readOnly && (
                 <div className="flex justify-end border-t border-stone-100 pt-4">
-                  <Button variant="primary" disabled={busy !== null || !Object.values(permissions).some(Boolean)} onClick={() => void createService()}>
+                  <Button variant="primary" disabled={!canManageModels || busy !== null || !Object.values(permissions).some(Boolean)} onClick={() => void createService()}>
                     {busy === 'create' ? <LoaderCircle className="size-4 animate-spin" /> : <Server className="size-4" />}创建 Service Access
                   </Button>
                 </div>
@@ -444,20 +468,20 @@ export function ServiceAccessSection({
                     <p className="mt-1 text-xs leading-5 text-stone-400">选择这个服务可以查看或修改哪些家庭内容。</p>
                   </div>
                   {!readOnly && !service.hasWholeSpaceGrant && !editingPermissions && (
-                    <Button disabled={busy !== null || service.rotationPending} onClick={() => setEditingPermissions(true)}>编辑</Button>
+                    <Button disabled={!canManageModels || busy !== null || service.rotationPending} onClick={() => setEditingPermissions(true)}>编辑</Button>
                   )}
                 </div>
                 {editingPermissions ? (
                   <div className="space-y-3">
-                    <PermissionEditor value={permissions} onChange={setPermissions} disabled={busy !== null} />
+                    <PermissionEditor models={editableModels} value={permissions} onChange={setPermissions} disabled={!canManageModels || busy !== null} />
                     <div className="flex justify-end gap-2">
                       <Button disabled={busy !== null} onClick={() => { setEditingPermissions(false); setPermissions(service.permissions); }}>取消</Button>
-                      <Button variant="primary" disabled={busy !== null || !Object.values(permissions).some(Boolean)} onClick={() => void savePermissions()}>
+                      <Button variant="primary" disabled={!canManageModels || busy !== null || !Object.values(permissions).some(Boolean)} onClick={() => void savePermissions()}>
                         {busy === 'save' ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}保存数据访问
                       </Button>
                     </div>
                   </div>
-                ) : <PermissionSummary value={service.effectivePermissions} />}
+                ) : <PermissionSummary models={visibleIntegrationModels(models, service.effectivePermissions)} value={service.effectivePermissions} />}
               </div>
 
               <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
