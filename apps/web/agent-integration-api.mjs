@@ -5,7 +5,8 @@ import {
 } from './integration-binding.mjs';
 
 const MANAGER_SCOPES = ['profile:read', 'grants:manage'];
-const MODEL_KEYS = ['event', 'task', 'day_record'];
+const LEGACY_MODEL_KEYS = ['event', 'task', 'day_record'];
+const MODEL_KEY_PATTERN = /^[a-z][a-z0-9_]{0,79}$/u;
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
 
 class AgentIntegrationError extends Error {
@@ -111,11 +112,12 @@ function parsePermissions(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new AgentIntegrationError(422, 'VALIDATION_ERROR', 'permissions is required');
   }
-  if (Object.keys(value).some((key) => !MODEL_KEYS.includes(key))) {
-    throw new AgentIntegrationError(422, 'VALIDATION_ERROR', 'permissions contains an unsupported model');
+  const keys = Object.keys(value);
+  if (keys.length > 200 || keys.some((key) => !MODEL_KEY_PATTERN.test(key))) {
+    throw new AgentIntegrationError(422, 'VALIDATION_ERROR', 'permissions contains an invalid model key');
   }
-  const result = {};
-  for (const modelKey of MODEL_KEYS) {
+  const result = Object.create(null);
+  for (const modelKey of keys) {
     const permission = value[modelKey];
     if (permission === undefined || permission === null || permission === 'none') {
       result[modelKey] = null;
@@ -454,7 +456,7 @@ async function revokeGrant(env, fetcher, managerToken, spaceId, grantId, id) {
 
 async function reconcileAgentModelGrants(env, fetcher, managerToken, spaceId, agentId, allGrants, permissions, id) {
   const agentGrants = grantsForAgent(allGrants, agentId);
-  for (const modelKey of MODEL_KEYS) {
+  for (const modelKey of Object.keys(permissions)) {
     const desired = permissions[modelKey];
     const active = agentGrants.filter((grant) => activeGrant(grant) && grant.resourceType === 'model' && grant.resourceId === modelKey);
     if (!desired) {
@@ -490,8 +492,8 @@ function agentDto(agent, grants, credentials) {
     displayName: agent.displayName,
     status: agent.status,
     credentialAccess: credentialAccessForScopes(candidate?.scopes ?? []),
-    permissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants, modelKey, false)])),
-    effectivePermissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants, modelKey, true)])),
+    permissions: Object.fromEntries([...new Set([...LEGACY_MODEL_KEYS, ...grants.filter((grant) => grant.resourceType === 'model' && typeof grant.resourceId === 'string').map((grant) => grant.resourceId)])].map((modelKey) => [modelKey, modelPermission(grants, modelKey, false)])),
+    effectivePermissions: Object.fromEntries([...new Set([...LEGACY_MODEL_KEYS, ...grants.filter((grant) => grant.resourceType === 'model' && typeof grant.resourceId === 'string').map((grant) => grant.resourceId)])].map((modelKey) => [modelKey, modelPermission(grants, modelKey, true)])),
     hasWholeSpaceGrant: activeWholeSpaceGrants.length > 0,
     rotationPending: activeCredentials.length > 1,
     rotationCandidateId: activeCredentials.length > 1 ? candidate.id : null,
@@ -633,7 +635,7 @@ async function handleStartCredentialRotation(request, env, fetcher, assertion, i
   const credentials = await listAgentCredentials(env, fetcher, binding.agentId, id);
   const activeCredentials = credentials.filter((credential) => credential.active);
   if (activeCredentials.length > 1) throw new AgentIntegrationError(409, 'AGENT_CREDENTIAL_ROTATION_PENDING', '已有一次 Agent 凭据轮换尚未完成');
-  const directPermissions = Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grantsForAgent(grants, binding.agentId), modelKey, true)]));
+  const directPermissions = Object.fromEntries([...new Set([...LEGACY_MODEL_KEYS, ...grants.filter((grant) => grant.resourceType === 'model' && typeof grant.resourceId === 'string').map((grant) => grant.resourceId)])].map((modelKey) => [modelKey, modelPermission(grantsForAgent(grants, binding.agentId), modelKey, true)]));
   assertPermissionsWithinCredentialAccess(directPermissions, access);
 
   const credential = await createAgentCredentialWithReconciliation(
