@@ -267,7 +267,11 @@ async function listSpaceGrants(env, fetcher, managerToken, spaceId, id) {
     fallbackCode: 'INTEGRATION_GRANTS_FAILED',
   });
   if (!Array.isArray(grants)) throw new AgentIntegrationError(502, 'INTEGRATION_GRANTS_FAILED', 'LifeSpace 未返回有效授权列表');
-  return grants;
+  const scoped = await coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/person-directory/grants?includeRevoked=true`, {
+    id, fallbackCode: 'INTEGRATION_GRANTS_FAILED',
+  });
+  if (!Array.isArray(scoped)) throw new AgentIntegrationError(502, 'INTEGRATION_GRANTS_FAILED', 'LifeSpace 未返回有效人员授权列表');
+  return [...grants, ...scoped];
 }
 
 async function managementContext(env, fetcher, assertion, spaceId, id) {
@@ -434,13 +438,12 @@ function grantsForAgent(grants, agentId) {
 }
 
 async function createAgentGrant(env, fetcher, managerToken, spaceId, agentId, modelKey, permission, id) {
-  return coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/grants`, {
+  return coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/${modelKey === PERSON_DIRECTORY_KEY ? 'person-directory/grants' : 'grants'}`, {
     method: 'POST',
     body: {
       granteeType: 'agent',
       granteeId: agentId,
-      resourceType: modelKey === PERSON_DIRECTORY_KEY ? 'person_directory' : 'model',
-      resourceId: modelKey === PERSON_DIRECTORY_KEY ? null : modelKey,
+      ...(modelKey === PERSON_DIRECTORY_KEY ? {} : { resourceType: 'model', resourceId: modelKey }),
       permission,
       expiresAt: null,
     },
@@ -473,7 +476,7 @@ async function reconcileAgentModelGrants(env, fetcher, managerToken, spaceId, ag
     }
     const [keep, ...duplicates] = active;
     if (keep.permission !== desired) {
-      await coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/grants/${encodeURIComponent(keep.id)}`, {
+      await coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/${modelKey === PERSON_DIRECTORY_KEY ? 'person-directory/grants' : 'grants'}/${encodeURIComponent(keep.id)}`, {
         method: 'PATCH',
         body: { permission: desired },
         id,
