@@ -6,12 +6,13 @@ function payload(service, environment, contractVersion, schemaVersion) {
   return { data: { status: 'ok', service, environment, contractVersion, schemaVersion } };
 }
 
-test('release pins reviewed Identity 0.17 and Core 0.53', () => {
-  assert.equal(LIFESPACE_RELEASE_BASELINE.core.contractVersion, '0.53.0');
+test('release pins reviewed Identity 0.17 and Core 0.54', () => {
+  assert.equal(LIFESPACE_RELEASE_BASELINE.core.contractVersion, '0.54.0');
   assert.equal(LIFESPACE_RELEASE_BASELINE.identity.contractVersion, '0.17.0');
   assert.equal(assertLifeSpaceStatus(payload('core', 'production', '0.53.0', 74), 'core', 'production').schemaVersion, 74);
 
   assert.equal(assertLifeSpaceStatus(payload('core', 'staging', '0.53.0', '74'), 'core', 'staging').schemaVersion, '74');
+  assert.equal(assertLifeSpaceStatus(payload('core', 'staging', '0.54.0', 76), 'core', 'staging').schemaVersion, 76);
 });
 
 test('allows reviewed older Core contract revisions with their schema floors', () => {
@@ -24,6 +25,7 @@ test('allows reviewed older Core contract revisions with their schema floors', (
 test('rejects partial upgrades, rejected Identity versions and unreviewed contracts', () => {
   for (const [service, version, schema] of [
     ['core', '0.53.0', 73],
+    ['core', '0.54.0', 75],
     ['identity', '0.15.0', 13],
     ['identity', '0.16.0', 13],
     ['identity', '0.17.0', 13],
@@ -34,7 +36,7 @@ test('rejects partial upgrades, rejected Identity versions and unreviewed contra
   for (const [service, version, schema] of [
     ['core', '0.47.0', 72],
     ['core', '0.50.0', 72],
-    ['core', '0.54.0', 72],
+    ['core', '0.55.0', 76],
     ['identity', '0.10.0', 11],
     ['identity', '0.13.0', 12],
     ['identity', '0.14.0', 13],
