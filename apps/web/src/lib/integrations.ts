@@ -14,7 +14,7 @@ const localModelLabels: Record<string, string> = {
   person_profile: '个人档案',
   habit: '习惯',
   football_match: '足球比赛',
-  football_player_performance: '球员表现',
+  football_performance: '球员表现',
 };
 
 export type Permission = 'read' | 'write' | null;

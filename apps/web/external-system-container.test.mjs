@@ -85,3 +85,9 @@ test('external-system permission UI obtains models from LifeSpace instead of a f
   assert.match(service, /!canManageModels/u);
   assert.match(agent, /!canManageModels/u);
 });
+
+test('football performance model key has a localized HomeMew label', () => {
+  const catalog = source('./src/lib/integrations.ts');
+  assert.match(catalog, /football_performance: '球员表现'/u);
+  assert.doesNotMatch(catalog, /football_player_performance: '球员表现'/u);
+});
