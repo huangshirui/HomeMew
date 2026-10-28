@@ -103,8 +103,8 @@ test('Person Directory is a separate Kernel Data Grant, not a discovered model g
   assert.match(catalog, /return \[personDirectoryPermission, \.\.\.models/u);
   for (const sourceCode of [service, agent, legacyAgent]) {
     assert.match(sourceCode, /PERSON_DIRECTORY_KEY = 'person_directory'/u);
-    assert.match(sourceCode, /resourceType: modelKey === PERSON_DIRECTORY_KEY \? 'person_directory' : 'model'/u);
-    assert.match(sourceCode, /resourceId: modelKey === PERSON_DIRECTORY_KEY \? null : modelKey/u);
+    assert.match(sourceCode, /modelKey === PERSON_DIRECTORY_KEY \? 'person-directory\/grants' : 'grants'/u);
+    assert.match(sourceCode, /modelKey === PERSON_DIRECTORY_KEY \? \{\} : \{ resourceType: 'model', resourceId: modelKey \}/u);
     assert.match(sourceCode, /grant\.resourceType === 'person_directory' && grant\.resourceId === null/u);
   }
 });
