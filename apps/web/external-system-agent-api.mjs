@@ -7,7 +7,8 @@ import {
 } from './external-system-catalog.mjs';
 
 const MANAGER_SCOPES = ['profile:read', 'grants:manage'];
-const MODEL_KEYS = ['event', 'task', 'day_record'];
+const LEGACY_MODEL_KEYS = ['event', 'task', 'day_record'];
+const MODEL_KEY_PATTERN = /^[a-z][a-z0-9_]{0,79}$/u;
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
 
 class AgentAccessError extends Error {
@@ -144,9 +145,10 @@ async function managementContext(env, fetcher, assertion, spaceId, id) {
 
 function parsePermissions(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AgentAccessError(422, 'VALIDATION_ERROR', 'permissions is required');
-  if (Object.keys(value).some((key) => !MODEL_KEYS.includes(key))) throw new AgentAccessError(422, 'VALIDATION_ERROR', 'permissions contains an unsupported model');
-  const result = {};
-  for (const modelKey of MODEL_KEYS) {
+  const keys = Object.keys(value);
+  if (keys.length > 200 || keys.some((key) => !MODEL_KEY_PATTERN.test(key))) throw new AgentAccessError(422, 'VALIDATION_ERROR', 'permissions contains an invalid model key');
+  const result = Object.create(null);
+  for (const modelKey of keys) {
     const permission = value[modelKey];
     if (permission === undefined || permission === null || permission === 'none') result[modelKey] = null;
     else if (permission === 'read' || permission === 'write') result[modelKey] = permission;
@@ -326,7 +328,7 @@ async function revokeGrant(env, fetcher, managerToken, spaceId, grantId, id) {
 async function reconcileGrants(env, fetcher, managerToken, spaceId, agentId, permissions, id) {
   const all = await listSpaceGrants(env, fetcher, managerToken, spaceId, id);
   const current = grantsForAgent(all, agentId);
-  for (const modelKey of MODEL_KEYS) {
+  for (const modelKey of Object.keys(permissions)) {
     const desired = permissions[modelKey];
     const active = current.filter((grant) => activeGrant(grant) && grant.resourceType === 'model' && grant.resourceId === modelKey);
     if (!desired) {
@@ -350,13 +352,16 @@ async function reconcileGrants(env, fetcher, managerToken, spaceId, agentId, per
 function agentDto(agent, grants, credentials) {
   const activeCredentials = credentials.filter((item) => item.active);
   const wholeSpace = grants.some((grant) => activeGrant(grant) && grant.resourceType === 'space' && grant.resourceId === null);
+  const modelKeys = new Set([...LEGACY_MODEL_KEYS, ...grants
+    .filter((grant) => grant.resourceType === 'model' && typeof grant.resourceId === 'string')
+    .map((grant) => grant.resourceId)]);
   return {
     id: agent.id,
     displayName: agent.displayName,
     status: agent.status,
     credentialAccess: credentialAccessForScopes(activeCredentials[0]?.scopes ?? []),
-    permissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants.filter((grant) => grant.resourceType === 'model'), modelKey)])),
-    effectivePermissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants, modelKey)])),
+    permissions: Object.fromEntries([...modelKeys].map((modelKey) => [modelKey, modelPermission(grants.filter((grant) => grant.resourceType === 'model'), modelKey)])),
+    effectivePermissions: Object.fromEntries([...modelKeys].map((modelKey) => [modelKey, modelPermission(grants, modelKey)])),
     hasWholeSpaceGrant: wholeSpace,
     rotationPending: activeCredentials.length > 1,
     rotationCandidateId: activeCredentials.length > 1 ? activeCredentials[0].id : null,
@@ -452,7 +457,7 @@ async function handleStartRotation(request, env, fetcher, assertion, id, externa
   const active = current.filter((item) => item.active);
   if (active.length > 1) throw new AgentAccessError(409, 'AGENT_CREDENTIAL_ROTATION_PENDING', '已有一次 Agent 凭据轮换尚未完成');
   const grants = grantsForAgent(await listSpaceGrants(env, fetcher, managerToken, spaceId, id), external.agentId);
-  const permissions = Object.fromEntries(MODEL_KEYS.map((key) => [key, modelPermission(grants, key)]));
+  const permissions = Object.fromEntries([...new Set([...LEGACY_MODEL_KEYS, ...grants.filter((grant) => grant.resourceType === 'model' && typeof grant.resourceId === 'string').map((grant) => grant.resourceId)])].map((key) => [key, modelPermission(grants, key)]));
   assertPermissionsWithinAccess(permissions, access);
   const credential = await createCredentialSafely(env, fetcher, external.agentId, external.displayName, access, id, active);
   return json({ data: { agent: await readAgentAccess(env, fetcher, managerToken, external, spaceId, id), credential } }, 201, id);

@@ -8,7 +8,8 @@ import {
 } from './integration-binding.mjs';
 
 const MANAGER_SCOPES = ['profile:read', 'grants:manage'];
-const MODEL_KEYS = ['event', 'task', 'day_record'];
+const LEGACY_MODEL_KEYS = ['event', 'task', 'day_record'];
+const MODEL_KEY_PATTERN = /^[a-z][a-z0-9_]{0,79}$/u;
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
 const MAX_USER_DESCRIPTION_LENGTH = 400;
 const CREDENTIAL_MODES = ['api_token', 'oauth_client_credentials'];
@@ -150,11 +151,12 @@ function parsePermissions(value) {
     throw new IntegrationError(422, 'VALIDATION_ERROR', 'permissions is required');
   }
   const keys = Object.keys(value);
-  if (keys.some((key) => !MODEL_KEYS.includes(key))) {
-    throw new IntegrationError(422, 'VALIDATION_ERROR', 'permissions contains an unsupported model');
+  if (keys.length > 200 || keys.some((key) => !MODEL_KEY_PATTERN.test(key))) {
+    throw new IntegrationError(422, 'VALIDATION_ERROR', 'permissions contains an invalid model key');
   }
-  const result = {};
-  for (const modelKey of MODEL_KEYS) {
+  // The published model and Space authority are verified by LifeSpace when each Grant is changed.
+  const result = Object.create(null);
+  for (const modelKey of keys) {
     const permission = value[modelKey];
     if (permission === undefined || permission === null || permission === 'none') {
       result[modelKey] = null;
@@ -243,6 +245,9 @@ function integrationDto(principal, grants, credentials, bindingStatus = 'bound')
   const visibleCredentials = bindingStatus === 'bound' ? sortCredentials(credentials) : [];
   const activeCredentials = visibleCredentials.filter((credential) => credential.active);
   const candidate = activeCredentials[0] ?? null;
+  const modelKeys = new Set([...LEGACY_MODEL_KEYS, ...grants
+    .filter((grant) => grant.resourceType === 'model' && typeof grant.resourceId === 'string')
+    .map((grant) => grant.resourceId)]);
   return {
     id: principal.id,
     displayName: principal.displayName,
@@ -253,8 +258,8 @@ function integrationDto(principal, grants, credentials, bindingStatus = 'bound')
     createdByUserId: principal.createdByUserId ?? null,
     createdAt: principal.createdAt,
     updatedAt: principal.updatedAt,
-    permissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants, modelKey, false)])),
-    effectivePermissions: Object.fromEntries(MODEL_KEYS.map((modelKey) => [modelKey, modelPermission(grants, modelKey, true)])),
+    permissions: Object.fromEntries([...modelKeys].map((modelKey) => [modelKey, modelPermission(grants, modelKey, false)])),
+    effectivePermissions: Object.fromEntries([...modelKeys].map((modelKey) => [modelKey, modelPermission(grants, modelKey, true)])),
     hasWholeSpaceGrant: activeWholeSpaceGrants.length > 0,
     credentialMode: candidate?.type ?? null,
     rotationPending: activeCredentials.length > 1,
@@ -448,7 +453,7 @@ async function revokeGrant(env, fetcher, managerToken, spaceId, grantId, id) {
 
 async function reconcileModelGrants(env, fetcher, managerToken, spaceId, principalId, allGrants, permissions, id) {
   const principalGrants = grantsForPrincipal(allGrants, principalId);
-  for (const modelKey of MODEL_KEYS) {
+  for (const modelKey of Object.keys(permissions)) {
     const desired = permissions[modelKey];
     const active = principalGrants.filter((grant) => activeGrant(grant) && grant.resourceType === 'model' && grant.resourceId === modelKey);
     if (!desired) {
@@ -694,7 +699,7 @@ async function handleCreate(request, env, fetcher, assertion, id) {
 
   const createdGrants = [];
   try {
-    for (const modelKey of MODEL_KEYS) {
+    for (const modelKey of Object.keys(permissions)) {
       if (!permissions[modelKey]) continue;
       const grant = await createGrant(env, fetcher, manager.accessToken, spaceId, principal.id, modelKey, permissions[modelKey], id);
       if (grant?.id) createdGrants.push(grant.id);
@@ -740,7 +745,11 @@ async function handleUpdate(request, env, fetcher, assertion, id, principalId) {
   let permissions = null;
   if (body.permissions !== undefined) {
     permissions = parsePermissions(body.permissions);
-    patch.maxScopes = scopesForPermissions(permissions);
+    // Omitted model grants are unchanged, including models no longer shown by Discovery.
+    const existing = Object.fromEntries(principalGrants.filter((grant) => activeGrant(grant)
+      && grant.resourceType === 'model' && typeof grant.resourceId === 'string')
+      .map((grant) => [grant.resourceId, modelPermission(principalGrants, grant.resourceId)]));
+    patch.maxScopes = scopesForPermissions({ ...existing, ...permissions });
   }
   if (!Object.keys(patch).length && !permissions) throw new IntegrationError(400, 'INVALID_REQUEST', '没有需要更新的内容');
 

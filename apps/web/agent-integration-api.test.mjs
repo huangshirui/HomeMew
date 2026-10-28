@@ -284,3 +284,24 @@ test('removing Agent access revokes credentials and current-family grants but ke
   assert.equal(read.status, 200);
   assert.equal((await payload(read)).data, null);
 });
+
+test('Agent direct Grants accept additional model keys without dropping existing authority', async () => {
+  const state = createState();
+  const created = await createAgentAccess(state, 'write');
+  const agentId = created.agent.id;
+
+  const updated = await call(state, '/api/integrations/svc_family/agent', {
+    method: 'PATCH', body: { spaceId: 'spc_family', permissions: { habit: 'write' } },
+  });
+  assert.equal(updated.status, 200);
+  const access = (await payload(updated)).data;
+  assert.equal(access.permissions.habit, 'write');
+  assert.equal(access.permissions.task, 'read', 'unmentioned task Grant stays intact');
+  assert.ok(state.grants.some((item) => item.granteeId === agentId && item.resourceId === 'habit' && item.permission === 'write' && !item.revokedAt));
+
+  const narrower = await call(state, '/api/integrations/svc_family/agent/credential-rotation', {
+    method: 'POST', body: { spaceId: 'spc_family', credentialAccess: 'read' },
+  });
+  assert.equal(narrower.status, 422);
+  assert.equal((await payload(narrower)).error.code, 'AGENT_SCOPE_TOO_NARROW');
+});
