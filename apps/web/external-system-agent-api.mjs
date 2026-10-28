@@ -7,7 +7,8 @@ import {
 } from './external-system-catalog.mjs';
 
 const MANAGER_SCOPES = ['profile:read', 'grants:manage'];
-const LEGACY_MODEL_KEYS = ['event', 'task', 'day_record'];
+const PERSON_DIRECTORY_KEY = 'person_directory';
+const LEGACY_MODEL_KEYS = ['event', 'task', 'day_record', PERSON_DIRECTORY_KEY];
 const MODEL_KEY_PATTERN = /^[a-z][a-z0-9_]{0,79}$/u;
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
 
@@ -198,7 +199,9 @@ function modelPermission(grants, modelKey) {
   let rank = 0;
   for (const grant of grants) {
     if (!activeGrant(grant)) continue;
-    const matchesModel = grant.resourceType === 'model' && grant.resourceId === modelKey;
+    const matchesModel = modelKey === PERSON_DIRECTORY_KEY
+      ? grant.resourceType === 'person_directory' && grant.resourceId === null
+      : grant.resourceType === 'model' && grant.resourceId === modelKey;
     const matchesSpace = grant.resourceType === 'space' && grant.resourceId === null;
     if (!matchesModel && !matchesSpace) continue;
     const nextRank = PERMISSION_RANK[grant.permission] ?? 0;
@@ -313,7 +316,7 @@ function grantsForAgent(grants, agentId) {
 async function createGrant(env, fetcher, managerToken, spaceId, agentId, modelKey, permission, id) {
   return coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/grants`, {
     method: 'POST',
-    body: { granteeType: 'agent', granteeId: agentId, resourceType: 'model', resourceId: modelKey, permission, expiresAt: null },
+    body: { granteeType: 'agent', granteeId: agentId, resourceType: modelKey === PERSON_DIRECTORY_KEY ? 'person_directory' : 'model', resourceId: modelKey === PERSON_DIRECTORY_KEY ? null : modelKey, permission, expiresAt: null },
     id,
     fallbackCode: 'AGENT_GRANT_CREATE_FAILED',
   });
@@ -330,7 +333,8 @@ async function reconcileGrants(env, fetcher, managerToken, spaceId, agentId, per
   const current = grantsForAgent(all, agentId);
   for (const modelKey of Object.keys(permissions)) {
     const desired = permissions[modelKey];
-    const active = current.filter((grant) => activeGrant(grant) && grant.resourceType === 'model' && grant.resourceId === modelKey);
+    const active = current.filter((grant) => activeGrant(grant) && ((modelKey === PERSON_DIRECTORY_KEY && grant.resourceType === 'person_directory' && grant.resourceId === null)
+      || (modelKey !== PERSON_DIRECTORY_KEY && grant.resourceType === 'model' && grant.resourceId === modelKey)));
     if (!desired) {
       for (const grant of active) await revokeGrant(env, fetcher, managerToken, spaceId, grant.id, id);
       continue;
@@ -360,7 +364,7 @@ function agentDto(agent, grants, credentials) {
     displayName: agent.displayName,
     status: agent.status,
     credentialAccess: credentialAccessForScopes(activeCredentials[0]?.scopes ?? []),
-    permissions: Object.fromEntries([...modelKeys].map((modelKey) => [modelKey, modelPermission(grants.filter((grant) => grant.resourceType === 'model'), modelKey)])),
+    permissions: Object.fromEntries([...modelKeys].map((modelKey) => [modelKey, modelPermission(grants.filter((grant) => grant.resourceType !== 'space'), modelKey)])),
     effectivePermissions: Object.fromEntries([...modelKeys].map((modelKey) => [modelKey, modelPermission(grants, modelKey)])),
     hasWholeSpaceGrant: wholeSpace,
     rotationPending: activeCredentials.length > 1,
