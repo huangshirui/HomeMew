@@ -71,3 +71,17 @@ test('retired 喵一下 shell card is absent', () => {
   assert.doesNotMatch(shell, /喵一下/u);
   assert.doesNotMatch(shell, /Sparkles/u);
 });
+
+test('external-system permission UI obtains models from LifeSpace instead of a fixed three-model catalog', () => {
+  const catalog = source('./src/lib/integrations.ts');
+  const service = source('./src/pages/service-access-section.tsx');
+  const agent = source('./src/pages/agent-access-section.tsx');
+  assert.match(catalog, /\/api\/lifespace\/core\/v1\/me\/_discovery\/models/u);
+  assert.match(catalog, /visibleIntegrationModels/u);
+  assert.match(service, /fetchIntegrationModels/u);
+  assert.match(agent, /fetchIntegrationModels/u);
+  assert.doesNotMatch(service, /integrationModels\.map/u);
+  assert.doesNotMatch(agent, /integrationModels\.map/u);
+  assert.match(service, /!canManageModels/u);
+  assert.match(agent, /!canManageModels/u);
+});
