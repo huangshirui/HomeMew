@@ -1,14 +1,72 @@
-import { ApiError } from './api-client';
+import { apiRequest, ApiError } from './api-client';
 
-export const integrationModels = [
-  { key: 'event', label: '日程', description: '读取或创建、修改家庭日程' },
-  { key: 'task', label: '待办', description: '读取或创建、修改家庭待办' },
-  { key: 'day_record', label: '日子', description: '读取或维护纪念日、倒计时等时间状态' },
-] as const;
+// LifeSpace's configuration-time Discovery is authoritative for the current
+// HomeMew Application × Model Access. Labels below are presentation only.
+const localModelLabels: Record<string, string> = {
+  event: '日程',
+  task: '待办',
+  day_record: '日子',
+  wish: '心愿',
+  person_group: '人员分组',
+  anniversary: '纪念日',
+  activity: '活动',
+  goal: '目标',
+  person_profile: '个人档案',
+  habit: '习惯',
+  football_match: '足球比赛',
+  football_player_performance: '球员表现',
+};
 
-export type ModelKey = (typeof integrationModels)[number]['key'];
 export type Permission = 'read' | 'write' | null;
-export type PermissionMap = Record<ModelKey, Permission>;
+export type PermissionMap = Record<string, Permission>;
+export type IntegrationModel = {
+  key: string;
+  label: string;
+  description: string;
+  access: ('read' | 'write')[];
+};
+
+type DiscoveredModel = {
+  key: string;
+  display?: { singular?: string };
+  access?: string[];
+};
+
+export async function fetchIntegrationModels(): Promise<IntegrationModel[]> {
+  const discovery = await apiRequest<{ models: DiscoveredModel[] }>('/api/lifespace/core/v1/me/_discovery/models');
+  if (!Array.isArray(discovery?.models)) throw new Error('LifeSpace 未返回有效的模型权限清单');
+  const models = discovery.models.flatMap((model): IntegrationModel[] => {
+    if (typeof model?.key !== 'string' || !/^[a-z][a-z0-9_]{0,79}$/u.test(model.key)) return [];
+    const access = (Array.isArray(model.access) ? model.access : [])
+      .filter((value): value is 'read' | 'write' => value === 'read' || value === 'write');
+    if (!access.length) return [];
+    return [{
+      key: model.key,
+      label: localModelLabels[model.key] ?? model.display?.singular ?? model.key,
+      description: model.key,
+      access,
+    }];
+  });
+  return models;
+}
+
+// Keep old Grants visible if a model is later retired or the Application loses
+// Model Access, but never allow edits/elevation on an undiscoverable model.
+export function visibleIntegrationModels(models: IntegrationModel[], ...permissions: PermissionMap[]): IntegrationModel[] {
+  const available = new Set(models.map((model) => model.key));
+  const existing = new Set(permissions.flatMap((map) => Object.entries(map)
+    .filter(([, permission]) => permission !== null && permission !== undefined)
+    .map(([key]) => key)));
+  return [
+    ...models,
+    ...[...existing].filter((key) => !available.has(key)).map((key) => ({
+      key,
+      label: localModelLabels[key] ?? key,
+      description: '该模型当前不可配置，原有授权会保留；请在 LifeSpace Console 核查。',
+      access: [] as ('read' | 'write')[],
+    })),
+  ];
+}
 export type CredentialMode = 'api_token' | 'oauth_client_credentials';
 
 export type ExternalSystem = {
