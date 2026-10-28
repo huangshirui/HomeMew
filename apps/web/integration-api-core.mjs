@@ -342,7 +342,11 @@ async function listSpaceGrants(env, fetcher, managerToken, spaceId, id) {
     fallbackCode: 'INTEGRATION_GRANTS_FAILED',
   });
   if (!Array.isArray(grants)) throw new IntegrationError(502, 'INTEGRATION_GRANTS_FAILED', 'LifeSpace 未返回有效授权列表');
-  return grants;
+  const scoped = await requestJson(fetcher, coreUrl(env, `/api/v1/spaces/${encodeURIComponent(spaceId)}/person-directory/grants?includeRevoked=true`), {
+    credential: managerToken, id, fallbackCode: 'INTEGRATION_GRANTS_FAILED',
+  });
+  if (!Array.isArray(scoped)) throw new IntegrationError(502, 'INTEGRATION_GRANTS_FAILED', 'LifeSpace 未返回有效人员授权列表');
+  return [...grants, ...scoped];
 }
 
 async function identityIntegrationRequest(env, fetcher, path, { method = 'GET', body, id, fallbackCode }) {
@@ -431,13 +435,12 @@ async function resolveBoundIntegration(env, fetcher, spaceId, principalId, id) {
 }
 
 async function createGrant(env, fetcher, managerToken, spaceId, principalId, modelKey, permission, id) {
-  return coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/grants`, {
+  return coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/${modelKey === PERSON_DIRECTORY_KEY ? 'person-directory/grants' : 'grants'}`, {
     method: 'POST',
     body: {
       granteeType: 'service',
       granteeId: principalId,
-      resourceType: modelKey === PERSON_DIRECTORY_KEY ? 'person_directory' : 'model',
-      resourceId: modelKey === PERSON_DIRECTORY_KEY ? null : modelKey,
+      ...(modelKey === PERSON_DIRECTORY_KEY ? {} : { resourceType: 'model', resourceId: modelKey }),
       permission,
       expiresAt: null,
     },
@@ -470,7 +473,7 @@ async function reconcileModelGrants(env, fetcher, managerToken, spaceId, princip
     }
     const [keep, ...duplicates] = active;
     if (keep.permission !== desired) {
-      await coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/grants/${encodeURIComponent(keep.id)}`, {
+      await coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/${modelKey === PERSON_DIRECTORY_KEY ? 'person-directory/grants' : 'grants'}/${encodeURIComponent(keep.id)}`, {
         method: 'PATCH',
         body: { permission: desired },
         id,
