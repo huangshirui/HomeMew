@@ -8,7 +8,8 @@ import {
 } from './integration-binding.mjs';
 
 const MANAGER_SCOPES = ['profile:read', 'grants:manage'];
-const LEGACY_MODEL_KEYS = ['event', 'task', 'day_record'];
+const PERSON_DIRECTORY_KEY = 'person_directory';
+const LEGACY_MODEL_KEYS = ['event', 'task', 'day_record', PERSON_DIRECTORY_KEY];
 const MODEL_KEY_PATTERN = /^[a-z][a-z0-9_]{0,79}$/u;
 const PERMISSION_RANK = { read: 1, write: 2, manage: 3 };
 const MAX_USER_DESCRIPTION_LENGTH = 400;
@@ -190,7 +191,9 @@ function modelPermission(grants, modelKey, includeWholeSpace = false) {
   let bestRank = 0;
   for (const grant of grants) {
     if (!activeGrant(grant)) continue;
-    const matchesModel = grant.resourceType === 'model' && grant.resourceId === modelKey;
+    const matchesModel = modelKey === PERSON_DIRECTORY_KEY
+      ? grant.resourceType === 'person_directory' && grant.resourceId === null
+      : grant.resourceType === 'model' && grant.resourceId === modelKey;
     const matchesSpace = includeWholeSpace && grant.resourceType === 'space' && grant.resourceId === null;
     if (!matchesModel && !matchesSpace) continue;
     const rank = PERMISSION_RANK[grant.permission] ?? 0;
@@ -339,7 +342,11 @@ async function listSpaceGrants(env, fetcher, managerToken, spaceId, id) {
     fallbackCode: 'INTEGRATION_GRANTS_FAILED',
   });
   if (!Array.isArray(grants)) throw new IntegrationError(502, 'INTEGRATION_GRANTS_FAILED', 'LifeSpace 未返回有效授权列表');
-  return grants;
+  const scoped = await requestJson(fetcher, coreUrl(env, `/api/v1/spaces/${encodeURIComponent(spaceId)}/person-directory/grants?includeRevoked=true`), {
+    credential: managerToken, id, fallbackCode: 'INTEGRATION_GRANTS_FAILED',
+  });
+  if (!Array.isArray(scoped)) throw new IntegrationError(502, 'INTEGRATION_GRANTS_FAILED', 'LifeSpace 未返回有效人员授权列表');
+  return [...grants, ...scoped];
 }
 
 async function identityIntegrationRequest(env, fetcher, path, { method = 'GET', body, id, fallbackCode }) {
@@ -428,13 +435,12 @@ async function resolveBoundIntegration(env, fetcher, spaceId, principalId, id) {
 }
 
 async function createGrant(env, fetcher, managerToken, spaceId, principalId, modelKey, permission, id) {
-  return coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/grants`, {
+  return coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/${modelKey === PERSON_DIRECTORY_KEY ? 'person-directory/grants' : 'grants'}`, {
     method: 'POST',
     body: {
       granteeType: 'service',
       granteeId: principalId,
-      resourceType: 'model',
-      resourceId: modelKey,
+      ...(modelKey === PERSON_DIRECTORY_KEY ? {} : { resourceType: 'model', resourceId: modelKey }),
       permission,
       expiresAt: null,
     },
@@ -455,7 +461,8 @@ async function reconcileModelGrants(env, fetcher, managerToken, spaceId, princip
   const principalGrants = grantsForPrincipal(allGrants, principalId);
   for (const modelKey of Object.keys(permissions)) {
     const desired = permissions[modelKey];
-    const active = principalGrants.filter((grant) => activeGrant(grant) && grant.resourceType === 'model' && grant.resourceId === modelKey);
+    const active = principalGrants.filter((grant) => activeGrant(grant) && ((modelKey === PERSON_DIRECTORY_KEY && grant.resourceType === 'person_directory' && grant.resourceId === null)
+      || (modelKey !== PERSON_DIRECTORY_KEY && grant.resourceType === 'model' && grant.resourceId === modelKey)));
     if (!desired) {
       for (const grant of active) await revokeGrant(env, fetcher, managerToken, spaceId, grant.id, id);
       continue;
@@ -466,7 +473,7 @@ async function reconcileModelGrants(env, fetcher, managerToken, spaceId, princip
     }
     const [keep, ...duplicates] = active;
     if (keep.permission !== desired) {
-      await coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/grants/${encodeURIComponent(keep.id)}`, {
+      await coreManagerRequest(env, fetcher, managerToken, `/api/v1/spaces/${encodeURIComponent(spaceId)}/${modelKey === PERSON_DIRECTORY_KEY ? 'person-directory/grants' : 'grants'}/${encodeURIComponent(keep.id)}`, {
         method: 'PATCH',
         body: { permission: desired },
         id,
