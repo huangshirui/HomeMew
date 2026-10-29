@@ -4,7 +4,7 @@
 
   <view class="header">
     <text class="title">邀请家人加入</text>
-    <text class="subtitle">创建一个邀请链接，通过微信发送给家人。</text>
+    <text class="subtitle">生成邀请后，发送微信分享卡片给家人，点击即可进入加入家庭页。</text>
   </view>
 
   <!-- 生成成功：分享卡片 -->
@@ -23,8 +23,7 @@
     <button class="btn-primary share-btn" open-type="share">发送给微信好友</button>
 
     <view class="secondary-actions">
-      <button class="btn-outline sm" bindtap="onCopyCode">复制邀请码</button>
-      <button class="btn-outline sm" bindtap="onCopyPath">复制邀请链接</button>
+      <button class="btn-outline sm" bindtap="onCopyCode">复制邀请码（手动输入）</button>
     </view>
 
     <view class="regenerate" bindtap="onCreate">
