@@ -3,10 +3,10 @@
  *
  * 支持：
  * - 查看邀请列表（状态：有效 / 已过期 / 已用完 / 已撤销）
- * - 创建邀请（成功后立即展示完整邀请码与邀请路径）
+ * - 创建邀请（成功后立即展示完整邀请码）
  * - 撤销邀请
- * - 复制新邀请码 / 复制邀请路径
- * - 微信分享（onShareAppMessage 使用 joinPath）
+ * - 复制新邀请码（不复制无法在微信聊天中点击的小程序内部路径）
+ * - 微信分享（onShareAppMessage 使用 BFF 提供的 joinPath）
  *
  * 历史邀请列表不假设仍返回完整邀请码，仅对本次创建成功的邀请提供复制。
  */
@@ -155,17 +155,12 @@ Page({
     copyToClipboard(this.data.newInvite.code);
   },
 
-  onCopyPath(): void {
-    if (!this.data.newInvite) return;
-    copyToClipboard(this.data.newInvite.joinPath);
-  },
-
   onShareAppMessage(): WechatMiniprogram.Page.ICustomShareContent {
     const invite = this.data.newInvite;
     if (!invite) {
       return {
-        title: '家事喵 · 邀请你加入我们的家庭',
-        path: '/pages/launch/launch',
+        title: '家事喵 · 一起管理家庭生活',
+        path: '/pages/home/home',
       };
     }
     return {
