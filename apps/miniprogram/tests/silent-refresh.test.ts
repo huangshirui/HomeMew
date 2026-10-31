@@ -8,7 +8,7 @@ const source = (path: string) => readFileSync(new URL(`../miniprogram/${path}`, 
 
 function domainList(listDomainRecords: (...args: any[]) => Promise<any>, familyStore: any) {
   let page: any;
-  const script = stripTypeScriptTypes(source('pages/domains/list.ts').replace(/^import[\\s\\S]*?from ['\"][^'\"]+['\"];?\\r?$/gm, ''));
+  const script = stripTypeScriptTypes(source('pages/domains/list.ts').replace(/^import[\s\S]*?from ['"][^'"]+['"];?\r?$/gm, ''));
   const copy = { activities: { title: '活动', symbol: 'A' }, goals: { title: '目标', symbol: 'G' }, habits: { title: '习惯', symbol: 'H' }, anniversaries: { title: '纪念日', symbol: 'D' } };
   runInNewContext(script, {
     Page: (def: any) => { page = def; }, currentFamilyStore: familyStore,
