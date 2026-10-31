@@ -1,57 +1,58 @@
-<!-- 加入家庭页 -->
+<!-- 从微信分享卡片进入时自动预览，验证成功直接确认；手动输入保留 -->
 <view class="container">
-  <nav-bar title="加入家庭" showBack="true" />
+  <nav-bar title="加入家庭" showBack="{{true}}" />
 
   <view class="header">
-    <text class="title">加入家庭</text>
-    <text class="subtitle">输入家人分享的邀请码，加入对应的家庭</text>
+    <text class="title">{{fromShare ? '你收到一份家庭邀请' : '加入家庭'}}</text>
+    <text class="subtitle">{{fromShare ? '请确认家庭信息后再加入' : '输入家人提供的邀请码，确认后加入对应家庭'}}</text>
   </view>
 
-  <!-- 输入区 -->
-  <view class="card">
+  <view wx:if="{{!joined && !preview}}" class="card">
     <view class="input-row">
       <input
         class="code-input"
         placeholder="请输入邀请码"
         value="{{code}}"
+        disabled="{{previewing}}"
         bindinput="onCodeInput"
         confirm-type="search"
         bindconfirm="onPreview"
       />
     </view>
     <view class="btn-row">
-      <button class="btn-primary flex-1" bindtap="onPreview">下一步</button>
+      <button
+        class="btn-primary flex-1"
+        disabled="{{previewing}}"
+        bindtap="onPreview"
+      >{{previewing ? '正在验证邀请...' : '下一步'}}</button>
     </view>
   </view>
 
-  <!-- 预览结果 -->
-  <block wx:if="{{preview}}">
-    <view class="card preview-card">
-      <view class="family-row">
-        <image
-          class="family-avatar"
-          src="{{preview.family.avatarUrl || '/assets/images/default-family.png'}}"
-          mode="aspectFill"
-        />
-        <view class="family-meta">
-          <text class="family-name">{{preview.family.name}}</text>
-          <text class="family-sub">{{preview.family.memberCount}} 位成员</text>
-        </view>
+  <view wx:if="{{!joined && preview}}" class="card preview-card">
+    <view class="family-row">
+      <image
+        class="family-avatar"
+        src="{{preview.family.avatarUrl || '/assets/images/default-family.png'}}"
+        mode="aspectFill"
+      />
+      <view class="family-meta">
+        <text class="family-name">{{preview.family.name}}</text>
+        <text class="family-sub">{{preview.family.memberCount}} 位成员</text>
       </view>
-      <text class="preview-tip">确认是这个家庭后，点击下方「确认加入」即可成为家庭成员</text>
-      <button
-        class="btn-primary confirm-btn"
-        disabled="{{submitting}}"
-        bindtap="onJoin"
-      >
-        {{submitting ? '加入中...' : '确认加入'}}
-      </button>
     </view>
-  </block>
+    <text class="preview-tip">确认是这个家庭后，即可加入并查看家庭内容。</text>
+    <button
+      wx:if="{{preview.canJoin}}"
+      class="btn-primary confirm-btn"
+      disabled="{{submitting}}"
+      bindtap="onJoin"
+    >{{submitting ? '加入中...' : '确认加入'}}</button>
+    <text wx:else class="invite-unavailable">暂时无法加入：邀请可能已不可用或家庭人数已满。</text>
+    <view class="alternate-code" bindtap="onUseAnotherCode">
+      <text>换一个邀请码</text>
+    </view>
+  </view>
 
-  <!-- 预览错误 -->
-  <view wx:if="{{previewError}}" class="error-tip">{{previewError}}</view>
-
-  <!-- 已加入提示 -->
-  <view wx:if="{{joined}}" class="success-tip">已成功加入家庭，正在进入首页...</view>
+  <view wx:if="{{!joined && previewError}}" class="error-tip">{{previewError}}</view>
+  <view wx:if="{{joined}}" class="success-tip">已加入家庭，正在进入首页...</view>
 </view>
