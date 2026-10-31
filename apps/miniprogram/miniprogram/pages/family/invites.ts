@@ -71,7 +71,7 @@ Page({
 
   onShow(): void {
     if (this.data.familyId && this.data.loaded) {
-      void this.loadInvites();
+      void this.loadInvites(true);
     }
   },
 
@@ -104,7 +104,7 @@ Page({
     });
   },
 
-  async loadInvites(): Promise<void> {
+  async loadInvites(silent = false): Promise<void> {
     const seq = ++this._listRequest;
     try {
       const invites = await listInvites(this.data.familyId);
@@ -125,7 +125,7 @@ Page({
       if (seq !== this._listRequest) return;
       console.error('[Invites] Load failed:', error);
       const err = error as { code?: string; message?: string };
-      showError(getErrorMessage(err.code, err.message));
+      if (!silent) showError(getErrorMessage(err.code, err.message));
       this.setData({ loaded: true });
     }
   },
@@ -145,9 +145,9 @@ Page({
       hideLoading();
       showSuccess('邀请已生成');
       // 状态与剩余次数从服务端同步；获取列表失败不影响已创建的邀请。
-      await this.loadInvites();
+      await this.loadInvites(true);
     } catch (error: unknown) {
-      console.error('[Invites] Create failed:', error);
+      console.error('[Invites] Create failed:, error);
       const err = error as { code?: string; message?: string };
       showError(getErrorMessage(err.code, err.message));
     } finally {
@@ -169,10 +169,10 @@ Page({
       if (this.data.newInvite?.id === inviteId) {
         this.setData({ newInviteAvailable: false });
       }
-      await this.loadInvites();
+      await this.loadInvites(true);
     } catch (error: unknown) {
       hideLoading();
-      console.error('[Invites] Revoke failed:', error);
+      console.error('[Invites] Revoke failed:, error);
       const err = error as { code?: string; message?: string };
       showError(getErrorMessage(err.code, err.message));
     }
