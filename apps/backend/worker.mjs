@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { upsertRecentPlace, pruneRecentPlaces, validRecentLocation } from './recent-place-value.mjs';
+import { handleInternalWechatInviteCode } from './wechat-mini-code.mjs';
 
 const USER_SCOPES = [
   'profile:read', 'profile:write', 'spaces:read', 'spaces:write', 'spaces:manage',
@@ -638,6 +639,9 @@ export default {
           recentPlacesReady: Boolean(env.RECENT_PLACES && env.RECENT_PLACES_PERSISTENCE_ALLOWED === 'true'),
           identityBootstrapConfigured: Boolean(env.WECHAT_IDENTITY_BOOTSTRAP_MAP),
         });
+      }
+      if (url.pathname === '/internal/v1/wechat/invite-mini-code') {
+        return handleInternalWechatInviteCode(request, env);
       }
       if (request.method === 'POST' && url.pathname === '/api/v1/login/wechat') return await login(request, env);
       if (request.method === 'POST' && url.pathname === '/api/v1/activity/me') return await reportOwnActivity(request, env);
