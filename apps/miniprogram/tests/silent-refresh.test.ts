@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
+import { AutoRefreshGate, markRefreshDirty } from '../miniprogram/services/refresh-policy.ts';
 
 const source = (path: string) => readFileSync(new URL(`../miniprogram/${path}`, import.meta.url), 'utf8');
 
@@ -11,6 +12,7 @@ function domainList(listDomainRecords: (...args: any[]) => Promise<any>, familyS
   const script = stripTypeScriptTypes(source('pages/domains/list.ts').replace(/^import[\s\S]*?from ['"][^'"]+['"];?\r?$/gm, ''));
   const copy = { activities: { title: '活动', symbol: 'A' }, goals: { title: '目标', symbol: 'G' }, habits: { title: '习惯', symbol: 'H' }, anniversaries: { title: '纪念日', symbol: 'D' } };
   runInNewContext(script, {
+    AutoRefreshGate, markRefreshDirty,
     Page: (def: any) => { page = def; }, currentFamilyStore: familyStore,
     userStore: { value: { id: 'usr_me' } },
     ensureRuntimeReady: async () => {}, listDomainRecords,
@@ -38,6 +40,7 @@ test('automatic foreground refresh retains a successfully loaded domain list unt
   await page.onShow();
   assert.equal(page.data.loadedOnce, true);
   assert.equal(page.data.records[0].id, 'first');
+  markRefreshDirty('domains'); // a real edit bypasses the 60s onShow throttle
   const refresh = page.onShow();
   assert.equal(page.data.records[0].id, 'first');
   assert.equal(page.data.loading, false);
@@ -60,6 +63,7 @@ test('network failure retains domain records while a real family change clears t
     return { items: [row('other-family')], nextCursor: null };
   }, family);
   await page.onShow();
+  markRefreshDirty('domains');
   await page.onShow();
   assert.equal(page.data.records[0].id, 'visible');
   assert.equal(page.data.error, 'offline');
