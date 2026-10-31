@@ -31,7 +31,7 @@
     <view class="card">
       <view class="section-title">已记录的表现</view>
       <view wx:if="{{eventsError}}" class="load-error-state"><text class="load-error-text">{{eventsError}}</text><button class="btn-outline btn-sm" bindtap="onRetry">重新加载</button></view>
-      <view wx:elif="{{performanceBusy}}" class="loading-state">读取表现中…</view>
+      <view wx:elif="{{performanceBusy && !performancesLoaded}}" class="loading-state">读取表现中…</view>
       <view wx:for="{{performances}}" wx:key="id" class="performance-row" data-id="{{item.id}}" bindtap="onPerformanceTap">
         <view class="performance-main"><view><text class="performance-type">{{item.typeText}}</text><text class="performance-person">{{item.personName}}</text></view><text wx:if="{{item.detailText}}" class="performance-detail">{{item.detailText}}</text></view>
         <button class="football-icon-button" data-id="{{item.id}}" catchtap="onPerformanceTap" aria-label="编辑这条表现"><lucide-icon name="pencil" size="17" color="#78716c"/></button>

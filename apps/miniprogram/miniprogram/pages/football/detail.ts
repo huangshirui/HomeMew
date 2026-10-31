@@ -15,7 +15,7 @@ Page({
     familyId:'',matchId:'',match:null as Match|null,loading:true,error:'',busy:false,
     representativeIcon:null as DomainIcon|null,opponentIcon:null as DomainIcon|null,representative:'代表球队',opponent:'对方球队',competition:'',score:'— : —',
     people:[] as FootballPerson[],selectedPersonId:'',selectedPersonIndex:0,
-    performances:[] as PerformanceView[],performanceCursor:null as string|null,performanceBusy:false,
+    performances:[] as PerformanceView[],performanceCursor:null as string|null,performanceBusy:false,performancesLoaded:false,
     schema:null as FootballSchema|null,schemaError:'',quickTypes:quickTypes.map(t=>({...t,count:0})),allTypes:[] as FieldOption[],
     eventsError:'',formError:'',appearanceAvailable:false,hasShotOutcome:false,moreOpen:false,moreTypes:[] as FieldOption[],
     formOpen:false,performanceId:'',performanceVersion:0,performanceType:'',performanceTypeIndex:0,
@@ -23,6 +23,7 @@ Page({
     shotOutcome:'',shotOutcomeIndex:0,shotOutcomes,minutesPlayed:'',position:'',entryMode:'',entryModeIndex:0,entryModes,
   },
   _eventsGeneration:0,
+  _refreshing:false,
   onUnload():void{this._eventsGeneration++;},
   async onLoad(opts:{familyId?:string;id?:string;personId?:string}):Promise<void>{
     this.setData({familyId:opts.familyId||currentFamilyStore.value?.id||'',matchId:opts.id||'',selectedPersonId:opts.personId||''});
@@ -31,7 +32,9 @@ Page({
   },
   onShow():void{if(this.data.matchId&&!this.data.loading)void this.refresh();},
   async refresh():Promise<void>{
-    const d=this.data;this.setData({loading:true,error:''});
+    if(this._refreshing)return;
+    this._refreshing=true;
+    const d=this.data;this.setData({loading:!d.match,error:''});
     try{
       const [match,schema]=await Promise.all([
         getMatch(d.familyId,d.matchId),
@@ -62,14 +65,14 @@ Page({
       });
       await this.loadPerformances(true);
     }catch(e){this.setData({error:statusError(e)});}
-    finally{this.setData({loading:false});}
+    finally{this._refreshing=false;this.setData({loading:false});}
   },
   onRetry():void{void this.refresh();},
   async loadPerformances(_reset:boolean):Promise<void>{
     const generation=++this._eventsGeneration;
     const personId=this.data.selectedPersonId;
     if(!personId){this.setData({performances:[],eventsError:'请先编辑比赛，添加参赛球员'});return;}
-    this.setData({performanceBusy:true,eventsError:'',performances:[]});
+    this.setData({performanceBusy:!this.data.performancesLoaded,eventsError:''});
     try{
       const items:Performance[]=[];let cursor:string|undefined;
       for(let page=0;page<8;page++){
@@ -87,7 +90,7 @@ Page({
           p.performanceType==='appearance'?[p.minutesPlayed!==null&&p.minutesPlayed!==undefined?p.minutesPlayed+' 分钟':'时长可补充',p.position,this.data.entryModes.find(o=>o.key===p.entryMode)?.name||p.entryMode].filter(Boolean).join(' · '):'',p.notes
         ].filter(Boolean).join(' · '),
       });
-      this.setData({performances:items.map(format),performanceCursor:null,
+      this.setData({performances:items.map(format),performanceCursor:null,performancesLoaded:true,
         quickTypes:quickTypes.filter(t=>!this.data.schema||availableTypes(this.data.schema).includes(t.key)).map(t=>({...t,count:items.filter(p=>(t.key==='shot'?['goal','shot']:t.key==='key_pass'?['assist','key_pass']:[t.key]).includes(p.performanceType)).length}))});
     }catch(e){if(generation===this._eventsGeneration)this.setData({eventsError:statusError(e)});}
     finally{if(generation===this._eventsGeneration)this.setData({performanceBusy:false});}
@@ -96,7 +99,7 @@ Page({
   onEditMatch():void{wx.navigateTo({url:'/pages/football/edit?kind=match&familyId='+this.data.familyId+'&id='+this.data.matchId});},
   onPlayer(e:WechatMiniprogram.CustomEvent<{value:string}>):void{
     const index=Number(e.detail.value),person=this.data.people[index];
-    if(person){rememberFootballPerson(userStore.value?.id||'',this.data.familyId,person.id);this.setData({selectedPersonId:person.id,selectedPersonIndex:index});void this.loadPerformances(true);}
+    if(person){rememberFootballPerson(userStore.value?.id||'',this.data.familyId,person.id);this.setData({selectedPersonId:person.id,selectedPersonIndex:index,performances:[],performancesLoaded:false});void this.loadPerformances(true);}
   },
   onOpenQuick(e:WechatMiniprogram.TouchEvent):void{this.openPerformance(String(e.currentTarget.dataset.type));},
   onChooseAllType(e:WechatMiniprogram.CustomEvent<{value:string}>):void{

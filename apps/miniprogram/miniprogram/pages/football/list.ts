@@ -7,7 +7,7 @@ import { preferredFootballPerson,rememberFootballPerson,parseFootballScope,type 
 type MatchRow=Match&{representativeName:string;opponentName:string;competitionName:string;score:string;dateText:string;representativeIcon:DomainIcon|null;opponentIcon:DomainIcon|null};
 Page({
   data:{
-    mode:'record' as 'record'|'stats',activeScope:{} as FootballScope,hasFilters:false,teamIcons:{} as Record<string,DomainIcon|null>,userId:'',familyId:'',loading:true,loadingMore:false,error:'',rows:[] as MatchRow[],nextCursor:null as string|null,
+    mode:'record' as 'record'|'stats',activeScope:{} as FootballScope,hasFilters:false,teamIcons:{} as Record<string,DomainIcon|null>,userId:'',familyId:'',loading:true,loadedOnce:false,loadingMore:false,error:'',rows:[] as MatchRow[],nextCursor:null as string|null,
     people:[] as PersonOption[],personIndex:0,personOptions:[] as {id:string;label:string}[],personId:'',
     filterOpen:false,year:'',matchType:'',matchTypeIndex:0,matchTypes:[{key:'',label:'全部类型'},{key:'official',label:'正式比赛'},{key:'friendly',label:'友谊赛'}],
     years:['全部年份',...Array.from({length:5},(_,i)=>String(new Date().getFullYear()-i)),'其他年份…'],yearIndex:0,
@@ -32,9 +32,12 @@ Page({
   async onShow():Promise<void>{
     try{await ensureRuntimeReady();}catch{}
     const familyId=currentFamilyStore.value?.id||'';
-    if(!familyId){this.setData({loading:false,error:'请先加入家庭',familyId:''});return;}
-    if(familyId!==this.data.familyId)this.setData({familyId,personId:'',personIndex:0,knownTeams:{},teamIcons:{},activeScope:{},hasFilters:false,
-      representativeTeamId:'',opponentTeamId:'',competitionActivityId:'',representativeTeamName:'全部代表球队',opponentTeamName:'全部对手球队',competitionName:'全部赛事'});
+    if(!familyId){++this._generation;this.setData({loading:false,error:'请先加入家庭',familyId:'',rows:[],loadedOnce:false});return;}
+    if(familyId!==this.data.familyId){
+      ++this._generation;
+      this.setData({familyId,rows:[],nextCursor:null,loadedOnce:false,personId:'',personIndex:0,knownTeams:{},teamIcons:{},activeScope:{},hasFilters:false,
+        representativeTeamId:'',opponentTeamId:'',competitionActivityId:'',representativeTeamName:'全部代表球队',opponentTeamName:'全部对手球队',competitionName:'全部赛事'});
+    }
     this.setData({userId:userStore.value?.id||''});
     await this.load(true);
   },
@@ -46,7 +49,7 @@ Page({
   async load(reset:boolean):Promise<void>{
     const familyId=this.data.familyId;if(!familyId)return;
     const generation=++this._generation;
-    this.setData({loading:reset,loadingMore:!reset,error:''});
+    this.setData({loading:reset&&!this.data.loadedOnce,loadingMore:!reset,error:''});
     try{
       if(reset){
         const people=await listDomainPeople(familyId);
@@ -56,7 +59,7 @@ Page({
         this.setData({people,personOptions:options,personId,personIndex:Math.max(0,options.findIndex(p=>p.id===personId))});
       }
       const activeScope=this.scope();this.setData({activeScope,hasFilters:Object.keys(activeScope).some(k=>k!=='playerPersonId'&&Boolean(activeScope[k as keyof FootballScope]))});
-      if(this.data.mode==='stats')return;
+      if(this.data.mode==='stats'){this.setData({loadedOnce:true});return;}
       const page=await listMatches(familyId,{...this.scope(),limit:40,cursor:reset?undefined:this.data.nextCursor||undefined});
       const names={...this.data.knownTeams},icons={...this.data.teamIcons};
       const teamIds=new Set<string>();for(const m of page.items){teamIds.add(m.representativeTeamId);teamIds.add(m.opponentTeamId);}
@@ -66,7 +69,7 @@ Page({
         ...[...competitionIds].filter(id=>!names[id]).map(async id=>{try{names[id]=(await getDomainRecord(familyId,'activities',id)).name||'未命名赛事';}catch{}}),
       ]);
       if(generation!==this._generation)return;
-      this.setData({knownTeams:names,teamIcons:icons,rows:reset?page.items.map(m=>this.row(m,names,icons)):[...this.data.rows,...page.items.map(m=>this.row(m,names,icons))],nextCursor:page.nextCursor});
+      this.setData({knownTeams:names,teamIcons:icons,rows:reset?page.items.map(m=>this.row(m,names,icons)):[...this.data.rows,...page.items.map(m=>this.row(m,names,icons))],nextCursor:page.nextCursor,loadedOnce:true});
     }catch(error){if(generation===this._generation)this.setData({error:(error as Error).message||'加载失败'});}
     finally{if(generation===this._generation)this.setData({loading:false,loadingMore:false});}
   },

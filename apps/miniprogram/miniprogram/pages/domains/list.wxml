@@ -21,7 +21,7 @@
       <view class="chip-row"><view wx:for="{{filters}}" wx:key="key" class="domain-chip {{filter===item.key?'selected':''}}" data-key="{{item.key}}" bindtap="onFilterTap">{{item.label}}</view></view>
     </scroll-view>
     <view wx:if="{{loading}}" class="loading-state"><text class="loading-text">正在加载{{title}}…</text></view>
-    <view wx:elif="{{error}}" class="load-error-state"><text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onApplySearch">重试</button></view>
+    <view wx:elif="{{error && !records.length}}" class="load-error-state"><text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onApplySearch">重试</button></view>
     <view wx:elif="{{!records.length}}" class="card domain-empty">
       <text>这里还没有{{title}}记录</text><text wx:if="{{kind==='activities' && filter==='current'}}">可切换「即将开始」「已结束」「全部」查看其他活动。</text>
       <button class="btn-outline btn-sm" bindtap="onCreate">新建{{title}}</button>

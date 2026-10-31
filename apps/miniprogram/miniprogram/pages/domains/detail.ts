@@ -63,7 +63,7 @@ Page({
   async refresh():Promise<void>{
     const {familyId,recordId,kind}=this.data;if(!familyId||!recordId)return;
     const generation=++this._generation;
-    this.setData({loading:true,error:''});
+    this.setData({loading:!this.data.record,error:''});
     try{
       const [record,people]=await Promise.all([getDomainRecord(familyId,kind,recordId),listDomainPeople(familyId)]);
       if(generation!==this._generation)return;

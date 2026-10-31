@@ -17,7 +17,7 @@
   <block wx:if="{{mode==='record'}}">
   <view class="football-section"><text>比赛记录</text><button class="football-icon-button" bindtap="onRefresh" aria-label="刷新比赛"><lucide-icon name="refresh-cw" size="18" color="#57534e"/></button></view>
   <view wx:if="{{loading}}" class="loading-state">正在读取比赛…</view>
-  <view wx:elif="{{error}}" class="load-error-state"><text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onRefresh">重试</button></view>
+  <view wx:elif="{{error && !rows.length}}" class="load-error-state"><text class="load-error-text">{{error}}</text><button class="btn-outline btn-sm" bindtap="onRefresh">重试</button></view>
   <view wx:else class="card football-list">
     <view wx:for="{{rows}}" wx:key="id" class="football-row" data-id="{{item.id}}" bindtap="onRecord">
       <view class="football-date"><text>{{item.matchDate}}</text><lucide-icon name="{{item.matchType==='friendly'?'handshake':'trophy'}}" size="15" color="{{item.matchType==='friendly'?'#0284c7':'#d97706'}}"/><view class="football-row-actions"><button class="football-row-record" data-id="{{item.id}}" catchtap="onRecord" aria-label="记录比赛表现">记录</button><button class="football-icon-button" data-id="{{item.id}}" catchtap="onEditMatch" aria-label="编辑比赛信息"><lucide-icon name="pencil" size="17" color="#57534e"/></button></view></view>

@@ -9,8 +9,10 @@ Page({
     ready:false,
   },
   onShow():void {
-    this.setData({ready:false});
-    void ensureRuntimeReady().then(()=>{this.setData({ready:true});}).catch(()=>wx.showToast({title:'账号信息加载失败，请重试',icon:'none'}));
+    // 解锁/切前台时不重置已就绪的关联表单。
+    void ensureRuntimeReady().then(()=>{this.setData({ready:true});}).catch(()=>{
+      if(!this.data.ready)wx.showToast({title:'账号信息加载失败，请重试',icon:'none'});
+    });
   },
 
   onChallengeInput(event: WechatMiniprogram.Input): void {

@@ -195,6 +195,11 @@ Page({
   },
 
   _lifeGeneration: { habits: 0, activities: 0, goals: 0 },
+  /** 成功加载过空结果也算已有展示；自动刷新不能再打开加载态。 */
+  _lifeFetched: { habits: false, activities: false, goals: false },
+  _eventsFetched: false,
+  _tasksFetched: false,
+  _daysFetched: false,
   _lifePersonId: '',
   _lifeContext: 0,
   _checkingHabits: new Set<string>(),
@@ -371,9 +376,10 @@ Page({
     const cached = readHomeStartupCache(userId, familyId, viewDate);
     if (!cached) return;
 
-    if (cached.events) this._todayEvents = cached.events;
-    if (cached.tasks) this._pendingTasks = cached.tasks;
+    if (cached.events) { this._todayEvents = cached.events; this._eventsFetched = true; }
+    if (cached.tasks) { this._pendingTasks = cached.tasks; this._tasksFetched = true; }
     if (cached.attentionDays) {
+      this._daysFetched = true;
       this.setData({ attentionDays: cached.attentionDays.map(mapDayRecordView) });
     }
     this._statusFingerprint = '';
@@ -391,6 +397,10 @@ Page({
   _resetFamilyData(): void {
     this._todayEvents = [];
     this._pendingTasks = [];
+    this._eventsFetched = false;
+    this._tasksFetched = false;
+    this._daysFetched = false;
+    this._lifeFetched = { habits: false, activities: false, goals: false };
     this._completingIds.clear();
     this._statusFingerprint = '';
     this._homeCacheHydratedFamilyId = '';
@@ -520,7 +530,7 @@ Page({
    */
   async loadTodayEvents(familyId: string): Promise<void> {
     // 已有数据时进入非破坏性「后台刷新」态，保留旧列表继续展示，避免整块闪现「加载中」
-    const hasOld = this.data.todayEvents.length > 0;
+    const hasOld = this._eventsFetched || this.data.todayEvents.length > 0;
     this.setData({
       eventsLoading: !hasOld,
       eventsRefreshing: hasOld,
@@ -542,6 +552,7 @@ Page({
       });
       if (this.data.currentFamily?.id !== familyId) return;
 
+      this._eventsFetched = true;
       this._todayEvents = events.filter(event =>
         eventDaysInRange(
           event,
@@ -574,7 +585,7 @@ Page({
    * 3 天截止筛选，「需要关注」的逾期汇总与问候语计数仍基于同一份数据，保证口径一致。
    */
   async loadTasks(familyId: string): Promise<void> {
-    const hasOld = this.data.pendingTasks.length > 0;
+    const hasOld = this._tasksFetched || this.data.pendingTasks.length > 0;
     this.setData({
       tasksLoading: !hasOld,
       tasksRefreshing: hasOld,
@@ -592,6 +603,7 @@ Page({
       });
       if (this.data.currentFamily?.id !== familyId) return;
 
+      this._tasksFetched = true;
       this._pendingTasks = tasks;
       const userId = userStore.value?.id;
       if (userId) cacheHomeTasks(userId, familyId, tasks);
@@ -613,7 +625,7 @@ Page({
    * 关注状态完全来自 Core 的 computed，本页不重新判断。
    */
   async loadAttentionDays(familyId: string): Promise<void> {
-    const hasOld = this.data.attentionDays.length > 0;
+    const hasOld = this._daysFetched || this.data.attentionDays.length > 0;
     this.setData({
       daysLoading: !hasOld,
       daysError: false,
@@ -626,6 +638,7 @@ Page({
       if (this.data.currentFamily?.id !== familyId) return;
       const userId = userStore.value?.id;
       if (userId) cacheHomeAttentionDays(userId, familyId, records);
+      this._daysFetched = true;
       this.setData({
         attentionDays: records.map(mapDayRecordView),
         daysLoading: false,
@@ -652,7 +665,7 @@ Page({
     const generations = { ...this._lifeGeneration };
     for (const kind of kinds) {
       generations[kind] = ++this._lifeGeneration[kind];
-      this.setData({ [`lifeLoading.${kind}`]: true, [`lifeErrors.${kind}`]: false });
+      this.setData({ [`lifeLoading.${kind}`]: !this._lifeFetched[kind], [`lifeErrors.${kind}`]: false });
     }
     const isCurrent = (kind: LifeKind) => this.data.currentFamily?.id === familyId &&
       this._lifeGeneration[kind] === generations[kind];
@@ -678,6 +691,7 @@ Page({
         const records = await listCurrentLifeRecords(familyId, kind, fetchPersonId, today, () => isCurrent(kind));
         if (!isCurrent(kind)) return;
         const rows = homeLifeRows(records, kind, people, fetchPersonId);
+        this._lifeFetched[kind] = true;
         // A poll may finish while a check-in is pending. Keep its button locked.
         rows.forEach(row => { row.checking = this._checkingHabits.has(row.id); });
         this.loadLifeIcons(kind, rows, familyId);
