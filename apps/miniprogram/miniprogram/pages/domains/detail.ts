@@ -1,5 +1,6 @@
 import { currentFamilyStore,userStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { AutoRefreshGate, markRefreshDirty } from '../../services/refresh-policy';
 import {
   getDomainRecord,listDomainPeople,listDomainRelations,performDomainAction,listHabitHistory,
   searchLinkedCandidates,linkDomainRecord,unlinkDomainRecord,createLinkedRecord,
@@ -48,6 +49,7 @@ Page({
     candidateCursor:null as string|null,candidateLoading:false,moreCandidates:false,
   },
   _generation:0,
+  _refreshGate:new AutoRefreshGate(),
   async onLoad(opts:{kind?:string;familyId?:string;id?:string}):Promise<void>{
     const kind=['activities','goals','habits'].includes(opts.kind||'')?opts.kind as Kind:'activities';
     const familyId=opts.familyId||currentFamilyStore.value?.id||'',recordId=opts.id||'';
@@ -59,9 +61,13 @@ Page({
     try{await ensureRuntimeReady();}catch{}
     await this.refresh();
   },
-  onShow():void{if(this.data.recordId&&!this.data.loading)void this.refresh();},
+  onShow():void{
+    const d=this.data;
+    if(d.recordId&&!d.loading&&this._refreshGate.shouldRefresh(`${d.familyId}:${d.kind}:${d.recordId}`,'domains',Boolean(d.record)))void this.refresh();
+  },
   async refresh():Promise<void>{
     const {familyId,recordId,kind}=this.data;if(!familyId||!recordId)return;
+    this._refreshGate.noteRequest(`${familyId}:${kind}:${recordId}`,'domains');
     const generation=++this._generation;
     this.setData({loading:!this.data.record,error:''});
     try{
@@ -116,6 +122,7 @@ Page({
     this.setData({busy:true,error:''});
     try{
       await performDomainAction(this.data.familyId,this.data.kind as 'goals'|'habits',record.id,action,record.version);
+      markRefreshDirty('domains');
       await this.refresh();
       wx.showToast({title:action==='check-in'?'打卡成功':'操作成功',icon:'success'});
     }catch(error){this.setData({error:(error as Error).message||'操作失败，请刷新后重试'});}

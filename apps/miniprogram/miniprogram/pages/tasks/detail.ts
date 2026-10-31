@@ -20,6 +20,7 @@ import {
 import { Task } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { AutoRefreshGate } from '../../services/refresh-policy';
 import { downloadRecordIconImage } from '../../services/record-icons';
 
 Page({
@@ -51,6 +52,8 @@ Page({
     toggling: false,
   },
 
+  _refreshGate: new AutoRefreshGate(),
+
   async onLoad(options: { id?: string; familyId?: string }): Promise<void> {
     const taskId = options?.id;
     const familyId = options?.familyId;
@@ -70,13 +73,11 @@ Page({
   },
 
   onShow(): void {
-    // 从编辑页返回后刷新，避免继续展示编辑前的旧数据
-    if (this.data.loaded && this.data.taskId) {
-      this.loadTask();
-    }
+    if (this.data.loaded && this._refreshGate.shouldRefresh(`tasks:${this.data.familyId}:${this.data.taskId}`,'tasks',Boolean(this.data.task))) this.loadTask();
   },
 
   async loadTask(): Promise<void> {
+    this._refreshGate.noteRequest(`tasks:${this.data.familyId}:${this.data.taskId}`,'tasks');
     try {
       const task = await getTask(this.data.familyId, this.data.taskId);
       this.applyTask(task);

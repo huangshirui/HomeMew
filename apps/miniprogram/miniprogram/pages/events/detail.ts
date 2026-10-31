@@ -26,6 +26,7 @@ import { Event } from '../../types/index';
 import { markDirty } from '../../stores/dirty';
 import { currentFamilyStore, familiesStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { AutoRefreshGate } from '../../services/refresh-policy';
 import { setCloneSource } from '../../stores/clone-buffer';
 import { downloadRecordIconImage } from '../../services/record-icons';
 import { wgs84ToGcj02 } from '../../utils/map-coordinates';
@@ -57,6 +58,8 @@ Page({
     deleting: false,
   },
 
+  _refreshGate: new AutoRefreshGate(),
+
   async onLoad(options: { id?: string; familyId?: string }): Promise<void> {
     const eventId = options?.id;
     const familyId = options?.familyId;
@@ -76,13 +79,11 @@ Page({
   },
 
   onShow(): void {
-    // 从编辑页返回后刷新，避免继续展示编辑前的旧数据
-    if (this.data.loaded && this.data.eventId) {
-      this.loadEvent();
-    }
+    if (this.data.loaded && this._refreshGate.shouldRefresh(`events:${this.data.familyId}:${this.data.eventId}`,'events',Boolean(this.data.event))) this.loadEvent();
   },
 
   async loadEvent(): Promise<void> {
+    this._refreshGate.noteRequest(`events:${this.data.familyId}:${this.data.eventId}`,'events');
     try {
       const event = await getEvent(this.data.familyId, this.data.eventId);
       this.applyEvent(event);
