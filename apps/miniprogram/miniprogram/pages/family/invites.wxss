@@ -228,3 +228,14 @@
   font-size: 26rpx;
   color: var(--color-text-hint);
 }
+
+/* Permission guidance stays local to the QR sheet and does not interrupt the page. */
+.qr-preview-hint,
+.qr-backup-hint {
+  display: block;
+  color: var(--color-text-hint);
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+.qr-preview-hint { margin-bottom: 10rpx; }
+.qr-backup-hint { margin-top: 18rpx; }

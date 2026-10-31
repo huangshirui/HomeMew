@@ -81,11 +81,14 @@
 <view wx:if="{{qrVisible}}" class="qr-overlay" catchtap="onCloseMiniCode">
   <view class="qr-sheet" catchtap="onStopQrTap">
     <text class="qr-title">家庭邀请小程序码</text>
-    <image class="qr-image" src="{{qrCodePath}}" mode="aspectFit" show-menu-by-longpress="{{true}}" />
+    <image class="qr-image" src="{{qrCodePath}}" mode="aspectFit" bindtap="onPreviewMiniCode" />
+    <text class="qr-preview-hint">点击图片可全屏查看，必要时可截图发送给微信好友</text>
     <text class="qr-caption">让家人用微信扫一扫，确认家庭信息后加入。</text>
     <text wx:if="{{qrCodeVersion === 'trial'}}" class="qr-trial-tip">当前二维码指向体验版，需要先上传体验版并添加体验成员。</text>
     <button class="btn-primary qr-action" bindtap="onShareMiniCode">分享二维码图片</button>
-    <button class="btn-outline qr-action" bindtap="onSaveMiniCode">保存图片到相册</button>
+    <button class="btn-outline qr-action" bindtap="onSaveMiniCode" disabled="{{savingAlbum}}">{{savingAlbum ? '正在保存...' : '保存图片到相册'}}</button>
+    <button wx:if="{{albumPermissionRequired}}" class="btn-outline qr-action" open-type="openSetting" bindopensetting="onAlbumSettingChanged">开启相册权限</button>
+    <text class="qr-backup-hint">如果微信限制分享或保存，可全屏截图后发送；也可关闭后复制邀请码。</text>
     <view class="qr-close" bindtap="onCloseMiniCode">关闭</view>
   </view>
 </view>
