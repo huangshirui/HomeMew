@@ -195,3 +195,9 @@ corepack pnpm test:web
 - `apps/web/README.md`
 - `docs/decisions/2026-10-08-single-lifespace-application.md`
 - 当前 LifeSpace 对应 contract / architecture（平台 API 与权限的唯一源码来源）
+
+## 许可证
+
+本仓库中由项目权利人有权许可、且未另行标明其他授权条款的原创软件代码，依据 **GNU Affero General Public License v3.0 only (AGPL-3.0-only)** 提供。完整协议见 [LICENSE](./LICENSE)。
+
+AGPLv3 允许商业使用，但对分发、修改及通过网络向用户提供修改后程序等情形规定了相应的义务，包括第 13 条的对应源码提供要求。第三方依赖和素材各自的许可证或权利不因本声明改变；本许可证不授予品牌名称或商标使用权。
