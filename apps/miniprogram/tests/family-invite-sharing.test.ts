@@ -144,7 +144,7 @@ test('share-card entry automatically previews the invitation without a second ta
 });
 
 test('join success stays successful when subsequent family refresh fails, avoiding duplicate writes', async () => {
-  const { page, successes, destinations, joins } = joinHarness({
+  const { page, successes, destinations } = joinHarness({
     loadFamilies: async () => { throw new Error('network unavailable'); },
   });
   page.onLoad({ code: 'LS-ABCD-EFGH-JKLM-NPQR' });
@@ -169,4 +169,24 @@ test('unjoinable invitation blocks the write and shows the appropriate state', a
   assert.equal(harness.joins, 0);
   const template = readMini('pages/family/join.wxml');
   assert.match(template, /wx:if="\{\{preview.canJoin\}\}"/);
+});
+
+test('an existing member can open a full family instead of being blocked by invite capacity', async () => {
+  const selected: string[] = [];
+  const harness = joinHarness({
+    previewInvite: async () => ({
+      family: { id: 'spc_home', name: '测试家庭', memberCount: 8 },
+      canJoin: false,
+    }),
+    setCurrentFamily: (family: { id: string }) => { selected.push(family.id); },
+  });
+  harness.page.onLoad({ code: 'LS-FULL' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(harness.page.data.alreadyMember, true);
+  await harness.page.onEnterExistingFamily();
+  assert.deepEqual(selected, ['spc_home']);
+  assert.equal(harness.page.data.joined, true);
+  assert.deepEqual(harness.destinations, ['/pages/home/home']);
+  assert.equal(harness.joins, 0);
+  assert.match(readMini('pages/family/join.wxml'), /bindtap="onEnterExistingFamily"/);
 });
