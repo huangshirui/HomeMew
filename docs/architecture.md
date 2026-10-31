@@ -88,6 +88,13 @@ Required secrets/configuration:
 
 The Mini Program never receives `openid`, the WeChat app secret, or the LifeSpace application credential.
 
+### WeChat Mini Program code for family invitations (experimental, 2026-10-31)
+
+The HomeMew Mini Program BFF offers only a bounded invitation code operation:
+`POST /api/v1/miniprogram/families/{familyId}/invites/mini-code`. The BFF first uses the current LifeSpace user bearer to verify Core invitation-management authority and preview the supplied invite's HomeMew family target; it never accepts an arbitrary WeChat page or caller-chosen provider credentials. The Web Worker then delegates through `HOMEMEW_BACKEND` Service Binding to the internal-only provider route `/internal/v1/wechat/invite-mini-code`.
+
+The backend reuses its existing WeChat AppID/AppSecret, caches the provider `access_token` for its short validity window, and calls `getwxacodeunlimit` with fixed page `pages/family/join`, validated `scene` and environment. It returns bounded image bytes as temporary Base64 JSON; the Mini Program writes a local file for `wx.showShareImageMenu` or album saving. QR images and invitation plaintext are not persisted as HomeMew business data. Scanner entry is still validated by the ordinary LifeSpace-backed invite preview and explicit join workflow. This is not a general-purpose QR endpoint or an account-link/SSO flow. The unverified WeChat account may still restrict image sharing or scanning; use trial-version tester accounts to validate.
+
 ## 4. Mini Program identity flow
 
 ```text
