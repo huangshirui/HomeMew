@@ -73,7 +73,7 @@ test('no invite, expiry and revoke prevent code copying or QR generation', async
   page.data.familyId = 'spc_home';
   await page.loadInvites();
   assert.equal(page.data.newInviteAvailable, false);
-  await page.onShareInvite();
+  await page.onGenerateMiniCode();
   page.onCopyCode();
   assert.deepEqual(copied, []);
   assert.ok(errors.every(value => value.includes('已失效')));
@@ -81,16 +81,16 @@ test('no invite, expiry and revoke prevent code copying or QR generation', async
   // A previously active invitation may expire while the page remains open.
   page.data.newInvite = inviteFixture(new Date(Date.now() - 1000).toISOString());
   page.data.newInviteAvailable = true;
-  await page.onShareInvite();
+  await page.onGenerateMiniCode();
   assert.equal(page.data.qrVisible, false);
   assert.equal(typeof page.onShareAppMessage, 'undefined');
 });
 
 test('mini-code image and copying a code are visually separate actions', () => {
   const template = readMini('pages/family/invites.wxml');
-  assert.match(template, /bindtap="onShareInvite"/);
+  assert.match(template, /bindtap="onGenerateMiniCode"/);
   assert.doesNotMatch(template, /open-type="share"/);
-  assert.match(template, /bindtap="onShareMiniCode"/);
+  assert.doesNotMatch(template, /bindtap="onShareMiniCode"|分享二维码图片|发送给微信好友<\/button>/);
   assert.match(template, /bindtap="onSaveMiniCode"/);
   assert.match(template, /bindtap="onCopyCode"/);
   assert.match(template, /生成小程序码图片/);
@@ -213,7 +213,7 @@ test('generating a QR image uses the stable BFF, writes only a local file, and o
   page.data.newInvite = inviteFixture();
   page.data.newInviteAvailable = true;
   page.data.familyId = 'spc_home';
-  await page.onShareInvite();
+  await page.onGenerateMiniCode();
   assert.equal(page.data.qrVisible, true);
   assert.equal(page.data.qrCodeVersion, 'trial');
   assert.deepEqual(requested, [{
@@ -225,24 +225,22 @@ test('generating a QR image uses the stable BFF, writes only a local file, and o
   assert.equal(page.data.qrVisible, false);
 });
 
-test('blocked native image sharing offers fullscreen screenshot fallback', () => {
-  const errors: string[] = [];
+test('QR preview remains usable while disabled native sharing UI and handler are removed', () => {
   const previews: string[] = [];
   const page = inviteHarness({
-    showError: (message: string) => errors.push(message),
     wx: {
-      showShareImageMenu: ({ fail }: { fail: (error: { errMsg: string }) => void }) =>
-        fail({ errMsg: 'showShareImageMenu:fail account verification required' }),
       previewImage: ({ current }: { current: string }) => previews.push(current),
     },
   }).page;
   page.data.qrCodePath = '/user/data/invite.png';
   page.data.qrVisible = true;
-  page.onShareMiniCode();
-  assert.match(errors[0], /微信暂不允许直接分享/);
+  assert.equal(typeof page.onShareMiniCode, 'undefined');
   page.onPreviewMiniCode();
   assert.deepEqual(previews, ['/user/data/invite.png']);
-  assert.match(readMini('pages/family/invites.wxml'), /全屏截图/);
+  const template = readMini('pages/family/invites.wxml');
+  assert.match(template, /bindtap="onSaveMiniCode"/);
+  assert.match(template, /全屏截图/);
+  assert.doesNotMatch(template, /bindtap="onShareMiniCode"|分享二维码图片/);
 });
 
 test('photo album permission is requested only when saving and successful grant saves the code', () => {
