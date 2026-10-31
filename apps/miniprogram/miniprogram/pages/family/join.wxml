@@ -47,6 +47,11 @@
       disabled="{{submitting}}"
       bindtap="onJoin"
     >{{submitting ? '加入中...' : '确认加入'}}</button>
+    <button
+      wx:elif="{{alreadyMember}}"
+      class="btn-primary confirm-btn"
+      bindtap="onEnterExistingFamily"
+    >你已是该家庭成员，进入家庭</button>
     <text wx:else class="invite-unavailable">暂时无法加入：邀请可能已不可用或家庭人数已满。</text>
     <view class="alternate-code" bindtap="onUseAnotherCode">
       <text>换一个邀请码</text>
