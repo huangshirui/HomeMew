@@ -5,7 +5,7 @@
  * must already authorize the LifeSpace invitation and issuing user.
  * No household facts, plaintext invitation or generated images are persisted.
  */
-const SCENE = /^[A-Za-z0-9!#$&'()*+,\/:;=?@._~-]{1,32}$/u;
+const SCENE = /^LS-[A-Z0-9]+(?:-[A-Z0-9]+)*$/u;
 const ENV_VERSIONS = new Set(['develop', 'trial', 'release']);
 const JOIN_PAGE = 'pages/family/join';
 const MAX_IMAGE_BYTES = 512 * 1024;
@@ -115,7 +115,7 @@ export async function handleInternalWechatInviteCode(request, env, { fetcher = f
     || Object.keys(input).some(key => !['scene', 'envVersion'].includes(key))) {
     return fail(400, 'INVALID_REQUEST', 'Unsupported mini-code input');
   }
-  if (typeof input.scene !== 'string' || !SCENE.test(input.scene)
+  if (typeof input.scene !== 'string' || input.scene.length > 32 || !SCENE.test(input.scene)
     || !ENV_VERSIONS.has(input.envVersion)) {
     return fail(422, 'VALIDATION_ERROR', 'Invalid scene or mini-program version');
   }
