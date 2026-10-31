@@ -20,7 +20,7 @@
       disabled="{{creating || sharing || !newInviteAvailable}}"
       bindtap="onGenerateMiniCode"
     >{{sharing ? '正在生成小程序码...' : '生成小程序码图片'}}</button>
-    <text class="share-hint">生成后可保存图片，或点击二维码全屏截图，再从微信聊天发送。</text>
+    <text class="share-hint">生成后长按二维码选择微信原生「保存图片」，或全屏截图发送。</text>
 
     <view class="invite-divider">
       <view class="divider-line" />
@@ -45,7 +45,7 @@
   </view>
 
   <view wx:else class="card create-card">
-    <text class="create-hint">生成邀请后，可查看并保存小程序码，或复制邀请码。</text>
+    <text class="create-hint">生成邀请后，可长按小程序码使用微信菜单保存，或复制邀请码。</text>
     <button
       class="btn-primary"
       disabled="{{creating}}"
@@ -77,17 +77,16 @@
   </view>
 </view>
 
-<!-- 生成图片后展示，仅提供可用的相册保存、全屏截图与邀请码备用方案。 -->
+<!-- 使用微信原生图片长按菜单，不主动调用相册保存 API 或请求相册权限。 -->
 <view wx:if="{{qrVisible}}" class="qr-overlay" catchtap="onCloseMiniCode">
   <view class="qr-sheet" catchtap="onStopQrTap">
     <text class="qr-title">家庭邀请小程序码</text>
-    <image class="qr-image" src="{{qrCodePath}}" mode="aspectFit" bindtap="onPreviewMiniCode" />
-    <text class="qr-preview-hint">点击图片可全屏查看，必要时可截图发送给微信好友</text>
+    <image class="qr-image" src="{{qrCodePath}}" mode="aspectFit" show-menu-by-longpress="{{true}}" bindtap="onPreviewMiniCode" />
+    <text class="qr-preview-hint">点击「查看并保存」进入微信图片预览，在原生菜单中选择「保存图片」</text>
     <text class="qr-caption">让家人用微信扫一扫，确认家庭信息后加入。</text>
     <text wx:if="{{qrCodeVersion === 'trial'}}" class="qr-trial-tip">当前二维码指向体验版，需要先上传体验版并添加体验成员。</text>
-    <button class="btn-primary qr-action" bindtap="onSaveMiniCode" disabled="{{savingAlbum}}">{{savingAlbum ? '正在保存...' : '保存图片到相册'}}</button>
-    <button wx:if="{{albumPermissionRequired}}" class="btn-outline qr-action" open-type="openSetting" bindopensetting="onAlbumSettingChanged">开启相册权限</button>
-    <text class="qr-backup-hint">无法保存时，可点二维码全屏预览并截图发送；也可关闭后复制邀请码。</text>
+    <button class="btn-primary qr-action" bindtap="onPreviewMiniCode">查看并保存</button>
+    <text class="qr-backup-hint">图片预览内使用微信原生「保存图片」菜单；如保存不可用，可截图发送，或关闭后复制邀请码。</text>
     <view class="qr-close" bindtap="onCloseMiniCode">关闭</view>
   </view>
 </view>
