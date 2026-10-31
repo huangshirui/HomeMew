@@ -1,5 +1,7 @@
 # HomeMew 家事喵
 
+> **版权与授权：本仓库目前不是开源项目。** GitHub 上的临时公开仅便于代码查阅与协作，不代表授予复制、修改、再分发、部署或商业利用的许可；法定权利及 GitHub 服务条款允许的操作不受影响。详情见 [COPYRIGHT.md](./COPYRIGHT.md)。
+
 HomeMew 是构建在 LifeSpace 平台之上的家庭事务应用。LifeSpace 是 Identity、Space/Data Grant、领域模型、权限、业务数据、契约和平台部署的唯一权威来源；HomeMew 负责家庭场景的产品体验、微信 provider 适配和 Web 应用边界。
 
 ## 当前架构
