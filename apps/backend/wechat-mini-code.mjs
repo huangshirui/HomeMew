@@ -5,7 +5,7 @@
  * must already authorize the LifeSpace invitation and issuing user.
  * No household facts, plaintext invitation or generated images are persisted.
  */
-const SCENE = /^[A-Za-z0-9!#$&'()*+,/:;=?@._~-]{1,32}$/u;
+const SCENE = /^[A-Za-z0-9!#$&'()*+,\/:;=?@._~-]{1,32}$/u;
 const ENV_VERSIONS = new Set(['develop', 'trial', 'release']);
 const JOIN_PAGE = 'pages/family/join';
 const MAX_IMAGE_BYTES = 512 * 1024;
