@@ -450,7 +450,7 @@ async function inviteMiniCode(request, env, familyId) {
   const code = input.data.code;
   const envVersion = input.data.envVersion;
   if (typeof code !== 'string' || code.length < 1 || code.length > 32
-    || !/^[A-Za-z0-9!#$&'()*+,/:;=?@._~-]+$/u.test(code)
+    || !/^[A-Za-z0-9!#$&'()*+,\/:;=?@._~-]+$/u.test(code)
     || !['develop', 'trial', 'release'].includes(envVersion)) {
     return errorResponse(422, 'VALIDATION_ERROR', 'Invalid invitation code or version', requestId);
   }
