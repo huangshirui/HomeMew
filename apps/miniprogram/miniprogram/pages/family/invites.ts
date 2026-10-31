@@ -2,9 +2,9 @@
  * 家庭邀请管理页
  *
  * 用户旅程：
- * - 首选使用微信小程序码图片，扫码携带 LifeSpace 邀请码进入加入家庭页
+ * - 首选生成微信小程序码图片，允许保存或全屏截图交给家人扫码
  * - 备用方式只复制邀请码（小程序内部 joinPath 不可作为微信聊天链接）
- * - 邀请撤销、过期或用完后不再展示可用的分享/复制操作
+ * - 邀请撤销、过期或用完后不再提供小程序码生成与复制操作
  *
  * 邀请历史仅展示状态。LifeSpace 仅在新建时返回明文码。
  */
@@ -77,8 +77,8 @@ Page({
   },
 
   onShow(): void {
-    // This page uses QR-image sharing; the ordinary WeChat share menu is
-    // unavailable for unverified Mini Program accounts.
+    // Unverified Mini Program accounts cannot reliably share cards/images;
+    // this page provides QR saving or user-controlled screenshots instead.
     wx.hideShareMenu({});
     if (this.data.familyId && this.data.loaded) {
       void this.loadInvites(true);
@@ -201,7 +201,7 @@ Page({
     }
   },
 
-  async onShareInvite(): Promise<void> {
+  async onGenerateMiniCode(): Promise<void> {
     const invite = this.data.newInvite;
     if (this.data.sharing) return;
     if (!invite || !this.data.newInviteAvailable || !isUsable(invite)) {
@@ -225,22 +225,6 @@ Page({
     } finally {
       this.setData({ sharing: false });
     }
-  },
-
-  onShareMiniCode(): void {
-    if (!this.data.qrCodePath) return;
-    if (typeof wx.showShareImageMenu !== 'function') {
-      showError('当前微信版本不支持直接分享，可全屏截图后发送', 3000);
-      return;
-    }
-    wx.showShareImageMenu({
-      path: this.data.qrCodePath,
-      fail: (error) => {
-        // Direct image sharing may be restricted by WeChat account verification.
-        console.warn('[Invites] Image share blocked:', error?.errMsg ?? 'unknown');
-        showError('微信暂不允许直接分享，可点图片全屏截图后发送', 3500);
-      },
-    });
   },
 
   onPreviewMiniCode(): void {

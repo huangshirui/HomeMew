@@ -14,13 +14,13 @@
     </view>
     <text class="invite-meta">有效期至 {{newInviteView.expiresAtText}} · {{newInviteView.usesText}}</text>
 
-    <!-- 先生成小程序码，再通过微信的图片分享菜单发送（失败可保存图片）。 -->
+    <!-- 生成小程序码后提供保存与全屏截图；不显示微信已限制的分享入口。 -->
     <button
       class="btn-primary share-btn"
       disabled="{{creating || sharing || !newInviteAvailable}}"
-      bindtap="onShareInvite"
-    >{{sharing ? '正在生成小程序码...' : '发送给微信好友'}}</button>
-    <text class="share-hint">生成小程序码图片，可发送给好友或保存后转发。</text>
+      bindtap="onGenerateMiniCode"
+    >{{sharing ? '正在生成小程序码...' : '生成小程序码图片'}}</button>
+    <text class="share-hint">生成后可保存图片，或点击二维码全屏截图，再从微信聊天发送。</text>
 
     <view class="invite-divider">
       <view class="divider-line" />
@@ -45,7 +45,7 @@
   </view>
 
   <view wx:else class="card create-card">
-    <text class="create-hint">生成邀请后，可将小程序码图片发送给家人，或复制邀请码。</text>
+    <text class="create-hint">生成邀请后，可查看并保存小程序码，或复制邀请码。</text>
     <button
       class="btn-primary"
       disabled="{{creating}}"
@@ -77,7 +77,7 @@
   </view>
 </view>
 
-<!-- 生成图片后展示，明确支持微信未认证导致图片分享功能受限的备用方案。 -->
+<!-- 生成图片后展示，仅提供可用的相册保存、全屏截图与邀请码备用方案。 -->
 <view wx:if="{{qrVisible}}" class="qr-overlay" catchtap="onCloseMiniCode">
   <view class="qr-sheet" catchtap="onStopQrTap">
     <text class="qr-title">家庭邀请小程序码</text>
@@ -85,10 +85,9 @@
     <text class="qr-preview-hint">点击图片可全屏查看，必要时可截图发送给微信好友</text>
     <text class="qr-caption">让家人用微信扫一扫，确认家庭信息后加入。</text>
     <text wx:if="{{qrCodeVersion === 'trial'}}" class="qr-trial-tip">当前二维码指向体验版，需要先上传体验版并添加体验成员。</text>
-    <button class="btn-primary qr-action" bindtap="onShareMiniCode">分享二维码图片</button>
-    <button class="btn-outline qr-action" bindtap="onSaveMiniCode" disabled="{{savingAlbum}}">{{savingAlbum ? '正在保存...' : '保存图片到相册'}}</button>
+    <button class="btn-primary qr-action" bindtap="onSaveMiniCode" disabled="{{savingAlbum}}">{{savingAlbum ? '正在保存...' : '保存图片到相册'}}</button>
     <button wx:if="{{albumPermissionRequired}}" class="btn-outline qr-action" open-type="openSetting" bindopensetting="onAlbumSettingChanged">开启相册权限</button>
-    <text class="qr-backup-hint">如果微信限制分享或保存，可全屏截图后发送；也可关闭后复制邀请码。</text>
+    <text class="qr-backup-hint">无法保存时，可点二维码全屏预览并截图发送；也可关闭后复制邀请码。</text>
     <view class="qr-close" bindtap="onCloseMiniCode">关闭</view>
   </view>
 </view>

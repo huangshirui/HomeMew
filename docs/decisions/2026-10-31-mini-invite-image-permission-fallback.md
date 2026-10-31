@@ -22,3 +22,9 @@ The QR generation path delivered by PR #167 was successfully deployed in Product
 - First use, granted permission, denied permission, Settings recovery, and OS-level denial are tested; repeated taps do not trigger duplicate save requests while one save is active.
 - Existing QR generation and scanning are unaffected. Test on real iOS/Android WeChat builds, distinguishing Mini scope, phone system permission and account verification restrictions.
 - Merging/publishing Mini client code follows the repository release discipline. Production backend and Web BFF do not need to be redeployed for this client-only fix.
+
+## Follow-up UX decision (2026-10-31) — remove unusable share action
+
+Real-device tests with the currently unverified WeChat Mini Program account demonstrated that the native image-sharing button cannot complete the intended action. **Do not render** the `wx.showShareImageMenu` control or promise immediate sending with a "发送给微信好友" primary action. Instead, label the entry `生成小程序码图片`, show the generated QR, and provide only album save (with authorization recovery), full-screen image preview for ordinary user screenshots, and the already-supported plaintext invite-code copy.
+
+This is a current-account, observed product decision rather than a claim that all unverified Mini Programs universally lack every image sharing capability. A future verified/account-policy change may warrant a separate, tested UX reintroduction; do not silently show a broken control again. No platform or BFF changes are required.
