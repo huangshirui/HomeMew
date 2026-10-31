@@ -73,7 +73,7 @@ test('no invite, expiry and revoke prevent code copying or QR generation', async
   page.data.familyId = 'spc_home';
   await page.loadInvites();
   assert.equal(page.data.newInviteAvailable, false);
-  assert.equal(page.data.newInviteAvailable, false);
+  await page.onShareInvite();
   page.onCopyCode();
   assert.deepEqual(copied, []);
   assert.ok(errors.every(value => value.includes('已失效')));
@@ -81,7 +81,8 @@ test('no invite, expiry and revoke prevent code copying or QR generation', async
   // A previously active invitation may expire while the page remains open.
   page.data.newInvite = inviteFixture(new Date(Date.now() - 1000).toISOString());
   page.data.newInviteAvailable = true;
-  assert.equal(page.data.newInviteAvailable, true);
+  await page.onShareInvite();
+  assert.equal(page.data.qrVisible, false);
   assert.equal(typeof page.onShareAppMessage, 'undefined');
 });
 
