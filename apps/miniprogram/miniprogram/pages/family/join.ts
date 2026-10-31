@@ -26,6 +26,7 @@ Page({
     previewCode: '',
     previewError: '',
     previewing: false,
+    alreadyMember: false,
     submitting: false,
     joined: false,
   },
@@ -48,6 +49,8 @@ Page({
       previewCode: '',
       previewError: '',
       previewing: false,
+      alreadyMember: false,
+      fromShare: false,
     });
   },
 
@@ -60,6 +63,7 @@ Page({
       previewCode: '',
       previewError: '',
       previewing: false,
+      alreadyMember: false,
     });
   },
 
@@ -70,11 +74,19 @@ Page({
       return;
     }
     const seq = ++this._previewSeq;
-    this.setData({ previewing: true, previewError: '' });
+    this.setData({ previewing: true, previewError: '', alreadyMember: false });
     try {
       const preview = await previewInvite(code);
       if (seq !== this._previewSeq || code !== (this.data.code || '').trim()) return;
       this.setData({ preview, previewCode: code });
+      if (!preview.canJoin) {
+        // 满员家庭的现有成员仍可进入；只把 LifeSpace 返回的成员关系用于 UX。
+        // 不等待该查询才能展示预览，避免分享直达被无关请求阻塞。
+        void loadFamilies().then(families => {
+          if (seq !== this._previewSeq || this.data.previewCode !== code) return;
+          this.setData({ alreadyMember: families.some(f => f.id === preview.family.id) });
+        }).catch(() => {});
+      }
     } catch (error: unknown) {
       if (seq !== this._previewSeq || code !== (this.data.code || '').trim()) return;
       console.error('[Join] Preview failed:', error);
@@ -82,10 +94,30 @@ Page({
       this.setData({
         preview: null,
         previewCode: '',
+        alreadyMember: false,
         previewError: getErrorMessage(err.code, err.message),
       });
     } finally {
       if (seq === this._previewSeq) this.setData({ previewing: false });
+    }
+  },
+
+  async onEnterExistingFamily(): Promise<void> {
+    const familyId = this.data.preview?.family.id;
+    if (!this.data.alreadyMember || !familyId) return;
+    try {
+      const families = await loadFamilies();
+      const family = families.find(f => f.id === familyId);
+      if (!family) {
+        this.setData({ alreadyMember: false });
+        showError('当前无法访问该家庭');
+        return;
+      }
+      setCurrentFamily(family);
+      this.setData({ joined: true });
+      wx.switchTab({ url: '/pages/home/home' });
+    } catch {
+      showError('读取家庭失败，请稍后再试');
     }
   },
 
