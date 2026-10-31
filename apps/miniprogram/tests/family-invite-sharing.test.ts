@@ -254,7 +254,8 @@ test('native WeChat long-press menu replaces app-level photo permissions and uns
   assert.match(template, /show-menu-by-longpress="\{\{true\}\}"/);
   assert.match(template, /bindtap="onPreviewMiniCode"/);
   assert.match(template, /长按二维码/);
-  assert.match(template, /全屏查看二维码/);
+  assert.match(template, /查看并保存/);
+  assert.match(template, /微信图片预览/);
   assert.match(template, /全屏截图|截图发送/);
   assert.doesNotMatch(template, /onSaveMiniCode|saveImageToPhotosAlbum|openSetting|开启相册权限|分享二维码图片/);
   const source = readMini('pages/family/invites.ts');
