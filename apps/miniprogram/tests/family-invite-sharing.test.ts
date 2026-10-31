@@ -245,11 +245,10 @@ test('native WeChat long-press menu replaces app-level photo permissions and uns
   assert.equal(typeof page.onAlbumSettingChanged, 'undefined');
   assert.equal(typeof page.onShareMiniCode, 'undefined');
   page.onPreviewMiniCode();
-  assert.deepEqual(previews, [{
-    current: '/user/data/invite.png',
-    urls: ['/user/data/invite.png'],
-    showmenu: true,
-  }]);
+  assert.equal(previews.length, 1);
+  assert.equal(previews[0].current, '/user/data/invite.png');
+  assert.deepEqual(Array.from(previews[0].urls), ['/user/data/invite.png']);
+  assert.equal(previews[0].showmenu, true);
   const template = readMini('pages/family/invites.wxml');
   assert.match(template, /show-menu-by-longpress="\{\{true\}\}"/);
   assert.match(template, /bindtap="onPreviewMiniCode"/);
