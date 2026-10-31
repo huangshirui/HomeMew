@@ -48,6 +48,23 @@ export async function listInvites(familyId: string): Promise<InviteListItem[]> {
 export function revokeInvite(familyId: string, inviteId: string): Promise<void> {
   return request(`${base(familyId)}/invites/${encodeURIComponent(inviteId)}/revoke`, { method: 'POST', skipRetry: true });
 }
+export interface FamilyInviteMiniCode {
+  imageBase64: string;
+  mimeType: 'image/png' | 'image/jpeg';
+  envVersion: 'develop' | 'trial' | 'release';
+}
+
+/** One-time image response, never a reusable image URL; no provider secrets in Mini. */
+export function generateFamilyInviteMiniCode(
+  familyId: string,
+  code: string,
+  envVersion: FamilyInviteMiniCode['envVersion'],
+): Promise<FamilyInviteMiniCode> {
+  return request(`${base(familyId)}/invites/mini-code`, {
+    method: 'POST', data: { code, envVersion }, skipRetry: true,
+  });
+}
+
 export function previewInvite(code: string): Promise<InvitePreview> {
   return request('/api/v1/miniprogram/family-invites/preview', { method: 'POST', data: { code }, skipRetry: true });
 }

@@ -1,17 +1,15 @@
 /**
  * 家庭邀请管理页
  *
- * 支持：
- * - 查看邀请列表（状态：有效 / 已过期 / 已用完 / 已撤销）
- * - 创建邀请（成功后立即展示完整邀请码与邀请路径）
- * - 撤销邀请
- * - 复制新邀请码 / 复制邀请路径
- * - 微信分享（onShareAppMessage 使用 joinPath）
+ * 用户旅程：
+ * - 首选生成小程序码图片，由微信原生长按菜单保存或用户全屏截图发送
+ * - 备用方式只复制邀请码（小程序内部 joinPath 不可作为微信聊天链接）
+ * - 邀请撤销、过期或用完后不再提供小程序码生成与复制操作
  *
- * 历史邀请列表不假设仍返回完整邀请码，仅对本次创建成功的邀请提供复制。
+ * 邀请历史仅展示状态。LifeSpace 仅在新建时返回明文码。
  */
 
-import { listInvites, createInvite, revokeInvite } from '../../services/families';
+import { listInvites, createInvite, revokeInvite, generateFamilyInviteMiniCode } from '../../services/families';
 import {
   showError,
   showSuccess,
@@ -25,6 +23,7 @@ import {
 import { InviteListItem, InviteCreated } from '../../types/index';
 
 type InviteView = InviteListItem & { statusText: string; subText: string; expiresAtText: string };
+type CreatedView = { expiresAtText: string; usesText: string };
 
 const STATUS_TEXT: Record<string, string> = {
   active: '有效',
@@ -33,15 +32,36 @@ const STATUS_TEXT: Record<string, string> = {
   revoked: '已撤销',
 };
 
+function isUsable(invite: InviteCreated, status?: InviteListItem['status']): boolean {
+  return (!status || status === 'active')
+    && Date.parse(invite.expiresAt) > Date.now()
+    && invite.usedCount < invite.maxUses;
+}
+
+function createdView(invite: InviteCreated): CreatedView {
+  return {
+    expiresAtText: formatDate(invite.expiresAt, 'datetime'),
+    usesText: `剩余可使用 ${Math.max(0, invite.maxUses - invite.usedCount)} 次`,
+  };
+}
+
 Page({
   data: {
     familyId: '',
     invites: [] as InviteView[],
     newInvite: null as InviteCreated | null,
-    newInviteView: null as { expiresAtText: string; usesText: string } | null,
+    newInviteView: null as CreatedView | null,
+    newInviteAvailable: false,
     creating: false,
     loaded: false,
+    sharing: false,
+    qrVisible: false,
+    qrCodePath: '',
+    qrCodeVersion: '' as 'develop' | 'trial' | 'release' | '',
+
   },
+
+  _listRequest: 0,
 
   onLoad(options: { familyId?: string }): void {
     const familyId = options?.familyId;
@@ -51,12 +71,15 @@ Page({
       return;
     }
     this.setData({ familyId });
-    this.loadInvites();
+    void this.loadInvites();
   },
 
   onShow(): void {
+    // Unverified Mini Program accounts cannot reliably share cards/images;
+    // this page provides QR saving or user-controlled screenshots instead.
+    wx.hideShareMenu({});
     if (this.data.familyId && this.data.loaded) {
-      this.loadInvites();
+      void this.loadInvites(true);
     }
   },
 
@@ -89,35 +112,49 @@ Page({
     });
   },
 
-  async loadInvites(): Promise<void> {
+  async loadInvites(silent = false): Promise<void> {
+    const seq = ++this._listRequest;
     try {
       const invites = await listInvites(this.data.familyId);
-      this.setData({ invites: this.mapInvites(invites), loaded: true });
+      if (seq !== this._listRequest) return;
+      const newInvite = this.data.newInvite;
+      const latest = invites.find(i => i.id === newInvite?.id);
+      const current = newInvite && latest
+        ? { ...newInvite, usedCount: latest.usedCount, maxUses: latest.maxUses, expiresAt: latest.expiresAt }
+        : newInvite;
+      this.setData({
+        invites: this.mapInvites(invites),
+        loaded: true,
+        newInvite: current,
+        newInviteView: current ? createdView(current) : null,
+        newInviteAvailable: Boolean(current && isUsable(current, latest?.status)),
+        qrVisible: Boolean(current && isUsable(current, latest?.status) && this.data.qrVisible),
+      });
     } catch (error: unknown) {
+      if (seq !== this._listRequest) return;
       console.error('[Invites] Load failed:', error);
       const err = error as { code?: string; message?: string };
-      showError(getErrorMessage(err.code, err.message));
+      if (!silent) showError(getErrorMessage(err.code, err.message));
       this.setData({ loaded: true });
     }
   },
 
   async onCreate(): Promise<void> {
     if (this.data.creating) return;
-    this.setData({ creating: true });
+    this.setData({ creating: true, qrVisible: false, qrCodePath: '' });
     showLoading('生成邀请中...');
     try {
       const created = await createInvite(this.data.familyId);
-      hideLoading();
+      this._listRequest++;
       this.setData({
         newInvite: created,
-        newInviteView: {
-          expiresAtText: formatDate(created.expiresAt, 'datetime'),
-          usesText: `可加入人数：${created.maxUses} 人`,
-        },
+        newInviteView: createdView(created),
+        newInviteAvailable: isUsable(created),
       });
-      // 重新加载列表（列表项不含 code，仅用于状态追踪）
-      await this.loadInvites();
+      hideLoading();
       showSuccess('邀请已生成');
+      // 状态与剩余次数从服务端同步；获取列表失败不影响已创建的邀请。
+      await this.loadInvites(true);
     } catch (error: unknown) {
       console.error('[Invites] Create failed:', error);
       const err = error as { code?: string; message?: string };
@@ -138,10 +175,10 @@ Page({
       await revokeInvite(this.data.familyId, inviteId);
       hideLoading();
       showSuccess('已撤销');
-      if (this.data.newInvite && this.data.newInvite.id === inviteId) {
-        this.setData({ newInvite: null });
+      if (this.data.newInvite?.id === inviteId) {
+        this.setData({ newInviteAvailable: false, qrVisible: false, qrCodePath: '' });
       }
-      await this.loadInvites();
+      await this.loadInvites(true);
     } catch (error: unknown) {
       hideLoading();
       console.error('[Invites] Revoke failed:', error);
@@ -150,27 +187,75 @@ Page({
     }
   },
 
-  onCopyCode(): void {
-    if (!this.data.newInvite) return;
-    copyToClipboard(this.data.newInvite.code);
-  },
-
-  onCopyPath(): void {
-    if (!this.data.newInvite) return;
-    copyToClipboard(this.data.newInvite.joinPath);
-  },
-
-  onShareAppMessage(): WechatMiniprogram.Page.ICustomShareContent {
-    const invite = this.data.newInvite;
-    if (!invite) {
-      return {
-        title: '家事喵 · 邀请你加入我们的家庭',
-        path: '/pages/launch/launch',
-      };
+  /**
+   * 开发版/体验版分享给外部体验者时必须使用 trial；正式版用 release。
+   * 开发版上传体验版本后才能让有体验权限的微信好友扫码。
+   */
+  qrTargetVersion(): 'trial' | 'release' {
+    try {
+      return wx.getAccountInfoSync().miniProgram.envVersion === 'release' ? 'release' : 'trial';
+    } catch {
+      return 'trial';
     }
-    return {
-      title: '家事喵 · 邀请你加入我们的家庭',
-      path: invite.joinPath,
-    };
   },
+
+  async onGenerateMiniCode(): Promise<void> {
+    const invite = this.data.newInvite;
+    if (this.data.sharing) return;
+    if (!invite || !this.data.newInviteAvailable || !isUsable(invite)) {
+      showError('邀请已失效，请再生成一个邀请');
+      return;
+    }
+    this.setData({ sharing: true });
+    try {
+      const envVersion = this.qrTargetVersion();
+      const qr = await generateFamilyInviteMiniCode(this.data.familyId, invite.code, envVersion);
+      // 生成过程中更换/撤销的邀请码不能展示旧图片。
+      if (this.data.newInvite?.id !== invite.id || !this.data.newInviteAvailable) return;
+      const suffix = qr.mimeType === 'image/jpeg' ? 'jpg' : 'png';
+      const filePath = `${wx.env.USER_DATA_PATH}/homemew-invite-${invite.id}.${suffix}`;
+      wx.getFileSystemManager().writeFileSync(filePath, qr.imageBase64, 'base64');
+      this.setData({ qrCodePath: filePath, qrCodeVersion: envVersion, qrVisible: true });
+    } catch (error: unknown) {
+      console.error('[Invites] Mini code generation failed:', error);
+      const err = error as { code?: string; message?: string };
+      showError(getErrorMessage(err.code, err.message), 3000);
+    } finally {
+      this.setData({ sharing: false });
+    }
+  },
+
+  onPreviewMiniCode(): void {
+    const filePath = this.data.qrCodePath;
+    if (!filePath) return;
+    wx.previewImage({
+      current: filePath,
+      urls: [filePath],
+      showmenu: true,
+      fail: (error) => {
+        console.warn('[Invites] Preview image failed:', error?.errMsg ?? 'unknown');
+        showError('无法预览图片，请使用邀请码');
+      },
+    });
+  },
+
+  onCloseMiniCode(): void {
+    this.setData({ qrVisible: false });
+  },
+
+  onStopQrTap(): void {
+    // 阻止弹层内容的点击穿透到遮罩。
+  },
+
+  onCopyCode(): void {
+    const invite = this.data.newInvite;
+    if (!invite || !this.data.newInviteAvailable || !isUsable(invite)) {
+      showError('邀请已失效，请再生成一个邀请');
+      return;
+    }
+    // 复制纯邀请码以便在“加入家庭”页粘贴；失败提示由工具函数处理。
+    void copyToClipboard(invite.code).catch(() => {});
+  },
+
+
 });

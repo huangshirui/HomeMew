@@ -35,6 +35,11 @@ export function matchMiniProgramFamilyRoute(pathname) {
     const userId = decodeId(match[2], USER_ID);
     return familyId && userId ? { kind: 'member', familyId, userId } : null;
   }
+  match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/invites/mini-code$`, 'u').exec(pathname);
+  if (match) {
+    const familyId = decodeId(match[1], FAMILY_ID);
+    return familyId ? { kind: 'invite-mini-code', familyId } : null;
+  }
   match = new RegExp(`^${MINI_PREFIX}/families/([^/]+)/invites/([^/]+)/revoke$`, 'u').exec(pathname);
   if (match) {
     const familyId = decodeId(match[1], FAMILY_ID);
@@ -358,6 +363,65 @@ async function listInvites(request, env, familyId) {
   })) } }, 200, result.requestId);
 }
 
+/**
+ * Permission remains authoritative in LifeSpace; the provider only generates
+ * the fixed-page image and never receives the caller's LifeSpace user token.
+ */
+async function inviteMiniCode(request, env, familyId) {
+  const requestId = request.headers.get('x-request-id') || '';
+  const input = await readBody(request, ['code', 'envVersion']);
+  if (!input.ok) return input.response;
+  const { code, envVersion } = input.data;
+  if (typeof code !== 'string' || code.length > 32
+    || !/^LS-[A-Z0-9]+(?:-[A-Z0-9]+)*$/u.test(code)
+    || !['develop', 'trial', 'release'].includes(envVersion)) {
+    return errorResponse(422, 'VALIDATION_ERROR', 'Invalid invitation code or version', requestId);
+  }
+
+  // Listing invites requires the current user's spaces:manage authority.
+  const authorized = await callJson(request, env, 'core',
+    `/api/v1/spaces/${encodeURIComponent(familyId)}/invites`);
+  if (!authorized.ok) return authorized.response;
+
+  const preview = await requireFamilyInvite(request, env, code);
+  if (!preview.ok) return preview.response;
+  if (preview.preview.space.id !== familyId) {
+    return errorResponse(422, 'INVITE_FAMILY_MISMATCH', '邀请不属于当前家庭', requestId);
+  }
+  if (Date.parse(preview.preview.expiresAt) <= Date.now()) {
+    return errorResponse(409, 'INVITE_EXPIRED', '邀请码已过期', requestId);
+  }
+
+  const backend = env.HOMEMEW_BACKEND;
+  if (!backend || typeof backend.fetch !== 'function') {
+    return errorResponse(503, 'WECHAT_PROVIDER_UNAVAILABLE', '微信小程序码服务暂时不可用', requestId);
+  }
+  try {
+    const response = await backend.fetch(new Request(
+      'https://homemew-backend.internal/internal/v1/wechat/invite-mini-code', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ scene: code, envVersion }),
+      },
+    ));
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      return errorResponse(response.status, payload?.error?.code || 'WECHAT_MINI_CODE_FAILED',
+        typeof payload?.error?.message === 'string'
+          ? payload.error.message : '微信小程序码生成失败', requestId);
+    }
+    if (!payload?.data || typeof payload.data.imageBase64 !== 'string'
+      || !['image/png', 'image/jpeg'].includes(payload.data.mimeType)
+      || payload.data.envVersion !== envVersion
+      || payload.data.imageBase64.length > 750000) {
+      return errorResponse(502, 'INVALID_PROVIDER_RESPONSE', '微信小程序码服务返回无效响应', requestId);
+    }
+    return json({ data: payload.data }, 200, requestId);
+  } catch {
+    return errorResponse(502, 'WECHAT_PROVIDER_UNAVAILABLE', '微信小程序码服务暂时不可用', requestId);
+  }
+}
+
 async function inviteAction(request, env, kind) {
   const input = await readBody(request, ['code']);
   if (!input.ok) return input.response;
@@ -433,6 +497,9 @@ export async function handleMiniProgramFamilyBff(request, env) {
   if (route.kind === 'invites') {
     if (request.method === 'GET') return listInvites(request, env, route.familyId);
     if (request.method === 'POST') return createInvite(request, env, route.familyId);
+  }
+  if (route.kind === 'invite-mini-code' && request.method === 'POST') {
+    return inviteMiniCode(request, env, route.familyId);
   }
   if (route.kind === 'invite-revoke' && request.method === 'POST') {
     return forwardLifeSpace(derivedRequest(request, 'POST'), env, {

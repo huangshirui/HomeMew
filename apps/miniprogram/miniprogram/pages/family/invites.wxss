@@ -1,6 +1,6 @@
-/* 家庭邀请管理页样式 */
+/* 家庭邀请页：突出主分享、收起邀请码、避免三按钮并列 */
 .header {
-  margin-bottom: 16rpx;
+  margin-bottom: 20rpx;
   padding: 0 8rpx;
 }
 
@@ -13,83 +13,129 @@
 
 .subtitle {
   display: block;
+  margin-top: 8rpx;
   font-size: 24rpx;
+  line-height: 1.6;
   color: var(--color-text-hint);
-  margin-top: 4rpx;
+}
+
+.invite-card { margin-bottom: 20rpx; }
+
+.invite-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16rpx;
   margin-bottom: 8rpx;
 }
 
-.invite-card {
-  margin-bottom: 20rpx;
-}
-
 .card-label {
-  display: block;
   font-size: 28rpx;
-  font-weight: 500;
-  color: var(--color-primary);
-  margin-bottom: 16rpx;
-}
-
-.invite-meta {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 16rpx;
-}
-
-.meta-line {
-  font-size: 26rpx;
-  color: var(--color-text-hint);
-  line-height: 1.6;
-}
-
-.code-box {
-  background-color: var(--color-bg);
-  border-radius: 12rpx;
-  padding: 24rpx;
-  text-align: center;
-  margin-bottom: 24rpx;
-}
-
-.code-text {
-  font-size: 40rpx;
   font-weight: 600;
-  letter-spacing: 4rpx;
   color: var(--color-text-primary);
 }
 
-.share-btn {
-  width: 100%;
+.invite-state {
+  font-size: 22rpx;
+  border-radius: 24rpx;
+  padding: 6rpx 14rpx;
 }
 
-.secondary-actions {
-  display: flex;
-  gap: 16rpx;
-  margin-top: 16rpx;
+.invite-active {
+  color: var(--color-primary);
+  background: var(--color-bg);
 }
 
-.btn-outline.sm {
-  flex: 1;
-  height: 72rpx;
-  line-height: 68rpx;
-  font-size: 26rpx;
-  border-radius: 36rpx;
+.invite-invalid {
+  color: var(--color-danger);
+  background: var(--color-bg);
 }
 
-.regenerate {
-  margin-top: 20rpx;
-  text-align: center;
+.invite-meta {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--color-text-hint);
+  margin-bottom: 24rpx;
 }
 
-.regenerate-text {
-  font-size: 26rpx;
+.share-btn { width: 100%; }
+
+.share-hint, .code-hint, .create-hint {
+  display: block;
+  font-size: 23rpx;
+  line-height: 1.6;
   color: var(--color-text-hint);
 }
 
-.section-header {
-  margin-bottom: 12rpx;
+.share-hint {
+  margin-top: 12rpx;
+  text-align: center;
 }
 
+.invite-divider {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin: 28rpx 0 20rpx;
+}
+
+.divider-line {
+  flex: 1;
+  height: 2rpx;
+  background: var(--color-divider);
+}
+
+.divider-label {
+  color: var(--color-text-hint);
+  font-size: 24rpx;
+  white-space: nowrap;
+}
+
+.code-section {
+  background: var(--color-bg);
+  border-radius: 16rpx;
+  padding: 24rpx 16rpx;
+  text-align: center;
+}
+
+.code-text {
+  display: block;
+  font-size: 31rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+}
+
+.copy-btn {
+  margin: 16rpx auto 0;
+  height: 72rpx;
+  width: 100%;
+  line-height: 68rpx;
+  border-radius: 36rpx;
+  font-size: 26rpx;
+}
+
+.code-hint { margin-top: 12rpx; }
+
+.invite-warning {
+  display: block;
+  margin-top: 16rpx;
+  color: var(--color-danger);
+  font-size: 24rpx;
+}
+
+.regenerate {
+  margin-top: 26rpx;
+  text-align: center;
+  padding: 10rpx;
+}
+
+.regenerate-text { font-size: 25rpx; color: var(--color-text-hint); }
+.create-hint { margin-bottom: 20rpx; }
+
+.section-header { margin-bottom: 12rpx; }
 .section-title {
   font-size: 28rpx;
   font-weight: 500;
@@ -100,52 +146,96 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16rpx;
   padding: 24rpx 0;
   border-bottom: 2rpx solid var(--color-divider);
 }
-
-.invite-item:last-child {
-  border-bottom: none;
-}
-
-.invite-meta {
+.invite-item:last-child { border-bottom: none; }
+.invite-item-meta {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
-
 .invite-status {
   font-size: 28rpx;
   font-weight: 500;
   color: var(--color-text-primary);
 }
-
-.invite-status.status-active {
-  color: var(--color-primary);
-}
-
+.invite-status.status-active { color: var(--color-primary); }
 .invite-status.status-revoked,
 .invite-status.status-expired,
-.invite-status.status-exhausted {
-  color: var(--color-text-hint);
-}
-
+.invite-status.status-exhausted { color: var(--color-text-hint); }
 .invite-sub {
   font-size: 22rpx;
   color: var(--color-text-hint);
   margin-top: 4rpx;
 }
+.action-link { font-size: 26rpx; color: var(--color-danger); }
+.empty-hint { padding: 32rpx 0; text-align: center; }
+.empty-text { font-size: 26rpx; color: var(--color-text-hint); }
 
-.action-link {
-  font-size: 26rpx;
-  color: var(--color-danger);
+/* WeChat 小程序码图片分享弹层 */
+.qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 40rpx 26rpx;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, .48);
 }
 
-.empty-hint {
-  padding: 32rpx 0;
+.qr-sheet {
+  width: 100%;
+  max-width: 680rpx;
+  box-sizing: border-box;
+  border-radius: 28rpx;
+  padding: 34rpx 32rpx 26rpx;
+  background: var(--color-card, #ffffff);
   text-align: center;
 }
 
-.empty-text {
+.qr-title {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.qr-image {
+  display: block;
+  margin: 20rpx auto 4rpx;
+  width: 390rpx;
+  height: 390rpx;
+  max-width: 100%;
+}
+
+.qr-caption, .qr-trial-tip {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--color-text-hint);
+}
+.qr-trial-tip { margin-top: 12rpx; }
+
+.qr-action { width: 100%; margin-top: 18rpx; }
+
+.qr-close {
+  margin-top: 22rpx;
+  padding: 10rpx 0;
   font-size: 26rpx;
   color: var(--color-text-hint);
 }
+
+/* Permission guidance stays local to the QR sheet and does not interrupt the page. */
+.qr-preview-hint,
+.qr-backup-hint {
+  display: block;
+  color: var(--color-text-hint);
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+.qr-preview-hint { margin-bottom: 10rpx; }
+.qr-backup-hint { margin-top: 18rpx; }
