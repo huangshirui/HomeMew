@@ -75,6 +75,9 @@ Page({
   },
 
   onShow(): void {
+    // This page uses QR-image sharing; the ordinary WeChat share menu is
+    // unavailable for unverified Mini Program accounts.
+    wx.hideShareMenu();
     if (this.data.familyId && this.data.loaded) {
       void this.loadInvites(true);
     }
@@ -125,6 +128,7 @@ Page({
         newInvite: current,
         newInviteView: current ? createdView(current) : null,
         newInviteAvailable: Boolean(current && isUsable(current, latest?.status)),
+        qrVisible: Boolean(current && isUsable(current, latest?.status) && this.data.qrVisible),
       });
     } catch (error: unknown) {
       if (seq !== this._listRequest) return;
@@ -197,7 +201,8 @@ Page({
 
   async onShareInvite(): Promise<void> {
     const invite = this.data.newInvite;
-    if (this.data.sharing || !invite || !this.data.newInviteAvailable || !isUsable(invite)) {
+    if (this.data.sharing) return;
+    if (!invite || !this.data.newInviteAvailable || !isUsable(invite)) {
       showError('邀请已失效，请再生成一个邀请');
       return;
     }
@@ -222,6 +227,10 @@ Page({
 
   onShareMiniCode(): void {
     if (!this.data.qrCodePath) return;
+    if (typeof wx.showShareImageMenu !== 'function') {
+      showError('当前微信版本不支持图片分享，请保存图片后发送', 3000);
+      return;
+    }
     wx.showShareImageMenu({
       path: this.data.qrCodePath,
       fail: () => {
@@ -257,17 +266,5 @@ Page({
     void copyToClipboard(invite.code).catch(() => {});
   },
 
-  onShareAppMessage(): WechatMiniprogram.Page.ICustomShareContent {
-    const invite = this.data.newInvite;
-    if (!invite || !this.data.newInviteAvailable || !isUsable(invite)) {
-      return {
-        title: '家事喵 · 一起管理家庭生活',
-        path: '/pages/home/home',
-      };
-    }
-    return {
-      title: '家事喵 · 邀请你加入我们的家庭',
-      path: invite.joinPath,
-    };
-  },
+
 });
