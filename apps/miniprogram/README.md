@@ -10,6 +10,10 @@
 
 邮箱只要求合法地址和明确登录授权，不发送验证码；Web 身份由 Cloudflare Access 验证。绑定后只提供修改邮箱，隐藏一次性关联码。首次启动与邀请流程不依赖邮箱。必须先发布 LifeSpace Identity 0.13 和 HomeMew BFF，才可发布 Mini 2.0.0。
 
+## 全局静默刷新（2026-10-31）
+
+解锁、切回小程序、返回页面及后台定时同步时，保持已显示的数据和交互状态；仅在真实家庭／账号切换或权限失效时清空旧权限上下文。成功返回空列表也视为一次完整加载，不得在后续自动轮询重开全屏加载态。用户主动下拉刷新可显示刷新指示器。规范详见 `docs/decisions/2026-10-31-miniprogram-global-silent-refresh.md`。
+
 ## 当前测试及环境策略（2026-10-22）
 
 - **开发版、体验版、正式版**微信小程序均使用固定正式入口 https://homemew.aisr.online，经 HomeMew Mini BFF 连接 LifeSpace Production。
