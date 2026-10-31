@@ -14,7 +14,7 @@ The "official SaveButton security control" described for HarmonyOS is an ArkUI s
 
 - Retain the existing short-lived local QR PNG/JPEG provided by HomeMew Mini BFF; do not publish a sensitive invitation-code image on an unauthenticated public URL.
 - Enable the official WeChat `<image show-menu-by-longpress="{{true}}">` menu. `wx.previewImage` explicitly passes `showmenu: true`. The user chooses "保存图片" in WeChat's own UI.
-- The Mini app no longer calls `wx.getSetting`, `wx.authorize`, `wx.saveImageToPhotosAlbum` or renders `open-type="openSetting"` just to save this QR image. Remove the currently failing programmatic save button; replace it with a clearly labeled fullscreen-preview action. The native menu itself may still be limited by WeChat version, app verification or device policy.
+- The Mini app presents a **查看并保存** button that only opens the native WeChat preview with menu support; it does not programmatically press Save. The Mini app no longer calls `wx.getSetting`, `wx.authorize`, `wx.saveImageToPhotosAlbum` or renders `open-type="openSetting"` just to save this QR image. Remove the currently failing programmatic save button; replace it with a clearly labeled fullscreen-preview action. The native menu itself may still be limited by WeChat version, app verification or device policy.
 - Keep manual screenshot and plaintext invite-code copying as fallbacks; never promise native menu success or bypass platform share/verification restrictions.
 - User acceptance is essential: Android/iOS and any HarmonyOS WeChat device available should test (a) long-press on embedded image, (b) tap fullscreen then long-press, (c) file appearing in the album, and (d) QR scan/join. If not available, preserve screenshot fallback.
 
