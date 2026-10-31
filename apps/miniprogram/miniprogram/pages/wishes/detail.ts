@@ -8,6 +8,7 @@
 import { getWish, fulfillWish, reopenWish, deleteWish } from '../../services/wishes';
 import { currentFamilyStore, userStore, loadCurrentUser } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { AutoRefreshGate } from '../../services/refresh-policy';
 import { markDirty } from '../../stores/dirty';
 import {
   showError,
@@ -51,6 +52,8 @@ Page({
   _wish: null as Wish | null,
   _celebrationTimer: null as ReturnType<typeof setTimeout> | null,
 
+  _refreshGate: new AutoRefreshGate(),
+
   async onLoad(options: { id?: string; familyId?: string }): Promise<void> {
     // 补全运行时上下文（用户/家庭/时区），失败也不阻塞详情加载（请求层会自动登录）
     try {
@@ -70,7 +73,7 @@ Page({
   },
 
   onShow(): void {
-    if (this.data.loaded && !this.data.celebrating) this.loadWish(true);
+    if (this.data.loaded && !this.data.celebrating && this._refreshGate.shouldRefresh(`wishes:${this.data.familyId}:${this.data.wishId}`,'wishes',Boolean(this._wish))) this.loadWish(true);
   },
 
   onUnload(): void {
@@ -80,12 +83,13 @@ Page({
   /** 下拉刷新：仅内容区下拉（nav-bar 固定），重新拉取愿望详情 */
   onRefresh(): void {
     this.setData({ refreshing: true });
-    Promise.resolve(this.loadWish(true))
+    Promise.resolve(this.loadWish(true, true))
       .then(() => this.setData({ refreshing: false }))
       .catch(() => this.setData({ refreshing: false }));
   },
 
-  async loadWish(silent = false): Promise<void> {
+  async loadWish(silent = false, notifyOnError = false): Promise<void> {
+    this._refreshGate.noteRequest(`wishes:${this.data.familyId}:${this.data.wishId}`,'wishes');
     if (!silent) this.setData({ loadError: false });
     try {
       const wish = await getWish(this.data.familyId, this.data.wishId);
@@ -93,7 +97,7 @@ Page({
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
       if (!silent) this.setData({ loadError: true, loaded: true });
-      else showError(getErrorMessage(err.code, err.message));
+      else if (notifyOnError) showError(getErrorMessage(err.code, err.message));
     }
   },
 

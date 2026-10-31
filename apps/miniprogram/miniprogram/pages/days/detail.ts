@@ -19,6 +19,7 @@ import {
 } from '../../services/day-records';
 import { currentFamilyStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { AutoRefreshGate } from '../../services/refresh-policy';
 import { markDirty } from '../../stores/dirty';
 import {
   showError,
@@ -90,6 +91,8 @@ Page({
   _record: null as DayRecord | null,
   _occurrenceCursor: null as string | null,
 
+  _refreshGate: new AutoRefreshGate(),
+
   async onLoad(options: { id?: string; familyId?: string }): Promise<void> {
     // 补全运行时上下文（用户/家庭/时区），失败也不阻塞详情加载（请求层会自动登录）
     try {
@@ -119,19 +122,19 @@ Page({
   },
 
   onShow(): void {
-    // 从编辑页返回时重新拉取最新详情（编辑成功会 markDirty('days')）
-    if (this.data.loaded) this.loadRecord(true);
+    if (this.data.loaded && this._refreshGate.shouldRefresh(`days:${this.data.familyId}:${this.data.dayRecordId}`,'days',Boolean(this._record))) this.loadRecord(true);
   },
 
   /** 下拉刷新：仅内容区下拉（nav-bar 固定），重新拉取日子详情 */
   onRefresh(): void {
     this.setData({ refreshing: true });
-    Promise.resolve(this.loadRecord(true))
+    Promise.resolve(this.loadRecord(true, true))
       .then(() => this.setData({ refreshing: false }))
       .catch(() => this.setData({ refreshing: false }));
   },
 
-  async loadRecord(silent = false): Promise<void> {
+  async loadRecord(silent = false, notifyOnError = false): Promise<void> {
+    this._refreshGate.noteRequest(`days:${this.data.familyId}:${this.data.dayRecordId}`,'days');
     if (!silent) this.setData({ loadError: false });
     try {
       const record = await getDayRecord(this.data.familyId, this.data.dayRecordId);
@@ -143,7 +146,7 @@ Page({
       console.error('[DayDetail] Load failed:', error);
       const err = error as { code?: string; message?: string };
       if (!silent) this.setData({ loadError: true, loaded: true });
-      else showError(getErrorMessage(err.code, err.message));
+      else if (notifyOnError) showError(getErrorMessage(err.code, err.message));
     }
   },
 
