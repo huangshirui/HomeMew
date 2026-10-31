@@ -1,5 +1,6 @@
 import { currentFamilyStore, userStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { AutoRefreshGate } from '../../services/refresh-policy';
 import { listDomainPeople,getDomainRecord,type PersonOption,type DomainIcon } from '../../services/domains';
 import { listMatches,getTeam,type Match } from '../../services/football';
 import { preferredFootballPerson,rememberFootballPerson,parseFootballScope,type FootballScope } from '../../utils/football-scope';
@@ -17,6 +18,7 @@ Page({
 
   },
   _generation:0,
+  _refreshGate:new AutoRefreshGate(),
   onLoad(opts:{familyId?:string;mode?:string;scope?:string}):void{
     const scope=parseFootballScope(opts.scope);
     this.setData({...scope,familyId:opts.familyId||currentFamilyStore.value?.id||'',mode:opts.mode==='stats'?'stats':'record',
@@ -39,15 +41,17 @@ Page({
         representativeTeamId:'',opponentTeamId:'',competitionActivityId:'',representativeTeamName:'全部代表球队',opponentTeamName:'全部对手球队',competitionName:'全部赛事'});
     }
     this.setData({userId:userStore.value?.id||''});
-    await this.load(true);
+    if(this._refreshGate.shouldRefresh(this.refreshContext(),'football',this.data.loadedOnce))await this.load(true);
   },
   onUnload():void{this._generation++;},
+  refreshContext():string{return JSON.stringify([this.data.familyId,this.data.mode,this.scope()]);},
   scope():FootballScope{
     const d=this.data;return{year:d.year,matchType:d.matchType,q:d.appliedSearch,playerPersonId:d.personId,
       representativeTeamId:d.representativeTeamId,opponentTeamId:d.opponentTeamId,competitionActivityId:d.competitionActivityId};
   },
   async load(reset:boolean):Promise<void>{
     const familyId=this.data.familyId;if(!familyId)return;
+    if(reset)this._refreshGate.noteRequest(this.refreshContext(),'football');
     const generation=++this._generation;
     this.setData({loading:reset&&!this.data.loadedOnce,loadingMore:!reset,error:''});
     try{

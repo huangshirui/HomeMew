@@ -1,4 +1,5 @@
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { markRefreshDirty } from '../../services/refresh-policy';
 import { currentFamilyStore } from '../../stores/index';
 import { getDomainRecord,createDomainRecord,updateDomainRecord,deleteDomainRecord,listDomainPeople,DOMAIN_COPY,type DomainKind,type DomainRecord,type PersonOption } from '../../services/domains';
 import { originalIconState,prepareRecordIcon,pickerChangeState,type RecordIconPickerChange } from '../../utils/record-icon-edit';
@@ -100,9 +101,10 @@ Page({
     try{
       const presentation=await prepareRecordIcon(d.familyId,modelKeys[kind],d.recordId?'edit':'create',d);
       if(presentation)fields.presentation=presentation;
-      if(d.recordId){await updateDomainRecord(d.familyId,kind,d.recordId,{...fields,version:d.version});}
+      if(d.recordId){await updateDomainRecord(d.familyId,kind,d.recordId,{...fields,version:d.version});markRefreshDirty('domains');}
       else{
         const record=await createDomainRecord(d.familyId,kind,fields);
+        markRefreshDirty('domains');
         wx.showToast({title:'创建成功',icon:'success'});
         if(kind!=='anniversaries'&&record.id){
           wx.redirectTo({url:'/pages/domains/detail?kind='+kind+'&familyId='+d.familyId+'&id='+encodeURIComponent(record.id)});
@@ -119,7 +121,7 @@ Page({
       success:async res=>{
         if(!res.confirm)return;
         this.setData({submitting:true,error:''});
-        try{await deleteDomainRecord(d.familyId,d.kind,d.recordId,d.version);wx.redirectTo({url:'/pages/domains/list?kind='+d.kind});}
+        try{await deleteDomainRecord(d.familyId,d.kind,d.recordId,d.version);markRefreshDirty('domains');wx.redirectTo({url:'/pages/domains/list?kind='+d.kind});}
         catch(e){this.setData({error:errorMessage(e)});}
         finally{this.setData({submitting:false});}
       },

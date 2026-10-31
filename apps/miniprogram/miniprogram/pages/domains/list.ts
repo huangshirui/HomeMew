@@ -1,5 +1,6 @@
 import { currentFamilyStore, userStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { AutoRefreshGate } from '../../services/refresh-policy';
 import { listDomainPeople, listDomainRecords, DOMAIN_COPY, STATUS_COPY, type DomainKind, type DomainRecord, type DomainStatus, type PersonOption } from '../../services/domains';
 import { formatInstantInTimeZone } from '../../utils/index';
 import { listPersonalHabitPage } from '../../services/life-records';
@@ -32,6 +33,8 @@ Page({
     mine:false,
   },
   _generation:0,
+  _refreshGate:new AutoRefreshGate(),
+  refreshContext():string{return JSON.stringify([this.data.familyId,this.data.kind,this.data.filter,this.data.appliedSearch,this.data.personId,this.data.mine]);},
   onLoad(options:{kind?:string;mine?:string}):void {
     const kind=KINDS.includes(options.kind as Kind) ? options.kind as Kind : 'activities';
     const filters = kind==='activities' ? [
@@ -55,11 +58,12 @@ Page({
       ++this._generation;
       this.setData({familyId,noFamily:false,records:[],nextCursor:null,loadedOnce:false});
     } else this.setData({noFamily:false});
-    await this.load(true);
+    if(this._refreshGate.shouldRefresh(this.refreshContext(),'domains',this.data.loadedOnce))await this.load(true);
   },
   async load(reset:boolean):Promise<void> {
     const familyId=this.data.familyId,kind=this.data.kind,cursor=reset?undefined:this.data.nextCursor || undefined;
     if(!familyId || (!reset && !cursor))return;
+    if(reset)this._refreshGate.noteRequest(this.refreshContext(),'domains');
     const generation=++this._generation;
     this.setData({loading:reset&&!this.data.loadedOnce,loadingMore:!reset,error:reset?'':this.data.error});
     try {

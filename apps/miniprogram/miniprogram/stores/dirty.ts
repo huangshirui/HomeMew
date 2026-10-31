@@ -18,6 +18,8 @@
  *    期间的实时同步，也作为「万一某处漏写 markDirty」之外的一道实时兜底。
  */
 
+import { markRefreshDirty } from '../services/refresh-policy';
+
 export type DirtyDomain = 'events' | 'tasks' | 'days' | 'wishes';
 
 type DirtyListener = (domain: DirtyDomain) => void;
@@ -35,6 +37,7 @@ const listeners = new Set<DirtyListener>();
 /** 标记某个域的数据已变更：留下脏标记，并实时通知当前已订阅的页面 */
 export function markDirty(domain: DirtyDomain): void {
   dirtyFlags[domain] = true;
+  markRefreshDirty(domain);
   listeners.forEach((listener) => listener(domain));
 }
 
