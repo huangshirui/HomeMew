@@ -1,7 +1,7 @@
 /**
  * 家庭加入页
  *
- * 微信分享卡片：页面携带 code，自动验证并直接展示邀请确认。
+ * 微信小程序码：页面携带 scene，解码为邀请码并自动验证/展示确认。
  * 手工邀请码：展示输入框，验证后再确认；已收到邀请可切换为手动输入。
  * 仅 LifeSpace/HomeMew Mini BFF 决定邀请码有效性与加入权限。
  * 不在日志中打印邀请码。
@@ -34,9 +34,13 @@ Page({
   /** 丢弃修改邀请码后返回的过期预览响应 */
   _previewSeq: 0,
 
-  onLoad(options: { code?: string }): void {
-    if (options?.code) {
-      this.setData({ code: options.code.trim(), fromShare: true });
+  onLoad(options: { code?: string; scene?: string }): void {
+    let code = options?.code?.trim() || '';
+    if (!code && options?.scene) {
+      try { code = decodeURIComponent(options.scene).trim(); } catch { code = ''; }
+    }
+    if (code) {
+      this.setData({ code, fromShare: true });
       void this.onPreview();
     }
   },
