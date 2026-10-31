@@ -154,6 +154,8 @@ test('match revalidation only reloads volatile match and performance data during
   let version = 3, matches = 0, teams = 0, people = 0, schema = 0, performances = 0;
   const p = page('detail', {
     quickTypes, goalMethods: [], shotOutcomes: [], entryModes: [],
+    typeLabels: {goal:'进球'}, availableTypes: (schema:any) =>
+      schema.fields.find((field:any)=>field.key==='performanceType')?.values||[],
     getMatch: async () => { matches++; return {
       id:'m',version,representativeTeamId:'a',opponentTeamId:'b',
       playerPersonIds:['p'],representativeTeamScore:2,opponentTeamScore:1,
