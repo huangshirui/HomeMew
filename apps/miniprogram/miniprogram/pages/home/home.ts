@@ -38,6 +38,7 @@ import { eventDaysInRange } from '../../utils/event-timeline';
 import { isEventEnded, isEventOngoing, eventDisplayRank } from '../../utils/event-status';
 import { consumeAnyDirty, consumeDirtyDomains, markDirty, subscribe } from '../../stores/dirty';
 import { loadHomeScope, type HomeScope } from '../../stores/home-scope';
+import { AutoRefreshGate, markRefreshDirty } from '../../services/refresh-policy';
 import { listEvents } from '../../services/events';
 import { listTasks, completeTask } from '../../services/tasks';
 import { listAttentionDayRecords } from '../../services/day-records';
@@ -201,6 +202,8 @@ Page({
   _tasksFetched: false,
   _daysFetched: false,
   _lifePersonId: '',
+  /** One revalidation clock for the three Home Life modules; local edits bypass it. */
+  _lifeOnShowGate: new AutoRefreshGate(),
   _lifeContext: 0,
   _checkingHabits: new Set<string>(),
 
@@ -223,6 +226,15 @@ Page({
   /** 上次重算得到的「已结束 / 进行中」指纹，用于跳过无变化的 setData */
   _statusFingerprint: '' as string,
 
+  /** Page-local life data context includes the date so tomorrow revalidates immediately. */
+  lifeRefreshContext(familyId: string): string {
+    const userId = userStore.value?.id || '';
+    const scope = loadHomeScope(familyId, userId);
+    const today = formatInstantInTimeZone(new Date().toISOString(),
+      this.data.currentFamily?.timezone || 'Asia/Shanghai').date;
+    return JSON.stringify([familyId, userId, scope, today]);
+  },
+
   /** 页面显示：同步导航栏家庭名 + 订阅状态 + 启动每分钟本地重算 */
   onShow(): void {
     this.getTabBar()?.setData({ selected: 0 });
@@ -243,8 +255,11 @@ Page({
     // 或数据范围设置变更时重新拉取；普通切换 tab 不重复请求。
     if (!this.data.loaded || (storeFamilyId && storeFamilyId !== shownFamilyId) || dirty.size > 0 || scopeChanged) {
       this.loadData();
-    } else if (storeFamilyId) {
-      // New domain edit/detail pages do not publish the legacy dirty flags.
+    } else if (storeFamilyId && this._lifeOnShowGate.shouldRefresh(
+      this.lifeRefreshContext(storeFamilyId), 'domains',
+      this._lifeFetched.habits && this._lifeFetched.activities && this._lifeFetched.goals)) {
+      // Domain edits invalidate this gate immediately. Ordinary unlocks do not re-fetch
+      // three model lists and the family people within the same 60-second window.
       void this.loadLife(storeFamilyId);
     }
 
@@ -662,6 +677,9 @@ Page({
     const kinds: LifeKind[] = (onlyKind ? [onlyKind] : ['habits', 'activities', 'goals'] as LifeKind[])
       .filter(kind => kind !== 'habits' || this._checkingHabits.size === 0);
     if (!kinds.length) return;
+    // Full Life refreshes also run on polling and initial load, so onShow should
+    // reuse their freshness and never immediately start an identical request.
+    if (!onlyKind) this._lifeOnShowGate.noteRequest(this.lifeRefreshContext(familyId), 'domains');
     const generations = { ...this._lifeGeneration };
     for (const kind of kinds) {
       generations[kind] = ++this._lifeGeneration[kind];
@@ -768,6 +786,7 @@ Page({
       row.id === id ? { ...row, checking: true } : row) });
     try {
       const updated = await performDomainAction(familyId, 'habits', id, 'check-in', habit.version);
+      markRefreshDirty('domains');
       if (this.data.currentFamily?.id !== familyId || this._lifeContext !== context) return;
       // Update in place: don't move the tapped row out from under the user's finger.
       this.setData({ 'lifeRecords.habits': this.data.lifeRecords.habits.map(row => row.id === id ? {
