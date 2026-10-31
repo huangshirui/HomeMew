@@ -1,4 +1,5 @@
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { markRefreshDirty } from '../../services/refresh-policy';
 import { currentFamilyStore,userStore } from '../../stores/index';
 import { deleteDomainRecord,listDomainPeople } from '../../services/domains';
 import { getMatch,getTeam,saveTeam,saveMatch,removeMatch,listMatches,listFootballPeople,saveFootballPerson,getFootballPerson,
@@ -92,6 +93,7 @@ Page({
         this.setData({saving:true,error:''});
         try{
           const person=await saveFootballPerson(this.data.familyId,r.content.trim());
+          markRefreshDirty('football');
           const key=this.data.kind==='team'?'teamMemberPersonIds':'playerPersonIds';
           this.setData({people:[{...person,selected:true},...this.data.people],[key]:[...new Set([...this.data[key],person.id])],personSearch:'',personCanCreate:false});
         }catch(e){this.setData({error:(e as Error).message||'添加失败'});}finally{this.setData({saving:false});}
@@ -136,6 +138,7 @@ Page({
       }
       const saved=d.kind==='team'?await saveTeam(d.familyId,{...payload,...(d.recordId?{version:d.version}:{})},d.recordId||undefined):
         await saveMatch(d.familyId,{...payload,...(d.recordId?{version:d.version}:{})},d.recordId||undefined);
+      markRefreshDirty('football');
       wx.showToast({title:'已保存',icon:'success'});
       if(d.kind==='match'&&!d.recordId&&saved.id)
         wx.redirectTo({url:'/pages/football/detail?familyId='+d.familyId+'&id='+encodeURIComponent(saved.id)});
@@ -155,8 +158,8 @@ Page({
               const page=await listMatches(d.familyId,{[field]:d.recordId,limit:1});
               if(page.items.length)throw Error('球队被比赛引用，请先修改相关比赛');
             }
-            await deleteDomainRecord(d.familyId,'football-teams',d.recordId,d.version);wx.navigateBack();
-          }else{await removeMatch(d.familyId,d.recordId,d.version);wx.redirectTo({url:'/pages/football/list'});}
+            await deleteDomainRecord(d.familyId,'football-teams',d.recordId,d.version);markRefreshDirty('football');wx.navigateBack();
+          }else{await removeMatch(d.familyId,d.recordId,d.version);markRefreshDirty('football');wx.redirectTo({url:'/pages/football/list'});}
         }
         catch(e){this.setData({error:(e as Error).message||'删除失败'});}finally{this.setData({saving:false});}
       }});

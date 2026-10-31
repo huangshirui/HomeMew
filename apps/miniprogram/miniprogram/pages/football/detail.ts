@@ -1,5 +1,6 @@
 import { currentFamilyStore,userStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { AutoRefreshGate, markRefreshDirty } from '../../services/refresh-policy';
 import type { DomainIcon } from '../../services/domains';
 import { rememberFootballPerson } from '../../utils/football-scope';
 import {
@@ -24,17 +25,23 @@ Page({
   },
   _eventsGeneration:0,
   _refreshing:false,
+  _refreshGate:new AutoRefreshGate(),
   onUnload():void{this._eventsGeneration++;},
   async onLoad(opts:{familyId?:string;id?:string;personId?:string}):Promise<void>{
     this.setData({familyId:opts.familyId||currentFamilyStore.value?.id||'',matchId:opts.id||'',selectedPersonId:opts.personId||''});
     try{await ensureRuntimeReady();}catch{}
     await this.refresh();
   },
-  onShow():void{if(this.data.matchId&&!this.data.loading)void this.refresh();},
+  onShow():void{
+    const d=this.data;
+    if(d.matchId&&!d.loading&&this._refreshGate.shouldRefresh(`football:${d.familyId}:${d.matchId}`,'football',Boolean(d.match)))void this.refresh();
+  },
   async refresh():Promise<void>{
     if(this._refreshing)return;
     this._refreshing=true;
-    const d=this.data;this.setData({loading:!d.match,error:''});
+    const d=this.data;
+    this._refreshGate.noteRequest(`football:${d.familyId}:${d.matchId}`,'football');
+    this.setData({loading:!d.match,error:''});
     try{
       const [match,schema]=await Promise.all([
         getMatch(d.familyId,d.matchId),
@@ -161,6 +168,7 @@ Page({
     this.setData({busy:true,formError:''});
     try{
       await savePerformance(d.familyId,{...payload,...(d.performanceId?{version:d.performanceVersion}:{})},d.performanceId||undefined);
+      markRefreshDirty('football');
       this.setData({formOpen:false,selectedPersonId:d.playerPersonId,selectedPersonIndex:Math.max(0,d.people.findIndex(p=>p.id===d.playerPersonId))});await this.loadPerformances(true);
       wx.showToast({title:'记录成功',icon:'success'});
     }catch(e){this.setData({formError:statusError(e)});}
@@ -174,6 +182,7 @@ Page({
         this.setData({busy:true});
         try{
           await removePerformance(this.data.familyId,this.data.performanceId,this.data.performanceVersion);
+          markRefreshDirty('football');
           this.setData({formOpen:false});await this.loadPerformances(true);
         }catch(e){this.setData({formError:statusError(e)});}
         finally{this.setData({busy:false});}

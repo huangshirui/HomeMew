@@ -1,5 +1,6 @@
 import { currentFamilyStore,userStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
+import { AutoRefreshGate, markRefreshDirty } from '../../services/refresh-policy';
 import { readFootballRecent } from '../../utils/football-recent-cache';
 import { listDomainPeople,deleteDomainRecord,type DomainRecord } from '../../services/domains';
 import { getTeam,listTeams,listFootballPeople,saveFootballPerson,removeFootballPerson,listMatches,listPerformances,type FootballPerson } from '../../services/football';
@@ -7,16 +8,18 @@ Page({
   data:{familyId:'',tab:'teams',loading:true,loadedOnce:false,loadingMore:false,busy:false,error:'',search:'',appliedSearch:'',
     teams:[] as DomainRecord[],players:[] as FootballPerson[],familyPersonIds:[] as string[],nextCursor:null as string|null},
   _generation:0,_timer:0 as ReturnType<typeof setTimeout>|0,
+  _refreshGate:new AutoRefreshGate(),
   onLoad(opts:{familyId?:string}):void{this.setData({familyId:opts.familyId||currentFamilyStore.value?.id||''});},
   async onShow():Promise<void>{
     try{await ensureRuntimeReady();}catch{}
     const familyId=currentFamilyStore.value?.id||'';
     if(familyId!==this.data.familyId){++this._generation;this.setData({familyId,teams:[],players:[],nextCursor:null,loadedOnce:false});}
-    await this.load(true);
+    if(this._refreshGate.shouldRefresh(JSON.stringify([familyId,this.data.tab,this.data.appliedSearch]),'football',this.data.loadedOnce))await this.load(true);
   },
   onUnload():void{this._generation++;if(this._timer)clearTimeout(this._timer);},
   async load(reset:boolean):Promise<void>{
     if(!this.data.familyId){this.setData({loading:false,error:'请先加入家庭'});return;}
+    if(reset)this._refreshGate.noteRequest(JSON.stringify([this.data.familyId,this.data.tab,this.data.appliedSearch]),'football');
     const generation=++this._generation;
     this.setData({loading:reset&&!this.data.loadedOnce,loadingMore:!reset,error:''});
     try{
@@ -57,7 +60,7 @@ Page({
     wx.showModal({title:person?'编辑球员':'新建球员',editable:true,content:person?.displayName||'',placeholderText:'球员姓名',success:async r=>{
       if(!r.confirm||!r.content?.trim()||this.data.busy)return;
       this.setData({busy:true,error:''});
-      try{await saveFootballPerson(this.data.familyId,r.content.trim(),person?.id,person?.version);await this.load(true);}
+      try{await saveFootballPerson(this.data.familyId,r.content.trim(),person?.id,person?.version);markRefreshDirty('football');await this.load(true);}
       catch(e){this.setData({error:(e as Error).message||'保存失败，请刷新后重试'});}
       finally{this.setData({busy:false});}
     }});
@@ -68,7 +71,7 @@ Page({
       if(!r.confirm||this.data.busy)return;this.setData({busy:true,error:''});
       try{
         for(const key of ['representativeTeamId','opponentTeamId'] as const){const page=await listMatches(this.data.familyId,{[key]:team.id,limit:1});if(page.items.length)throw Error('球队被比赛引用，请先修改相关比赛');}
-        await deleteDomainRecord(this.data.familyId,'football-teams',team.id,team.version);await this.load(true);
+        await deleteDomainRecord(this.data.familyId,'football-teams',team.id,team.version);markRefreshDirty('football');await this.load(true);
       }catch(e){this.setData({error:(e as Error).message||'删除失败，请刷新后重试'});}finally{this.setData({busy:false});}
     }});
   },
@@ -80,7 +83,7 @@ Page({
       try{
         const [matches,performances]=await Promise.all([listMatches(this.data.familyId,{playerPersonId:person.id,limit:1}),listPerformances(this.data.familyId,undefined,undefined,person.id)]);
         if(matches.items.length||performances.items.length)throw Error('球员被比赛或表现记录引用，请先处理相关记录');
-        await removeFootballPerson(this.data.familyId,person.id,person.version);await this.load(true);
+        await removeFootballPerson(this.data.familyId,person.id,person.version);markRefreshDirty('football');await this.load(true);
       }catch(e){this.setData({error:(e as Error).message||'删除失败，请刷新后重试'});}
       finally{this.setData({busy:false});}
     }});
