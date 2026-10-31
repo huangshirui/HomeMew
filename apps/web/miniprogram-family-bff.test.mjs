@@ -291,3 +291,85 @@ test('LifeSpace authorization errors are preserved without remapping', async () 
     error: { code: 'FORBIDDEN', message: 'Insufficient Space role' },
   });
 });
+
+test('mini code route is a bounded family route and rejects wrong methods', async () => {
+  assert.deepEqual(
+    matchMiniProgramFamilyRoute('/api/v1/miniprogram/families/spc_home/invites/mini-code'),
+    { kind: 'invite-mini-code', familyId: 'spc_home' },
+  );
+  const response = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/families/spc_home/invites/mini-code', { method: 'GET' }),
+    env(async () => assert.fail('must not call Core')),
+  );
+  assert.equal(response.status, 405);
+});
+
+test('mini code needs administrator authority and matching LifeSpace family', async () => {
+  let providerCalled = false;
+  const denied = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/families/spc_home/invites/mini-code', {
+      method: 'POST', body: { code: 'LS-ABC', envVersion: 'trial' },
+    }),
+    env(async () => new Response(JSON.stringify({ error: { code: 'FORBIDDEN', message: 'No admin role' } }), {
+      status: 403, headers: { 'content-type': 'application/json' },
+    })),
+  );
+  assert.equal(denied.status, 403);
+  const mismatch = await handleMiniProgramFamilyBff(
+    request('/api/v1/miniprogram/families/spc_home/invites/mini-code', {
+      method: 'POST', body: { code: 'LS-ABC', envVersion: 'trial' },
+    }),
+    env(async incoming => {
+      const path = new URL(incoming.url).pathname;
+      if (path.endsWith('/invites')) return ok([]);
+      if (path.endsWith('/preview')) return ok({
+        space: { id: 'spc_other', name: 'Other', memberCount: 1 },
+        expiresAt: '2099-01-01T00:00:00Z', canJoin: true,
+      });
+      return assert.fail('unexpected path');
+    }, undefined, ['spc_other'], {
+      onInviteMiniCode() { providerCalled = true; },
+    }),
+  );
+  assert.equal(mismatch.status, 422);
+  assert.equal((await mismatch.json()).error.code, 'INVITE_FAMILY_MISMATCH');
+  assert.equal(providerCalled, false);
+});
+
+test('mini code validates version, binds fixed scene, and returns ephemeral image data', async () => {
+  const calls = [];
+  const original = env(async incoming => {
+    const path = new URL(incoming.url).pathname;
+    if (path.endsWith('/invites')) return ok([]);
+    if (path.endsWith('/preview')) {
+      assert.deepEqual(await incoming.json(), { token: 'LS-ABC' });
+      return ok({ space: { id: 'spc_home', memberCount: 2 }, canJoin: true,
+        expiresAt: '2099-01-01T00:00:00Z' });
+    }
+    assert.fail('unexpected Core path');
+  }, undefined, ['spc_home']);
+  const backend = original.HOMEMEW_BACKEND;
+  original.HOMEMEW_BACKEND = {
+    async fetch(incoming) {
+      if (new URL(incoming.url).pathname === '/internal/v1/wechat/invite-mini-code') {
+        calls.push(await incoming.json());
+        assert.equal(incoming.headers.get('authorization'), null);
+        return ok({ imageBase64: 'aGVsbG8=', mimeType: 'image/png', envVersion: 'trial' });
+      }
+      return backend.fetch(incoming);
+    },
+  };
+  const route = '/api/v1/miniprogram/families/spc_home/invites/mini-code';
+  const invalid = await handleMiniProgramFamilyBff(
+    request(route, { method: 'POST', body: { code: 'LS-ABC', envVersion: 'staging' } }), original,
+  );
+  assert.equal(invalid.status, 422);
+  const okResponse = await handleMiniProgramFamilyBff(
+    request(route, { method: 'POST', body: { code: 'LS-ABC', envVersion: 'trial' } }), original,
+  );
+  assert.equal(okResponse.status, 200);
+  assert.equal(okResponse.headers.get('x-request-id'), 'req_family');
+  assert.deepEqual(calls, [{ scene: 'LS-ABC', envVersion: 'trial' }]);
+  assert.deepEqual((await okResponse.json()).data,
+    { imageBase64: 'aGVsbG8=', mimeType: 'image/png', envVersion: 'trial' });
+});
