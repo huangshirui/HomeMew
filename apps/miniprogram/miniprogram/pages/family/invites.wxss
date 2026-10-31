@@ -173,3 +173,58 @@
 .action-link { font-size: 26rpx; color: var(--color-danger); }
 .empty-hint { padding: 32rpx 0; text-align: center; }
 .empty-text { font-size: 26rpx; color: var(--color-text-hint); }
+
+/* WeChat 小程序码图片分享弹层 */
+.qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 40rpx 26rpx;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, .48);
+}
+
+.qr-sheet {
+  width: 100%;
+  max-width: 680rpx;
+  box-sizing: border-box;
+  border-radius: 28rpx;
+  padding: 34rpx 32rpx 26rpx;
+  background: var(--color-card, #ffffff);
+  text-align: center;
+}
+
+.qr-title {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.qr-image {
+  display: block;
+  margin: 20rpx auto 4rpx;
+  width: 390rpx;
+  height: 390rpx;
+  max-width: 100%;
+}
+
+.qr-caption, .qr-trial-tip {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--color-text-hint);
+}
+.qr-trial-tip { margin-top: 12rpx; }
+
+.qr-action { width: 100%; margin-top: 18rpx; }
+
+.qr-close {
+  margin-top: 22rpx;
+  padding: 10rpx 0;
+  font-size: 26rpx;
+  color: var(--color-text-hint);
+}
