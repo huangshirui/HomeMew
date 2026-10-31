@@ -1,6 +1,6 @@
 import { currentFamilyStore,userStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
-import { AutoRefreshGate, markRefreshDirty } from '../../services/refresh-policy';
+import { AutoRefreshGate, getRefreshRevision, markRefreshDirty } from '../../services/refresh-policy';
 import type { DomainIcon } from '../../services/domains';
 import { rememberFootballPerson } from '../../utils/football-scope';
 import {
@@ -11,6 +11,8 @@ import {
 type PerformanceView=Performance&{typeText:string;personName:string;detailText:string};
 type FieldOption={key:string;name:string};
 const statusError=(e:unknown)=>e instanceof Error?e.message:'操作失败';
+/** Rarely-changing match display metadata and schema; each refresh still checks the match. */
+const DETAIL_METADATA_TTL_MS=5*60*1000;
 Page({
   data:{
     familyId:'',matchId:'',match:null as Match|null,loading:true,error:'',busy:false,
@@ -26,6 +28,9 @@ Page({
   _eventsGeneration:0,
   _refreshing:false,
   _refreshGate:new AutoRefreshGate(),
+  _schemaLoadedAt:0,
+  _metadataLoadedAt:0,
+  _metadataSignature:'',
   onUnload():void{this._eventsGeneration++;},
   async onLoad(opts:{familyId?:string;id?:string;personId?:string}):Promise<void>{
     this.setData({familyId:opts.familyId||currentFamilyStore.value?.id||'',matchId:opts.id||'',selectedPersonId:opts.personId||''});
@@ -43,24 +48,53 @@ Page({
     this._refreshGate.noteRequest(`football:${d.familyId}:${d.matchId}`,'football');
     this.setData({loading:!d.match,error:''});
     try{
+      // Always fetch authoritative match and selected-player performances;
+      // re-use only the rarely-changing schema and display metadata.
+      const schemaFresh=Boolean(d.schema)&&Date.now()-this._schemaLoadedAt<DETAIL_METADATA_TTL_MS;
       const [match,schema]=await Promise.all([
         getMatch(d.familyId,d.matchId),
-        readPerformanceSchema(d.familyId).catch(e=>{this.setData({schemaError:statusError(e)});return null;}),
+        schemaFresh?Promise.resolve(d.schema):readPerformanceSchema(d.familyId)
+          .then(value=>{this._schemaLoadedAt=Date.now();return value;})
+          .catch(e=>{this.setData({schemaError:statusError(e)});return d.schema;}),
       ]);
-      const ids=new Set(match.playerPersonIds||[]);
-      const [a,b,comp,...people]=await Promise.all([
-        getTeam(d.familyId,match.representativeTeamId).catch(()=>null),
-        getTeam(d.familyId,match.opponentTeamId).catch(()=>null),
-        match.competitionActivityId?import('../../services/domains').then(x=>x.getDomainRecord(d.familyId,'activities',match.competitionActivityId!)).catch(()=>null):Promise.resolve(null),
-        ...[...ids].slice(0,50).map(id=>getFootballPerson(d.familyId,id).catch(()=>null)),
+      const ids=[...new Set(match.playerPersonIds||[])].slice(0,50);
+      const signature=JSON.stringify([
+        d.familyId,userStore.value?.id||'',match.version,match.representativeTeamId,match.opponentTeamId,
+        match.competitionActivityId,ids,
+        getRefreshRevision('football'),getRefreshRevision('domains'),
       ]);
-      const roster=people.filter((p):p is FootballPerson=>Boolean(p));
-      const current=roster.some(p=>p.id===this.data.selectedPersonId)?this.data.selectedPersonId:roster[0]?.id||'';
+      const reuseMetadata=Boolean(d.match)&&this._metadataSignature===signature&&
+        Date.now()-this._metadataLoadedAt<DETAIL_METADATA_TTL_MS;
+      let representativeIcon=d.representativeIcon,opponentIcon=d.opponentIcon;
+      let representative=d.representative,opponent=d.opponent,competition=d.competition;
+      let roster=d.people;
+      if(!reuseMetadata){
+        const [a,b,comp,...people]=await Promise.all([
+          getTeam(d.familyId,match.representativeTeamId).catch(()=>null),
+          getTeam(d.familyId,match.opponentTeamId).catch(()=>null),
+          match.competitionActivityId?import('../../services/domains')
+            .then(x=>x.getDomainRecord(d.familyId,'activities',match.competitionActivityId!)).catch(()=>null):Promise.resolve(null),
+          ...ids.map(id=>getFootballPerson(d.familyId,id).catch(()=>null)),
+        ]);
+        roster=people.filter((person):person is FootballPerson=>Boolean(person));
+        representativeIcon=a?.presentation?.icon||null;
+        opponentIcon=b?.presentation?.icon||null;
+        representative=a?.name||'代表球队';
+        opponent=b?.name||'对方球队';
+        competition=comp?.name||'';
+        // Failed metadata reads must not be cached as successful results.
+        if(a&&b&&(!match.competitionActivityId||comp)&&roster.length===ids.length){
+          this._metadataSignature=signature;
+          this._metadataLoadedAt=Date.now();
+        }
+      }
+      const current=roster.some(person=>person.id===this.data.selectedPersonId)?
+        this.data.selectedPersonId:roster[0]?.id||'';
       const score=(typeof match.representativeTeamScore==='number'&&typeof match.opponentTeamScore==='number')
         ?match.representativeTeamScore+' : '+match.opponentTeamScore:'— : —';
       const types=schema?availableTypes(schema).map(key=>({key,name:typeLabels[key]||key})):[];
       this.setData({
-        match,representativeIcon:a?.presentation?.icon||null,opponentIcon:b?.presentation?.icon||null,representative:a?.name||'代表球队',opponent:b?.name||'对方球队',competition:comp?.name||'',
+        match,representativeIcon,opponentIcon,representative,opponent,competition,
         score,people:roster,selectedPersonId:current,selectedPersonIndex:Math.max(0,roster.findIndex(p=>p.id===current)),
         schema,allTypes:types,schemaError:schema? '':this.data.schemaError,
         moreTypes:types.filter(t=>t.key!=='appearance'&&!quickTypes.some(q=>q.key===t.key)),

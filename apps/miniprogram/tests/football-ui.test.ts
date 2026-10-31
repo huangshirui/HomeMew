@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
-import { AutoRefreshGate, markRefreshDirty } from '../miniprogram/services/refresh-policy.ts';
+import { AutoRefreshGate, getRefreshRevision, markRefreshDirty } from '../miniprogram/services/refresh-policy.ts';
 const read=(path:string)=>readFileSync(new URL('../miniprogram/'+path,import.meta.url),'utf8');
 function executable(path:string){return stripTypeScriptTypes(read(path).replace(/^import[\s\S]*?from ['"][^'"]+['"];?\r?$/gm,'')).replace(/\bexport /g,'');}
 function page(name:string,globals:Record<string,unknown>={}){
-  let result:any;runInNewContext(executable('pages/football/'+name+'.ts'),{Error,AutoRefreshGate,markRefreshDirty,userStore:{value:{id:'u'}},...globals,Page:(p:any)=>{result=p;}});
+  let result:any;runInNewContext(executable('pages/football/'+name+'.ts'),{Error,AutoRefreshGate,getRefreshRevision,markRefreshDirty,userStore:{value:{id:'u'}},...globals,Page:(p:any)=>{result=p;}});
   result.setData=(patch:any)=>Object.assign(result.data,patch);return result;
 }
 const people=[{personId:'per_a',displayName:'甲'},{personId:'per_kk',displayName:'KK'}];
@@ -148,4 +148,35 @@ test('legacy stats links return to the shared workspace with the same decoded sc
 test('refresh preserves unapplied search text and match actions have distinct destinations',()=>{
   let url='';const p=page('list',{wx:{navigateTo:(o:any)=>{url=o.url;}}});p.setData({familyId:'s',search:'尚未搜索',appliedSearch:'已应用'});p.load=async()=>{};p.onRefresh();assert.equal(p.data.appliedSearch,'已应用');
   const event={currentTarget:{dataset:{id:'rec_one'}}};p.onRecord(event);assert.match(url,/football\/detail/);p.onEditMatch(event);assert.match(url,/football\/edit\?kind=match/);
+});
+
+test('match revalidation only reloads volatile match and performance data during metadata TTL', async () => {
+  let version = 3, matches = 0, teams = 0, people = 0, schema = 0, performances = 0;
+  const p = page('detail', {
+    quickTypes, goalMethods: [], shotOutcomes: [], entryModes: [],
+    typeLabels: {goal:'进球'}, availableTypes: (schema:any) =>
+      schema.fields.find((field:any)=>field.key==='performanceType')?.values||[],
+    getMatch: async () => { matches++; return {
+      id:'m',version,representativeTeamId:'a',opponentTeamId:'b',
+      playerPersonIds:['p'],representativeTeamScore:2,opponentTeamScore:1,
+    }; },
+    getTeam: async (_family:string,id:string) => { teams++; return { id, name:id }; },
+    getFootballPerson: async (_family:string,id:string) => { people++; return { id, displayName:'KK' }; },
+    readPerformanceSchema: async () => { schema++; return { fields:[{key:'performanceType',values:['goal']}] }; },
+    listPerformances: async () => { performances++; return { items:[],nextCursor:null }; },
+  });
+  p.setData({familyId:'spc_a',matchId:'m'});
+  await p.refresh();
+  assert.deepEqual([matches,teams,people,schema,performances],[1,2,1,1,1]);
+  await p.refresh();
+  assert.deepEqual([matches,teams,people,schema,performances],[2,2,1,1,2],
+    'same match version should retain team and roster data while updating performances');
+  version++;
+  await p.refresh();
+  assert.deepEqual([matches,teams,people,schema,performances],[3,4,2,1,3],
+    'a match version change invalidates displayed metadata immediately');
+  markRefreshDirty('football');
+  await p.refresh();
+  assert.deepEqual([matches,teams,people,schema,performances],[4,6,3,1,4],
+    'local football edits bypass metadata TTL without re-reading the schema');
 });

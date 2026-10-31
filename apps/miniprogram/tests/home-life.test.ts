@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
+import { AutoRefreshGate, markRefreshDirty } from '../miniprogram/services/refresh-policy.ts';
 
 function executable(path: string): string {
   const source = readFileSync(new URL(`../miniprogram/${path}.ts`, import.meta.url), 'utf8');
@@ -21,6 +22,7 @@ function home(overrides: Record<string, any> = {}) {
   let page: any;
   runInNewContext(executable('pages/home/home'), {
     Page: (value: any) => { page = value; },
+    AutoRefreshGate, markRefreshDirty,
     userStore: { value: { id: 'usr_me' } },
     listDomainPeople: async () => [{ userId: 'usr_me', personId: 'per_me', displayName: '本人' }],
     listCurrentLifeRecords: async () => [], homeLifeRows,
@@ -208,4 +210,31 @@ test('home removes tools, keeps module order, and retains empty reminder modules
   assert.match(taskMarkup, /还没有待办/);
   assert.doesNotMatch(taskMarkup, /wx:if="\\{\\{pendingTasks.length > 0/);
   assert.match(template, /<view class="card section life-section">/);
+});
+
+test('home foreground recovery skips already fresh Life models and edits force immediate refresh', async () => {
+  const family = { id: 'spc_a', timezone: 'Asia/Shanghai', role: 'member' };
+  const store = { value: family, subscribe: () => () => {} };
+  let fetches = 0;
+  const page = home({
+    currentFamilyStore: store, familiesStore: { subscribe: () => () => {} },
+    consumeDirtyDomains: () => new Set(), subscribe: () => () => {},
+    listCurrentLifeRecords: async () => { fetches++; return []; },
+  });
+  page.getTabBar = () => null;
+  page.applyNavTitle = () => {};
+  page._startTick = () => {};
+  page._startPoll = () => {};
+  page._subscribeDirty = () => {};
+  page.data.loaded = true;
+  page._lifeFetched = { habits: true, activities: true, goals: true };
+  page._lifeOnShowGate.noteRequest(page.lifeRefreshContext('spc_a'), 'domains');
+  page.onShow();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fetches, 0, 'unlock within 60s must not re-fetch the three model lists');
+
+  markRefreshDirty('domains');
+  page.onShow();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fetches, 3, 'successful domain edits must invalidate the Life view');
 });
