@@ -59,7 +59,7 @@ Page({
       ]);
       const ids=[...new Set(match.playerPersonIds||[])].slice(0,50);
       const signature=JSON.stringify([
-        match.version,match.representativeTeamId,match.opponentTeamId,
+        d.familyId,userStore.value?.id||'',match.version,match.representativeTeamId,match.opponentTeamId,
         match.competitionActivityId,ids,
         getRefreshRevision('football'),getRefreshRevision('domains'),
       ]);

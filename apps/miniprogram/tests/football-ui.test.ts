@@ -173,4 +173,8 @@ test('match revalidation only reloads volatile match and performance data during
   await p.refresh();
   assert.deepEqual([matches,teams,people,schema,performances],[3,4,2,1,3],
     'a match version change invalidates displayed metadata immediately');
+  markRefreshDirty('football');
+  await p.refresh();
+  assert.deepEqual([matches,teams,people,schema,performances],[4,6,3,1,4],
+    'local football edits bypass metadata TTL without re-reading the schema');
 });
