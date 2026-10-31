@@ -55,6 +55,8 @@ Page({
     creating: false,
     loaded: false,
     sharing: false,
+    savingAlbum: false,
+    albumPermissionRequired: false,
     qrVisible: false,
     qrCodePath: '',
     qrCodeVersion: '' as 'develop' | 'trial' | 'release' | '',
@@ -228,24 +230,109 @@ Page({
   onShareMiniCode(): void {
     if (!this.data.qrCodePath) return;
     if (typeof wx.showShareImageMenu !== 'function') {
-      showError('当前微信版本不支持图片分享，请保存图片后发送', 3000);
+      showError('当前微信版本不支持直接分享，可全屏截图后发送', 3000);
       return;
     }
     wx.showShareImageMenu({
       path: this.data.qrCodePath,
-      fail: () => {
-        showError('微信暂不允许转发图片，可先保存后从聊天发送', 3000);
+      fail: (error) => {
+        // Direct image sharing may be restricted by WeChat account verification.
+        console.warn('[Invites] Image share blocked:', error?.errMsg ?? 'unknown');
+        showError('微信暂不允许直接分享，可点图片全屏截图后发送', 3500);
+      },
+    });
+  },
+
+  onPreviewMiniCode(): void {
+    const filePath = this.data.qrCodePath;
+    if (!filePath) return;
+    wx.previewImage({
+      current: filePath,
+      urls: [filePath],
+      fail: (error) => {
+        console.warn('[Invites] Preview image failed:', error?.errMsg ?? 'unknown');
+        showError('无法预览图片，请使用邀请码');
+      },
+    });
+  },
+
+  saveQrToAlbum(): void {
+    const filePath = this.data.qrCodePath;
+    if (!filePath) {
+      this.setData({ savingAlbum: false });
+      return;
+    }
+    wx.saveImageToPhotosAlbum({
+      filePath,
+      success: () => {
+        this.setData({ savingAlbum: false, albumPermissionRequired: false });
+        showSuccess('已保存小程序码，可在微信聊天中发送');
+      },
+      fail: (error) => {
+        this.setData({ savingAlbum: false });
+        const errMsg = error?.errMsg || '';
+        console.warn('[Invites] Save QR image failed:', errMsg);
+        if (/auth|permission|deny|denied|authorize/u.test(errMsg.toLowerCase())) {
+          wx.getSetting({
+            success: (setting) => {
+              if (setting.authSetting?.['scope.writePhotosAlbum'] !== true) {
+                this.setData({ albumPermissionRequired: true });
+                showError('请开启相册权限后再保存', 3000);
+              } else {
+                showError('微信或系统未允许写入照片，可全屏截图后发送', 3500);
+              }
+            },
+            fail: () => showError('无法检查相册授权，可全屏截图后发送', 3500),
+          });
+          return;
+        }
+        showError('保存失败，可全屏截图后发送或复制邀请码', 3500);
       },
     });
   },
 
   onSaveMiniCode(): void {
-    if (!this.data.qrCodePath) return;
-    wx.saveImageToPhotosAlbum({
-      filePath: this.data.qrCodePath,
-      success: () => showSuccess('已保存小程序码'),
-      fail: () => showError('保存失败，请检查相册权限'),
+    if (!this.data.qrCodePath || this.data.savingAlbum) return;
+    this.setData({ savingAlbum: true });
+    wx.getSetting({
+      success: (setting) => {
+        const authorized = setting.authSetting?.['scope.writePhotosAlbum'];
+        if (authorized === true) {
+          this.saveQrToAlbum();
+          return;
+        }
+        if (authorized === false) {
+          this.setData({ savingAlbum: false, albumPermissionRequired: true });
+          showError('请点击「开启相册权限」后再保存', 3000);
+          return;
+        }
+        // First-time authorization is requested only when the user presses Save.
+        wx.authorize({
+          scope: 'scope.writePhotosAlbum',
+          success: () => this.saveQrToAlbum(),
+          fail: (error) => {
+            console.warn('[Invites] Album authorization denied:', error?.errMsg ?? 'unknown');
+            this.setData({ savingAlbum: false, albumPermissionRequired: true });
+            showError('相册授权未开启，请点击「开启相册权限」', 3000);
+          },
+        });
+      },
+      fail: (error) => {
+        console.warn('[Invites] Album setting lookup failed:', error?.errMsg ?? 'unknown');
+        this.setData({ savingAlbum: false });
+        showError('无法获取相册权限，请检查微信与手机设置', 3000);
+      },
     });
+  },
+
+  onAlbumSettingChanged(event: { detail?: { authSetting?: Record<string, boolean> } }): void {
+    const authorized = event.detail?.authSetting?.['scope.writePhotosAlbum'] === true;
+    this.setData({ albumPermissionRequired: !authorized });
+    if (authorized && this.data.qrVisible) {
+      this.onSaveMiniCode();
+    } else if (!authorized) {
+      showError('未开启相册权限，可全屏截图后发送', 3000);
+    }
   },
 
   onCloseMiniCode(): void {
