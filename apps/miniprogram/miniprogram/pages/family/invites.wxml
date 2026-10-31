@@ -1,60 +1,65 @@
-<!-- 家庭邀请管理页 -->
+<!-- 家庭邀请管理页：分享卡片优先，纯邀请码作为备用方式 -->
 <view class="container">
-  <nav-bar title="家庭邀请" showBack="true" />
+  <nav-bar title="家庭邀请" showBack="{{true}}" />
 
   <view class="header">
     <text class="title">邀请家人加入</text>
-    <text class="subtitle">生成邀请后，发送微信分享卡片给家人，点击即可进入加入家庭页。</text>
+    <text class="subtitle">选择一种邀请方式，家人确认后即可加入。</text>
   </view>
 
-  <!-- 生成成功：分享卡片 -->
   <view wx:if="{{newInvite}}" class="card invite-card">
-    <text class="card-label">邀请已生成</text>
+    <view class="invite-head">
+      <text class="card-label">邀请已生成</text>
+      <text class="invite-state {{newInviteAvailable ? 'invite-active' : 'invite-invalid'}}">{{newInviteAvailable ? '有效' : '已失效'}}</text>
+    </view>
+    <text class="invite-meta">有效期至 {{newInviteView.expiresAtText}} · {{newInviteView.usesText}}</text>
 
-    <view class="invite-meta">
-      <text class="meta-line">有效期至 {{newInviteView.expiresAtText}}</text>
-      <text class="meta-line">{{newInviteView.usesText}}</text>
+    <!-- 微信原生小程序卡片，不是把内部路径复制成普通聊天链接 -->
+    <button
+      class="btn-primary share-btn"
+      open-type="share"
+      disabled="{{creating || !newInviteAvailable}}"
+    >发送给微信好友</button>
+    <text class="share-hint">好友点击分享卡片，即可查看家庭并确认加入。</text>
+
+    <view class="invite-divider">
+      <view class="divider-line" />
+      <text class="divider-label">或使用邀请码</text>
+      <view class="divider-line" />
     </view>
 
-    <view class="code-box">
-      <text class="code-text">{{newInvite.code}}</text>
+    <view class="code-section">
+      <text class="code-text" selectable="{{true}}">{{newInvite.code}}</text>
+      <button
+        class="btn-outline copy-btn"
+        disabled="{{creating || !newInviteAvailable}}"
+        bindtap="onCopyCode"
+      >复制邀请码</button>
     </view>
-
-    <button class="btn-primary share-btn" open-type="share">发送给微信好友</button>
-
-    <view class="secondary-actions">
-      <button class="btn-outline sm" bindtap="onCopyCode">复制邀请码（手动输入）</button>
-    </view>
+    <text class="code-hint">家人打开家事喵，在「家庭管理 → 加入家庭」中粘贴邀请码。</text>
+    <text wx:if="{{!newInviteAvailable}}" class="invite-warning">当前邀请不可再使用，请生成新邀请。</text>
 
     <view class="regenerate" bindtap="onCreate">
-      <text class="regenerate-text">重新生成邀请</text>
+      <text class="regenerate-text">{{creating ? '正在生成...' : '再生成一个邀请'}}</text>
     </view>
   </view>
 
-  <!-- 初始 / 生成中：生成入口 -->
-  <view wx:else class="card">
+  <view wx:else class="card create-card">
+    <text class="create-hint">生成邀请后，可以发送微信卡片，或复制邀请码给家人。</text>
     <button
       class="btn-primary"
       disabled="{{creating}}"
       bindtap="onCreate"
-    >
-      {{creating ? '正在生成邀请...' : '生成邀请'}}
-    </button>
+    >{{creating ? '正在生成邀请...' : '生成邀请'}}</button>
   </view>
 
-  <!-- 邀请记录 -->
   <view class="card">
     <view class="section-header">
       <text class="section-title">邀请记录</text>
     </view>
-
     <block wx:if="{{invites.length > 0}}">
-      <view
-        class="invite-item"
-        wx:for="{{invites}}"
-        wx:key="id"
-      >
-        <view class="invite-meta">
+      <view class="invite-item" wx:for="{{invites}}" wx:key="id">
+        <view class="invite-item-meta">
           <text class="invite-status status-{{item.status}}">{{item.statusText}}</text>
           <text class="invite-sub">{{item.subText}}</text>
         </view>
@@ -66,7 +71,6 @@
         >撤销</text>
       </view>
     </block>
-
     <view wx:else class="empty-hint">
       <text class="empty-text">暂无邀请记录</text>
     </view>
