@@ -279,6 +279,7 @@ test('previously denied photo permission reveals native settings button and save
   const saves: string[] = [];
   const page = inviteHarness({
     showError: (message: string) => errors.push(message),
+    showSuccess: () => {},
     wx: {
       getSetting: ({ success }: { success: (value: unknown) => void }) => success({
         authSetting: { 'scope.writePhotosAlbum': granted },
