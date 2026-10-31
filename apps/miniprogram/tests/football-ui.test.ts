@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
+import { AutoRefreshGate, markRefreshDirty } from '../miniprogram/services/refresh-policy.ts';
 const read=(path:string)=>readFileSync(new URL('../miniprogram/'+path,import.meta.url),'utf8');
 function executable(path:string){return stripTypeScriptTypes(read(path).replace(/^import[\s\S]*?from ['"][^'"]+['"];?\r?$/gm,'')).replace(/\bexport /g,'');}
 function page(name:string,globals:Record<string,unknown>={}){
-  let result:any;runInNewContext(executable('pages/football/'+name+'.ts'),{Error,userStore:{value:{id:'u'}},...globals,Page:(p:any)=>{result=p;}});
+  let result:any;runInNewContext(executable('pages/football/'+name+'.ts'),{Error,AutoRefreshGate,markRefreshDirty,userStore:{value:{id:'u'}},...globals,Page:(p:any)=>{result=p;}});
   result.setData=(patch:any)=>Object.assign(result.data,patch);return result;
 }
 const people=[{personId:'per_a',displayName:'甲'},{personId:'per_kk',displayName:'KK'}];
