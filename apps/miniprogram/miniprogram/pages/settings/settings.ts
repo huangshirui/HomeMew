@@ -41,7 +41,7 @@ Page({
 
   onShow(): void { void this.loadAccount(); },
   async loadAccount(): Promise<void> {
-    this.setData({accountLoaded:false,accountError:false,user:userStore.value});
+    this.setData({accountError:false,user:userStore.value||this.data.user});
     try {
       await ensureRuntimeReady();
       const user=await loadCurrentUser();
@@ -51,7 +51,7 @@ Page({
       this.setData({user,accountLoaded:true,linked:account.linked,linkStatus:account.status,emailAvailable:account.available!==false,
         loginEmail:email?email.replace(/^(.).*(@.*)$/,'$1***$2'):''});
       this.refreshHomeScope();
-    }catch { this.setData({accountError:true}); }
+    }catch { this.setData({accountError:!this.data.accountLoaded}); }
   },
 
   onLoad(): void {

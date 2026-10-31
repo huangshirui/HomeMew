@@ -26,7 +26,7 @@ function formatted(record:DomainRecord,people:PersonOption[],kind:Kind):Display 
 Page({
   data:{
     kind:'activities' as Kind,title:'活动',familyId:'',loading:true,loadingMore:false,error:'',
-    records:[] as Display[],nextCursor:null as string|null,noFamily:false,
+    records:[] as Display[],nextCursor:null as string|null,noFamily:false,loadedOnce:false,
     filters:[] as {key:string;label:string}[],filter:'current',searchOpen:false,search:'',appliedSearch:'',
     people:[] as PersonOption[],personId:'',personOptions:[] as {id:string;label:string}[],selectedPersonIndex:0,
     mine:false,
@@ -45,15 +45,23 @@ Page({
   async onShow():Promise<void> {
     try { await ensureRuntimeReady(); } catch {}
     const familyId=currentFamilyStore.value?.id||'';
-    if (!familyId) { this.setData({familyId:'',records:[],noFamily:true,loading:false});return; }
-    this.setData({familyId,noFamily:false,records:[],nextCursor:null});
+    if (!familyId) {
+      ++this._generation;
+      this.setData({familyId:'',records:[],nextCursor:null,noFamily:true,loadedOnce:false,loading:false});
+      return;
+    }
+    // 同家庭自动刷新保留旧数据；只有权限/家庭边界变更才清空。
+    if (familyId !== this.data.familyId) {
+      ++this._generation;
+      this.setData({familyId,noFamily:false,records:[],nextCursor:null,loadedOnce:false});
+    } else this.setData({noFamily:false});
     await this.load(true);
   },
   async load(reset:boolean):Promise<void> {
     const familyId=this.data.familyId,kind=this.data.kind,cursor=reset?undefined:this.data.nextCursor || undefined;
     if(!familyId || (!reset && !cursor))return;
     const generation=++this._generation;
-    this.setData({loading:reset,loadingMore:!reset,error:reset?'':this.data.error});
+    this.setData({loading:reset&&!this.data.loadedOnce,loadingMore:!reset,error:reset?'':this.data.error});
     try {
       const members=reset ? await listDomainPeople(familyId) : this.data.people;
       const now=localToday(currentFamilyStore.value?.timezone||'Asia/Shanghai');
@@ -71,7 +79,7 @@ Page({
       this.loadRecordIcons(items,familyId,kind);
       const records=reset?items:[...this.data.records,...items.filter(x=>!this.data.records.some(prev=>prev.id===x.id))];
       this.setData({people:members,personOptions:[{id:'',label:'全部成员'},...members.map(p=>({id:p.personId,label:p.displayName}))],
-        records,nextCursor:page.nextCursor,error:''});
+        records,nextCursor:page.nextCursor,error:'',loadedOnce:true});
     }catch(error:unknown){if(generation===this._generation)this.setData({error:(error as Error).message||'加载失败'});}
     finally{if(generation===this._generation)this.setData({loading:false,loadingMore:false});}
   },

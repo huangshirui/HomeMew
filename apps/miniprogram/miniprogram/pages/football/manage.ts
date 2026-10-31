@@ -4,16 +4,21 @@ import { readFootballRecent } from '../../utils/football-recent-cache';
 import { listDomainPeople,deleteDomainRecord,type DomainRecord } from '../../services/domains';
 import { getTeam,listTeams,listFootballPeople,saveFootballPerson,removeFootballPerson,listMatches,listPerformances,type FootballPerson } from '../../services/football';
 Page({
-  data:{familyId:'',tab:'teams',loading:true,loadingMore:false,busy:false,error:'',search:'',appliedSearch:'',
+  data:{familyId:'',tab:'teams',loading:true,loadedOnce:false,loadingMore:false,busy:false,error:'',search:'',appliedSearch:'',
     teams:[] as DomainRecord[],players:[] as FootballPerson[],familyPersonIds:[] as string[],nextCursor:null as string|null},
   _generation:0,_timer:0 as ReturnType<typeof setTimeout>|0,
   onLoad(opts:{familyId?:string}):void{this.setData({familyId:opts.familyId||currentFamilyStore.value?.id||''});},
-  async onShow():Promise<void>{try{await ensureRuntimeReady();}catch{}await this.load(true);},
+  async onShow():Promise<void>{
+    try{await ensureRuntimeReady();}catch{}
+    const familyId=currentFamilyStore.value?.id||'';
+    if(familyId!==this.data.familyId){++this._generation;this.setData({familyId,teams:[],players:[],nextCursor:null,loadedOnce:false});}
+    await this.load(true);
+  },
   onUnload():void{this._generation++;if(this._timer)clearTimeout(this._timer);},
   async load(reset:boolean):Promise<void>{
     if(!this.data.familyId){this.setData({loading:false,error:'请先加入家庭'});return;}
     const generation=++this._generation;
-    this.setData({loading:reset,loadingMore:!reset,error:''});
+    this.setData({loading:reset&&!this.data.loadedOnce,loadingMore:!reset,error:''});
     try{
       const q=this.data.appliedSearch||undefined,cursor=reset?undefined:this.data.nextCursor||undefined;
       if(this.data.tab==='teams'){
@@ -28,18 +33,18 @@ Page({
           const teams=await Promise.all([...ids].filter(Boolean).slice(0,50).map(id=>getTeam(this.data.familyId,id).catch(()=>null)));
           page={items:teams.filter((t):t is DomainRecord=>!!t),nextCursor:null};
         }
-        if(generation===this._generation)this.setData({teams:reset?page.items:[...this.data.teams,...page.items],nextCursor:page.nextCursor});
+        if(generation===this._generation)this.setData({teams:reset?page.items:[...this.data.teams,...page.items],nextCursor:page.nextCursor,loadedOnce:true});
       }else{
         const [page,family]=await Promise.all([listFootballPeople(this.data.familyId,q,cursor),listDomainPeople(this.data.familyId)]);
         if(generation!==this._generation)return;
         const familyPersonIds=family.map(p=>p.personId);
         const players=page.items.filter(p=>!p.linkedUser&&!familyPersonIds.includes(p.id));
-        this.setData({players:reset?players:[...this.data.players,...players],familyPersonIds,nextCursor:page.nextCursor});
+        this.setData({players:reset?players:[...this.data.players,...players],familyPersonIds,nextCursor:page.nextCursor,loadedOnce:true});
       }
     }catch(e){if(generation===this._generation)this.setData({error:(e as Error).message||'加载失败'});}
     finally{if(generation===this._generation)this.setData({loading:false,loadingMore:false});}
   },
-  onTab(e:WechatMiniprogram.TouchEvent):void{this.setData({tab:String(e.currentTarget.dataset.tab),search:'',appliedSearch:'',teams:[],players:[],nextCursor:null});void this.load(true);},
+  onTab(e:WechatMiniprogram.TouchEvent):void{this.setData({tab:String(e.currentTarget.dataset.tab),search:'',appliedSearch:'',teams:[],players:[],nextCursor:null,loadedOnce:false});void this.load(true);},
   onInput(e:WechatMiniprogram.Input):void{if(this._timer)clearTimeout(this._timer);this.setData({search:e.detail.value});this._timer=setTimeout(()=>this.onSearch(),320);},
   onClearSearch():void{if(this._timer)clearTimeout(this._timer);this.setData({search:'',appliedSearch:''});void this.load(true);},
   onSearch():void{this.setData({appliedSearch:this.data.search.trim()});void this.load(true);},
