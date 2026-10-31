@@ -12,7 +12,7 @@
 
 ## 家庭邀请体验（2026-10-31，实验 PR #167）
 
-- 管理员生成 HomeMew/LifeSpace 邀请码后，首选「发送给微信好友」：不再使用受未认证小程序限制的 `open-type="share"`。点击后经 HomeMew Mini BFF → Provider Backend 生成微信小程序码图片，显示分享图片/保存图片两个操作；若图片分享仍被微信账号资质限制，不能保证保存也有权限；保存前须处理 `scope.writePhotosAlbum`，已拒绝则通过微信原生设置重新授权。两者都不可用时点击图片全屏预览并截图，从微信聊天中自行发送，或复制纯邀请码。
+- 管理员生成 HomeMew/LifeSpace 邀请码后，点击「生成小程序码图片」，经 HomeMew Mini BFF → Provider Backend 生成微信小程序码图片。由于当前未认证小程序的微信直接图片分享已被真机验证为不可用，不展示「分享二维码图片」按钮，也不再用「发送给微信好友」误导。弹层保留保存图片到相册和点击图片全屏预览截图的方式；保存前处理 `scope.writePhotosAlbum`，已拒绝则通过微信原生设置重新授权，仍受系统权限限制时可自行截图发送，或复制纯邀请码。
 - 码的固定页面是 `pages/family/join`，短 `scene` 直接携带新建时返回的明文邀请码；加入页兼容 `scene`（扫码）与 `code`（旧路径）。仅允许 `develop/trial/release`，Mini 正式版指向 `release`，开发/体验版生成 `trial` 码用于体验成员测试。体验版必须预先上传且扫码账号有体验资格。
 - BFF 在调用微信前，通过当前 LifeSpace user bearer 核查该家庭的邀请码管理权限、LifeSpace 邀请有效性及 HomeMew Family Catalog；Provider Backend 只负责微信凭证、缓存与小程序码二进制转 Base64，图片只短期返回小程序本地文件。不新增 HomeMew 家庭业务存储。
 - 「复制邀请码」是备用入口，只复制纯邀请码，不复制小程序内部页面路径；受邀者先进入家事喵，再在「家庭管理 → 加入家庭」中粘贴。
