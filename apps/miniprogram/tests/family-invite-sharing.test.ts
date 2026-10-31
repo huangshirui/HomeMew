@@ -232,7 +232,7 @@ test('native WeChat long-press menu replaces app-level photo permissions and uns
   const page = inviteHarness({
     wx: {
       previewImage: (args: { current: string; urls: string[]; showmenu: boolean }) =>
-        previews.push(args),
+        previews.push({ current: args.current, urls: args.urls, showmenu: args.showmenu }),
       authorize: () => assert.fail('Native long-press menu must not ask for app scope'),
       getSetting: () => assert.fail('Native long-press menu must not read app scope'),
       saveImageToPhotosAlbum: () => assert.fail('Native menu must own save behavior'),
