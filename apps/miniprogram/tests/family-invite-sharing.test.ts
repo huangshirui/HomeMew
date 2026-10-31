@@ -46,20 +46,18 @@ function inviteHarness(overrides: Record<string, unknown> = {}) {
   return { page, copied, errors };
 }
 
-test('share card points to the HomeMew family join page; copy yields the bare code', async () => {
+test('copy yields only the bare code, not unsupported native share cards', async () => {
   const { page, copied } = inviteHarness();
   page.data.newInvite = inviteFixture();
   page.data.newInviteAvailable = true;
-  const shared = page.onShareAppMessage();
-  assert.equal(shared.path, '/pages/family/join?code=LS-ABCD-EFGH-JKLM-NPQR');
-  assert.match(shared.title, /邀请你加入/);
+  assert.equal(typeof page.onShareAppMessage, 'undefined');
   page.onCopyCode();
   await Promise.resolve();
   assert.deepEqual(copied, ['LS-ABCD-EFGH-JKLM-NPQR']);
   assert.equal(typeof page.onCopyPath, 'undefined');
 });
 
-test('no new invitation, expiry and revoked invitations cannot be copied or sent as invite cards', async () => {
+test('no invite, expiry and revoke prevent code copying or QR generation', async () => {
   const { page, copied, errors } = inviteHarness({
     listInvites: async () => [{
       ...inviteFixture(),
@@ -68,14 +66,14 @@ test('no new invitation, expiry and revoked invitations cannot be copied or sent
       createdAt: new Date().toISOString(),
     }],
   });
-  assert.equal(page.onShareAppMessage().path, '/pages/home/home');
+  assert.equal(page.data.newInvite, null);
   page.onCopyCode();
   page.data.newInvite = inviteFixture();
   page.data.newInviteAvailable = true;
   page.data.familyId = 'spc_home';
   await page.loadInvites();
   assert.equal(page.data.newInviteAvailable, false);
-  assert.equal(page.onShareAppMessage().path, '/pages/home/home');
+  assert.equal(page.data.newInviteAvailable, false);
   page.onCopyCode();
   assert.deepEqual(copied, []);
   assert.ok(errors.every(value => value.includes('已失效')));
@@ -83,7 +81,8 @@ test('no new invitation, expiry and revoked invitations cannot be copied or sent
   // A previously active invitation may expire while the page remains open.
   page.data.newInvite = inviteFixture(new Date(Date.now() - 1000).toISOString());
   page.data.newInviteAvailable = true;
-  assert.equal(page.onShareAppMessage().path, '/pages/home/home');
+  assert.equal(page.data.newInviteAvailable, true);
+  assert.equal(typeof page.onShareAppMessage, 'undefined');
 });
 
 test('mini-code image and copying a code are visually separate actions', () => {
