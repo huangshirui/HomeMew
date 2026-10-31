@@ -1,4 +1,4 @@
-<!-- 家庭邀请管理页：分享卡片优先，纯邀请码作为备用方式 -->
+<!-- 家庭邀请管理页：小程序码图片优先，纯邀请码作为备用方式 -->
 <view class="container">
   <nav-bar title="家庭邀请" showBack="{{true}}" />
 
@@ -14,13 +14,13 @@
     </view>
     <text class="invite-meta">有效期至 {{newInviteView.expiresAtText}} · {{newInviteView.usesText}}</text>
 
-    <!-- 微信原生小程序卡片，不是把内部路径复制成普通聊天链接 -->
+    <!-- 先生成小程序码，再通过微信的图片分享菜单发送（失败可保存图片）。 -->
     <button
       class="btn-primary share-btn"
-      open-type="share"
-      disabled="{{creating || !newInviteAvailable}}"
-    >发送给微信好友</button>
-    <text class="share-hint">好友点击分享卡片，即可查看家庭并确认加入。</text>
+      disabled="{{creating || sharing || !newInviteAvailable}}"
+      bindtap="onShareInvite"
+    >{{sharing ? '正在生成小程序码...' : '发送给微信好友'}}</button>
+    <text class="share-hint">生成小程序码图片，可发送给好友或保存后转发。</text>
 
     <view class="invite-divider">
       <view class="divider-line" />
@@ -45,7 +45,7 @@
   </view>
 
   <view wx:else class="card create-card">
-    <text class="create-hint">生成邀请后，可以发送微信卡片，或复制邀请码给家人。</text>
+    <text class="create-hint">生成邀请后，可将小程序码图片发送给家人，或复制邀请码。</text>
     <button
       class="btn-primary"
       disabled="{{creating}}"
@@ -74,5 +74,18 @@
     <view wx:else class="empty-hint">
       <text class="empty-text">暂无邀请记录</text>
     </view>
+  </view>
+</view>
+
+<!-- 生成图片后展示，明确支持微信未认证导致图片分享功能受限的备用方案。 -->
+<view wx:if="{{qrVisible}}" class="qr-overlay" catchtap="onCloseMiniCode">
+  <view class="qr-sheet" catchtap="onStopQrTap">
+    <text class="qr-title">家庭邀请小程序码</text>
+    <image class="qr-image" src="{{qrCodePath}}" mode="aspectFit" show-menu-by-longpress="{{true}}" />
+    <text class="qr-caption">让家人用微信扫一扫，确认家庭信息后加入。</text>
+    <text wx:if="{{qrCodeVersion === 'trial'}}" class="qr-trial-tip">当前二维码指向体验版，需要先上传体验版并添加体验成员。</text>
+    <button class="btn-primary qr-action" bindtap="onShareMiniCode">分享二维码图片</button>
+    <button class="btn-outline qr-action" bindtap="onSaveMiniCode">保存图片到相册</button>
+    <view class="qr-close" bindtap="onCloseMiniCode">关闭</view>
   </view>
 </view>
