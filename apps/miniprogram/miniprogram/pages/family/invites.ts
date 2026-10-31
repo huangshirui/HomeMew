@@ -1,14 +1,12 @@
 /**
  * 家庭邀请管理页
  *
- * 支持：
- * - 查看邀请列表（状态：有效 / 已过期 / 已用完 / 已撤销）
- * - 创建邀请（成功后立即展示完整邀请码）
- * - 撤销邀请
- * - 复制新邀请码（不复制无法在微信聊天中点击的小程序内部路径）
- * - 微信分享（onShareAppMessage 使用 BFF 提供的 joinPath）
+ * 用户旅程：
+ * - 首选微信原生分享卡片，携带 LifeSpace 邀请码打开加入家庭页
+ * - 备用方式只复制邀请码（小程序内部 joinPath 不可作为微信聊天链接）
+ * - 邀请撤销、过期或用完后不再展示可用的分享/复制操作
  *
- * 历史邀请列表不假设仍返回完整邀请码，仅对本次创建成功的邀请提供复制。
+ * 邀请历史仅展示状态。LifeSpace 仅在新建时返回明文码。
  */
 
 import { listInvites, createInvite, revokeInvite } from '../../services/families';
@@ -25,6 +23,7 @@ import {
 import { InviteListItem, InviteCreated } from '../../types/index';
 
 type InviteView = InviteListItem & { statusText: string; subText: string; expiresAtText: string };
+type CreatedView = { expiresAtText: string; usesText: string };
 
 const STATUS_TEXT: Record<string, string> = {
   active: '有效',
@@ -33,15 +32,31 @@ const STATUS_TEXT: Record<string, string> = {
   revoked: '已撤销',
 };
 
+function isUsable(invite: InviteCreated, status?: InviteListItem['status']): boolean {
+  return (!status || status === 'active')
+    && Date.parse(invite.expiresAt) > Date.now()
+    && invite.usedCount < invite.maxUses;
+}
+
+function createdView(invite: InviteCreated): CreatedView {
+  return {
+    expiresAtText: formatDate(invite.expiresAt, 'datetime'),
+    usesText: `剩余可使用 ${Math.max(0, invite.maxUses - invite.usedCount)} 次`,
+  };
+}
+
 Page({
   data: {
     familyId: '',
     invites: [] as InviteView[],
     newInvite: null as InviteCreated | null,
-    newInviteView: null as { expiresAtText: string; usesText: string } | null,
+    newInviteView: null as CreatedView | null,
+    newInviteAvailable: false,
     creating: false,
     loaded: false,
   },
+
+  _listRequest: 0,
 
   onLoad(options: { familyId?: string }): void {
     const familyId = options?.familyId;
@@ -51,12 +66,12 @@ Page({
       return;
     }
     this.setData({ familyId });
-    this.loadInvites();
+    void this.loadInvites();
   },
 
   onShow(): void {
     if (this.data.familyId && this.data.loaded) {
-      this.loadInvites();
+      void this.loadInvites();
     }
   },
 
@@ -90,10 +105,24 @@ Page({
   },
 
   async loadInvites(): Promise<void> {
+    const seq = ++this._listRequest;
     try {
       const invites = await listInvites(this.data.familyId);
-      this.setData({ invites: this.mapInvites(invites), loaded: true });
+      if (seq !== this._listRequest) return;
+      const newInvite = this.data.newInvite;
+      const latest = invites.find(i => i.id === newInvite?.id);
+      const current = newInvite && latest
+        ? { ...newInvite, usedCount: latest.usedCount, maxUses: latest.maxUses, expiresAt: latest.expiresAt }
+        : newInvite;
+      this.setData({
+        invites: this.mapInvites(invites),
+        loaded: true,
+        newInvite: current,
+        newInviteView: current ? createdView(current) : null,
+        newInviteAvailable: Boolean(current && isUsable(current, latest?.status)),
+      });
     } catch (error: unknown) {
+      if (seq !== this._listRequest) return;
       console.error('[Invites] Load failed:', error);
       const err = error as { code?: string; message?: string };
       showError(getErrorMessage(err.code, err.message));
@@ -107,17 +136,16 @@ Page({
     showLoading('生成邀请中...');
     try {
       const created = await createInvite(this.data.familyId);
-      hideLoading();
+      this._listRequest++;
       this.setData({
         newInvite: created,
-        newInviteView: {
-          expiresAtText: formatDate(created.expiresAt, 'datetime'),
-          usesText: `可加入人数：${created.maxUses} 人`,
-        },
+        newInviteView: createdView(created),
+        newInviteAvailable: isUsable(created),
       });
-      // 重新加载列表（列表项不含 code，仅用于状态追踪）
-      await this.loadInvites();
+      hideLoading();
       showSuccess('邀请已生成');
+      // 状态与剩余次数从服务端同步；获取列表失败不影响已创建的邀请。
+      await this.loadInvites();
     } catch (error: unknown) {
       console.error('[Invites] Create failed:', error);
       const err = error as { code?: string; message?: string };
@@ -138,8 +166,8 @@ Page({
       await revokeInvite(this.data.familyId, inviteId);
       hideLoading();
       showSuccess('已撤销');
-      if (this.data.newInvite && this.data.newInvite.id === inviteId) {
-        this.setData({ newInvite: null });
+      if (this.data.newInvite?.id === inviteId) {
+        this.setData({ newInviteAvailable: false });
       }
       await this.loadInvites();
     } catch (error: unknown) {
@@ -151,13 +179,18 @@ Page({
   },
 
   onCopyCode(): void {
-    if (!this.data.newInvite) return;
-    copyToClipboard(this.data.newInvite.code);
+    const invite = this.data.newInvite;
+    if (!invite || !this.data.newInviteAvailable || !isUsable(invite)) {
+      showError('邀请已失效，请再生成一个邀请');
+      return;
+    }
+    // 复制纯邀请码以便在“加入家庭”页粘贴；失败提示由工具函数处理。
+    void copyToClipboard(invite.code).catch(() => {});
   },
 
   onShareAppMessage(): WechatMiniprogram.Page.ICustomShareContent {
     const invite = this.data.newInvite;
-    if (!invite) {
+    if (!invite || !this.data.newInviteAvailable || !isUsable(invite)) {
       return {
         title: '家事喵 · 一起管理家庭生活',
         path: '/pages/home/home',
