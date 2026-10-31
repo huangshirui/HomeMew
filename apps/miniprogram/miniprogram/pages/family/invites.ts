@@ -77,7 +77,7 @@ Page({
   onShow(): void {
     // This page uses QR-image sharing; the ordinary WeChat share menu is
     // unavailable for unverified Mini Program accounts.
-    wx.hideShareMenu();
+    wx.hideShareMenu({});
     if (this.data.familyId && this.data.loaded) {
       void this.loadInvites(true);
     }
