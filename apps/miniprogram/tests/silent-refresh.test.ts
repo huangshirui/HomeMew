@@ -83,6 +83,6 @@ test('empty successful home and football refreshes do not reopen full-screen loa
   assert.match(source('pages/domains/detail.ts'), /loading:!this\.data\.record/);
   assert.match(source('pages/settings/settings.ts'), /accountError:false,user:userStore\.value\|\|this\.data\.user/);
   assert.doesNotMatch(source('pages/account-link/account-link.ts'), /this\.setData\(\{ready:false\}\)/);
-  assert.match(source('pages/domains/list.wxml'), /error && !records\.length/);
-  assert.match(source('pages/football/list.wxml'), /error && !rows\.length/);
+  assert.match(source('pages/domains/list.wxml'), /error && !loadedOnce/);
+  assert.match(source('pages/football/list.wxml'), /error && !loadedOnce/);
 });
