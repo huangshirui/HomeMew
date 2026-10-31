@@ -86,13 +86,16 @@ test('no new invitation, expiry and revoked invitations cannot be copied or sent
   assert.equal(page.onShareAppMessage().path, '/pages/home/home');
 });
 
-test('sending a share card and copying a code are visually separate actions', () => {
+test('mini-code image and copying a code are visually separate actions', () => {
   const template = readMini('pages/family/invites.wxml');
-  assert.match(template, /open-type="share"/);
+  assert.match(template, /bindtap="onShareInvite"/);
+  assert.doesNotMatch(template, /open-type="share"/);
+  assert.match(template, /bindtap="onShareMiniCode"/);
+  assert.match(template, /bindtap="onSaveMiniCode"/);
   assert.match(template, /bindtap="onCopyCode"/);
-  assert.match(template, /好友点击分享卡片/);
+  assert.match(template, /生成小程序码图片/);
   assert.match(template, /家庭管理 → 加入家庭/);
-  assert.match(template, /disabled="\{\{creating \|\| !newInviteAvailable\}\}"/);
+  assert.match(template, /disabled="\{\{creating \|\| sharing \|\| !newInviteAvailable\}\}"/);
   assert.doesNotMatch(template, /onCopyPath|复制邀请链接/);
 
   const pages = JSON.parse(readMini('app.json')).pages;
@@ -128,9 +131,9 @@ function joinHarness(overrides: Record<string, unknown> = {}) {
   return { page, errors, successes, destinations, get joins() { return joins; } };
 }
 
-test('share-card entry automatically previews the invitation without a second tap', async () => {
+test('mini-code scene entry automatically previews the invitation without a second tap', async () => {
   const { page } = joinHarness();
-  page.onLoad({ code: 'LS-ABCD-EFGH-JKLM-NPQR' });
+  page.onLoad({ scene: encodeURIComponent('LS-ABCD-EFGH-JKLM-NPQR') });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(page.data.fromShare, true);
   assert.equal(page.data.preview.family.id, 'spc_home');
@@ -189,4 +192,55 @@ test('an existing member can open a full family instead of being blocked by invi
   assert.deepEqual(harness.destinations, ['/pages/home/home']);
   assert.equal(harness.joins, 0);
   assert.match(readMini('pages/family/join.wxml'), /bindtap="onEnterExistingFamily"/);
+});
+
+test('generating a QR image uses the stable BFF, writes only a local file, and opens fallback actions', async () => {
+  const requested: unknown[] = [];
+  const files: unknown[] = [];
+  const page = inviteHarness({
+    generateFamilyInviteMiniCode: async (familyId: string, code: string, version: string) => {
+      requested.push({ familyId, code, version });
+      return { imageBase64: 'iVBORw0KGgo=', mimeType: 'image/png', envVersion: version };
+    },
+    wx: {
+      env: { USER_DATA_PATH: '/user/data' },
+      getAccountInfoSync: () => ({ miniProgram: { envVersion: 'develop' } }),
+      getFileSystemManager: () => ({
+        writeFileSync: (...args: unknown[]) => files.push(args),
+      }),
+    },
+  }).page;
+  page.data.newInvite = inviteFixture();
+  page.data.newInviteAvailable = true;
+  page.data.familyId = 'spc_home';
+  await page.onShareInvite();
+  assert.equal(page.data.qrVisible, true);
+  assert.equal(page.data.qrCodeVersion, 'trial');
+  assert.deepEqual(requested, [{
+    familyId: 'spc_home', code: 'LS-ABCD-EFGH-JKLM-NPQR', version: 'trial',
+  }]);
+  assert.deepEqual(files, [['/user/data/homemew-invite-inv_test.png', 'iVBORw0KGgo=', 'base64']]);
+  assert.equal(page.data.qrCodePath, '/user/data/homemew-invite-inv_test.png');
+  page.onCloseMiniCode();
+  assert.equal(page.data.qrVisible, false);
+});
+
+test('invite image sharing failure retains the save-to-album fallback', () => {
+  const errors: string[] = [];
+  const saved: string[] = [];
+  const page = inviteHarness({
+    showError: (message: string) => errors.push(message),
+    showSuccess: (message: string) => saved.push(message),
+    wx: {
+      showShareImageMenu: ({ fail }: { fail: () => void }) => fail(),
+      saveImageToPhotosAlbum: ({ success }: { success: () => void }) => success(),
+    },
+  }).page;
+  page.data.qrCodePath = '/user/data/invite.png';
+  page.data.qrVisible = true;
+  page.onShareMiniCode();
+  assert.match(errors[0], /暂不允许转发图片/);
+  assert.equal(page.data.qrVisible, true);
+  page.onSaveMiniCode();
+  assert.deepEqual(saved, ['已保存小程序码']);
 });
