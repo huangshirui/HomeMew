@@ -91,7 +91,9 @@ test('mini-code image and copying a code are visually separate actions', () => {
   assert.match(template, /bindtap="onGenerateMiniCode"/);
   assert.doesNotMatch(template, /open-type="share"/);
   assert.doesNotMatch(template, /bindtap="onShareMiniCode"|分享二维码图片|发送给微信好友<\/button>/);
-  assert.match(template, /bindtap="onSaveMiniCode"/);
+  assert.match(template, /show-menu-by-longpress="\{\{true\}\}"/);
+  assert.match(template, /bindtap="onPreviewMiniCode"/);
+  assert.doesNotMatch(template, /onSaveMiniCode|openSetting|相册授权/);
   assert.match(template, /bindtap="onCopyCode"/);
   assert.match(template, /生成小程序码图片/);
   assert.match(template, /家庭管理 → 加入家庭/);
@@ -225,121 +227,50 @@ test('generating a QR image uses the stable BFF, writes only a local file, and o
   assert.equal(page.data.qrVisible, false);
 });
 
-test('QR preview remains usable while disabled native sharing UI and handler are removed', () => {
-  const previews: string[] = [];
+test('native WeChat long-press menu replaces app-level photo permissions and unsafe share calls', () => {
+  const previews: Array<{ current: string; urls: string[]; showmenu: boolean }> = [];
   const page = inviteHarness({
     wx: {
-      previewImage: ({ current }: { current: string }) => previews.push(current),
+      previewImage: (args: { current: string; urls: string[]; showmenu: boolean }) =>
+        previews.push(args),
+      authorize: () => assert.fail('Native long-press menu must not ask for app scope'),
+      getSetting: () => assert.fail('Native long-press menu must not read app scope'),
+      saveImageToPhotosAlbum: () => assert.fail('Native menu must own save behavior'),
+      showShareImageMenu: () => assert.fail('Account-restricted image share must remain removed'),
     },
   }).page;
   page.data.qrCodePath = '/user/data/invite.png';
   page.data.qrVisible = true;
+  assert.equal(typeof page.onSaveMiniCode, 'undefined');
+  assert.equal(typeof page.onAlbumSettingChanged, 'undefined');
   assert.equal(typeof page.onShareMiniCode, 'undefined');
   page.onPreviewMiniCode();
-  assert.deepEqual(previews, ['/user/data/invite.png']);
+  assert.deepEqual(previews, [{
+    current: '/user/data/invite.png',
+    urls: ['/user/data/invite.png'],
+    showmenu: true,
+  }]);
   const template = readMini('pages/family/invites.wxml');
-  assert.match(template, /bindtap="onSaveMiniCode"/);
-  assert.match(template, /全屏截图/);
-  assert.doesNotMatch(template, /bindtap="onShareMiniCode"|分享二维码图片/);
+  assert.match(template, /show-menu-by-longpress="\{\{true\}\}"/);
+  assert.match(template, /bindtap="onPreviewMiniCode"/);
+  assert.match(template, /长按二维码/);
+  assert.match(template, /全屏查看二维码/);
+  assert.match(template, /全屏截图|截图发送/);
+  assert.doesNotMatch(template, /onSaveMiniCode|saveImageToPhotosAlbum|openSetting|开启相册权限|分享二维码图片/);
+  const source = readMini('pages/family/invites.ts');
+  assert.doesNotMatch(source, /saveImageToPhotosAlbum|scope\.writePhotosAlbum|wx\.authorize|wx\.getSetting|showShareImageMenu/);
 });
 
-test('photo album permission is requested only when saving and successful grant saves the code', () => {
-  const saves: string[] = [];
-  const prompts: string[] = [];
-  const successes: string[] = [];
-  const page = inviteHarness({
-    showSuccess: (message: string) => successes.push(message),
-    wx: {
-      getSetting: ({ success }: { success: (value: unknown) => void }) =>
-        success({ authSetting: {} }),
-      authorize: ({ scope, success }: { scope: string; success: () => void }) => {
-        prompts.push(scope);
-        success();
-      },
-      saveImageToPhotosAlbum: ({ filePath, success }: { filePath: string; success: () => void }) => {
-        saves.push(filePath);
-        success();
-      },
-    },
-  }).page;
-  page.data.qrCodePath = '/user/data/invite.png';
-  page.onSaveMiniCode();
-  assert.deepEqual(prompts, ['scope.writePhotosAlbum']);
-  assert.deepEqual(saves, ['/user/data/invite.png']);
-  assert.equal(page.data.savingAlbum, false);
-  assert.equal(page.data.albumPermissionRequired, false);
-  assert.match(successes[0], /已保存小程序码/);
-});
-
-test('previously denied photo permission reveals native settings button and saves after grant', () => {
-  let granted = false;
+test('native image preview failure still shows the copy-code fallback', () => {
   const errors: string[] = [];
-  const saves: string[] = [];
-  const page = inviteHarness({
+  const { page } = inviteHarness({
     showError: (message: string) => errors.push(message),
-    showSuccess: () => {},
     wx: {
-      getSetting: ({ success }: { success: (value: unknown) => void }) => success({
-        authSetting: { 'scope.writePhotosAlbum': granted },
-      }),
-      authorize: () => assert.fail('denied user must recover in native settings'),
-      saveImageToPhotosAlbum: ({ filePath, success }: { filePath: string; success: () => void }) => {
-        saves.push(filePath);
-        success();
-      },
+      previewImage: ({ fail }: { fail: (error: { errMsg: string }) => void }) =>
+        fail({ errMsg: 'previewImage:fail unavailable' }),
     },
-  }).page;
-  page.data.qrCodePath = '/user/data/invite.png';
-  page.data.qrVisible = true;
-  page.onSaveMiniCode();
-  assert.equal(page.data.albumPermissionRequired, true);
-  assert.equal(page.data.savingAlbum, false);
-  assert.equal(saves.length, 0);
-  assert.match(errors[0], /开启相册权限/);
-  const template = readMini('pages/family/invites.wxml');
-  assert.match(template, /open-type="openSetting"/);
-  assert.match(template, /bindopensetting="onAlbumSettingChanged"/);
-
-  granted = true;
-  page.onAlbumSettingChanged({
-    detail: { authSetting: { 'scope.writePhotosAlbum': true } },
   });
-  assert.deepEqual(saves, ['/user/data/invite.png']);
-  assert.equal(page.data.albumPermissionRequired, false);
-});
-
-test('declining the first photo authorization keeps recoverable settings UI', () => {
-  const errors: string[] = [];
-  const page = inviteHarness({
-    showError: (message: string) => errors.push(message),
-    wx: {
-      getSetting: ({ success }: { success: (value: unknown) => void }) => success({ authSetting: {} }),
-      authorize: ({ fail }: { fail: (error: { errMsg: string }) => void }) =>
-        fail({ errMsg: 'authorize:fail auth deny' }),
-      saveImageToPhotosAlbum: () => assert.fail('must not save without authorization'),
-    },
-  }).page;
   page.data.qrCodePath = '/user/data/invite.png';
-  page.onSaveMiniCode();
-  assert.equal(page.data.savingAlbum, false);
-  assert.equal(page.data.albumPermissionRequired, true);
-  assert.match(errors[0], /相册授权未开启/);
-});
-
-test('device-level photo write denial is not misrepresented as a missing mini-program scope', () => {
-  const errors: string[] = [];
-  const page = inviteHarness({
-    showError: (message: string) => errors.push(message),
-    wx: {
-      getSetting: ({ success }: { success: (value: unknown) => void }) =>
-        success({ authSetting: { 'scope.writePhotosAlbum': true } }),
-      saveImageToPhotosAlbum: ({ fail }: { fail: (error: { errMsg: string }) => void }) =>
-        fail({ errMsg: 'saveImageToPhotosAlbum:fail permission denied' }),
-    },
-  }).page;
-  page.data.qrCodePath = '/user/data/invite.png';
-  page.onSaveMiniCode();
-  assert.equal(page.data.savingAlbum, false);
-  assert.equal(page.data.albumPermissionRequired, false);
-  assert.match(errors[0], /微信或系统未允许写入照片/);
+  page.onPreviewMiniCode();
+  assert.deepEqual(errors, ['无法预览图片，请使用邀请码']);
 });
