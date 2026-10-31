@@ -2,14 +2,14 @@
  * 家庭邀请管理页
  *
  * 用户旅程：
- * - 首选微信原生分享卡片，携带 LifeSpace 邀请码打开加入家庭页
+ * - 首选使用微信小程序码图片，扫码携带 LifeSpace 邀请码进入加入家庭页
  * - 备用方式只复制邀请码（小程序内部 joinPath 不可作为微信聊天链接）
  * - 邀请撤销、过期或用完后不再展示可用的分享/复制操作
  *
  * 邀请历史仅展示状态。LifeSpace 仅在新建时返回明文码。
  */
 
-import { listInvites, createInvite, revokeInvite } from '../../services/families';
+import { listInvites, createInvite, revokeInvite, generateFamilyInviteMiniCode } from '../../services/families';
 import {
   showError,
   showSuccess,
@@ -54,6 +54,11 @@ Page({
     newInviteAvailable: false,
     creating: false,
     loaded: false,
+    sharing: false,
+    qrVisible: false,
+    qrCodePath: '',
+    qrCodeVersion: '' as 'develop' | 'trial' | 'release' | '',
+
   },
 
   _listRequest: 0,
@@ -132,7 +137,7 @@ Page({
 
   async onCreate(): Promise<void> {
     if (this.data.creating) return;
-    this.setData({ creating: true });
+    this.setData({ creating: true, qrVisible: false, qrCodePath: '' });
     showLoading('生成邀请中...');
     try {
       const created = await createInvite(this.data.familyId);
@@ -147,7 +152,7 @@ Page({
       // 状态与剩余次数从服务端同步；获取列表失败不影响已创建的邀请。
       await this.loadInvites(true);
     } catch (error: unknown) {
-      console.error('[Invites] Create failed:, error);
+      console.error('[Invites] Create failed:', error);
       const err = error as { code?: string; message?: string };
       showError(getErrorMessage(err.code, err.message));
     } finally {
@@ -167,15 +172,79 @@ Page({
       hideLoading();
       showSuccess('已撤销');
       if (this.data.newInvite?.id === inviteId) {
-        this.setData({ newInviteAvailable: false });
+        this.setData({ newInviteAvailable: false, qrVisible: false, qrCodePath: '' });
       }
       await this.loadInvites(true);
     } catch (error: unknown) {
       hideLoading();
-      console.error('[Invites] Revoke failed:, error);
+      console.error('[Invites] Revoke failed:', error);
       const err = error as { code?: string; message?: string };
       showError(getErrorMessage(err.code, err.message));
     }
+  },
+
+  /**
+   * 开发版/体验版分享给外部体验者时必须使用 trial；正式版用 release。
+   * 开发版上传体验版本后才能让有体验权限的微信好友扫码。
+   */
+  qrTargetVersion(): 'trial' | 'release' {
+    try {
+      return wx.getAccountInfoSync().miniProgram.envVersion === 'release' ? 'release' : 'trial';
+    } catch {
+      return 'trial';
+    }
+  },
+
+  async onShareInvite(): Promise<void> {
+    const invite = this.data.newInvite;
+    if (this.data.sharing || !invite || !this.data.newInviteAvailable || !isUsable(invite)) {
+      showError('邀请已失效，请再生成一个邀请');
+      return;
+    }
+    this.setData({ sharing: true });
+    try {
+      const envVersion = this.qrTargetVersion();
+      const qr = await generateFamilyInviteMiniCode(this.data.familyId, invite.code, envVersion);
+      // 生成过程中更换/撤销的邀请码不能展示旧图片。
+      if (this.data.newInvite?.id !== invite.id || !this.data.newInviteAvailable) return;
+      const suffix = qr.mimeType === 'image/jpeg' ? 'jpg' : 'png';
+      const filePath = `${wx.env.USER_DATA_PATH}/homemew-invite-${invite.id}.${suffix}`;
+      wx.getFileSystemManager().writeFileSync(filePath, qr.imageBase64, 'base64');
+      this.setData({ qrCodePath: filePath, qrCodeVersion: envVersion, qrVisible: true });
+    } catch (error: unknown) {
+      console.error('[Invites] Mini code generation failed:', error);
+      const err = error as { code?: string; message?: string };
+      showError(getErrorMessage(err.code, err.message), 3000);
+    } finally {
+      this.setData({ sharing: false });
+    }
+  },
+
+  onShareMiniCode(): void {
+    if (!this.data.qrCodePath) return;
+    wx.showShareImageMenu({
+      path: this.data.qrCodePath,
+      fail: () => {
+        showError('微信暂不允许转发图片，可先保存后从聊天发送', 3000);
+      },
+    });
+  },
+
+  onSaveMiniCode(): void {
+    if (!this.data.qrCodePath) return;
+    wx.saveImageToPhotosAlbum({
+      filePath: this.data.qrCodePath,
+      success: () => showSuccess('已保存小程序码'),
+      fail: () => showError('保存失败，请检查相册权限'),
+    });
+  },
+
+  onCloseMiniCode(): void {
+    this.setData({ qrVisible: false });
+  },
+
+  onStopQrTap(): void {
+    // 阻止弹层内容的点击穿透到遮罩。
   },
 
   onCopyCode(): void {
