@@ -233,7 +233,7 @@ export function TasksPage() {
       } else {
         await apiRequest<TaskRecord>(`/api/lifespace/core/v1/spaces/${encodeURIComponent(currentFamily.id)}/models/task/records`, {
           method: 'POST',
-          body: JSON.stringify({ ...payload, status: 'pending' }),
+          body: JSON.stringify(payload),
         });
       }
       setEditing(null);

@@ -72,3 +72,18 @@ test('household pages keep their canonical LifeSpace modelKey and Action routes'
     assert.doesNotMatch(text, /\/spaces\/\$\{encodeURIComponent\(currentFamily\.id\)\}\/(?:events|tasks|day-records|wishes)(?:[/?`])/u, `${label} must not retain pre-modelKey ordinary Runtime paths`);
   }
 });
+
+test('Task creation omits LifeSpace read-only lifecycle status and relies on the model default', () => {
+  const tasks = source('./src/pages/tasks-page.tsx');
+  const saveStart = tasks.indexOf('async function saveTask(');
+  const saveEnd = tasks.indexOf('async function deleteTask(', saveStart);
+  assert.ok(saveStart >= 0 && saveEnd > saveStart, 'Tasks must expose the create/update save handler');
+
+  const save = tasks.slice(saveStart, saveEnd);
+  assert.match(save, /method: 'POST',\s*body: JSON\.stringify\(payload\)/u,
+    'Task create must only send editable fields; LifeSpace supplies status=pending by default');
+  assert.doesNotMatch(save, /status:\s*['"]pending['"]/u,
+    'Task creation must not write a read-only lifecycle field');
+  assert.match(tasks, /action: 'complete' \| 'reopen'/u,
+    'Task lifecycle transitions continue through semantic Actions');
+});
