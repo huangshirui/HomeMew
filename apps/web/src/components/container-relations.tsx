@@ -34,7 +34,10 @@ export function relatedRecordTitle(label: string | undefined, record: RelatedRec
   return '名称暂不可用';
 }
 type Page<T> = { items: T[]; nextCursor: string | null };
-type Candidate = { id: string; name?: string; summary?: string; title?: string };
+type Candidate = RelatedRecord & { id: string };
+type SelectedCandidate = { modelKey: string; candidate: Candidate };
+const candidateKey = (modelKey: string, recordId: string) => modelKey + ':' + recordId;
+const candidateTitle = (item: Candidate) => item.name || item.summary || item.title || '名称暂不可用';
 type Countdown = { name: string; anchorDate: string; kind: string };
 const models = [
   { key: 'task', title: '待办', route: '/tasks' },
@@ -103,6 +106,20 @@ function relatedTimelineDate(modelKey: string, record: RelatedRecord | undefined
   return Number.isNaN(instant.getTime()) ? null : dateInFamilyZone(instant, timezone);
 }
 
+/** Search results need a business date to distinguish records with identical names. */
+function candidateDateLabel(modelKey: string, candidate: Candidate, timezone: string): string | null {
+  const today = dateInFamilyZone(new Date(), timezone).date;
+  const date = relatedTimelineDate(modelKey, candidate, timezone, today);
+  if (!date) return null;
+  if (modelKey === 'event') {
+    const time = candidate.when?.kind === 'instant' ? ' ' + date.sortKey.slice(11, 16) : '';
+    return '时间 ' + date.date + time;
+  }
+  if (modelKey === 'task') return '截止 ' + date.date;
+  if (modelKey === 'anniversary') return '下次 ' + date.date;
+  return '日期 ' + date.date;
+}
+
 function CollapsibleDescription({ description }: { description: string }) {
   const id = useId();
   const paragraph = useRef<HTMLParagraphElement>(null);
@@ -162,6 +179,9 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [candidateCursor, setCandidateCursor] = useState<string | null>(null);
   const [candidateLoading, setCandidateLoading] = useState(false);
+  const candidateRequest = useRef(0);
+  const [selectedCandidates, setSelectedCandidates] = useState<SelectedCandidate[]>([]);
+  const [linkedInPicker, setLinkedInPicker] = useState<string[]>([]);
   const [countdownOpen, setCountdownOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [taskName, setTaskName] = useState('');
@@ -223,32 +243,100 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
     finally { setLoading(false); }
   }
 
-  async function searchCandidates(cursor: string | null = null) {
-    if (!search.trim() || candidateLoading) return;
-    setCandidateLoading(true); setError('');
-    try {
-      const page = await queryModelRecords<Candidate>(spaceId, selectedModel, {
-        search: { text: search.trim() }, page: { limit: 30, ...(cursor ? { cursor } : {}) },
-      });
-      const items = page.items.filter(item => !(selectedModel === modelKey && item.id === record.id));
-      setCandidates(list => cursor ? [...list, ...items] : items);
-      setCandidateCursor(page.nextCursor);
-    } catch (cause) { setError(explain(cause)); }
-    finally { setCandidateLoading(false); }
+  function clearCandidateResults() {
+    // Old search responses must never replace results after the type/query changes.
+    candidateRequest.current += 1;
+    setCandidateLoading(false);
+    setCandidates([]);
+    setCandidateCursor(null);
   }
 
-  async function link(candidate: Candidate) {
-    setWorking(true); setError('');
+  function isAlreadyLinked(candidateModel: string, candidateId: string): boolean {
+    const key = candidateKey(candidateModel, candidateId);
+    return linkedInPicker.includes(key) || outgoing.some(edge =>
+      edge.target.modelKey === candidateModel && edge.target.recordId === candidateId);
+  }
+
+  async function searchCandidates(cursor: string | null = null) {
+    const queryText = search.trim();
+    if (!queryText || candidateLoading || working) return;
+    const queryModel = selectedModel;
+    const requestId = ++candidateRequest.current;
+    setCandidateLoading(true); setError('');
     try {
-      await apiRequest(relationsUrl, {
-        method: 'POST', body: JSON.stringify({
-          source: ref(modelKey, record.id), predicate: 'relates_to', target: ref(selectedModel, candidate.id),
-        }),
+      const page = await queryModelRecords<Candidate>(spaceId, queryModel, {
+        search: { text: queryText }, page: { limit: 30, ...(cursor ? { cursor } : {}) },
       });
-      setPickerOpen(false); setCandidates([]); setSearch('');
-      await refreshRelations();
-    } catch (cause) { setError(explain(cause)); }
-    finally { setWorking(false); }
+      if (requestId !== candidateRequest.current) return;
+      const items = page.items.filter(item => !(queryModel === modelKey && item.id === record.id));
+      setCandidates(list => cursor ? [...list, ...items.filter(item => !list.some(old => old.id === item.id))] : items);
+      setCandidateCursor(page.nextCursor);
+    } catch (cause) {
+      if (requestId === candidateRequest.current) setError(explain(cause));
+    } finally {
+      if (requestId === candidateRequest.current) setCandidateLoading(false);
+    }
+  }
+
+  function toggleCandidate(candidate: Candidate) {
+    if (working || isAlreadyLinked(selectedModel, candidate.id)) return;
+    const key = candidateKey(selectedModel, candidate.id);
+    setSelectedCandidates(list => list.some(item => candidateKey(item.modelKey, item.candidate.id) === key)
+      ? list.filter(item => candidateKey(item.modelKey, item.candidate.id) !== key)
+      : [...list, { modelKey: selectedModel, candidate }]);
+  }
+
+  function selectAllVisible() {
+    if (working) return;
+    setSelectedCandidates(list => {
+      const keys = new Set(list.map(item => candidateKey(item.modelKey, item.candidate.id)));
+      const additions = candidates.filter(candidate => {
+        const key = candidateKey(selectedModel, candidate.id);
+        if (isAlreadyLinked(selectedModel, candidate.id) || keys.has(key)) return false;
+        keys.add(key);
+        return true;
+      }).map(candidate => ({ modelKey: selectedModel, candidate }));
+      return [...list, ...additions];
+    });
+  }
+
+  async function linkSelected() {
+    if (!writable || working || !selectedCandidates.length) return;
+    const pending = selectedCandidates.filter(item => !isAlreadyLinked(item.modelKey, item.candidate.id));
+    if (!pending.length) { setSelectedCandidates([]); return; }
+    setWorking(true); setError('');
+    let linkedCount = 0;
+    let failure: unknown = null;
+    // LifeSpace's existing unified native Batch accepts at most 20 operations.
+    // Each chunk is atomic; if one chunk fails, keep it and later chunks selected.
+    for (let offset = 0; offset < pending.length; offset += 20) {
+      const chunk = pending.slice(offset, offset + 20);
+      try {
+        await apiRequest(`${core(spaceId)}/models/batch`, {
+          method: 'POST', body: JSON.stringify({
+            atomicConsistency: true,
+            operations: chunk.map(item => ({
+              operation: 'relation_create', predicate: 'relates_to',
+              source: ref(modelKey, record.id), target: ref(item.modelKey, item.candidate.id),
+            })),
+          }),
+        });
+        const completed = new Set(chunk.map(item => candidateKey(item.modelKey, item.candidate.id)));
+        linkedCount += chunk.length;
+        setLinkedInPicker(keys => [...new Set([...keys, ...completed])]);
+        setSelectedCandidates(list => list.filter(item => !completed.has(candidateKey(item.modelKey, item.candidate.id))));
+      } catch (cause) { failure = cause; break; }
+    }
+    if (linkedCount) await refreshRelations();
+    if (failure) {
+      setError(`${linkedCount ? linkedCount + ' 项已关联；' : ''}剩余内容未关联：${explain(failure)}。选择已保留，可重试。`);
+    } else {
+      setPickerOpen(false);
+      clearCandidateResults();
+      setSelectedCandidates([]);
+      setSearch('');
+    }
+    setWorking(false);
   }
 
   async function unlink(edge: Relation) {
@@ -384,8 +472,12 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
   }
 
   function openPicker() {
+    if (working) return;
+    clearCandidateResults();
+    setSelectedCandidates([]);
+    setLinkedInPicker([]);
     setPickerOpen(true); setCountdownOpen(false); setTaskOpen(false);
-    setCandidates([]); setSearch(''); setCandidateCursor(null);
+    setSearch('');
   }
 
   function listing(edges: Relation[], outgoingDirection: boolean, timeline = false) {
@@ -539,25 +631,70 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
         {inCursor ? <Button variant="ghost" disabled={loading} onClick={() => void moreRelations('target')}>加载更多</Button> : null}
       </section> : null}
 
-      {pickerOpen ? <section className="space-y-3 rounded-2xl border border-stone-200 p-4">
+      {pickerOpen ? <section className="space-y-3 rounded-2xl border border-stone-200 p-4" aria-label="关联已有内容">
         <h3 className="font-semibold">从已有内容中添加</h3>
         <div className="grid gap-2 sm:grid-cols-[auto_1fr_auto]">
-          <select aria-label="关联记录类型" className="h-10 rounded-xl border border-stone-200 px-3 text-sm" value={selectedModel}
-            onChange={event => { setSelectedModel(event.target.value); setCandidates([]); setCandidateCursor(null); }}>
+          <select aria-label="关联记录类型" disabled={working} className="h-10 rounded-xl border border-stone-200 px-3 text-sm" value={selectedModel}
+            onChange={event => { setSelectedModel(event.target.value); clearCandidateResults(); }}>
             {models.map(item => <option key={item.key} value={item.key}>{item.title}</option>)}
           </select>
-          <input aria-label="搜索已有记录" className="h-10 min-w-0 rounded-xl border border-stone-200 px-3 text-sm"
-            placeholder="输入名称搜索" value={search} onChange={event => { setSearch(event.target.value); setCandidates([]); setCandidateCursor(null); }}
+          <input aria-label="搜索已有记录" disabled={working} className="h-10 min-w-0 rounded-xl border border-stone-200 px-3 text-sm"
+            placeholder="输入名称搜索" value={search} onChange={event => { setSearch(event.target.value); clearCandidateResults(); }}
             onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void searchCandidates(); } }} />
-          <Button variant="secondary" disabled={!search.trim() || candidateLoading} onClick={() => void searchCandidates()}><Search className="size-4" /> 搜索</Button>
+          <Button variant="secondary" disabled={!search.trim() || candidateLoading || working} onClick={() => void searchCandidates()}><Search className="size-4" /> 搜索</Button>
         </div>
-        {candidates.map(item => <div key={item.id} className="flex items-center justify-between gap-2 rounded-xl bg-stone-50 p-3">
-          <span className="min-w-0 truncate text-sm">{item.name || item.summary || item.title || '名称暂不可用'}</span>
-          <Button variant="secondary" disabled={working} onClick={() => void link(item)}>关联</Button>
-        </div>)}
-        {!candidates.length && !candidateLoading ? <p className="text-xs text-stone-500">输入关键词找到内容，加入这里只是建立关联，不会移动或复制原内容。</p> : null}
-        {candidateCursor ? <Button variant="ghost" disabled={candidateLoading} onClick={() => void searchCandidates(candidateCursor)}>加载更多搜索结果</Button> : null}
-        <Button variant="ghost" onClick={() => setPickerOpen(false)}>收起</Button>
+        {candidates.length ? <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-stone-500">搜索结果 {candidates.length} 条 · 勾选需要关联的内容</p>
+          <button type="button" disabled={working || !candidates.some(item => !isAlreadyLinked(selectedModel, item.id))}
+            className="text-xs font-medium text-emerald-700 disabled:text-stone-400" onClick={selectAllVisible}>全选已显示</button>
+        </div> : null}
+        <div className="max-h-72 space-y-2 overflow-y-auto overscroll-contain">
+          {candidates.map(item => {
+            const key = candidateKey(selectedModel, item.id);
+            const linked = isAlreadyLinked(selectedModel, item.id);
+            const selected = selectedCandidates.some(entry => candidateKey(entry.modelKey, entry.candidate.id) === key);
+            const date = candidateDateLabel(selectedModel, item, timezone);
+            return <label key={key} className={'flex items-center gap-3 rounded-xl p-3 ' +
+              (linked ? 'bg-stone-100 text-stone-400' : 'cursor-pointer bg-stone-50 hover:bg-emerald-50/70')}>
+              <input type="checkbox" checked={selected || linked} disabled={working || linked}
+                onChange={() => toggleCandidate(item)} aria-label={'选择' + modelName(selectedModel) + '：' + candidateTitle(item)}
+                className="size-4 shrink-0 accent-emerald-700" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{candidateTitle(item)}</span>
+                {date ? <span className="mt-0.5 block text-xs text-stone-500">{date}</span> : null}
+              </span>
+              {linked ? <span className="shrink-0 text-xs text-stone-500">已关联</span> : null}
+            </label>;
+          })}
+        </div>
+        {candidateLoading ? <p role="status" className="text-xs text-stone-500">正在搜索…</p> : null}
+        {!candidates.length && !candidateLoading ? <p className="text-xs text-stone-500">输入关键词找到内容。可以跨搜索词、跨类型多选；关联不会移动或复制原内容。</p> : null}
+        {candidateCursor ? <Button variant="ghost" disabled={candidateLoading || working} onClick={() => void searchCandidates(candidateCursor)}>加载更多搜索结果</Button> : null}
+        {selectedCandidates.length ? <div className="space-y-2 rounded-xl bg-emerald-50/60 p-3" aria-label="已选内容">
+          <p className="text-xs font-medium text-emerald-800">已选择 {selectedCandidates.length} 项</p>
+          <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+            {selectedCandidates.map(item => {
+              const key = candidateKey(item.modelKey, item.candidate.id);
+              const date = candidateDateLabel(item.modelKey, item.candidate, timezone);
+              return <button key={key} type="button" disabled={working} title="取消选择"
+                aria-label={'取消选择' + modelName(item.modelKey) + '：' + candidateTitle(item.candidate)}
+                onClick={() => setSelectedCandidates(list => list.filter(entry =>
+                  candidateKey(entry.modelKey, entry.candidate.id) !== key))}
+                className="flex max-w-full items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs text-stone-700 shadow-sm hover:bg-stone-100">
+                <span className="max-w-48 truncate">{modelName(item.modelKey)} · {candidateTitle(item.candidate)}{date ? ' · ' + date : ''}</span>
+                <X className="size-3 shrink-0" />
+              </button>;
+            })}
+          </div>
+        </div> : null}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-3">
+          <Button variant="ghost" disabled={working} onClick={() => { setPickerOpen(false); clearCandidateResults(); setSelectedCandidates([]); }}>取消</Button>
+          <div className="flex items-center gap-2">
+            {selectedCandidates.length ? <Button variant="ghost" disabled={working} onClick={() => setSelectedCandidates([])}>清空选择</Button> : null}
+            <Button variant="primary" disabled={!selectedCandidates.length || working}
+              onClick={() => void linkSelected()}>{working ? '关联中…' : '关联 ' + selectedCandidates.length + ' 项'}</Button>
+          </div>
+        </div>
       </section> : null}
 
       {taskOpen ? <form className="space-y-3 rounded-2xl border border-stone-200 p-4" onSubmit={event => void addTask(event)}>
