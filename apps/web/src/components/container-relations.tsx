@@ -499,7 +499,10 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
           <h3 className="text-sm font-semibold">重要日子</h3>
           {writable ? <Button variant="secondary" onClick={startCountdown}><CalendarClock className="size-4" /> 添加倒计时</Button> : null}
         </div>
-        {Object.entries(countdowns).filter(([, day]) => day.kind === 'countdown').map(([id, day]) => {
+        {Object.entries(countdowns).filter(([, day]) => day.kind === 'countdown')
+          .sort((left, right) => overviewOrder === 'asc'
+            ? left[1].anchorDate.localeCompare(right[1].anchorDate)
+            : right[1].anchorDate.localeCompare(left[1].anchorDate)).map(([id, day]) => {
           const days = daysUntil(day.anchorDate, timezone);
           return <div key={id} className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4">
             <div className="min-w-0"><p className="font-medium text-emerald-900">{day.name}</p>
