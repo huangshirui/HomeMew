@@ -382,7 +382,6 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             <button type="button" className="block max-w-full truncate text-left font-semibold text-stone-900 hover:text-emerald-700" onClick={() => openDetail(record)}>{record.name}</button>
-            {record.description ? <p className="truncate text-sm text-stone-500">{record.description}</p> : null}
             <p className="text-xs text-stone-500">{record.startDate || record.endDate ? `${record.startDate || '开始时间待定'} → ${record.endDate || '结束时间待定'}` : '日期待定'}
               {record.attendeePersonIds?.length ? ` · ${memberNames(record.attendeePersonIds, names)}` : ''}</p>
           </div>
