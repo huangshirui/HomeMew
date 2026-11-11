@@ -6,9 +6,9 @@ function payload(service, environment, contractVersion, schemaVersion) {
   return { data: { status: 'ok', service, environment, contractVersion, schemaVersion } };
 }
 
-test('release pins reviewed Identity 0.17 and Core 0.54', () => {
+test('release pins reviewed Identity 0.18 and Core 0.54', () => {
   assert.equal(LIFESPACE_RELEASE_BASELINE.core.contractVersion, '0.54.0');
-  assert.equal(LIFESPACE_RELEASE_BASELINE.identity.contractVersion, '0.17.0');
+  assert.equal(LIFESPACE_RELEASE_BASELINE.identity.contractVersion, '0.18.0');
   assert.equal(assertLifeSpaceStatus(payload('core', 'production', '0.53.0', 74), 'core', 'production').schemaVersion, 74);
 
   assert.equal(assertLifeSpaceStatus(payload('core', 'staging', '0.53.0', '74'), 'core', 'staging').schemaVersion, '74');
@@ -29,6 +29,7 @@ test('rejects partial upgrades, rejected Identity versions and unreviewed contra
     ['identity', '0.15.0', 13],
     ['identity', '0.16.0', 13],
     ['identity', '0.17.0', 13],
+    ['identity', '0.18.0', 14],
     ['core', '0.48.0', 52],
   ]) {
     assert.throws(() => assertLifeSpaceStatus(payload(service, 'production', version, schema), service, 'production'), /schema is behind/);
@@ -40,7 +41,7 @@ test('rejects partial upgrades, rejected Identity versions and unreviewed contra
     ['identity', '0.10.0', 11],
     ['identity', '0.13.0', 12],
     ['identity', '0.14.0', 13],
-    ['identity', '0.18.0', 14],
+    ['identity', '0.19.0', 15],
     ['identity', '0.12.0', 11],
   ]) {
     assert.throws(() => assertLifeSpaceStatus(payload(service, 'production', version, schema), service, 'production'), /contract mismatch/);
@@ -57,5 +58,13 @@ test('reviewed Identity 0.15-0.17 contracts require schema 14 in each matching e
       assert.equal(assertLifeSpaceStatus(payload('identity', environment, contractVersion, 14), 'identity', environment).schemaVersion, 14);
       assert.throws(() => assertLifeSpaceStatus(payload('identity', environment, contractVersion, 13), 'identity', environment), /schema is behind/);
     }
+  }
+});
+
+test('reviewed additive Identity 0.18 contract requires schema 15 in both environments', () => {
+  for (const environment of ['staging', 'production']) {
+    const current = assertLifeSpaceStatus(payload('identity', environment, '0.18.0', 15), 'identity', environment);
+    assert.equal(current.schemaVersion, 15);
+    assert.throws(() => assertLifeSpaceStatus(payload('identity', environment, '0.18.0', 14), 'identity', environment), /schema is behind/);
   }
 });
