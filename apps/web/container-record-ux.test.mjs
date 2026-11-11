@@ -69,6 +69,7 @@ test('Activity overview orders linked business dates with toggle and today divid
   assert.match(relations, /record\.anchorDate/);
   assert.match(relations, /dateInFamilyZone\(new Date\(\), timezone\)/);
   assert.match(relations, /left\.dateInfo\.sortKey\.localeCompare\(right\.dateInfo\.sortKey\)/);
+  assert.match(relations, /left\[1\]\.anchorDate\.localeCompare\(right\[1\]\.anchorDate\)/);
   assert.match(relations, /role="separator"/);
   assert.match(relations, /今天 · \{today\}/);
   assert.match(relations, /mode === 'page' && modelKey === 'activity' && tab === 'overview'/);
