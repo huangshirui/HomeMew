@@ -41,3 +41,14 @@ test('All new household modules share subtitle-free PageHeader', () => {
   assert.doesNotMatch(page, /spec\.description/);
   assert.match(page, /<PageHeader title=\{spec\.title\} mobileActions=/);
 });
+
+test('Activity list omits descriptions while retaining title, dates and participants', () => {
+  const start = page.indexOf(': modelKey === \'activity\' ? <div className="overflow-hidden');
+  const end = page.indexOf(' : <div className="grid gap-3 sm:grid-cols-2', start);
+  assert.ok(start >= 0 && end > start, 'activity list template found');
+  const activityRows = page.slice(start, end);
+  assert.match(activityRows, /openDetail\(record\)/);
+  assert.match(activityRows, /record\.startDate/);
+  assert.match(activityRows, /record\.attendeePersonIds/);
+  assert.doesNotMatch(activityRows, /record\.description/);
+});

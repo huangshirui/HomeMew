@@ -17,7 +17,7 @@ test('Linked records show hydrated title/summary instead of internal record ID',
   assert.match(relations, /outgoingDirection \? edge\.targetRecord : edge\.sourceRecord/);
   assert.match(relations, /\{title\}/);
   assert.doesNotMatch(relations, /\{title \|\| target\.recordId\}/);
-  assert.match(relations, /\$\{model\.route\}\/\$\{encodeURIComponent\(target\.recordId\)\}/);
+  assert.match(relations, /model\.route \+ '\/' \+ encodeURIComponent\(target\.recordId\)/);
 });
 
 test('Goal and Habit lifecycle operations are only in a separate menu with confirmation', () => {
@@ -45,4 +45,32 @@ test('candidate picker supports Wish title and does not expose raw IDs as labels
   assert.match(relations, /type Candidate = \{ id: string; name\?: string; summary\?: string; title\?: string \}/);
   assert.match(relations, /item\.name \|\| item\.summary \|\| item\.title \|\| '名称暂不可用'/);
   assert.match(relations, /const values = \[label, record\?\.name, record\?\.summary, record\?\.title/);
+});
+
+test('Activity detail description folds at three lines and expands into bounded scrolling', () => {
+  assert.match(relations, /function CollapsibleDescription/);
+  assert.match(relations, /element\.scrollHeight > 61/);
+  assert.match(relations, /max-h-\[60px\] overflow-hidden/);
+  assert.match(relations, /max-h-64 overflow-y-auto/);
+  assert.match(relations, /aria-expanded=\{expanded\}/);
+  assert.match(relations, /展开全文/);
+  assert.match(relations, /收起说明/);
+  assert.match(relations, /<CollapsibleDescription key=\{record\.id\}/);
+});
+
+test('Activity overview orders linked business dates with toggle and today divider', () => {
+  assert.match(relations, /type OverviewOrder = 'asc' \| 'desc'/);
+  assert.match(relations, /useState<OverviewOrder>\('asc'\)/);
+  assert.match(relations, /aria-label="概览时间顺序"/);
+  assert.match(relations, /<option value="asc">正序/);
+  assert.match(relations, /<option value="desc">倒序/);
+  assert.match(relations, /record\.when\?\.start/);
+  assert.match(relations, /record\.dueDate/);
+  assert.match(relations, /record\.anchorDate/);
+  assert.match(relations, /dateInFamilyZone\(new Date\(\), timezone\)/);
+  assert.match(relations, /left\.dateInfo\.sortKey\.localeCompare\(right\.dateInfo\.sortKey\)/);
+  assert.match(relations, /left\[1\]\.anchorDate\.localeCompare\(right\[1\]\.anchorDate\)/);
+  assert.match(relations, /role="separator"/);
+  assert.match(relations, /今天 · \{today\}/);
+  assert.match(relations, /mode === 'page' && modelKey === 'activity' && tab === 'overview'/);
 });

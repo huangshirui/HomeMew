@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Fragment, useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { ArrowUpRight, CalendarClock, CalendarDays, CheckSquare, Link2, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useHousehold } from './household-provider';
@@ -15,7 +15,12 @@ import { RecordLifecycleMenu, type LifecycleAction, type LifecycleStatus } from 
 
 type ContainerModel = 'activity' | 'goal' | 'habit';
 type EntityRef = { kind: 'record'; modelKey: string; recordId: string };
-type RelatedRecord = { name?: string | null; summary?: string | null; title?: string | null; displayName?: string | null };
+type RelatedRecord = {
+  name?: string | null; summary?: string | null; title?: string | null; displayName?: string | null;
+  dueDate?: string | null; anchorDate?: string | null; startDate?: string | null;
+  endDate?: string | null; targetDate?: string | null; month?: number; day?: number;
+  when?: { kind: 'date' | 'instant'; start: string; endExclusive: string };
+};
 type Relation = { id: string; source: EntityRef; target: EntityRef; sourceLabel?: string; targetLabel?: string;
   sourceRecord?: RelatedRecord; targetRecord?: RelatedRecord };
 
@@ -57,6 +62,74 @@ function daysUntil(anchorDate: string, timezone: string): number {
   return Math.round((anchor - today) / 86_400_000);
 }
 
+
+type TimelineDate = { date: string; sortKey: string };
+type OverviewOrder = 'asc' | 'desc';
+
+function dateInFamilyZone(instant: Date, timezone: string): TimelineDate {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(instant);
+  const value = (type: string) => parts.find(part => part.type === type)?.value ?? '00';
+  const date = value('year') + '-' + value('month') + '-' + value('day');
+  return { date, sortKey: date + 'T' + value('hour') + ':' + value('minute') + ':' + value('second') };
+}
+
+/** Use a linked record's business date, never the relation's creation timestamp. */
+function relatedTimelineDate(modelKey: string, record: RelatedRecord | undefined, timezone: string, today: string): TimelineDate | null {
+  if (!record) return null;
+  if (modelKey === 'anniversary' && record.month && record.day) {
+    // Annual recurrence: use the next valid occurrence, including leap days.
+    const month = record.month, day = record.day;
+    const thisYear = Number(today.slice(0, 4));
+    for (let year = thisYear; year < thisYear + 9; year += 1) {
+      const valid = new Date(Date.UTC(year, month - 1, day));
+      if (valid.getUTCMonth() !== month - 1 || valid.getUTCDate() !== day) continue;
+      const date = String(year).padStart(4, '0') + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+      if (date >= today) return { date, sortKey: date + 'T00:00:00' };
+    }
+    return null;
+  }
+  const raw = modelKey === 'event' ? record.when?.start
+    : modelKey === 'task' ? record.dueDate
+      : modelKey === 'day_record' ? record.anchorDate
+        : modelKey === 'activity' ? (record.startDate || record.endDate)
+          : modelKey === 'goal' ? (record.targetDate || record.startDate)
+            : null;
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { date: raw, sortKey: raw + 'T00:00:00' };
+  const instant = new Date(raw);
+  return Number.isNaN(instant.getTime()) ? null : dateInFamilyZone(instant, timezone);
+}
+
+function CollapsibleDescription({ description }: { description: string }) {
+  const id = useId();
+  const paragraph = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [canExpand, setCanExpand] = useState(false);
+  useEffect(() => {
+    setExpanded(false);
+    const element = paragraph.current;
+    if (!element) return;
+    const measure = () => setCanExpand(element.scrollHeight > 61);
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (element.parentElement) observer.observe(element.parentElement);
+    return () => observer.disconnect();
+  }, [description]);
+  return <div className="space-y-1.5">
+    <p className="text-xs font-medium text-stone-500">说明</p>
+    <p id={id} ref={paragraph} className={'whitespace-pre-wrap break-words text-sm leading-5 text-stone-600 ' +
+      (expanded ? 'max-h-64 overflow-y-auto overscroll-contain pr-2' : 'max-h-[60px] overflow-hidden')}>
+      {description}
+    </p>
+    {canExpand ? <button type="button" aria-controls={id} aria-expanded={expanded}
+      className="text-xs font-medium text-emerald-700 hover:text-emerald-800 hover:underline"
+      onClick={() => setExpanded(value => !value)}>{expanded ? '收起说明' : '展开全文'}</button> : null}
+  </div>;
+}
+
 export function ContainerRelations({ spaceId, modelKey, record, timezone, writable, participants, onEdit, onClose, mode = 'page', status, lifecycleBusy, onLifecycleAction }: {
   spaceId: string;
   modelKey: ContainerModel;
@@ -73,6 +146,7 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
 }) {
   const { members } = useHousehold();
   const [tab, setTab] = useState<'overview' | 'events' | 'tasks' | 'more'>('overview');
+  const [overviewOrder, setOverviewOrder] = useState<OverviewOrder>('asc');
   const [eventDraft, setEventDraft] = useState<EventDraft | null>(null);
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [outgoing, setOutgoing] = useState<Relation[]>([]);
@@ -314,31 +388,56 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
     setCandidates([]); setSearch(''); setCandidateCursor(null);
   }
 
-  function listing(edges: Relation[], outgoingDirection: boolean) {
+  function listing(edges: Relation[], outgoingDirection: boolean, timeline = false) {
+    const today = dateInFamilyZone(new Date(), timezone).date;
+    const entries = edges.map(edge => ({
+      edge,
+      dateInfo: timeline ? relatedTimelineDate(edge.target.modelKey, edge.targetRecord, timezone, today) : null,
+    }));
+    if (timeline) entries.sort((left, right) => {
+      if (!left.dateInfo) return right.dateInfo ? 1 : left.edge.id.localeCompare(right.edge.id);
+      if (!right.dateInfo) return -1;
+      const result = left.dateInfo.sortKey.localeCompare(right.dateInfo.sortKey);
+      return (overviewOrder === 'asc' ? result : -result) || left.edge.id.localeCompare(right.edge.id);
+    });
+    const markerAt = timeline ? entries.findIndex(item =>
+      !item.dateInfo || (overviewOrder === 'asc' ? item.dateInfo.date >= today : item.dateInfo.date <= today)) : -1;
+    const todayMarker = <div role="separator" aria-label={'今天 ' + today} className="flex items-center gap-3 py-2">
+      <span className="h-px min-w-0 flex-1 bg-emerald-300" />
+      <span className="shrink-0 text-xs font-semibold text-emerald-700">今天 · {today}</span>
+      <span className="h-px min-w-0 flex-1 bg-emerald-300" />
+    </div>;
     return <div className="space-y-2">
-      {edges.map(edge => {
+      {entries.map(({ edge, dateInfo }, index) => {
         const target = outgoingDirection ? edge.target : edge.source;
         const title = relatedRecordTitle(outgoingDirection ? edge.targetLabel : edge.sourceLabel,
           outgoingDirection ? edge.targetRecord : edge.sourceRecord, target.recordId);
         const model = models.find(item => item.key === target.modelKey);
         const destination = model && ['activity','goal','habit'].includes(target.modelKey)
-          ? `${model.route}/${encodeURIComponent(target.recordId)}`
+          ? model.route + '/' + encodeURIComponent(target.recordId)
           : model?.route;
-        return <div key={edge.id} className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2">
-          <Link2 className="size-4 shrink-0 text-stone-400" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-stone-800">{title}</div>
-            <div className="text-xs text-stone-500">{modelName(target.modelKey)}{!outgoingDirection ? ' · 此记录关联了当前容器' : ''}</div>
+        return <Fragment key={edge.id}>
+          {timeline && index === markerAt ? todayMarker : null}
+          <div className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2">
+            <Link2 className="size-4 shrink-0 text-stone-400" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium text-stone-800">{title}</div>
+              <div className="text-xs text-stone-500">{modelName(target.modelKey)}
+                {timeline ? (dateInfo ? ' · ' + dateInfo.date : ' · 未排期') : ''}
+                {!outgoingDirection ? ' · 此记录关联了当前容器' : ''}
+              </div>
+            </div>
+            {destination ? <a href={destination}
+              aria-label={['activity','goal','habit'].includes(target.modelKey) ? '查看' + title + '详情' : '前往' + model!.title + '列表'}
+              title={['activity','goal','habit'].includes(target.modelKey) ? '打开详情' : '查看所属列表'}
+              className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100"><ArrowUpRight className="size-4" /></a> : null}
+            {outgoingDirection && writable ? <button type="button" aria-label={'取消关联' + title}
+              disabled={working} onClick={() => void unlink(edge)} className="rounded-lg p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600">
+              <Trash2 className="size-4" /></button> : null}
           </div>
-          {destination ? <a href={destination}
-            aria-label={['activity','goal','habit'].includes(target.modelKey) ? `查看${title}详情` : `前往${model!.title}列表`}
-            title={['activity','goal','habit'].includes(target.modelKey) ? '打开详情' : '查看所属列表'}
-            className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100"><ArrowUpRight className="size-4" /></a> : null}
-          {outgoingDirection && writable ? <button type="button" aria-label={`取消关联${title}`}
-            disabled={working} onClick={() => void unlink(edge)} className="rounded-lg p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600">
-            <Trash2 className="size-4" /></button> : null}
-        </div>;
+        </Fragment>;
       })}
+      {timeline && markerAt === -1 ? todayMarker : null}
     </div>;
   }
 
@@ -375,7 +474,9 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
             disabled={lifecycleBusy} onAction={onLifecycleAction} onEdit={onEdit} /> : null}
         {mode === 'modal' ? <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose} disabled={working}><X className="size-4" /></Button> : null}
       </div>
-      {record.description ? <p className="whitespace-pre-wrap text-sm text-stone-600">{record.description}</p> : null}
+      {record.description ? (modelKey === 'activity'
+        ? <CollapsibleDescription key={record.id} description={record.description} />
+        : <p className="whitespace-pre-wrap text-sm text-stone-600">{record.description}</p>) : null}
       {mode === 'page' && writable ? <div className="flex flex-wrap gap-2 rounded-2xl bg-emerald-50/60 p-3">
         {modelKey === 'activity' ? <Button variant="secondary" onClick={startEvent}><CalendarDays className="size-4" /> 新建日程</Button> : null}
         <Button variant="secondary" onClick={startTask}><CheckSquare className="size-4" /> 新建待办</Button>
@@ -398,7 +499,10 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
           <h3 className="text-sm font-semibold">重要日子</h3>
           {writable ? <Button variant="secondary" onClick={startCountdown}><CalendarClock className="size-4" /> 添加倒计时</Button> : null}
         </div>
-        {Object.entries(countdowns).filter(([, day]) => day.kind === 'countdown').map(([id, day]) => {
+        {Object.entries(countdowns).filter(([, day]) => day.kind === 'countdown')
+          .sort((left, right) => overviewOrder === 'asc'
+            ? left[1].anchorDate.localeCompare(right[1].anchorDate)
+            : right[1].anchorDate.localeCompare(left[1].anchorDate)).map(([id, day]) => {
           const days = daysUntil(day.anchorDate, timezone);
           return <div key={id} className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4">
             <div className="min-w-0"><p className="font-medium text-emerald-900">{day.name}</p>
@@ -413,12 +517,19 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">{modelKey === 'activity' ? (tab === 'events' ? '活动日程' : tab === 'tasks' ? '活动待办' : '活动安排') : modelKey === 'goal' ? (tab === 'tasks' ? '行动计划' : '相关内容') : '相关内容'}</h3>
+          {mode === 'page' && modelKey === 'activity' && tab === 'overview' ? <label className="flex items-center gap-2 text-xs text-stone-500">
+            时间顺序
+            <select aria-label="概览时间顺序" value={overviewOrder} onChange={event => setOverviewOrder(event.target.value as OverviewOrder)}
+              className="h-8 rounded-lg border border-stone-200 bg-white px-2 text-xs text-stone-700">
+              <option value="asc">正序</option><option value="desc">倒序</option>
+            </select>
+          </label> : null}
           {writable && mode === 'modal' ? <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={startTask}><Plus className="size-4" /> 添加待办</Button>
             <Button variant="secondary" onClick={openPicker}><Link2 className="size-4" /> 添加已有内容</Button>
           </div> : null}</div>
         {loading && !outgoing.length ? <p className="text-sm text-stone-500">正在加载…</p> : null}
-        {!filteredEdges.length && !loading ? <p className="text-sm text-stone-500">{tab === 'events' ? '还没有关联日程，可以使用上面的“新建日程”。' : tab === 'tasks' ? '还没有关联待办，可以使用上面的“新建待办”。' : '还没有相关安排，从上面的快捷按钮开始添加吧。'}</p> : listing(filteredEdges, true)}
+        {!filteredEdges.length && !loading ? <p className="text-sm text-stone-500">{tab === 'events' ? '还没有关联日程，可以使用上面的“新建日程”。' : tab === 'tasks' ? '还没有关联待办，可以使用上面的“新建待办”。' : '还没有相关安排，从上面的快捷按钮开始添加吧。'}</p> : listing(filteredEdges, true, mode === 'page' && modelKey === 'activity' && tab === 'overview')}
         {outCursor ? <Button variant="ghost" disabled={loading} onClick={() => void moreRelations('source')}>加载更多关联</Button> : null}
       </section>
 
