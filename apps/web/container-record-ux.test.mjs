@@ -42,7 +42,7 @@ test('No extra model data writes or unbounded queries for relation titles', () =
   assert.match(relations, /limit: '50'/);
 });
 test('candidate picker supports Wish title and does not expose raw IDs as labels', () => {
-  assert.match(relations, /type Candidate = \{ id: string; name\?: string; summary\?: string; title\?: string \}/);
+  assert.match(relations, /type Candidate = RelatedRecord & \{ id: string \}/);
   assert.match(relations, /item\.name \|\| item\.summary \|\| item\.title \|\| '名称暂不可用'/);
   assert.match(relations, /const values = \[label, record\?\.name, record\?\.summary, record\?\.title/);
 });
@@ -73,4 +73,42 @@ test('Activity overview orders linked business dates with toggle and today divid
   assert.match(relations, /role="separator"/);
   assert.match(relations, /今天 · \{today\}/);
   assert.match(relations, /mode === 'page' && modelKey === 'activity' && tab === 'overview'/);
+});
+
+test('Existing relation picker retains cross-search and cross-model checkbox selection', () => {
+  assert.match(relations, /type SelectedCandidate = \{ modelKey: string; candidate: Candidate \}/);
+  assert.match(relations, /candidateKey = \(modelKey: string, recordId: string\)/);
+  assert.match(relations, /setSelectedCandidates\(list =>/);
+  assert.match(relations, /function toggleCandidate/);
+  assert.match(relations, /function selectAllVisible/);
+  assert.match(relations, /全选已显示/);
+  assert.match(relations, /已选择 \{selectedCandidates\.length\} 项/);
+  assert.match(relations, /关联 ' \+ selectedCandidates\.length \+ ' 项'/);
+  assert.match(relations, /checked=\{selected \|\| linked\}/);
+  assert.match(relations, /已关联/);
+  assert.match(relations, /setLinkedInPicker/);
+  assert.match(relations, /candidateRequest\.current \+= 1/);
+  assert.match(relations, /requestId !== candidateRequest\.current/);
+  assert.match(relations, /page: \{ limit: 30/);
+});
+
+test('Search result dates distinguish same-name events and tasks in family timezone', () => {
+  assert.match(relations, /function candidateDateLabel/);
+  assert.match(relations, /relatedTimelineDate\(modelKey, candidate, timezone, today\)/);
+  assert.match(relations, /candidate\.when\?\.kind === 'instant'/);
+  assert.match(relations, /date\.sortKey\.slice\(11, 16\)/);
+  assert.match(relations, /if \(modelKey === 'task'\) return '截止 ' \+ date\.date/);
+  assert.match(relations, /candidateDateLabel\(selectedModel, item, timezone\)/);
+  assert.match(relations, /\{date\}/);
+});
+
+test('Multiple links use bounded atomic native batch and preserve uncommitted items on error', () => {
+  assert.match(relations, /async function linkSelected/);
+  assert.match(relations, /offset \+= 20/);
+  assert.match(relations, /atomicConsistency: true/);
+  assert.match(relations, /operation: 'relation_create', predicate: 'relates_to'/);
+  assert.match(relations, /target: ref\(item\.modelKey, item\.candidate\.id\)/);
+  assert.match(relations, /catch \(cause\) \{ failure = cause; break; \}/);
+  assert.match(relations, /选择已保留，可重试/);
+  assert.doesNotMatch(relations, /async function link\(candidate: Candidate\)/);
 });
