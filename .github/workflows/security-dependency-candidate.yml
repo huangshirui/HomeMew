@@ -22,8 +22,10 @@ jobs:
       - name: Regenerate lockfile from active workspace
         run: |
           pnpm install --lockfile-only --no-frozen-lockfile
-          pnpm update source-map-js --depth Infinity --lockfile-only
           if grep -q '^  apps/core:' pnpm-lock.yaml; then echo 'Retired importer remains'; exit 1; fi
+      - name: Export generated lockfile for review
+        run: |
+          base64 -w 4000 pnpm-lock.yaml | sed 's/^/LOCK_CHUNK:/'
       - name: Audit all dependencies
         id: audit
         run: |
