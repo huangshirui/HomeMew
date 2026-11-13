@@ -3,16 +3,18 @@ import { fileURLToPath } from 'node:url';
 
 export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
   identity: Object.freeze({
-    contractVersion: '0.18.0',
+    contractVersion: '0.19.0',
     // 0.15/schema 14 introduced globally unique login mailboxes; 0.16 added
     // self-only Application inspection; 0.17 moved Bootstrap operations to
     // the separate Platform Admin OpenAPI without removing ordinary routes.
     // 0.18 adds an independent OAuth Authorization Server (schema 15) while
     // preserving existing trusted application/Access identity exchange routes.
+    // 0.19 adds optional private OAuth execution context without changing
+    // existing application/Access clients; the verified release uses schema 18.
     // Explicitly reviewed only: never accept unknown future versions by number.
-    compatibleContractVersions: Object.freeze(['0.15.0', '0.16.0', '0.17.0', '0.18.0']),
+    compatibleContractVersions: Object.freeze(['0.15.0', '0.16.0', '0.17.0', '0.18.0', '0.19.0']),
     minimumSchemaVersion: 14,
-    minimumSchemaByContract: Object.freeze({ '0.15.0': 14, '0.16.0': 14, '0.17.0': 14, '0.18.0': 15 }),
+    minimumSchemaByContract: Object.freeze({ '0.15.0': 14, '0.16.0': 14, '0.17.0': 14, '0.18.0': 15, '0.19.0': 18 }),
   }),
   core: Object.freeze({
     contractVersion: '0.54.0',
