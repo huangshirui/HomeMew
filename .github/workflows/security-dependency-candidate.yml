@@ -1,0 +1,43 @@
+name: Security dependency candidate (temporary)
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  candidate:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/security-dependency-cleanup'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Regenerate lockfile from active workspace
+        run: |
+          pnpm install --lockfile-only --no-frozen-lockfile
+          pnpm update source-map-js --depth Infinity --lockfile-only
+          if grep -q '^  apps/core:' pnpm-lock.yaml; then echo 'Retired importer remains'; exit 1; fi
+      - name: Audit all dependencies
+        id: audit
+        run: |
+          pnpm audit --json > security-audit.json
+      - name: Upload generated lockfile and audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-lock-candidate
+          path: |
+            pnpm-lock.yaml
+            security-audit.json
+          if-no-files-found: error
+      - name: Frozen install
+        run: pnpm install --frozen-lockfile
+      - name: Full repository checks
+        run: pnpm check
