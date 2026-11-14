@@ -20,14 +20,9 @@ test('Activity Goal Habit have deep-linked detail routes, not container dialogs'
   assert.match(page, /\.then\(record => \{ if \(!cancelled\) setContainerFor\(record\); \}\)/);
 });
 
-test('Current tab is initial Activity view, with date-aware bounded server query', () => {
-  assert.match(page, /useState<ActivityPeriod>\('current'\)/);
-  for(const label of ['当前','即将开始','已结束','全部']) assert.ok(page.includes(label));
-  assert.match(page, /period === 'current'/);
-  assert.match(page, /field: 'startDate', op: 'isNull'/);
-  assert.match(page, /field: 'startDate', op: 'lte'/);
-  assert.match(page, /field: 'endDate', op: 'isNull'/);
-  assert.match(page, /field: 'endDate', op: 'gte'/);
+test('Active is initial Activity view with bounded explicit lifecycle query', () => {
+  assert.match(page, /useState<ActivityStatus>\('active'\)/);
+  assert.match(page, /field: 'status', op: 'eq'/);
   assert.match(page, /sort: \[\{ field: 'createdAt', direction: 'desc' \}\]/);
   assert.match(page, /page: \{ limit: 40,/);
   assert.doesNotMatch(page, /activityStatus.*localStorage/);
