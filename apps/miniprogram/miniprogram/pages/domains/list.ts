@@ -2,7 +2,6 @@ import { currentFamilyStore, userStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { AutoRefreshGate } from '../../services/refresh-policy';
 import { listDomainPeople, listDomainRecords, DOMAIN_COPY, STATUS_COPY, type DomainKind, type DomainRecord, type DomainStatus, type PersonOption } from '../../services/domains';
-import { formatInstantInTimeZone } from '../../utils/index';
 import { listPersonalHabitPage } from '../../services/life-records';
 import { downloadRecordIconImage } from '../../services/record-icons';
 
@@ -10,10 +9,6 @@ type Kind = 'activities' | 'goals' | 'habits' | 'anniversaries';
 type Display = DomainRecord & { icon: string; iconImagePath: string; people: string; dates: string; statusLabel: string };
 const KINDS: Kind[] = ['activities','goals','habits','anniversaries'];
 const MODEL_KEYS={activities:'activity',goals:'goal',habits:'habit',anniversaries:'anniversary'} as const;
-function localToday(timezone: string): string {
-  try { return formatInstantInTimeZone(new Date().toISOString(),timezone || 'Asia/Shanghai').date; }
-  catch { return new Date().toISOString().slice(0,10); }
-}
 function formatted(record:DomainRecord,people:PersonOption[],kind:Kind):Display {
   const ids = record.attendeePersonIds || record.subjectPersonIds || record.personIds ||
     (record.subjectPersonId ? [record.subjectPersonId] : []);
@@ -28,7 +23,7 @@ Page({
   data:{
     kind:'activities' as Kind,title:'活动',familyId:'',loading:true,loadingMore:false,error:'',
     records:[] as Display[],nextCursor:null as string|null,noFamily:false,loadedOnce:false,
-    filters:[] as {key:string;label:string}[],filter:'current',searchOpen:false,search:'',appliedSearch:'',
+    filters:[] as {key:string;label:string}[],filter:'active',searchOpen:false,search:'',appliedSearch:'',
     people:[] as PersonOption[],personId:'',personOptions:[] as {id:string;label:string}[],selectedPersonIndex:0,
     mine:false,
   },
@@ -38,12 +33,12 @@ Page({
   onLoad(options:{kind?:string;mine?:string}):void {
     const kind=KINDS.includes(options.kind as Kind) ? options.kind as Kind : 'activities';
     const filters = kind==='activities' ? [
-      {key:'current',label:'当前'},{key:'upcoming',label:'即将开始'},{key:'past',label:'已结束'},{key:'all',label:'全部'}]
+      {key:'planned',label:'未开始'},{key:'active',label:'进行中'},{key:'completed',label:'已完成'},{key:'cancelled',label:'已取消'}]
       : kind==='anniversaries' ? [] : kind==='goals' ? [
         {key:'active',label:'进行中'},{key:'paused',label:'已暂停'},{key:'achieved',label:'已达成'},{key:'abandoned',label:'已放弃'}]
         : [{key:'active',label:'进行中'},{key:'paused',label:'已暂停'},{key:'ended',label:'已结束'}];
     const mine=kind==='habits'&&options.mine==='1';
-    this.setData({kind,mine,title:mine?'我的习惯':DOMAIN_COPY[kind].title,filters,filter:kind==='activities'?'current':'active'});
+    this.setData({kind,mine,title:mine?'我的习惯':DOMAIN_COPY[kind].title,filters,filter:'active'});
   },
   async onShow():Promise<void> {
     try { await ensureRuntimeReady(); } catch {}
@@ -68,10 +63,9 @@ Page({
     this.setData({loading:reset&&!this.data.loadedOnce,loadingMore:!reset,error:reset?'':this.data.error});
     try {
       const members=reset ? await listDomainPeople(familyId) : this.data.people;
-      const now=localToday(currentFamilyStore.value?.timezone||'Asia/Shanghai');
       const options={
         limit:40,cursor,q:this.data.appliedSearch,
-        ...(kind==='activities'?{period:this.data.filter as 'current',today:now,personId:this.data.personId}:
+        ...(kind==='activities'?{status:this.data.filter as DomainStatus,personId:this.data.personId}:
           kind==='goals'||kind==='habits'?{status:this.data.filter as DomainStatus}:{}),
       };
       const page=this.data.mine
