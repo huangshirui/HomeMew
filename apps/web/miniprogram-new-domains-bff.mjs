@@ -22,6 +22,8 @@ const KINDS = Object.freeze({
 });
 const TARGETS = new Set(['task','event','day_record','activity','goal','habit','anniversary','wish']);
 const ACTIONS = new Set(['pause','resume','achieve','abandon','end','reopen','check-in']);
+const ACTIVITY_ACTIONS = new Set(['start','complete','cancel','reopen','reset']);
+const ACTIVITY_STATUSES = new Set(['planned','active','completed','cancelled']);
 const PARAMS = new Set(['limit','cursor','q','status','period','today','personId','year','matchType','matchId','playerPersonId','representativeTeamId','opponentTeamId','competitionActivityId']);
 const safeDecode = (raw, pattern) => {
   try { const decoded = decodeURIComponent(raw); return decoded.length <= 200 && pattern.test(decoded) ? decoded : null; }
@@ -91,6 +93,10 @@ function queryOptions(url, kind) {
   const clauses = [];
   let sort = [{ field: 'createdAt', direction: 'desc' }];
   if (kind === 'activities') {
+    if (status && (!ACTIVITY_STATUSES.has(status) || period)) return null;
+    if (status) clauses.push(f('status','eq',status));
+    // Preserve the released Mini's explicit date cohort contract during review lag.
+    // New clients query the authoritative lifecycle state instead.
     if (period && !['current','upcoming','past','all'].includes(period)) return null;
     if (period && period !== 'all' && !DAY.test(today)) return null;
     if (period === 'current') clauses.push({ and: [
@@ -324,7 +330,8 @@ export async function handleMiniNewDomainBff(request, env) {
     return forward(request,env,path+'/check-ins?'+qs.toString());
   }
   if (action) {
-    if (!ACTIONS.has(action) || !['goals','habits'].includes(kind) || request.method !== 'POST' || url.search) return bad();
+    if (request.method !== 'POST' || url.search) return bad();
+    if (kind === 'activities' ? !ACTIVITY_ACTIONS.has(action) : !['goals','habits'].includes(kind) || !ACTIONS.has(action)) return bad();
     if (action === 'check-in' && kind !== 'habits') return bad();
     let body;
     try { body = await request.json(); } catch { return bad(); }
