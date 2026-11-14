@@ -50,7 +50,7 @@ const models = [
   { key: 'wish', title: '许愿池', route: '/wishes' },
 ] as const;
 const modelName = (key: string) => models.find(model => model.key === key)?.title ?? '其他内容';
-const statusText: Record<LifecycleStatus,string> = { active:'进行中', paused:'已暂停', achieved:'已达成', abandoned:'已放弃', ended:'已结束' };
+const statusText: Record<LifecycleStatus,string> = { planned:'未开始', completed:'已完成', cancelled:'已取消', active:'进行中', paused:'已暂停', achieved:'已达成', abandoned:'已放弃', ended:'已结束' };
 const core = (spaceId: string) => `/api/lifespace/core/v1/spaces/${encodeURIComponent(spaceId)}`;
 const ref = (modelKey: string, recordId: string): EntityRef => ({ kind: 'record', modelKey, recordId });
 const explain = (reason: unknown) => householdErrorMessage(reason, '操作失败，请稍后再试。');
@@ -561,9 +561,9 @@ export function ContainerRelations({ spaceId, modelKey, record, timezone, writab
           </div> : null}
         </div>
         {writable && onEdit && modelKey === 'activity' ? <Button variant="secondary" onClick={onEdit}><Pencil className="size-4" /> 编辑活动</Button> : null}
-        {writable && status && onLifecycleAction && modelKey !== 'activity' ?
+        {writable && status && onLifecycleAction ?
           <RecordLifecycleMenu model={modelKey} status={status} recordName={record.name}
-            disabled={lifecycleBusy} onAction={onLifecycleAction} onEdit={onEdit} /> : null}
+            disabled={lifecycleBusy} onAction={onLifecycleAction} onEdit={modelKey === 'activity' ? undefined : onEdit} /> : null}
         {mode === 'modal' ? <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose} disabled={working}><X className="size-4" /></Button> : null}
       </div>
       {record.description ? (modelKey === 'activity'
