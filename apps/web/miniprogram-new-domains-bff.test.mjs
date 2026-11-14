@@ -122,3 +122,52 @@ test('candidate query passes full model fields through to Mini without dropping 
   assert.equal(upstream[0].path, '/api/v1/spaces/spc_family/models/event/records/query');
   assert.equal(upstream[0].body.search.text, '足球');
 });
+
+const activityPath = '/api/v1/miniprogram/families/spc_family/domains/activities';
+async function activityRequest(suffix, method='GET', body) {
+  const calls=[];
+  const response=await handleMiniNewDomainBff(new Request('https://homemew.test'+activityPath+suffix,{
+    method,headers:{authorization:'Bearer user-token-1234567890','content-type':'application/json'},
+    ...(body===undefined?{}:{body:JSON.stringify(body)}),
+  }),{LIFESPACE_CORE:{async fetch(req){
+    calls.push({path:new URL(req.url).pathname,method:req.method,body:await req.json(),
+      token:req.headers.get('authorization')});
+    return Response.json({data:{items:[],nextCursor:null}});
+  }}});
+  return {response,calls};
+}
+test('Activity status is explicit and composable; released Mini period remains date-based', async()=>{
+  for(const status of ['planned','active','completed','cancelled']){
+    const {response,calls}=await activityRequest('?status='+status+'&personId=per_example&cursor=next');
+    assert.equal(response.status,200);
+    assert.equal(calls[0].path,'/api/v1/spaces/spc_family/models/activity/records/query');
+    assert.deepEqual(calls[0].body.filter,{and:[
+      {field:'status',op:'eq',value:status},{field:'attendeePersonIds',op:'contains',value:'per_example'},
+    ]});
+    assert.equal(calls[0].body.page.cursor,'next');
+  }
+  const legacy=await activityRequest('?period=current&today=2026-11-14');
+  assert.equal(legacy.response.status,200);
+  assert.equal(legacy.calls[0].body.filter.and[0].or[0].field,'startDate');
+  for(const suffix of ['?status=paused','?status=active&period=current&today=2026-11-14']){
+    const invalid=await activityRequest(suffix);assert.equal(invalid.response.status,400);assert.equal(invalid.calls.length,0);
+  }
+});
+test('Activity Action uses explicit product route, current bearer and version only', async()=>{
+  for(const action of ['start','complete','cancel','reopen','reset']){
+    const {response,calls}=await activityRequest('/rec_example/actions/'+action,'POST',{version:5});
+    assert.equal(response.status,200);
+    assert.deepEqual(calls,[{path:'/api/v1/spaces/spc_family/models/activity/records/rec_example/actions/'+action,
+      method:'POST',body:{version:5},token:'Bearer user-token-1234567890'}]);
+  }
+  for(const [suffix,method,body] of [
+    ['/rec_example/actions/pause','POST',{version:5}],
+    ['/rec_example/actions/complete','POST',{version:0}],
+    ['/rec_example/actions/complete','POST',{version:5,status:'completed'}],
+    ['/rec_example','PATCH',{version:5,status:'completed'}],
+    ['','POST',{name:'Activity',status:'planned'}],
+  ]){
+    const invalid=await activityRequest(suffix,method,body);
+    assert.equal(invalid.response.status,400);assert.equal(invalid.calls.length,0);
+  }
+});
