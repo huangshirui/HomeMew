@@ -10,7 +10,6 @@ export function homeLifeRows(
   records: DomainRecord[], kind: LifeKind, people: PersonOption[], personId: string,
 ): HomeLifeRow[] {
   return records.filter(record => {
-    if (kind === 'activities') return true;
     if (record.status !== 'active') return false;
     // 仅在指定了 personId（只看我的）时才按成员过滤；看全家时不限定成员
     if (kind === 'habits' && personId && record.subjectPersonId !== personId) return false;
