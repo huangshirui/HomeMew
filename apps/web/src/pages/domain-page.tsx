@@ -113,7 +113,7 @@ export function stepAnniversaryYear(value: string, step: -1 | 1, currentYear = n
   return value ? String(Math.max(1, Math.min(9999, Number(value) + step))) : String(currentYear);
 }
 function activityQuery(search: string, personId: string, status: ActivityStatus, cursor: string | null): CanonicalQuery {
-  const filters: CanonicalQueryFilter[] = [{field:'status', op:'eq', value:status}];
+  const filters: CanonicalQueryFilter[] = [{ field: 'status', op: 'eq', value: status }];
   if (personId) filters.push({ field: 'attendeePersonIds', op: 'contains', value: personId });
   return {
     ...(search ? { search: { text: search } } : {}),
