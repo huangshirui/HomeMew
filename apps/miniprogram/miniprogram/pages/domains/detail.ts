@@ -15,6 +15,12 @@ type RelationDisplay={id:string;title:string;category:string;modelKey:string;rec
 const TITLES:Record<string,string>={task:'待办',event:'日程',day_record:'日子',activity:'活动',goal:'目标',habit:'习惯',anniversary:'纪念日',wish:'愿望'};
 const MODEL_KEYS={activities:'activity',goals:'goal',habits:'habit'} as const;
 function actions(kind:Kind,status:DomainStatus):{key:string;title:string;danger:boolean}[]{
+  if(kind==='activities'){
+    if(status==='planned')return [{key:'start',title:'开始活动',danger:false},{key:'cancel',title:'取消活动',danger:true}];
+    if(status==='active')return [{key:'complete',title:'完成活动',danger:false},{key:'reset',title:'重置为未开始',danger:false},{key:'cancel',title:'取消活动',danger:true}];
+    if(status==='completed'||status==='cancelled')return [{key:'reopen',title:'重新开启',danger:false}];
+    return [];
+  }
   if(status==='active')return kind==='goals'?
     [{key:'pause',title:'暂停',danger:false},{key:'achieve',title:'标记为已达成',danger:false},{key:'abandon',title:'放弃目标',danger:true}]:
     [{key:'pause',title:'暂停',danger:false},{key:'end',title:'结束习惯',danger:true}];
@@ -83,7 +89,7 @@ Page({
         icon:iconText,iconImagePath:'',
         statusLabel:record.status?STATUS_COPY[record.status]:'',dateLabel,
         peopleLabel:ids.map(id=>people.find(p=>p.personId===id)?.displayName||'家庭成员').join('、'),
-        subjectOwner,canWrite,menuActions:kind==='activities'||!canWrite||!record.status?[]:actions(kind,record.status)});
+        subjectOwner,canWrite,menuActions:!canWrite||!record.status?[]:actions(kind,record.status)});
       if(icon?.type==='image'){
         const fileId=icon.fileId;
         void downloadRecordIconImage(familyId,MODEL_KEYS[kind],recordId,fileId)
@@ -121,7 +127,7 @@ Page({
     const record=this.data.record;if(!record||this.data.busy)return;
     this.setData({busy:true,error:''});
     try{
-      await performDomainAction(this.data.familyId,this.data.kind as 'goals'|'habits',record.id,action,record.version);
+      await performDomainAction(this.data.familyId,this.data.kind,record.id,action,record.version);
       markRefreshDirty('domains');
       await this.refresh();
       wx.showToast({title:action==='check-in'?'打卡成功':'操作成功',icon:'success'});
