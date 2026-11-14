@@ -111,14 +111,14 @@ test('stale pagination stops, and repeated cursors fail instead of looping forev
   assert.ok(calls < 5);
 });
 
-test('activities use the Space-local current window and sort dated endings first', async () => {
+test('activities query explicit active status and sort dated endings first', async () => {
   const s = service(async (_family, _kind, opts) => {
-    assert.equal(opts.period, 'current'); assert.equal(opts.today, '2026-10-26');
-    return { items: [{ id: 'open' }, { id: 'soon', endDate: '2026-10-27', attendeePersonIds: ['per_me'] }], nextCursor: null };
+    assert.equal(opts.status, 'active'); assert.equal(opts.period, undefined); assert.equal(opts.today, undefined);
+    return { items: [{ id: 'open', status: 'active' }, { id: 'finished', status: 'completed' }, { id: 'soon', status: 'active', endDate: '2026-10-27', attendeePersonIds: ['per_me'] }], nextCursor: null };
   });
   const rows = homeLifeRows(await s.listCurrentLifeRecords('spc_a', 'activities', 'per_me', '2026-10-26'),
     'activities', [{ personId: 'per_me', displayName: '本人' }], 'per_me');
-  assert.equal(rows[0].id, 'soon'); assert.equal(rows[0].relatedToMe, true); assert.equal(rows[0].peopleLabel, '本人');
+  assert.equal(rows.length, 2); assert.equal(rows[0].id, 'soon'); assert.equal(rows[0].relatedToMe, true); assert.equal(rows[0].peopleLabel, '本人');
 });
 
 test('goals exclude finished records, show three rows, and put dated goals before undated goals', () => {
