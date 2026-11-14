@@ -8,11 +8,10 @@ const title = readFileSync(new URL('./src/components/record-title-field.tsx', im
 test('Activity uses indexed createdAt ordering with bounded cursor pagination and server filters', () => {
   assert.match(page, /sort: \[\{ field: 'createdAt', direction: 'desc' \}\]/);
   assert.match(page, /page: \{ limit: 40,/);
-  assert.match(page, /activityQuery\(activitySearch, activityPerson, activityPeriod, currentFamily\.timezone, cursor\)/);
+  assert.match(page, /activityQuery\(activitySearch, activityPerson, activityStatus, cursor\)/);
   assert.match(page, /queryModelRecords<DomainRecord>\(currentFamily\.id, 'activity'/);
   assert.match(page, /field: 'attendeePersonIds', op: 'contains'/);
-  assert.match(page, /field: 'startDate', op: 'lte'/);
-  assert.match(page, /field: 'endDate', op: 'gte'/);
+  assert.match(page, /field: 'status', op: 'eq'/);
   assert.match(page, /requestGeneration\.current/);
   assert.match(page, /加载更多活动/);
 });

@@ -1,13 +1,32 @@
 import { useEffect, useRef } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 
-export type LifecycleModel = 'goal' | 'habit';
-export type LifecycleStatus = 'active' | 'paused' | 'achieved' | 'abandoned' | 'ended';
-export type LifecycleAction = 'pause' | 'resume' | 'achieve' | 'abandon' | 'end' | 'reopen';
+export type LifecycleModel = 'activity' | 'goal' | 'habit';
+export type ActivityStatus = 'planned' | 'active' | 'completed' | 'cancelled';
+export type LifecycleStatus = ActivityStatus | 'paused' | 'achieved' | 'abandoned' | 'ended';
+export type LifecycleAction = 'pause' | 'resume' | 'achieve' | 'abandon' | 'end' | 'reopen' | 'start' | 'complete' | 'cancel' | 'reset';
+
+export const ACTIVITY_STATUS_OPTIONS: {key:ActivityStatus;label:string}[] = [
+  {key:'planned',label:'未开始'},{key:'active',label:'进行中'},
+  {key:'completed',label:'已完成'},{key:'cancelled',label:'已取消'},
+];
+export function activityInitialAction(status: ActivityStatus): 'reset'|'complete'|'cancel'|null {
+  return status==='planned'?'reset':status==='completed'?'complete':status==='cancelled'?'cancel':null;
+}
 
 type MenuAction = { key: LifecycleAction; label: string; confirmation: string; danger?: boolean };
 
 export function lifecycleOptions(model: LifecycleModel, status: LifecycleStatus): MenuAction[] {
+  if (model === 'activity') {
+    const cancel: MenuAction = {key:'cancel',label:'取消活动',confirmation:'取消后保留活动及关联内容，仍可重新开启。',danger:true};
+    if(status==='planned') return [{key:'start',label:'开始活动',confirmation:'确认开始这项活动？'},cancel];
+    if(status==='active') return [
+      {key:'complete',label:'完成活动',confirmation:'确认这项活动已经完成？'},
+      {key:'reset',label:'重置为未开始',confirmation:'仅修改活动状态，不修改日期。'},cancel,
+    ];
+    if(status==='completed'||status==='cancelled') return [{key:'reopen',label:'重新开启',confirmation:'活动将恢复为进行中。'}];
+    return [];
+  }
   if (status === 'active') return [
     { key: 'pause', label: '暂停', confirmation: '暂停后可以随时恢复。' },
     ...(model === 'goal' ? [

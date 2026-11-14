@@ -22,7 +22,7 @@ test('read-only consumer smoke proves the pinned LifeSpace baseline and HomeMew 
       return jsonResponse({ data: { status: 'ok', service: 'identity', environment: 'production', contractVersion: '0.15.0', schemaVersion: 14 } });
     }
     if (target === 'https://core.example/api/v1/status') {
-      return jsonResponse({ data: { status: 'ok', service: 'core', environment: 'production', contractVersion: '0.53.0', schemaVersion: 74 } });
+      return jsonResponse({ data: { status: 'ok', service: 'core', environment: 'production', contractVersion: '0.54.0', schemaVersion: 79 } });
     }
     if (target === 'https://homemew.example/api/v1/miniprogram/families') {
       return jsonResponse({ data: { items: [{ id: 'spc_home', name: 'Home' }] } });
@@ -48,7 +48,7 @@ test('read-only consumer smoke proves the pinned LifeSpace baseline and HomeMew 
       fetcher: fakeFetch,
     });
     assert.deepEqual(result, {
-      baseline: { identity: '0.15.0', core: '0.53.0' },
+      baseline: { identity: '0.15.0', core: '0.54.0' },
       families: 1,
       familyId: 'spc_home',
       resources: { members: 1, events: 1, tasks: 1, dayRecords: 0, wishes: 0 },
@@ -67,7 +67,7 @@ test('read-only consumer smoke never requires a family when the user has none', 
       return jsonResponse({ data: { status: 'ok', service: 'identity', environment: 'production', contractVersion: '0.15.0', schemaVersion: 14 } });
     }
     if (target.includes('core.example')) {
-      return jsonResponse({ data: { status: 'ok', service: 'core', environment: 'production', contractVersion: '0.53.0', schemaVersion: 74 } });
+      return jsonResponse({ data: { status: 'ok', service: 'core', environment: 'production', contractVersion: '0.54.0', schemaVersion: 79 } });
     }
     return jsonResponse({ data: { items: [] } });
   };

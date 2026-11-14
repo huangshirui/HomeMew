@@ -4,7 +4,8 @@ import { productQuery } from './product-routes';
 import { candidateDisplayName, relationDisplayName } from '../utils/relation-display';
 
 export type DomainKind = 'activities' | 'goals' | 'habits' | 'anniversaries' | 'football-matches' | 'football-performances' | 'football-teams';
-export type DomainStatus = 'active' | 'paused' | 'achieved' | 'abandoned' | 'ended';
+export type ActivityStatus = 'planned' | 'active' | 'completed' | 'cancelled';
+export type DomainStatus = ActivityStatus | 'paused' | 'achieved' | 'abandoned' | 'ended';
 export type DomainIcon = { type: 'emoji'; value: string } | { type: 'image'; fileId: string };
 export type DomainRecord = {
   id: string; version: number; spaceId?: string; name?: string; summary?: string; title?: string;
@@ -45,7 +46,7 @@ export const updateDomainRecord = (familyId: string, kind: DomainKind, id: strin
   request<DomainRecord>(record(familyId,kind,id),{method:'PATCH',data,skipRetry:true});
 export const deleteDomainRecord = (familyId: string, kind: DomainKind, id: string, version: number) =>
   request<void>(record(familyId,kind,id),{method:'DELETE',data:{version},skipRetry:true});
-export const performDomainAction = (familyId: string, kind: 'goals'|'habits', id: string, action: string, version: number) =>
+export const performDomainAction = (familyId: string, kind: 'activities'|'goals'|'habits', id: string, action: string, version: number) =>
   request<DomainRecord>(record(familyId,kind,id)+'/actions/'+action,{method:'POST',data:{version},skipRetry:true});
 export const listDomainPeople = (familyId: string) => request<PersonOption[]>(root(familyId)+'/domain-people');
 export type DomainRelation = {
@@ -75,8 +76,15 @@ export const DOMAIN_COPY: Record<'activities'|'goals'|'habits'|'anniversaries',{
   habits: {title:'习惯',symbol:'◷'},anniversaries:{title:'纪念日',symbol:'◇'},
 };
 export const STATUS_COPY: Record<DomainStatus,string> = {
-  active:'进行中',paused:'已暂停',achieved:'已达成',abandoned:'已放弃',ended:'已结束',
+  planned:'未开始',completed:'已完成',cancelled:'已取消',active:'进行中',paused:'已暂停',achieved:'已达成',abandoned:'已放弃',ended:'已结束',
 };
+export const ACTIVITY_INITIAL_OPTIONS: {key:ActivityStatus;label:string}[] = [
+  {key:'active',label:'进行中'},{key:'planned',label:'未开始'},
+  {key:'completed',label:'已完成'},{key:'cancelled',label:'已取消'},
+];
+export function activityInitialAction(status: ActivityStatus): 'reset'|'complete'|'cancel'|null {
+  return status==='planned'?'reset':status==='completed'?'complete':status==='cancelled'?'cancel':null;
+}
 export function readableRelationTitle(edge: DomainRelation, direction: 'outgoing'|'incoming'): string {
   const obj = direction === 'outgoing' ? edge.targetRecord : edge.sourceRecord;
   const label = direction === 'outgoing' ? edge.targetLabel : edge.sourceLabel;

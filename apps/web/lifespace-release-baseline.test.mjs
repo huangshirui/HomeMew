@@ -6,32 +6,28 @@ function payload(service, environment, contractVersion, schemaVersion) {
   return { data: { status: 'ok', service, environment, contractVersion, schemaVersion } };
 }
 
-test('release pins reviewed Identity 0.19 and Core 0.54', () => {
+test('release pins reviewed Identity 0.19 and Activity Core schema 79', () => {
   assert.equal(LIFESPACE_RELEASE_BASELINE.core.contractVersion, '0.54.0');
   assert.equal(LIFESPACE_RELEASE_BASELINE.identity.contractVersion, '0.19.0');
-  assert.equal(assertLifeSpaceStatus(payload('core', 'production', '0.53.0', 74), 'core', 'production').schemaVersion, 74);
-
-  assert.equal(assertLifeSpaceStatus(payload('core', 'staging', '0.53.0', '74'), 'core', 'staging').schemaVersion, '74');
-  assert.equal(assertLifeSpaceStatus(payload('core', 'staging', '0.54.0', 76), 'core', 'staging').schemaVersion, 76);
-});
-
-test('allows reviewed older Core contract revisions with their schema floors', () => {
-  for (const contractVersion of ['0.48.0', '0.49.0']) {
-    assert.equal(assertLifeSpaceStatus(payload('core', 'staging', contractVersion, 53), 'core', 'staging').schemaVersion, 53);
-    assert.equal(assertLifeSpaceStatus(payload('core', 'staging', contractVersion, 54), 'core', 'staging').schemaVersion, 54);
+  for (const environment of ['staging', 'production']) {
+    for (const schema of [79, '79']) {
+      assert.equal(assertLifeSpaceStatus(payload('core', environment, '0.54.0', schema), 'core', environment).schemaVersion, schema);
+    }
+    for (const version of ['0.48.0', '0.49.0', '0.53.0']) {
+      assert.throws(() => assertLifeSpaceStatus(payload('core', environment, version, 79), 'core', environment), /contract mismatch/);
+    }
   }
 });
 
 test('rejects partial upgrades, rejected Identity versions and unreviewed contracts', () => {
   for (const [service, version, schema] of [
-    ['core', '0.53.0', 73],
+    ['core', '0.54.0', 78],
     ['core', '0.54.0', 75],
     ['identity', '0.15.0', 13],
     ['identity', '0.16.0', 13],
     ['identity', '0.17.0', 13],
     ['identity', '0.18.0', 14],
     ['identity', '0.19.0', 17],
-    ['core', '0.48.0', 52],
   ]) {
     assert.throws(() => assertLifeSpaceStatus(payload(service, 'production', version, schema), service, 'production'), /schema is behind/);
   }

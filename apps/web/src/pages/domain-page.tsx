@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useNavigate, useParams } from 'react-router-dom';
 import { CalendarDays, Check, Clock3, Gift, Minus, Plus, RefreshCw, Search, SlidersHorizontal, Target, Trash2, X } from 'lucide-react';
 import { RecordTitleField } from '../components/record-title-field';
-import { RecordLifecycleMenu } from '../components/record-lifecycle-menu';
+import { RecordLifecycleMenu, ACTIVITY_STATUS_OPTIONS, activityInitialAction, type ActivityStatus, type LifecycleStatus } from '../components/record-lifecycle-menu';
 import { useHousehold } from '../components/household-provider';
 import { ContainerRelations } from '../components/container-relations';
 import { RecordIconMark, emptyIconDraft, iconDraftFor, presentationToSave, type IconModel, type RecordIcon, type RecordIconDraft } from '../components/record-icon';
@@ -16,8 +16,7 @@ import { householdErrorMessage } from '../lib/user-facing-error';
 import { queryModelRecords, type CanonicalQuery, type CanonicalQueryFilter, type CanonicalQueryPage } from '../lib/canonical-query';
 
 type ModelKey = 'activity' | 'goal' | 'anniversary' | 'habit';
-type Status = 'active' | 'paused' | 'achieved' | 'abandoned' | 'ended';
-type ActivityPeriod = 'current' | 'upcoming' | 'past' | 'all';
+type Status = LifecycleStatus;
 type DomainRecord = {
   id: string; spaceId: string; version: number; name: string; description?: string | null; createdAt?: string;
   presentation?: { icon?: RecordIcon | null }; status?: Status;
@@ -29,7 +28,7 @@ type DomainRecord = {
   computed?: { checkIn?: { today: string; streakDays: number; checkedInToday: boolean } };
 };
 type Draft = {
-  name: string; description: string; icon: RecordIconDraft;
+  name: string; description: string; icon: RecordIconDraft; initialStatus: ActivityStatus;
   personIds: string[]; subjectPersonId: string; intervalDays: number;
   startDate: string; endDate: string; targetDate: string;
   month: string; day: string; year: string;
@@ -42,17 +41,17 @@ const settings = {
   habit: { title: '习惯', icon: Clock3, people: '习惯所属人' },
 } as const;
 const statusText: Record<Status, string> = {
-  active: '进行中', paused: '已暂停', achieved: '已达成', abandoned: '已放弃', ended: '已结束',
+  planned: '未开始', completed: '已完成', cancelled: '已取消', active: '进行中', paused: '已暂停', achieved: '已达成', abandoned: '已放弃', ended: '已结束',
 };
 const inputClass = 'h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100';
 const field = 'space-y-1.5 text-sm font-medium text-stone-700';
 const blank = (): Draft => ({
-  name: '', description: '', icon: emptyIconDraft(), personIds: [], subjectPersonId: '',
+  name: '', description: '', icon: emptyIconDraft(), initialStatus: 'active', personIds: [], subjectPersonId: '',
   intervalDays: 1, startDate: '', endDate: '', targetDate: '', month: '', day: '', year: '',
 });
 function draftFor(record: DomainRecord, key: ModelKey): Draft {
   return {
-    name: record.name, description: record.description ?? '', icon: iconDraftFor(record.presentation?.icon),
+    name: record.name, description: record.description ?? '', icon: iconDraftFor(record.presentation?.icon), initialStatus: 'active',
     personIds: key === 'activity' ? record.attendeePersonIds ?? [] : key === 'goal' ? record.subjectPersonIds ?? [] : record.personIds ?? [],
     subjectPersonId: record.subjectPersonId ?? '', intervalDays: record.intervalDays ?? 1,
     startDate: record.startDate ?? '', endDate: record.endDate ?? '', targetDate: record.targetDate ?? '',
@@ -109,27 +108,13 @@ async function loadRecords(spaceId: string, key: ModelKey, statusFilter: Status)
   }
   throw new Error('记录数量超过当前页面的安全加载上限，请缩小范围或联系管理员');
 }
-function todayInZone(timezone: string): string {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
-  const part = (type: string) => parts.find(item => item.type === type)?.value ?? '';
-  return `${part('year')}-${part('month')}-${part('day')}`;
-}
 export function stepAnniversaryYear(value: string, step: -1 | 1, currentYear = new Date().getFullYear()): string {
   // A blank optional year must start at the current year, not at 1.
   return value ? String(Math.max(1, Math.min(9999, Number(value) + step))) : String(currentYear);
 }
-function activityQuery(search: string, personId: string, period: ActivityPeriod, timezone: string, cursor: string | null): CanonicalQuery {
-  const filters: CanonicalQueryFilter[] = [];
-  const today = todayInZone(timezone);
+function activityQuery(search: string, personId: string, status: ActivityStatus, cursor: string | null): CanonicalQuery {
+  const filters: CanonicalQueryFilter[] = [{ field: 'status', op: 'eq', value: status }];
   if (personId) filters.push({ field: 'attendeePersonIds', op: 'contains', value: personId });
-  if (period === 'upcoming') filters.push({ field: 'startDate', op: 'gt', value: today });
-  if (period === 'past') filters.push({ field: 'endDate', op: 'lt', value: today });
-  if (period === 'current') filters.push({
-    and: [
-      { or: [{ field: 'startDate', op: 'isNull' }, { field: 'startDate', op: 'lte', value: today }] },
-      { or: [{ field: 'endDate', op: 'isNull' }, { field: 'endDate', op: 'gte', value: today }] },
-    ],
-  });
   return {
     ...(search ? { search: { text: search } } : {}),
     ...(filters.length ? { filter: filters.length === 1 ? filters[0] : { and: filters } } : {}),
@@ -156,7 +141,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const [activitySearchInput, setActivitySearchInput] = useState('');
   const [activitySearch, setActivitySearch] = useState('');
   const [activityPerson, setActivityPerson] = useState('');
-  const [activityPeriod, setActivityPeriod] = useState<ActivityPeriod>('current');
+  const [activityStatus, setActivityStatus] = useState<ActivityStatus>('active');
   const [activityCursor, setActivityCursor] = useState<string | null>(null);
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const [editing, setEditing] = useState<DomainRecord | null>(null);
@@ -180,7 +165,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
   const listPath = modelKey === 'activity' ? '/activities' : modelKey === 'goal' ? '/goals' : modelKey === 'habit' ? '/habits' : '/anniversaries';
   const openDetail = (record: DomainRecord) => navigate(`${listPath}/${encodeURIComponent(record.id)}`);
   const visible = records; // Goal/Habit status filtering is performed by the indexed LifeSpace query.
-  const activityFiltersActive = Boolean(activitySearchInput.trim() || activityPerson || activityPeriod !== 'current');
+  const activityFiltersActive = Boolean(activitySearchInput.trim() || activityPerson || activityStatus !== 'active');
   useEffect(() => {
     const timer = window.setTimeout(() => setActivitySearch(activitySearchInput.trim()), 320);
     return () => window.clearTimeout(timer);
@@ -192,7 +177,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     setLoading(true); setRecords([]); setActivityCursor(null); setError('');
     try {
       if (modelKey === 'activity') {
-        const result = await queryModelRecords<DomainRecord>(currentFamily.id, 'activity', activityQuery(activitySearch, activityPerson, activityPeriod, currentFamily.timezone, null));
+        const result = await queryModelRecords<DomainRecord>(currentFamily.id, 'activity', activityQuery(activitySearch, activityPerson, activityStatus, null));
         if (generation === requestGeneration.current) { setRecords(result.items); setActivityCursor(result.nextCursor); }
       } else {
         const next = await loadRecords(currentFamily.id, modelKey, statusFilter);
@@ -203,21 +188,21 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
     } finally {
       if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [currentFamily?.id, currentFamily?.timezone, modelKey, statusFilter, activitySearch, activityPerson, activityPeriod, detailMode]);
+  }, [currentFamily?.id, currentFamily?.timezone, modelKey, statusFilter, activitySearch, activityPerson, activityStatus, detailMode]);
   const moreActivities = useCallback(async () => {
     if (!currentFamily || modelKey !== 'activity' || !activityCursor || loading || activityLoadingMore) return;
     const generation = requestGeneration.current;
     const cursor = activityCursor;
     setActivityLoadingMore(true); setError('');
     try {
-      const next: CanonicalQueryPage<DomainRecord> = await queryModelRecords<DomainRecord>(currentFamily.id, 'activity', activityQuery(activitySearch, activityPerson, activityPeriod, currentFamily.timezone, cursor));
+      const next: CanonicalQueryPage<DomainRecord> = await queryModelRecords<DomainRecord>(currentFamily.id, 'activity', activityQuery(activitySearch, activityPerson, activityStatus, cursor));
       if (generation === requestGeneration.current) {
         setRecords(previous => [...previous, ...next.items.filter(item => !previous.some(existing => existing.id === item.id))]);
         setActivityCursor(next.nextCursor);
       }
     } catch (cause) { if (generation === requestGeneration.current) setError(message(cause)); }
     finally { setActivityLoadingMore(false); }
-  }, [currentFamily?.id, currentFamily?.timezone, modelKey, activityCursor, loading, activityLoadingMore, activitySearch, activityPerson, activityPeriod]);
+  }, [currentFamily?.id, currentFamily?.timezone, modelKey, activityCursor, loading, activityLoadingMore, activitySearch, activityPerson, activityStatus]);
   useEffect(() => { void refresh; void reload(); return () => { requestGeneration.current += 1; }; }, [reload, refresh]);
   useEffect(() => {
     if (!detailMode || !recordId || !currentFamily) { setContainerFor(null); setDetailLoading(false); return; }
@@ -229,7 +214,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
       .finally(() => { if (!cancelled) setDetailLoading(false); });
     return () => { cancelled = true; };
   }, [currentFamily?.id, recordId, modelKey, detailMode, refresh]);
-  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setHistoryInlineOpen(false); setContainerFor(null); setStatusFilter('active'); setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('current'); setActivityFilterOpen(false); }, [currentFamily?.id, modelKey]);
+  useEffect(() => { setEditing(null); setDraft(null); setHistoryFor(null); setHistoryInlineOpen(false); setContainerFor(null); setStatusFilter('active'); setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityStatus('active'); setActivityFilterOpen(false); }, [currentFamily?.id, modelKey]);
 
   function newRecord() {
     const next = blank();
@@ -256,6 +241,19 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
         body: JSON.stringify({ ...value, ...presentation, ...(editing ? { version: editing.version } : {}) }),
       });
       setDraft(null); setEditing(null);
+      if (wasCreating && modelKey === 'activity' && saved?.id) {
+        const initial = activityInitialAction(draft.initialStatus);
+        if(initial) {
+          try {
+            await apiRequest(`${url(currentFamily.id, modelKey, saved.id)}/actions/${initial}`, {
+              method:'POST', body: JSON.stringify({version:saved.version}),
+            });
+          } catch {
+            // The record has already been created. Do not retry creation.
+            window.alert('活动已创建，但初始状态设置未确认，请在详情中检查并调整。');
+          }
+        }
+      }
       setRefresh(v => v + 1);
       if (wasCreating && modelKey !== 'anniversary' && saved?.id) navigate(`${listPath}/${encodeURIComponent(saved.id)}`);
     } catch (cause) { setError(message(cause)); }
@@ -308,9 +306,9 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
       {canCreate ? <Button variant="primary" onClick={newRecord}><Plus className="size-4" /> 新建{spec.title}</Button> : null}
     </PageHeader> : null}
     {!detailMode && modelKey === 'activity' ? <div className="flex flex-wrap gap-2">
-      {([['current','当前'], ['upcoming','即将开始'], ['past','已结束'], ['all','全部']] as const).map(([key,label]) =>
-        <button key={key} type="button" aria-pressed={activityPeriod === key} onClick={() => setActivityPeriod(key)}
-          className={`rounded-xl px-4 py-2 text-sm font-medium ${activityPeriod === key ? 'bg-emerald-700 text-white' : 'bg-white text-stone-600 ring-1 ring-stone-200'}`}>
+      {ACTIVITY_STATUS_OPTIONS.map(({key,label}) =>
+        <button key={key} type="button" aria-pressed={activityStatus === key} onClick={() => setActivityStatus(key)}
+          className={`rounded-xl px-4 py-2 text-sm font-medium ${activityStatus === key ? 'bg-emerald-700 text-white' : 'bg-white text-stone-600 ring-1 ring-stone-200'}`}>
           {label}
         </button>)}
     </div> : null}
@@ -326,7 +324,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
         </select>
       </label>
       <p className="text-xs text-stone-500 sm:self-end">“当前”包含尚未排期、或日期范围覆盖今天的活动；需要明确结束时可切换“已结束”查看历史。</p>
-      {activityFiltersActive ? <button type="button" className="w-fit text-xs text-emerald-700 hover:underline" onClick={() => { setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityPeriod('current'); }}>清除筛选</button> : null}
+      {activityFiltersActive ? <button type="button" className="w-fit text-xs text-emerald-700 hover:underline" onClick={() => { setActivitySearchInput(''); setActivitySearch(''); setActivityPerson(''); setActivityStatus('active'); }}>清除筛选</button> : null}
     </div> : null}
     {!detailMode && (modelKey === 'goal' || modelKey === 'habit') ? <div className="flex flex-wrap items-center gap-2">
       {(['active','paused',...(modelKey === 'goal' ? ['achieved','abandoned'] : ['ended'])] as Status[]).map(key =>
@@ -344,7 +342,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
         <ContainerRelations key={`${currentFamily.id}:${modelKey}:${containerFor.id}`}
           spaceId={currentFamily.id} modelKey={modelKey as 'activity'|'goal'|'habit'} record={containerFor} timezone={currentFamily.timezone}
           writable={canManage(containerFor)} participants={memberNames(containerFor.attendeePersonIds ?? containerFor.subjectPersonIds ?? (containerFor.subjectPersonId ? [containerFor.subjectPersonId] : []), names)}
-          onEdit={() => edit(containerFor)} mode="page" status={modelKey === 'activity' ? undefined : containerFor.status}
+          onEdit={() => edit(containerFor)} mode="page" status={containerFor.status}
           lifecycleBusy={busy} onLifecycleAction={key => void action(containerFor,key)} />
         {modelKey === 'habit' && <div className="rounded-2xl border border-stone-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -382,6 +380,7 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             <button type="button" className="block max-w-full truncate text-left font-semibold text-stone-900 hover:text-emerald-700" onClick={() => openDetail(record)}>{record.name}</button>
+            {record.status ? <span className="text-xs text-stone-600">{statusText[record.status]}</span> : null}
             <p className="text-xs text-stone-500">{record.startDate || record.endDate ? `${record.startDate || '开始时间待定'} → ${record.endDate || '结束时间待定'}` : '日期待定'}
               {record.attendeePersonIds?.length ? ` · ${memberNames(record.attendeePersonIds, names)}` : ''}</p>
           </div>
@@ -442,6 +441,10 @@ export function DomainPage({ modelKey }: { modelKey: ModelKey }) {
         </RecordTitleField>
         <label className={`${field} block`}>说明<textarea value={draft.description} maxLength={5000} onChange={e => setDraft({ ...draft, description: e.target.value })}
           className="min-h-20 w-full rounded-xl border border-stone-200 p-3 text-sm" /></label>
+        {modelKey === 'activity' && !editing ? <label className={`${field} block`}>初始状态
+          <select className={inputClass} value={draft.initialStatus} onChange={e => setDraft({...draft, initialStatus:e.target.value as ActivityStatus})}>
+            {ACTIVITY_STATUS_OPTIONS.map(({key,label}) => <option key={key} value={key}>{label}</option>)}
+          </select></label> : null}
         {modelKey === 'habit' ? <>
           <label className={`${field} block`}>习惯所属人 *<select className={inputClass} required disabled={Boolean(editing)} value={draft.subjectPersonId}
             onChange={e => setDraft({ ...draft, subjectPersonId: e.target.value })}>

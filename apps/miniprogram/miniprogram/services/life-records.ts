@@ -24,16 +24,14 @@ export async function listPersonalHabitPage(
 
 /** Only active/current records; bounded requests through existing product routes, no local persistence. */
 export async function listCurrentLifeRecords(
-  familyId: string, kind: LifeKind, personId: string, today: string,
+  familyId: string, kind: LifeKind, personId: string, _today: string,
   isCurrent: () => boolean = () => true,
 ): Promise<DomainRecord[]> {
   const records: DomainRecord[] = [];
   let cursor: string | undefined;
   const visited = new Set<string>();
   do {
-    const options: DomainListOptions = kind === 'activities'
-      ? { period: 'current', today, limit: 100, cursor, ...(personId ? { personId } : {}) }
-      : { status: 'active', limit: 100, cursor, ...(personId ? { personId } : {}) };
+    const options: DomainListOptions = { status: 'active', limit: 100, cursor, ...(personId ? { personId } : {}) };
     const page = kind === 'habits'
       ? (personId
           ? await listPersonalHabitPage(familyId, personId, options, isCurrent)

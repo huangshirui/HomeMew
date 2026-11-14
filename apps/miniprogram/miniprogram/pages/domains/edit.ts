@@ -1,7 +1,7 @@
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { markRefreshDirty } from '../../services/refresh-policy';
 import { currentFamilyStore } from '../../stores/index';
-import { getDomainRecord,createDomainRecord,updateDomainRecord,deleteDomainRecord,listDomainPeople,DOMAIN_COPY,type DomainKind,type DomainRecord,type PersonOption } from '../../services/domains';
+import { getDomainRecord,createDomainRecord,updateDomainRecord,deleteDomainRecord,listDomainPeople,performDomainAction,ACTIVITY_INITIAL_OPTIONS,activityInitialAction,DOMAIN_COPY,type DomainKind,type DomainRecord,type PersonOption } from '../../services/domains';
 import { originalIconState,prepareRecordIcon,pickerChangeState,type RecordIconPickerChange } from '../../utils/record-icon-edit';
 import { downloadRecordIconImage } from '../../services/record-icons';
 import { shiftDateEndWithStart } from '../../utils/event-time-shift';
@@ -23,6 +23,7 @@ Page({
     startDate:'',endDate:'',targetDate:'',month:'',day:'',year:'',
     personIds:[] as string[],personOptions:[] as (PersonOption&{selected:boolean})[],
     subjectPersonId:'',selectedPersonIndex:0,intervalDays:'1',
+    initialStatusOptions:ACTIVITY_INITIAL_OPTIONS,initialStatusIndex:0,
   },
   async onLoad(opts:{kind?:string;familyId?:string;id?:string}):Promise<void>{
     const kind=KINDS.includes(opts.kind as Kind)?opts.kind as Kind:'activities';
@@ -75,6 +76,10 @@ Page({
     const index=Number(e.detail.value),person=this.data.personOptions[index];
     if(person)this.setData({subjectPersonId:person.personId,selectedPersonIndex:index});
   },
+  onInitialStatusChange(e:WechatMiniprogram.PickerChange):void{
+    const index=Number(e.detail.value);
+    if(!this.data.recordId&&ACTIVITY_INITIAL_OPTIONS[index])this.setData({initialStatusIndex:index});
+  },
   onRecordIconChange(e:WechatMiniprogram.CustomEvent<RecordIconPickerChange>):void{this.setData(pickerChangeState(e.detail));},
   async onSubmit():Promise<void>{
     if(this.data.submitting)return;
@@ -105,6 +110,22 @@ Page({
       else{
         const record=await createDomainRecord(d.familyId,kind,fields);
         markRefreshDirty('domains');
+        if(kind==='activities'){
+          const initial=activityInitialAction(ACTIVITY_INITIAL_OPTIONS[d.initialStatusIndex].key);
+          if(initial){
+            // Create is already committed; never replay it if the Action fails.
+            this.setData({recordId:record.id,version:record.version});
+            try{
+              const result=await performDomainAction(d.familyId,kind,record.id,initial,record.version);
+              this.setData({version:result.version});
+            }catch(e){
+              const detail='/pages/domains/detail?kind='+kind+'&familyId='+d.familyId+'&id='+encodeURIComponent(record.id);
+              wx.showModal({title:'活动已创建',content:'初始状态设置未确认，请在详情中检查并调整。',showCancel:false,
+                complete:()=>wx.redirectTo({url:detail})});
+              return;
+            }
+          }
+        }
         wx.showToast({title:'创建成功',icon:'success'});
         if(kind!=='anniversaries'&&record.id){
           wx.redirectTo({url:'/pages/domains/detail?kind='+kind+'&familyId='+d.familyId+'&id='+encodeURIComponent(record.id)});

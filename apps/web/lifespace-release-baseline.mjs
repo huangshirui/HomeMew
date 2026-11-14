@@ -18,12 +18,10 @@ export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
   }),
   core: Object.freeze({
     contractVersion: '0.54.0',
-    // 0.54 adds a scoped Person Directory Grant on top of the deployed 0.53/schema 76.
-    // Explicitly reviewed contracts; never accept an unknown
-    // future Kernel version as compatible merely because its number is higher.
-    compatibleContractVersions: Object.freeze(['0.48.0', '0.49.0', '0.53.0', '0.54.0']),
-    minimumSchemaVersion: 53,
-    minimumSchemaByContract: Object.freeze({ '0.48.0': 53, '0.49.0': 53, '0.53.0': 74, '0.54.0': 76 }),
+    // Activity lifecycle requires the explicit status and Actions in schema 79.
+    compatibleContractVersions: Object.freeze(['0.54.0']),
+    minimumSchemaVersion: 79,
+    minimumSchemaByContract: Object.freeze({ '0.54.0': 79 }),
   }),
 });
 

@@ -11,7 +11,7 @@ function editor(path:string){
  const datetime=runInNewContext(executable('utils/datetime.ts')+';({getWallTimeCandidates,formatInstantInTimeZone,addDaysToDateOnly})');
  let page:any;
  runInNewContext(executable('pages/'+path+'/edit.ts'),{
-  ...datetime,timeZoneLabel:(zone:string)=>zone,shiftEndWithStart,shiftDateEndWithStart,Page:(p:any)=>{page=p;},
+  ...datetime,...runInNewContext(executable('services/domains.ts')+';({ACTIVITY_INITIAL_OPTIONS,activityInitialAction})', {request:()=>{throw new Error('unexpected request');},candidateDisplayName:()=>'',relationDisplayName:()=>''}),timeZoneLabel:(zone:string)=>zone,shiftEndWithStart,shiftDateEndWithStart,Page:(p:any)=>{page=p;},
  });
  page.setData=(patch:any)=>Object.assign(page.data,patch);
  return page;
