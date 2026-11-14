@@ -15,6 +15,9 @@
       <textarea class="description-input" value="{{description}}" maxlength="3000" placeholder="补充说明或计划…" data-name="description" bindinput="onFieldInput" auto-height />
     </view>
     <view class="card">
+      <picker wx:if="{{kind==='activities'&&!recordId}}" mode="selector" range="{{initialStatusOptions}}" range-key="label" value="{{initialStatusIndex}}" bindchange="onInitialStatusChange">
+        <view class="field-row">初始状态 <text>{{initialStatusOptions[initialStatusIndex].label}} ›</text></view>
+      </picker>
       <block wx:if="{{kind==='activities'||kind==='goals'}}">
         <picker mode="date" value="{{startDate}}" data-name="startDate" bindchange="onDateChange"><view class="field-row">开始日期 <text>{{startDate||'未设置'}} ›</text></view></picker>
         <picker wx:if="{{kind==='activities'}}" mode="date" value="{{endDate}}" data-name="endDate" bindchange="onDateChange"><view class="field-row">结束日期 <text>{{endDate||'未设置'}} ›</text></view></picker>
