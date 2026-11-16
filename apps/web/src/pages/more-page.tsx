@@ -1,4 +1,4 @@
-import { CalendarRange, Clock3, Flame, Gift, Heart, Settings, Target, Trophy, Users } from 'lucide-react';
+import { CalendarRange, Clock3, Flame, Gift, Heart, HeartPulse, Settings, Target, Trophy, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/ui/page-header';
 import { Avatar } from '../components/app-shell';
@@ -14,8 +14,9 @@ const groups = [
     ],
   },
   {
-    title: '生活与回忆',
+    title: '家庭生活',
     entries: [
+      { to: '/health', title: '健康', icon: HeartPulse, tone: 'bg-rose-100 text-rose-700' },
       { to: '/days', title: '日子', icon: Clock3, tone: 'bg-amber-100 text-amber-700' },
       { to: '/anniversaries', title: '纪念日', icon: Gift, tone: 'bg-violet-100 text-violet-700' },
       { to: '/wishes', title: '许愿池', icon: Heart, tone: 'bg-pink-100 text-pink-700' },

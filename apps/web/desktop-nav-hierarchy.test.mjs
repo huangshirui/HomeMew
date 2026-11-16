@@ -19,7 +19,7 @@ test('desktop navigation follows the four approved groups and model placement', 
   ordered(shell, [
     'title="日常" entries={dailyNavigation}',
     'title="计划与成长" entries={growthNavigation}',
-    'title="生活与回忆" entries={memoriesNavigation}',
+    'title="家庭生活" entries={memoriesNavigation}',
     'title="家庭管理" entries={managementNavigation}',
   ]);
   const daily = shell.match(/const dailyNavigation = \[([\s\S]*?)\n\];/u)?.[1];
@@ -33,7 +33,7 @@ test('desktop navigation follows the four approved groups and model placement', 
 
   const memories = shell.match(/const memoriesNavigation = \[([\s\S]*?)\n\];/u)?.[1];
   assert.ok(memories);
-  ordered(memories, ["label: '日子'", "label: '纪念日'", "label: '许愿池'", "label: '足球比赛'"]);
+  ordered(memories, ["label: '健康'", "label: '日子'", "label: '纪念日'", "label: '许愿池'", "label: '足球比赛'"]);
 });
 
 test('family management is visible to all roles while actions remain server-authorized', () => {
@@ -49,11 +49,12 @@ test('family management is visible to all roles while actions remain server-auth
 });
 
 test('More uses compact grouped icon tiles and shows the staging family role', () => {
-  ordered(more, ["title: '计划与成长'", "title: '生活与回忆'", "title: '家庭管理'"]);
+  ordered(more, ["title: '计划与成长'", "title: '家庭生活'", "title: '家庭管理'"]);
   assert.match(more, /grid grid-cols-3 gap-2\.5 sm:grid-cols-4/u);
   assert.match(more, /min-h-28 flex-col items-center/u);
   assert.match(more, /当前身份：\{roleLabels\[currentFamily\.role\]\}/u);
   assert.doesNotMatch(more, /h-full p-5/u, 'Do not use old full-width descriptive cards on mobile');
+  assert.match(more, /to: '\/health', title: '健康'/u);
   assert.match(more, /to: '\/days', title: '日子'/u);
   assert.match(more, /to: '\/family', title: '家庭与成员'/u);
   assert.match(more, /to: '\/settings', title: '设置'/u);

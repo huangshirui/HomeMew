@@ -12,6 +12,7 @@ import {
   Clock3,
   Ellipsis,
   Heart,
+  HeartPulse,
   Home,
   RefreshCw,
   Settings,
@@ -35,6 +36,7 @@ const growthNavigation = [
 ];
 
 const memoriesNavigation = [
+  { to: '/health', label: '健康', icon: HeartPulse },
   { to: '/days', label: '日子', icon: Clock3 },
   { to: '/anniversaries', label: '纪念日', icon: Gift },
   { to: '/wishes', label: '许愿池', icon: Heart },
@@ -224,7 +226,7 @@ function DesktopNav() {
       <nav aria-label="家庭主导航" className="mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 scrollbar-overlay">
         <SidebarSection title="日常" entries={dailyNavigation} first />
         <SidebarSection title="计划与成长" entries={growthNavigation} />
-        <SidebarSection title="生活与回忆" entries={memoriesNavigation} />
+        <SidebarSection title="家庭生活" entries={memoriesNavigation} />
         <SidebarSection title="家庭管理" entries={managementNavigation} />
       </nav>
       <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-stone-200/80 px-2 pt-4">
