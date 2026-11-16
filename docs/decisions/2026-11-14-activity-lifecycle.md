@@ -19,3 +19,10 @@ The new Web/BFF release requires Core contract 0.54.0 and schema >=79; Identity 
 ## 2026-11-16 · Mini Activity list description parity / 小程序活动列表说明
 
 Following the Web Activity list rule accepted on 2026-11-11, Mini Activity list rows omit the description entirely. Users open the Activity detail to read its full description; keyword search still includes name and description. Status, dates, attendees, icon, navigation and other domain lists remain unchanged. This is Mini presentation only: no change to LifeSpace, BFF, query semantics or Web deployment. Include in the pending Mini release and verify on device.
+
+
+## 2026-11-16 · Mini Activity detail parity / 小程序活动详情
+
+Activity only: description defaults to three visible lines, measures rendered overflow, exposes 展开全文 / 收起说明 only on overflow, and expands into a bounded scroll region without truncating stored text. Reset expansion when description changes. Keep Goal/Habit description behavior unchanged.
+
+The existing authorized Mini relation BFF already returns target/source hydration. Use those fields directly (no per-record request or local truth). Activity related rows show the name, type, business date/time, status, visible participants/assignees and countdown when applicable; omit unavailable values. Overview sorts loaded pages by business date (ascending default; descending selectable), places today's divider in family-local time and keeps undated items last. The schedule/task/more tabs select corresponding relation types, incoming links remain visible in More. Existing navigation and unlink authorization are unchanged. No LifeSpace, Web or BFF deployment required; validate overflow measurement, scroll, long and short descriptions and relation layout on real Mini devices before release.
