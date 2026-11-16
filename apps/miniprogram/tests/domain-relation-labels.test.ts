@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
+import { runInNewContext } from 'node:vm';
 import { candidateDisplayName, relationDisplayName, relatedRecordMetadata, activityTimeline } from '../miniprogram/utils/relation-display.ts';
 
 test('relation label uses the authoritative LifeSpace referenceLabel', () => {
@@ -67,4 +69,24 @@ test('Activity detail keeps the full description in the expanded scroll view and
   assert.match(detail,/wx:for="\{\{activityRows\}\}"/);
   for(const key of ['dateLabel','status','peopleLabel','countdown'])assert.ok(detail.includes('{{item.'+key));
   assert.match(detail,/今天 · \{\{today\}\}/);assert.match(detail,/bindtap="onOverviewOrder"/);
+});
+
+
+test('Activity description measurement toggles only on real overflow and ignores stale callbacks',()=>{
+  const source=readFileSync(new URL('../miniprogram/pages/domains/detail.ts',import.meta.url),'utf8');
+  const executable=stripTypeScriptTypes(source.replace(/^import[\s\S]*?from ['"][^'"]+['"];?\r?$/gm,''));
+  let page:any;let height=132;let full=80;let deferred:((value:any[])=>void)|null=null;
+  const query={select:()=>query,boundingClientRect:()=>query,exec:(callback:(value:any[])=>void)=>{deferred=callback;}};
+  runInNewContext(executable,{Page:(p:any)=>{page=p;},AutoRefreshGate:class{},wx:{createSelectorQuery:()=>query}});
+  page.setData=(patch:any,callback?:()=>void)=>{Object.assign(page.data,patch);callback?.();};
+  page.data.record={description:'文字说明'};
+  const measure=()=>{page.measureDescription();assert.ok(deferred);const callback=deferred!;deferred=null;callback([{height},{height:full}]);};
+  measure();assert.equal(page.data.descriptionCanExpand,false);
+  page.onToggleDescription();assert.equal(page.data.descriptionExpanded,false);
+  full=1000;measure();assert.equal(page.data.descriptionCanExpand,true);
+  assert.equal(page.data.descriptionScrollHeight,429);
+  page.onToggleDescription();assert.equal(page.data.descriptionExpanded,true);
+  page.onToggleDescription();assert.equal(page.data.descriptionExpanded,false);
+  page._generation++;const callback=deferred!;deferred=null;callback([{height},{height:80}]);
+  assert.equal(page.data.descriptionCanExpand,true);
 });
