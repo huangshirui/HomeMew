@@ -18,7 +18,19 @@
       <view wx:if="{{statusLabel}}" class="workspace-status">{{statusLabel}}</view>
       <view wx:if="{{dateLabel}}" class="workspace-muted">📅 {{dateLabel}}</view>
       <view wx:if="{{peopleLabel}}" class="workspace-muted">👥 {{peopleLabel}}</view>
-      <view wx:if="{{record.description}}" class="workspace-description">{{record.description}}</view>
+      <block wx:if="{{kind==='activities'}}">
+        <view wx:if="{{record.description}}" class="activity-description">
+          <text class="description-label">说明</text>
+          <view wx:if="{{!descriptionExpanded}}" id="activity-description-clip" class="description-clip">
+            <view id="activity-description-text" class="description-text">{{record.description}}</view>
+          </view>
+          <scroll-view wx:else scroll-y class="description-expanded" style="height:{{descriptionScrollHeight}}px">
+            <view class="description-text">{{record.description}}</view>
+          </scroll-view>
+          <view wx:if="{{descriptionCanExpand}}" class="description-toggle" bindtap="onToggleDescription" aria-role="button" aria-label="{{descriptionExpanded?'收起说明':'展开全文'}}">{{descriptionExpanded?'收起说明':'展开全文'}}</view>
+        </view>
+      </block>
+      <block wx:else><view wx:if="{{record.description}}" class="workspace-description">{{record.description}}</view></block>
       <view wx:if="{{kind==='habits' && record.computed.checkIn}}" class="streak-row">
         <view><text class="streak-value">{{record.computed.checkIn.streakDays}}</text><text class="streak-unit">连续天数</text></view>
         <button wx:if="{{subjectOwner && record.status==='active'}}" class="check-btn"
@@ -79,12 +91,33 @@
     </view>
     <view class="card" wx:if="{{tab!=='overview'||kind==='activities'}}">
       <view class="workspace-section">{{tab==='calendar'?'相关日程':tab==='tasks'?'相关待办':'相关内容'}}</view>
+      <block wx:if="{{kind==='activities'}}">
+        <view wx:if="{{tab==='overview'}}" class="timeline-order">
+          <text>时间顺序</text><view bindtap="onOverviewOrder" aria-role="button" class="order-toggle">{{overviewOrder==='asc'?'正序 ↑':'倒序 ↓'}}</view>
+        </view>
+        <block wx:for="{{activityRows}}" wx:key="id">
+          <view wx:if="{{tab==='overview' && index===markerAt && today}}" class="today-marker"><view/><text>今天 · {{today}}</text><view/></view>
+          <view class="relation-row activity-relation-row">
+            <view class="relation-body activity-relation-body" data-model="{{item.modelKey}}" data-id="{{item.recordId}}" bindtap="onRelatedTap">
+              <view class="relation-heading"><text class="relation-title">{{item.title}}</text><text wx:if="{{item.status}}" class="relation-status">{{item.status}}</text></view>
+              <view class="relation-meta"><text class="relation-type">{{item.category}}</text><text>{{item.dateLabel || '未排期'}}</text><text wx:if="{{item.countdown}}" class="relation-countdown">{{item.countdown}}</text></view>
+              <view wx:if="{{item.peopleLabel}}" class="relation-people">{{item.peopleLabel}}</view>
+            </view>
+            <text class="relation-chevron">›</text>
+            <view wx:if="{{canWrite}}" class="unlink" data-id="{{item.id}}" catchtap="onUnlink">×</view>
+          </view>
+        </block>
+        <view wx:if="{{tab==='overview' && activityRows.length && markerAt===activityRows.length && today}}" class="today-marker"><view/><text>今天 · {{today}}</text><view/></view>
+        <view wx:if="{{!relationLoading && !relationError && !activityRows.length}}" class="workspace-muted">暂无相关内容</view>
+      </block>
+      <block wx:else>
       <view wx:for="{{outgoing}}" wx:key="id" wx:if="{{(tab==='calendar'&&item.modelKey==='event')||(tab==='tasks'&&item.modelKey==='task')||tab==='related'||tab==='overview'}}" class="relation-row">
         <view class="relation-body" data-model="{{item.modelKey}}" data-id="{{item.recordId}}" bindtap="onRelatedTap">
           <text class="relation-type">{{item.category}}</text><text class="relation-title">{{item.title}}</text>
         </view>
         <view wx:if="{{canWrite}}" class="unlink" data-id="{{item.id}}" catchtap="onUnlink">×</view>
       </view>
+      </block>
       <view wx:if="{{nextOut}}" class="soft-link more" data-direction="outgoing" bindtap="onMoreRelations">加载更多关联</view>
       <view wx:if="{{relationError}}" class="thin-error">{{relationError}}</view>
       <view wx:if="{{relationLoading}}" class="workspace-muted">正在读取关联内容…</view>
@@ -93,7 +126,10 @@
       <view class="workspace-section">被其他内容关联</view>
       <view wx:for="{{incoming}}" wx:key="id" class="relation-row">
         <view class="relation-body" data-model="{{item.modelKey}}" data-id="{{item.recordId}}" bindtap="onRelatedTap">
-          <text class="relation-type">{{item.category}}</text><text class="relation-title">{{item.title}}</text>
+          <block wx:if="{{kind==='activities'}}">
+            <view class="incoming-info"><text class="relation-title">{{item.title}}</text><view class="relation-meta"><text class="relation-type">{{item.category}}</text><text wx:if="{{item.dateLabel}}">{{item.dateLabel}}</text><text wx:if="{{item.status}}">{{item.status}}</text></view><view wx:if="{{item.peopleLabel}}" class="relation-people">{{item.peopleLabel}}</view></view>
+          </block>
+          <block wx:else><text class="relation-type">{{item.category}}</text><text class="relation-title">{{item.title}}</text></block>
         </view>
       </view>
       <view wx:if="{{nextIn}}" class="soft-link more" data-direction="incoming" bindtap="onMoreRelations">加载更多</view>
