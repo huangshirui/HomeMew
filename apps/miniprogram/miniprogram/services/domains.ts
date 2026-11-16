@@ -1,7 +1,7 @@
 /** Stable, explicit HomeMew Mini product domain contract. No LifeSpace wire paths in client. */
 import { request } from './api';
 import { productQuery } from './product-routes';
-import { candidateDisplayName, relationDisplayName } from '../utils/relation-display';
+import { candidateDisplayName, relationDisplayName, type RelatedRecord } from '../utils/relation-display';
 
 export type DomainKind = 'activities' | 'goals' | 'habits' | 'anniversaries' | 'football-matches' | 'football-performances' | 'football-teams';
 export type ActivityStatus = 'planned' | 'active' | 'completed' | 'cancelled';
@@ -53,8 +53,8 @@ export type DomainRelation = {
   id: string;
   source: { modelKey: string; recordId: string };
   target: { modelKey: string; recordId: string };
-  sourceRecord?: { name?: string|null; summary?: string|null; title?: string|null; displayName?: string|null };
-  targetRecord?: { name?: string|null; summary?: string|null; title?: string|null; displayName?: string|null };
+  sourceRecord?: RelatedRecord;
+  targetRecord?: RelatedRecord;
   sourceLabel?: string; targetLabel?: string;
 };
 const relations = (familyId: string, kind: 'activities'|'goals'|'habits', id: string) =>
