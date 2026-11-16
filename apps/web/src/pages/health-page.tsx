@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { PageHeader } from '../components/ui/page-header';
 import { useHousehold } from '../components/household-provider';
 import { ModalScrollLock } from '../components/ui/modal-behavior';
-import { ApiError } from '../lib/api-client';
+import { ApiError, apiRequest } from '../lib/api-client';
 import { deleteHealthRecord, eventPayload, familyToday, measurementPayload, observationValue, readHealthPage, readHealthSchema, saveHealthBatch, saveHealthRecord, type HealthDocument, type HealthEvent, type HealthMetric, type HealthModel, type HealthObservation, type HealthRecord } from './health-domain';
 
 const tabs = ['概览', '健康指标', '健康事件', '健康档案'] as const;
@@ -247,11 +247,73 @@ function Events({ spaceId, personId, timezone, writable }: { spaceId: string; pe
     {editing ? <EventDialog spaceId={spaceId} personId={personId} timezone={timezone} record={editing === 'new' ? undefined : editing} close={() => setEditing(null)} saved={() => { setEditing(null); void list.reload(); }} /> : null}
   </section>;
 }
-function Documents({ spaceId, personId }: { spaceId: string; personId: string }) {
+const documentLabels: Record<string,string> = {lab_report:'化验报告',imaging_report:'影像报告',physical_exam:'体检报告',prescription:'处方',visit_note:'门诊病历',discharge_summary:'出院记录',rehabilitation_plan:'康复方案',other:'其他'};
+const documentPath = (spaceId: string, personId: string) => '/api/health/spaces/' + encodeURIComponent(spaceId) + '/persons/' + encodeURIComponent(personId) + '/documents';
+function DocumentDialog({ spaceId, personId, record, close, saved }: { spaceId: string; personId: string; record?: HealthDocument; close: () => void; saved: () => void }) {
+  const [title,setTitle] = useState(record?.title ?? ''); const [type,setType] = useState(record?.documentType ?? '');
+  const [date,setDate] = useState(record?.issuedDate ?? ''); const [issuer,setIssuer] = useState(record?.issuerName ?? ''); const [notes,setNotes] = useState(record?.notes ?? '');
+  const [file,setFile] = useState<File | null>(null); const [shared,setShared] = useState(false);
+  const [types,setTypes] = useState<string[]>([]); const [schemaLoading,setSchemaLoading] = useState(true);
+  const [busy,setBusy] = useState(false); const [error,setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    void readHealthSchema(spaceId,'health_document').then(schema => {
+      if(!active) return;
+      const options = (schema.fields.find(f=>f.key==='documentType')?.values ?? []).filter(t => Object.hasOwn(documentLabels,t));
+      setTypes(options); setType(old => options.includes(old) ? old : record ? '' : options[0] ?? '');
+      if(!options.length) setError('当前健康档案类型契约不可用。');
+    }).catch(cause=>{if(active)setError(message(cause));}).finally(()=>{if(active)setSchemaLoading(false);});
+    return ()=>{active=false;};
+  },[spaceId,record]);
+  return <Dialog title={record?'编辑档案':'添加健康档案'} close={close} busy={busy}>
+    <form className="space-y-3" onSubmit={async e=>{
+      e.preventDefault(); if(busy || !title.trim() || !types.includes(type) || (!record && (!file || !shared)))return;
+      setBusy(true);setError('');
+      try {
+        if(record) {
+          if(record.subjectPersonId!==personId)throw Error('成员不匹配');
+          // artifactRef is immutable; metadata edits never replace it or the existing event.
+          await saveHealthRecord(spaceId,'health_document',{title:title.trim(),documentType:type,issuedDate:date||null,issuerName:issuer.trim()||null,notes:notes.trim()||null},record);
+        } else if(file) {
+          if(file.size>15*1024*1024 || !file.size)throw Error('文件大小无效');
+          const form=new FormData();
+          form.set('file',file);form.set('title',title.trim());form.set('documentType',type);form.set('issuedDate',date);form.set('issuerName',issuer.trim());form.set('notes',notes.trim());
+          await apiRequest<HealthDocument>(documentPath(spaceId,personId),{method:'POST',body:form});
+        }
+        saved();
+      } catch(cause){setError(message(cause));} finally{setBusy(false);}
+    }}>
+      <label className="block text-sm">名称<input required maxLength={200} className={control} value={title} onChange={e=>setTitle(e.target.value)}/></label>
+      <label className="block text-sm">类型<select required className={control} value={type} onChange={e=>setType(e.target.value)}><option value="">请选择</option>{types.map(t=><option key={t} value={t}>{documentLabels[t]??t}</option>)}</select></label>
+      <label className="block text-sm">报告日期<input type="date" className={control} value={date} onChange={e=>setDate(e.target.value)}/></label>
+      <label className="block text-sm">出具机构<input maxLength={200} className={control} value={issuer} onChange={e=>setIssuer(e.target.value)}/></label>
+      <label className="block text-sm">说明<textarea maxLength={4000} className={control} value={notes} onChange={e=>setNotes(e.target.value)}/></label>
+      {!record ? <><label className="block text-sm">附件（PDF 或图片，最大 15 MB）<input required type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" className={control} onChange={e=>{const f=e.target.files?.[0]??null;setFile(f);if(f&&!title.trim())setTitle(f.name.replace(/\.[^.]+$/u,''));}}/></label>
+      <label className="flex gap-2 text-sm"><input type="checkbox" required checked={shared} onChange={e=>setShared(e.target.checked)}/>确认该档案适合在当前家庭共享</label></> : <p className="text-xs text-stone-500">已有附件不随资料信息编辑而替换。</p>}
+      {error ? <p role="alert" className="text-sm text-red-700">{error}</p>:null}
+      <button type="submit" className={primary} disabled={busy||schemaLoading||!types.includes(type)||(!record&&(!file||!shared))}>{busy?'保存中…':'保存'}</button>
+    </form>
+  </Dialog>;
+}
+function Documents({ spaceId, personId, writable }: { spaceId: string; personId: string; writable: boolean }) {
   const list = useHealthList<HealthDocument>(spaceId, 'health_document', personId);
-  return <section className={panel + ' space-y-3'}><h2 className="font-semibold">健康档案</h2>
-    {list.items.map(r => <article key={r.id} className="border-b border-stone-100 pb-3"><p className="font-medium">{r.title}</p><p className="text-xs text-stone-500">{r.issuedDate || '日期未记录'} · {r.issuerName || r.documentType}</p>{r.notes ? <p className="mt-1 whitespace-pre-wrap break-words text-sm">{r.notes}</p> : null}</article>)}
+  const [editing,setEditing] = useState<HealthDocument | 'new' | null>(null);
+  const [busy,setBusy] = useState(false); const [error,setError] = useState('');
+  return <section className={panel + ' space-y-3'}><div className="flex items-center justify-between gap-2"><h2 className="font-semibold">健康档案</h2>{writable&&!list.loading&&!list.error?<button className={primary} onClick={()=>setEditing('new')}>添加档案</button>:null}</div>
+    {list.items.map(r => <article key={r.id} className="border-b border-stone-100 pb-3"><p className="font-medium">{r.title}</p><p className="text-xs text-stone-500">{r.issuedDate || '日期未记录'} · {documentLabels[r.documentType]??r.documentType} {r.issuerName??''}</p>{r.notes ? <p className="mt-1 whitespace-pre-wrap break-words text-sm">{r.notes}</p> : null}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {r.artifactRef ? <a className={button} href={documentPath(spaceId,personId)+'/'+encodeURIComponent(r.id)+'/file'} download>下载原始资料</a> : null}
+        {writable&&r.subjectPersonId===personId?<><button className={button} disabled={busy} onClick={()=>setEditing(r)}>编辑</button><button className={button} disabled={busy} onClick={async()=>{
+          if(busy||!window.confirm('确认删除这条健康档案？'))return;
+          setBusy(true);setError('');
+          try {await deleteHealthRecord(spaceId,'health_document',r);await list.reload();}
+          catch(cause){setError(message(cause));}finally{setBusy(false);}
+        }}>删除</button></>:null}
+      </div>
+    </article>)}
+    {error?<p role="alert" className="text-sm text-red-700">{error}</p>:null}
     <ListStatus {...list} empty={!list.items.length} retry={list.reload} />
+    {editing?<DocumentDialog spaceId={spaceId} personId={personId} record={editing==='new'?undefined:editing} close={()=>setEditing(null)} saved={()=>{setEditing(null);void list.reload();}}/>:null}
   </section>;
 }
 function Overview({ spaceId, personId, go }: { spaceId: string; personId: string; go: (tab: Tab) => void }) {
@@ -281,7 +343,7 @@ export function HealthPage() {
         {tab === '概览' ? <Overview spaceId={currentFamily.id} personId={selected.personId} go={setTab} />
         : tab === '健康指标' ? <Metrics spaceId={currentFamily.id} personId={selected.personId} timezone={currentFamily.timezone} writable={currentFamily.role !== 'viewer'} />
         : tab === '健康事件' ? <Events spaceId={currentFamily.id} personId={selected.personId} timezone={currentFamily.timezone} writable={currentFamily.role !== 'viewer'} />
-        : <Documents spaceId={currentFamily.id} personId={selected.personId} />}
+        : <Documents spaceId={currentFamily.id} personId={selected.personId} writable={currentFamily.role !== 'viewer'} />}
       </div>
     </>}
   </div>;
