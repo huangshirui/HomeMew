@@ -15,3 +15,7 @@ This supersedes the date-period filtering of new Activity clients in the earlier
 ## Release / 发布
 
 The new Web/BFF release requires Core contract 0.54.0 and schema >=79; Identity gate unchanged. Deploy LifeSpace staging first; verify HomeMew CI, Web Preview and BFF against staging. Production order is LifeSpace Core, HomeMew Web/BFF, then Mini device verification and submission/release. Existing Mini builds always use the production BFF. No production deployment or Mini review submission is implied by this decision. Owner manually dispatches release workflows. 
+
+## 2026-11-16 · Mini Activity list description parity / 小程序活动列表说明
+
+Following the Web Activity list rule accepted on 2026-11-11, Mini Activity list rows omit the description entirely. Users open the Activity detail to read its full description; keyword search still includes name and description. Status, dates, attendees, icon, navigation and other domain lists remain unchanged. This is Mini presentation only: no change to LifeSpace, BFF, query semantics or Web deployment. Include in the pending Mini release and verify on device.

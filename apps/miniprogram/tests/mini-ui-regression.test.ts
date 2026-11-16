@@ -75,3 +75,15 @@ test('Settings keeps profile usable when mailbox loading fails and distinguishes
   assert.equal(page.data.accountError,false);assert.equal(page.data.accountLoaded,true);assert.equal(page.data.emailAvailable,false);
   assert.equal(page.data.homeScope,'all');
 });
+
+
+test('Activity list hides descriptions like Web but retains detail and keyword search',()=>{
+  const list=readFileSync(new URL('../miniprogram/pages/domains/list.wxml',import.meta.url),'utf8');
+  const detail=readFileSync(new URL('../miniprogram/pages/domains/detail.wxml',import.meta.url),'utf8');
+  const description=list.match(/<text[^>]*class="record-description"[^>]*>\{\{item\.description\}\}<\/text>/g);
+  assert.equal(description?.length,1);
+  assert.match(description![0],/wx:if="\{\{kind !== 'activities' && item\.description\}\}"/);
+  assert.match(list,/placeholder="搜索名称或说明"/);
+  assert.match(list,/bindtap="onRecordTap"/);
+  assert.match(detail,/wx:if="\{\{record\.description\}\}" class="workspace-description">\{\{record\.description\}\}/);
+});
