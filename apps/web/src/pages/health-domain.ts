@@ -5,8 +5,8 @@ export type HealthModel = 'health_metric' | 'health_observation' | 'health_event
 export type HealthRecord = { id: string; version: number; subjectPersonId?: string; updatedAt?: string };
 export type HealthMetric = HealthRecord & { name: string; valueType: 'number' | 'text' | 'boolean'; defaultUnit?: string | null };
 export type HealthObservation = HealthRecord & { metricId: string; observedDate: string; valueNumber?: number | null; valueText?: string | null; valueBoolean?: boolean | null; unit?: string | null; notes?: string | null };
-export type HealthEvent = HealthRecord & { summary: string; eventType: string; when?: { kind: 'date' | 'instant'; start: string; endExclusive: string }; status?: string; description?: string | null };
-export type HealthDocument = HealthRecord & { title: string; documentType: string; issuedDate?: string | null; issuerName?: string | null; notes?: string | null };
+export type HealthEvent = HealthRecord & { summary: string; eventType: string; when?: { kind: 'date' | 'instant'; start: string; endExclusive: string }; status?: string; description?: string | null; location?: { name: string; address?: string; coordinates?: unknown } | null };
+export type HealthDocument = HealthRecord & { title: string; documentType: string; issuedDate?: string | null; issuerName?: string | null; notes?: string | null; artifactRef?: string; eventId?: string | null };
 export type HealthSchema = { key: string; fields: Array<{ key: string; values?: string[] }> };
 
 function spaceRoot(spaceId: string) {
@@ -49,16 +49,13 @@ export function observationValue(record: HealthObservation) {
   if (typeof record.valueBoolean === 'boolean') return record.valueBoolean ? '是' : '否';
   return record.valueText ?? '—';
 }
-export function measurementPayload(personId: string, metric: HealthMetric, date: string, raw: string, unit: string, notes: string) {
-  if (!/^per_[A-Za-z0-9_-]+$/.test(personId) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !raw.trim()) throw Error('请填写成员、日期与测量值');
-  const numeric = Number(raw);
-  if (metric.valueType === 'number' && !Number.isFinite(numeric)) throw Error('请输入有效数值');
-  if (metric.valueType === 'boolean' && !['true','false'].includes(raw)) throw Error('请选择是或否');
-  return { subjectPersonId: personId, metricId: metric.id, observedDate: date,
-    valueNumber: metric.valueType === 'number' ? numeric : null,
-    valueText: metric.valueType === 'text' ? raw.trim() : null,
-    valueBoolean: metric.valueType === 'boolean' ? raw === 'true' : null,
-    unit: unit.trim() || null, notes: notes.trim() || null };
+export { measurementPayload, validDate, dateRange, eventPayload } from './health-values';
+export async function saveHealthBatch(spaceId: string, payloads: Record<string, unknown>[]) {
+  if (!payloads.length || payloads.length > 2) throw Error('请选择一到两条测量记录');
+  return apiRequest(spaceRoot(spaceId) + '/models/batch', {
+    method: 'POST', body: JSON.stringify({ atomicConsistency: true,
+      operations: payloads.map(data => ({ operation: 'create', modelKey: 'health_observation', data })) }),
+  });
 }
 export function familyToday(timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());

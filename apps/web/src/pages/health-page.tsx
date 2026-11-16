@@ -3,7 +3,7 @@ import { PageHeader } from '../components/ui/page-header';
 import { useHousehold } from '../components/household-provider';
 import { ModalScrollLock } from '../components/ui/modal-behavior';
 import { ApiError } from '../lib/api-client';
-import { deleteHealthRecord, familyToday, measurementPayload, observationValue, readHealthPage, saveHealthRecord, type HealthDocument, type HealthEvent, type HealthMetric, type HealthModel, type HealthObservation, type HealthRecord } from './health-domain';
+import { deleteHealthRecord, eventPayload, familyToday, measurementPayload, observationValue, readHealthPage, readHealthSchema, saveHealthBatch, saveHealthRecord, type HealthDocument, type HealthEvent, type HealthMetric, type HealthModel, type HealthObservation, type HealthRecord } from './health-domain';
 
 const tabs = ['概览', '健康指标', '健康事件', '健康档案'] as const;
 type Tab = typeof tabs[number];
@@ -29,6 +29,9 @@ function useHealthList<T extends HealthRecord>(spaceId: string, model: HealthMod
     try {
       const result = await readHealthPage<T>(spaceId, model, personId, next, metricId);
       if (id !== generation.current) return;
+      // Defense in depth: the server query is still authoritative. Never display a
+      // mis-scoped response under the selected person if the response contract drifts.
+      if (model !== 'health_metric' && result.items.some(item => item.subjectPersonId !== personId)) throw Error('成员记录范围不匹配');
       setItems(previous => append ? [...previous, ...result.items.filter(item => !previous.some(p => p.id === item.id))] : result.items);
       setCursor(result.nextCursor);
     } catch (cause) {
@@ -131,7 +134,7 @@ function Measurements({ spaceId, personId, metric, timezone, writable }: { space
   const [editing, setEditing] = useState<HealthObservation | 'new' | null>(null);
   const [deleting, setDeleting] = useState(false); const [mutationError, setMutationError] = useState('');
   return <section className={panel + ' space-y-3'}>
-    <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">{metric.name}</h2>{writable && !list.error ? <button className={primary} onClick={() => setEditing('new')}>记录</button> : null}</div>
+    <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">{metric.name}</h2>{writable && !list.error && !list.loading ? <button className={primary} onClick={() => setEditing('new')}>记录</button> : null}</div>
     <Trend rows={list.items} />
     {list.items.map(r => <div key={r.id} className="flex flex-wrap items-center gap-2 border-b border-stone-100 py-2 text-sm">
       <div className="min-w-0 flex-1"><p className="font-medium">{observationValue(r)} {r.unit}</p><p className="text-xs text-stone-500">{r.observedDate}</p>{r.notes ? <p className="break-words text-xs text-stone-600">{r.notes}</p> : null}</div>
@@ -147,25 +150,101 @@ function Measurements({ spaceId, personId, metric, timezone, writable }: { space
     {editing ? <MeasurementDialog spaceId={spaceId} personId={personId} metric={metric} timezone={timezone} record={editing === 'new' ? undefined : editing} close={() => setEditing(null)} saved={() => { setEditing(null); void list.reload(); }} /> : null}
   </section>;
 }
+function GrowthDialog({ spaceId, personId, height, weight, timezone, close, saved }: {
+  spaceId: string; personId: string; height: HealthMetric; weight: HealthMetric; timezone: string; close: () => void; saved: () => void;
+}) {
+  const [date, setDate] = useState(familyToday(timezone));
+  const [h, setH] = useState(''); const [w, setW] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  return <Dialog title="记录身高体重" close={close} busy={busy}>
+    <form className="space-y-3" onSubmit={async e => {
+      e.preventDefault(); if (busy) return; setBusy(true); setError('');
+      try {
+        const payloads = [[height, h], [weight, w]] as const;
+        const selected = payloads.filter(([,value]) => value.trim());
+        if (!selected.length || selected.some(([,value]) => !Number.isFinite(Number(value)) || Number(value) <= 0)) throw Error('请输入有效的正数身高或体重');
+        await saveHealthBatch(spaceId, selected.map(([metric,value]) => measurementPayload(personId, metric, date, value, metric.defaultUnit ?? '', '')));
+        saved();
+      } catch (cause) { setError(message(cause)); } finally { setBusy(false); }
+    }}>
+      <label className="block text-sm">测量日期<input type="date" required className={control} value={date} onChange={e => setDate(e.target.value)} /></label>
+      <label className="block text-sm">身高（cm）<input type="number" min="0.01" step="any" className={control} value={h} onChange={e => setH(e.target.value)} /></label>
+      <label className="block text-sm">体重（kg）<input type="number" min="0.01" step="any" className={control} value={w} onChange={e => setW(e.target.value)} /></label>
+      <p className="text-xs text-stone-500">可以只填一项。两项同时提交时，由 LifeSpace 原子批处理保存。</p>
+      {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
+      <button className={primary} disabled={busy} type="submit">保存</button>
+    </form>
+  </Dialog>;
+}
 function Metrics({ spaceId, personId, timezone, writable }: { spaceId: string; personId: string; timezone: string; writable: boolean }) {
   const list = useHealthList<HealthMetric>(spaceId, 'health_metric', personId);
-  const [selected, setSelected] = useState(''); const [adding, setAdding] = useState(false);
+  const [selected, setSelected] = useState(''); const [adding, setAdding] = useState(false); const [growth, setGrowth] = useState(false); const [revision, setRevision] = useState(0);
   const metric = list.items.find(m => m.id === selected) ?? list.items[0];
+  const heights = list.items.filter(m => m.name === '身高' && m.valueType === 'number' && m.defaultUnit === 'cm');
+  const weights = list.items.filter(m => m.name === '体重' && m.valueType === 'number' && m.defaultUnit === 'kg');
+  const height = !list.cursor && heights.length === 1 ? heights[0] : undefined;
+  const weight = !list.cursor && weights.length === 1 ? weights[0] : undefined;
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center gap-2">
       <label className="min-w-40 flex-1 text-sm">指标<select className={control} value={metric?.id ?? ''} onChange={e => setSelected(e.target.value)}><option value="" disabled>请选择指标</option>{list.items.map(m => <option key={m.id} value={m.id}>{m.name}{m.defaultUnit ? ' · '+m.defaultUnit : ''}</option>)}</select></label>
-      {writable && !list.error ? <button className={button} onClick={() => setAdding(true)}>添加指标</button> : null}
+      {writable && !list.error && !list.loading ? <button className={button} onClick={() => setAdding(true)}>添加指标</button> : null}
+      {writable && height && weight && !list.error && !list.loading ? <button className={primary} onClick={() => setGrowth(true)}>记录身高体重</button> : null}
     </div>
     <ListStatus {...list} empty={!list.items.length} retry={list.reload} />
-    {metric ? <Measurements key={metric.id} spaceId={spaceId} personId={personId} metric={metric} timezone={timezone} writable={writable} /> : null}
+    {metric ? <Measurements key={metric.id + ':' + revision} spaceId={spaceId} personId={personId} metric={metric} timezone={timezone} writable={writable} /> : null}
+    {growth && height && weight ? <GrowthDialog spaceId={spaceId} personId={personId} timezone={timezone} height={height} weight={weight} close={() => setGrowth(false)} saved={() => { setGrowth(false); setRevision(v => v + 1); }} /> : null}
     {adding ? <MetricDialog spaceId={spaceId} close={() => setAdding(false)} saved={() => { setAdding(false); void list.reload(); }} /> : null}
   </div>;
 }
-function Events({ spaceId, personId, timezone }: { spaceId: string; personId: string; timezone: string }) {
+const eventLabels: Record<string,string> = { symptom: '不适症状', injury: '受伤', visit: '就诊', examination: '检查', procedure: '医疗操作', treatment: '治疗', medication_intake: '服药记录', vaccination: '疫苗接种', rehabilitation: '康复', other: '其他' };
+function EventDialog({ spaceId, personId, timezone, record, close, saved }: { spaceId: string; personId: string; timezone: string; record?: HealthEvent; close: () => void; saved: () => void }) {
+  const [summary, setSummary] = useState(record?.summary ?? '');
+  const [type, setType] = useState(record?.eventType ?? '');
+  const [date, setDate] = useState(record?.when?.kind === 'date' ? record.when.start : familyToday(timezone));
+  const [location, setLocation] = useState(record?.location?.name ?? ''); const [description, setDescription] = useState(record?.description ?? '');
+  const [types, setTypes] = useState<string[]>([]); const [schemaLoading, setSchemaLoading] = useState(true);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    void readHealthSchema(spaceId, 'health_event').then(schema => {
+      if (!active) return;
+      const values = schema.fields.find(f => f.key === 'eventType')?.values ?? [];
+      setTypes(values); setType(old => values.includes(old) ? old : record ? '' : values.includes('visit') ? 'visit' : values[0] ?? '');
+      if (!values.length) setError('当前健康事件类型契约不可用。');
+    }).catch(cause => { if(active) setError(message(cause)); }).finally(() => { if(active) setSchemaLoading(false); });
+    return () => { active = false; };
+  }, [spaceId, record]);
+  return <Dialog title={record ? '编辑健康事件' : '添加健康事件'} close={close} busy={busy}>
+    <form className="space-y-3" onSubmit={async e => {
+      e.preventDefault(); if(busy || !types.includes(type)) return; setBusy(true); setError('');
+      try { await saveHealthRecord(spaceId, 'health_event', eventPayload(personId, summary, type, date, location, description, record), record); saved(); }
+      catch(cause) { setError(message(cause)); } finally { setBusy(false); }
+    }}>
+      <label className="block text-sm">标题<input required className={control} value={summary} onChange={e => setSummary(e.target.value)} /></label>
+      <label className="block text-sm">类型<select required className={control} value={type} onChange={e => setType(e.target.value)}><option value="">请选择</option>{types.map(t => <option key={t} value={t}>{eventLabels[t] ?? t}</option>)}</select></label>
+      {record?.when?.kind === 'instant' ? <p className="text-xs text-stone-500">保留已有精确时间：{new Date(record.when.start).toLocaleString('zh-CN', { timeZone: timezone })}</p> : <label className="block text-sm">日期<input required type="date" className={control} value={date} onChange={e => setDate(e.target.value)} /></label>}
+      <label className="block text-sm">地点/机构<input className={control} value={location} onChange={e => setLocation(e.target.value)} /></label>
+      <label className="block text-sm">说明<textarea className={control} value={description} onChange={e => setDescription(e.target.value)} /></label>
+      {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
+      <button className={primary} disabled={busy || schemaLoading || !types.includes(type)} type="submit">{schemaLoading ? '读取类型…' : '保存'}</button>
+    </form>
+  </Dialog>;
+}
+function Events({ spaceId, personId, timezone, writable }: { spaceId: string; personId: string; timezone: string; writable: boolean }) {
   const list = useHealthList<HealthEvent>(spaceId, 'health_event', personId);
-  return <section className={panel + ' space-y-3'}><h2 className="font-semibold">健康事件</h2>
-    {list.items.map(r => <article key={r.id} className="border-b border-stone-100 pb-3"><p className="font-medium">{r.summary}</p><p className="text-xs text-stone-500">{r.when?.kind === 'instant' ? new Date(r.when.start).toLocaleString('zh-CN', { timeZone: timezone }) : r.when?.start} {r.eventType} {r.status === 'cancelled' ? '已取消' : ''}</p>{r.description ? <p className="mt-1 whitespace-pre-wrap break-words text-sm">{r.description}</p> : null}</article>)}
+  const [editing, setEditing] = useState<HealthEvent | 'new' | null>(null);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  return <section className={panel + ' space-y-3'}><div className="flex items-center justify-between gap-2"><h2 className="font-semibold">健康事件</h2>{writable && !list.error && !list.loading ? <button className={primary} onClick={() => setEditing('new')}>添加事件</button> : null}</div>
+    {list.items.map(r => <article key={r.id} className="border-b border-stone-100 pb-3"><p className="font-medium">{r.summary}</p><p className="text-xs text-stone-500">{r.when?.kind === 'instant' ? new Date(r.when.start).toLocaleString('zh-CN', { timeZone: timezone }) : r.when?.start} · {eventLabels[r.eventType] ?? r.eventType} {r.status === 'cancelled' ? '已取消' : ''}</p>{r.location?.name ? <p className="text-xs text-stone-500">{r.location.name}</p> : null}{r.description ? <p className="mt-1 whitespace-pre-wrap break-words text-sm">{r.description}</p> : null}
+      {writable && r.subjectPersonId === personId ? <div className="mt-2 flex gap-2"><button className={button} disabled={busy} onClick={() => setEditing(r)}>编辑</button><button className={button} disabled={busy} onClick={async () => {
+        if (busy || !window.confirm('确认删除这条健康事件？')) return;
+        setBusy(true); setError('');
+        try { await deleteHealthRecord(spaceId, 'health_event', r); await list.reload(); }
+        catch(cause) { setError(message(cause)); } finally { setBusy(false); }
+      }}>删除</button></div> : null}
+    </article>)}
+    {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
     <ListStatus {...list} empty={!list.items.length} retry={list.reload} />
+    {editing ? <EventDialog spaceId={spaceId} personId={personId} timezone={timezone} record={editing === 'new' ? undefined : editing} close={() => setEditing(null)} saved={() => { setEditing(null); void list.reload(); }} /> : null}
   </section>;
 }
 function Documents({ spaceId, personId }: { spaceId: string; personId: string }) {
@@ -201,7 +280,7 @@ export function HealthPage() {
       <div key={currentFamily.id + ':' + selected.personId + ':' + tab}>
         {tab === '概览' ? <Overview spaceId={currentFamily.id} personId={selected.personId} go={setTab} />
         : tab === '健康指标' ? <Metrics spaceId={currentFamily.id} personId={selected.personId} timezone={currentFamily.timezone} writable={currentFamily.role !== 'viewer'} />
-        : tab === '健康事件' ? <Events spaceId={currentFamily.id} personId={selected.personId} timezone={currentFamily.timezone} />
+        : tab === '健康事件' ? <Events spaceId={currentFamily.id} personId={selected.personId} timezone={currentFamily.timezone} writable={currentFamily.role !== 'viewer'} />
         : <Documents spaceId={currentFamily.id} personId={selected.personId} />}
       </div>
     </>}

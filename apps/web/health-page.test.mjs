@@ -20,3 +20,9 @@ test('health uses four tabs, existing BFF and versioned writes', () => {
   assert.match(page, /currentFamily\.role !== 'viewer'/u);
   assert.match(page, /new Set\(points\.map\(p => p\.unit/u);
 });
+
+test('health never displays a mismatched subject and uses the native atomic batch', () => {
+  assert.match(page, /result\.items\.some\(item => item\.subjectPersonId !== personId\)/u);
+  assert.match(domain, /atomicConsistency: true/u);
+  assert.match(page, /readHealthSchema\(spaceId, 'health_event'\)/u);
+});
