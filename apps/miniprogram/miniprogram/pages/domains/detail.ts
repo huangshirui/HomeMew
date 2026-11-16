@@ -1,4 +1,4 @@
-import { currentFamilyStore,userStore } from '../../stores/index';
+import { currentFamilyStore,userStore,familiesStore } from '../../stores/index';
 import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import { AutoRefreshGate, markRefreshDirty } from '../../services/refresh-policy';
 import {
@@ -8,10 +8,12 @@ import {
   type PersonOption,type CheckInHistory,
 } from '../../services/domains';
 import { downloadRecordIconImage } from '../../services/record-icons';
+import { formatInstantInTimeZone } from '../../utils/datetime';
+import { relatedRecordMetadata, activityTimeline } from '../../utils/relation-display';
 
 type Kind='activities'|'goals'|'habits';
 type Tab='overview'|'calendar'|'tasks'|'related';
-type RelationDisplay={id:string;title:string;category:string;modelKey:string;recordId:string};
+type RelationDisplay={id:string;title:string;category:string;modelKey:string;recordId:string}&ReturnType<typeof relatedRecordMetadata>;
 const TITLES:Record<string,string>={task:'待办',event:'日程',day_record:'日子',activity:'活动',goal:'目标',habit:'习惯',anniversary:'纪念日',wish:'愿望'};
 const MODEL_KEYS={activities:'activity',goals:'goal',habits:'habit'} as const;
 function actions(kind:Kind,status:DomainStatus):{key:string;title:string;danger:boolean}[]{
@@ -31,11 +33,11 @@ function actions(kind:Kind,status:DomainStatus):{key:string;title:string;danger:
     return [{key:'reopen',title:'重新开始',danger:false}];
   return [];
 }
-function relationDisplays(relations:DomainRelation[],direction:'incoming'|'outgoing'):RelationDisplay[]{
+function relationDisplays(relations:DomainRelation[],direction:'incoming'|'outgoing',timezone:string,today:string,people:PersonOption[]):RelationDisplay[]{
   return relations.map(edge=>{
     const ref=direction==='outgoing'?edge.target:edge.source;
     return{id:edge.id,title:readableRelationTitle(edge,direction),category:TITLES[ref.modelKey]||'其他内容',
-      modelKey:ref.modelKey,recordId:ref.recordId};
+      modelKey:ref.modelKey,recordId:ref.recordId,...relatedRecordMetadata(ref.modelKey,direction==='outgoing'?edge.targetRecord:edge.sourceRecord,timezone,today,people,formatInstantInTimeZone)};
   });
 }
 Page({
@@ -43,6 +45,9 @@ Page({
     kind:'activities' as Kind, familyId:'', recordId:'',loading:true,busy:false,error:'',record:null as DomainRecord|null,
     navigationTitle:'详情',title:'',statusLabel:'',dateLabel:'',peopleLabel:'',icon:'',iconImagePath:'',subjectOwner:false,canWrite:false,
     tabs:[] as {key:Tab;label:string}[],tab:'overview' as Tab,menuActions:[] as {key:string;title:string;danger:boolean}[],
+    descriptionExpanded:false,descriptionCanExpand:false,descriptionScrollHeight:0,
+    people:[] as PersonOption[],timezone:'Asia/Shanghai',today:'',overviewOrder:'asc' as 'asc'|'desc',
+    activityRows:[] as RelationDisplay[],markerAt:0,
     outgoing:[] as RelationDisplay[],incoming:[] as RelationDisplay[],nextOut:null as string|null,nextIn:null as string|null,
     relationLoading:false,relationError:'',checkIns:[] as CheckInHistory[],historyCursor:null as string|null,
     historyOpen:false,historyLoading:false,historyError:'',
@@ -82,14 +87,18 @@ Page({
       const ids=record.attendeePersonIds||record.subjectPersonIds||(record.subjectPersonId?[record.subjectPersonId]:[]);
       const dateLabel=[record.startDate,record.endDate||record.targetDate].filter(Boolean).join(' — ');
       const subjectOwner=Boolean(kind==='habits'&&people.find(p=>p.userId===userStore.value?.id)?.personId===record.subjectPersonId);
+      const family=familiesStore.value.find(f=>f.id===familyId)||(currentFamilyStore.value?.id===familyId?currentFamilyStore.value:null);
+      const timezone=family?.timezone||'Asia/Shanghai';
+      const today=formatInstantInTimeZone(new Date().toISOString(),timezone).date;
+      const descriptionChanged=this.data.record?.description!==record.description;
       const canWrite=(currentFamilyStore.value?.role as string)!=='viewer'&&(kind!=='habits'||subjectOwner);
       const icon=record.presentation?.icon;
       const iconText=icon?.type==='emoji'?icon.value:(icon?.type==='image'?'':DOMAIN_COPY[kind].symbol);
-      this.setData({record,title:record.name||DOMAIN_COPY[kind].title,
+      this.setData({record,people,timezone,today,...(descriptionChanged?{descriptionExpanded:false,descriptionCanExpand:false,descriptionScrollHeight:0}:{}),title:record.name||DOMAIN_COPY[kind].title,
         icon:iconText,iconImagePath:'',
         statusLabel:record.status?STATUS_COPY[record.status]:'',dateLabel,
         peopleLabel:ids.map(id=>people.find(p=>p.personId===id)?.displayName||'家庭成员').join('、'),
-        subjectOwner,canWrite,menuActions:!canWrite||!record.status?[]:actions(kind,record.status)});
+        subjectOwner,canWrite,menuActions:!canWrite||!record.status?[]:actions(kind,record.status)},()=>this.measureDescription());
       if(icon?.type==='image'){
         const fileId=icon.fileId;
         void downloadRecordIconImage(familyId,MODEL_KEYS[kind],recordId,fileId)
@@ -106,7 +115,39 @@ Page({
   },
   onRetry():void{void this.refresh();},
   noop():void{},
-  onTab(e:WechatMiniprogram.TouchEvent):void{this.setData({tab:String(e.currentTarget.dataset.key) as Tab});},
+  onReady():void{this.measureDescription();},
+  onResize():void{
+    if(this.data.kind==='activities')this.setData({descriptionExpanded:false},()=>this.measureDescription());
+  },
+  measureDescription():void{
+    const d=this.data;if(d.kind!=='activities'||!d.record?.description||d.descriptionExpanded)return;
+    const description=d.record.description,generation=this._generation;
+    const query=wx.createSelectorQuery();
+    query.select('#activity-description-clip').boundingClientRect();
+    query.select('#activity-description-text').boundingClientRect();
+    query.exec(results=>{
+      if(generation!==this._generation||this.data.record?.description!==description||this.data.descriptionExpanded)return;
+      const clip=results?.[0],full=results?.[1];
+      if(!clip||!full||typeof clip.height!=='number'||typeof full.height!=='number'||clip.height<=0)return;
+      this.setData({descriptionCanExpand:full.height>clip.height+1,descriptionScrollHeight:Math.ceil(Math.min(full.height,clip.height*3.25))});
+    });
+  },
+  onToggleDescription():void{
+    if(!this.data.descriptionCanExpand)return;
+    this.setData({descriptionExpanded:!this.data.descriptionExpanded},()=>this.measureDescription());
+  },
+  updateActivityRows():void{
+    const d=this.data;if(d.kind!=='activities')return;
+    const rows=d.tab==='calendar'?d.outgoing.filter(x=>x.modelKey==='event'):
+      d.tab==='tasks'?d.outgoing.filter(x=>x.modelKey==='task'):
+      d.tab==='related'?d.outgoing.filter(x=>!['event','task'].includes(x.modelKey)):d.outgoing;
+    const timeline=activityTimeline(rows,d.today,d.overviewOrder);
+    this.setData({activityRows:timeline.items,markerAt:timeline.markerAt});
+  },
+  onOverviewOrder():void{
+    this.setData({overviewOrder:this.data.overviewOrder==='asc'?'desc':'asc'},()=>this.updateActivityRows());
+  },
+  onTab(e:WechatMiniprogram.TouchEvent):void{this.setData({tab:String(e.currentTarget.dataset.key) as Tab},()=>this.updateActivityRows());},
   onEdit():void{
     if(!this.data.canWrite)return;
     const {kind,familyId,recordId}=this.data;
@@ -161,8 +202,8 @@ Page({
       for(const dir of (direction?[direction]:['outgoing','incoming'] as const)){
         const cursor=reset?undefined:(dir==='outgoing'?this.data.nextOut:this.data.nextIn)||undefined;
         const page=await listDomainRelations(this.data.familyId,this.data.kind,this.data.recordId,dir,cursor);
-        const items=relationDisplays(page.items,dir);
-        if(dir==='outgoing')this.setData({outgoing:reset?items:[...this.data.outgoing,...items],nextOut:page.nextCursor});
+        const items=relationDisplays(page.items,dir,this.data.timezone,this.data.today,this.data.people);
+        if(dir==='outgoing')this.setData({outgoing:reset?items:[...this.data.outgoing,...items.filter(x=>!this.data.outgoing.some(y=>y.id===x.id))],nextOut:page.nextCursor},()=>this.updateActivityRows());
         else this.setData({incoming:reset?items:[...this.data.incoming,...items],nextIn:page.nextCursor});
       }
     }catch(error){this.setData({relationError:(error as Error).message||'关联内容加载失败'});}
