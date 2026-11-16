@@ -111,7 +111,7 @@ Page({
       }
       await this.loadRelations(true);
     }catch(error){if(generation===this._generation)this.setData({error:(error as Error).message||'记录不存在或没有查看权限'});}
-    finally{if(generation===this._generation)this.setData({loading:false});}
+    finally{if(generation===this._generation)this.setData({loading:false},()=>this.measureDescription());}
   },
   onRetry():void{void this.refresh();},
   noop():void{},
@@ -197,17 +197,22 @@ Page({
   onMoreHistory():void{if(this.data.historyCursor)void this.loadHistory(true);},
   async loadRelations(reset:boolean,direction?:'outgoing'|'incoming'):Promise<void>{
     if(this.data.relationLoading)return;
+    const {familyId,kind,recordId}=this.data;
+    const generation=this._generation;
     this.setData({relationLoading:true,relationError:''});
     try{
       for(const dir of (direction?[direction]:['outgoing','incoming'] as const)){
         const cursor=reset?undefined:(dir==='outgoing'?this.data.nextOut:this.data.nextIn)||undefined;
-        const page=await listDomainRelations(this.data.familyId,this.data.kind,this.data.recordId,dir,cursor);
+        const page=await listDomainRelations(familyId,kind,recordId,dir,cursor);
+        if(generation!==this._generation||this.data.familyId!==familyId||this.data.recordId!==recordId)return;
         const items=relationDisplays(page.items,dir,this.data.timezone,this.data.today,this.data.people);
         if(dir==='outgoing')this.setData({outgoing:reset?items:[...this.data.outgoing,...items.filter(x=>!this.data.outgoing.some(y=>y.id===x.id))],nextOut:page.nextCursor},()=>this.updateActivityRows());
         else this.setData({incoming:reset?items:[...this.data.incoming,...items],nextIn:page.nextCursor});
       }
-    }catch(error){this.setData({relationError:(error as Error).message||'关联内容加载失败'});}
-    finally{this.setData({relationLoading:false});}
+    }catch(error){if(generation===this._generation)this.setData({relationError:(error as Error).message||'关联内容加载失败'});}
+    finally{this.setData({relationLoading:false});
+      if(generation!==this._generation&&this.data.record)void this.loadRelations(true);
+    }
   },
   onMoreRelations(e:WechatMiniprogram.TouchEvent):void{
     const direction=String(e.currentTarget.dataset.direction) as 'incoming'|'outgoing';
