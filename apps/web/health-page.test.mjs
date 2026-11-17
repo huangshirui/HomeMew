@@ -38,3 +38,9 @@ test('health relations reuse declared source predicate and document event field'
   assert.match(page,/verifyDocumentEvent\(spaceId,personId,eventId\)/u);
   assert.match(domain,/delete fields.subjectPersonId/u);
 });
+
+test('BMI loads the two specific growth metrics rather than depending on total observation count',()=>{
+  assert.match(domain,/readGrowthObservations/u);
+  assert.match(domain,/field:'metricId',op:'contains',value:heightId/u);
+  assert.match(page,/const boundary=page.nextCursor\?page.items.at\(-1\)\?\.observedDate/u);
+});

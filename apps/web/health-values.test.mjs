@@ -44,3 +44,10 @@ test('BMI uses unique same-date subject measurements, explicit units, no inferre
   assert.equal(derivedBmi([height,{...weight,unit:'lb'}],h.id,w.id,'per_synthetic'),null);
   assert.equal(derivedBmi([height,{...weight,subjectPersonId:'per_other'}],h.id,w.id,'per_synthetic'),null);
 });
+
+test('BMI excludes a date split across pagination without suppressing complete newer dates',()=>{
+  const h={id:'h',metricId:'rec_height',valueNumber:150,unit:'cm',observedDate:'2026-01-01',subjectPersonId:'per_synthetic',version:1};
+  const w={...h,id:'w',metricId:'rec_weight',valueNumber:45,unit:'kg'};
+  assert.equal(derivedBmi([h,w],'rec_height','rec_weight','per_synthetic','2026-01-01'),null);
+  assert.deepEqual(derivedBmi([h,w],'rec_height','rec_weight','per_synthetic','2025-12-31'),{date:'2026-01-01',value:20});
+});

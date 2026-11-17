@@ -52,11 +52,11 @@ export function growthMetrics(metrics: HealthMetric[], complete: boolean) {
   };
   return {height:find('身高','cm'),weight:find('体重','kg')};
 }
-export function derivedBmi(rows:HealthObservation[],heightId:string,weightId:string,personId:string) {
+export function derivedBmi(rows:HealthObservation[],heightId:string,weightId:string,personId:string, incompleteOldestDate?:string) {
   // Same subject and date only. Ambiguous repeated measurements are not paired.
   const byDate=new Map<string,HealthObservation[]>();
   for(const row of rows) {
-    if(row.subjectPersonId!==personId||!validDate(row.observedDate)||![heightId,weightId].includes(row.metricId))continue;
+    if(row.observedDate===incompleteOldestDate||row.subjectPersonId!==personId||!validDate(row.observedDate)||![heightId,weightId].includes(row.metricId))continue;
     const list=byDate.get(row.observedDate)??[];list.push(row);byDate.set(row.observedDate,list);
   }
   for(const date of [...byDate.keys()].sort().reverse()) {

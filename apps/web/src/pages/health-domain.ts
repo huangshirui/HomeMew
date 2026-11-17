@@ -1,5 +1,5 @@
 import { apiRequest } from '../lib/api-client';
-import { queryModelRecords, type CanonicalQuery } from '../lib/canonical-query';
+import { queryModelRecords, type CanonicalQuery, type CanonicalQueryPage } from '../lib/canonical-query';
 
 export type HealthModel = 'health_metric' | 'health_observation' | 'health_event' | 'health_document';
 export type HealthRecord = { id: string; version: number; subjectPersonId?: string; updatedAt?: string };
@@ -74,7 +74,7 @@ export async function checkMetricName(spaceId: string, name: string, existingId?
   // a bounded budget; never claim uniqueness if search is incomplete.
   let cursor: string | null = null;
   for (let i = 0; i < 4; i++) {
-    const page = await queryModelRecords<HealthMetric>(spaceId, 'health_metric', {search:{text:name},page:{limit:40,cursor}});
+    const page: CanonicalQueryPage<HealthMetric> = await queryModelRecords<HealthMetric>(spaceId, 'health_metric', {search:{text:name},page:{limit:40,cursor}});
     if (page.items.some(m => m.id !== existingId && m.name.trim().normalize('NFKC').toLowerCase() === name.trim().normalize('NFKC').toLowerCase())) throw Error('已存在同名指标，请复用。');
     cursor = page.nextCursor;
     if (!cursor) return;
@@ -101,4 +101,13 @@ export async function verifyDocumentEvent(spaceId:string,personId:string,eventId
   if(!eventId)return;
   const event=await apiRequest<HealthEvent>(healthRecordUrl(spaceId,'health_event',eventId));
   if(event.id!==eventId||event.subjectPersonId!==personId)throw Error('只能关联同一成员的健康事件');
+}
+
+export function readGrowthObservations(spaceId:string,personId:string,heightId:string,weightId:string) {
+  if(!/^per_[A-Za-z0-9_-]+$/.test(personId)||heightId===weightId)throw Error('生长指标无效');
+  return queryModelRecords<HealthObservation>(spaceId,'health_observation',{
+    filter:{and:[{field:'subjectPersonId',op:'contains',value:personId},
+      {or:[{field:'metricId',op:'contains',value:heightId},{field:'metricId',op:'contains',value:weightId}]}]},
+    sort:[{field:'observedDate',direction:'desc'}],page:{limit:40}
+  });
 }

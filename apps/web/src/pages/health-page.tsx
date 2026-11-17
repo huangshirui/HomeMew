@@ -5,7 +5,7 @@ import { ModalScrollLock } from '../components/ui/modal-behavior';
 import { growthMetrics, derivedBmi } from './health-values';
 import { HealthEventLinks } from './health-event-links';
 import { ApiError, apiRequest } from '../lib/api-client';
-import { checkMetricName, verifyDocumentEvent, deleteHealthRecord, eventPayload, familyToday, measurementPayload, observationValue, readHealthPage, readHealthSchema, saveHealthBatch, saveHealthRecord, type HealthDocument, type HealthEvent, type HealthMetric, type HealthModel, type HealthObservation, type HealthRecord } from './health-domain';
+import { checkMetricName, verifyDocumentEvent, deleteHealthRecord, eventPayload, familyToday, measurementPayload, observationValue, readHealthPage, readHealthSchema, readGrowthObservations, saveHealthBatch, saveHealthRecord, type HealthDocument, type HealthEvent, type HealthMetric, type HealthModel, type HealthObservation, type HealthRecord } from './health-domain';
 
 const tabs = ['概览', '健康指标', '健康事件', '健康档案'] as const;
 type Tab = typeof tabs[number];
@@ -331,7 +331,18 @@ function Overview({ spaceId, personId, go }: { spaceId: string; personId: string
   const obs = useHealthList<HealthObservation>(spaceId, 'health_observation', personId);
   const known = new Map(metrics.items.map(m => [m.id,m.name]));
   const {height,weight}=growthMetrics(metrics.items,!metrics.loading&&!metrics.error&&!metrics.cursor);
-  const bmi=height&&weight&&!obs.loading&&!obs.error&&!obs.cursor?derivedBmi(obs.items,height.id,weight.id,personId):null;
+  const heightId=height?.id,weightId=weight?.id;
+  const [growth,setGrowth]=useState<{date:string;value:number}|null>(null);
+  useEffect(()=>{
+    let active=true;setGrowth(null);
+    if(heightId&&weightId)void readGrowthObservations(spaceId,personId,heightId,weightId).then(page=>{
+      if(!active||page.items.some(r=>r.subjectPersonId!==personId||![heightId,weightId].includes(r.metricId)))return;
+      const boundary=page.nextCursor?page.items.at(-1)?.observedDate:undefined;
+      setGrowth(derivedBmi(page.items,heightId,weightId,personId,boundary));
+    }).catch(()=>{if(active)setGrowth(null);});
+    return()=>{active=false;};
+  },[spaceId,personId,heightId,weightId]);
+  const bmi=heightId&&weightId?growth:null;
   return <div className="space-y-3">
     {bmi?<section className={panel}><h2 className="text-sm text-stone-500">BMI（同日身高体重计算）</h2><p className="text-2xl font-semibold">{bmi.value} <span className="text-sm font-normal">kg/m²</span></p><p className="text-xs text-stone-500">{bmi.date} · 仅计算数值，不作成人或儿童健康分级</p></section>:null}
     <section className={panel + ' space-y-3'}><div className="flex justify-between gap-2"><h2 className="font-semibold">最近测量</h2><button className={button} onClick={() => go('健康指标')}>记录与趋势</button></div>
