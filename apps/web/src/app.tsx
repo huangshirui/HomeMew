@@ -9,6 +9,7 @@ import { FootballPage } from './pages/football-page';
 import { FootballManagePage } from './pages/football-manage-page';
 import { DaysPage } from './pages/days-page';
 import { FamilyPage } from './pages/family-page';
+import { HealthPage } from './pages/health-page';
 import { HomePage } from './pages/home-page';
 import { IntegrationDetailPage } from './pages/integration-detail-page';
 import { MorePage } from './pages/more-page';
@@ -37,6 +38,7 @@ export function App() {
             <Route path="football" element={<FootballPage />} />
             <Route path="football/:matchId" element={<FootballPage />} />
             <Route path="football/manage" element={<FootballManagePage />} />
+            <Route path="family-health" element={<HealthPage />} />
             <Route path="wishes" element={<WishesPage />} />
             <Route path="family" element={<FamilyPage />} />
             <Route path="more" element={<MorePage />} />

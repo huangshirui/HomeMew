@@ -2,6 +2,7 @@ import { handleIntegrationRequest, integrationsReady } from './integration-api.m
 import { adaptEventWritePayload } from './event-location.mjs';
 import { searchPlaces } from './map-places.mjs';
 import { recentPlacesRequest } from './recent-places.mjs';
+import { handleHealthDocumentFile } from './health-document-files.mjs';
 
 const ACCESS_ASSERTION_HEADER = 'cf-access-jwt-assertion';
 const SESSION_COOKIE = '__Host-homemew_session';
@@ -553,6 +554,29 @@ async function proxyLifeSpace(request, env, fetcher, assertion, id, nowMs, servi
 }
 
 
+const HEALTH_DOCUMENT_FILE = /^\/api\/health\/spaces\/(spc_[A-Za-z0-9_-]+)\/persons\/(per_[A-Za-z0-9_-]+)\/documents(?:\/(rec_[A-Za-z0-9_-]+)\/file)?$/u;
+async function healthDocumentFile(request, env, fetcher, assertion, id, nowMs, match) {
+  const [, spaceId, personId, documentId] = match;
+  if ((documentId && request.method !== 'GET') || (!documentId && request.method !== 'POST')) {
+    throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Unsupported health file method');
+  }
+  requireSameOrigin(request);
+  const session = await ensureSession(request, env, fetcher, assertion, id, nowMs);
+  // The family classification and active Person selection are product scope
+  // checks, not substitute authorization. All Core calls use the actual user.
+  const [families, members] = await Promise.all([
+    reconcileFamilySpaces(env, [{ id: spaceId }]),
+    coreUserRequest(env, fetcher, '/api/v1/spaces/' + spaceId + '/members', session.accessToken, id),
+  ]);
+  if (!families.length || !Array.isArray(members) || !members.some(member => member.personId === personId)) {
+    throw new HttpError(404, 'HEALTH_SUBJECT_NOT_FOUND', '家庭成员不可用');
+  }
+  const response = await handleHealthDocumentFile(request, {fetcher, coreBase:baseUrl(env.LIFESPACE_CORE_URL,'LIFESPACE_CORE_URL'), bearer:session.accessToken, spaceId, personId, documentId, id});
+  const headers = new Headers(response.headers);
+  if (session.cookie) headers.set('set-cookie', session.cookie);
+  return new Response(response.body, {status:response.status,headers});
+}
+
 const RECORD_ICON_IMAGE = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish|activity|goal|habit|anniversary|person_group)\/records\/(rec_[A-Za-z0-9_-]+)\/image$/u;
 const RECORD_ICON_UPLOAD = /^\/api\/record-icons\/spaces\/(spc_[A-Za-z0-9_-]+)\/models\/(day_record|event|task|wish|activity|goal|habit|anniversary|person_group)\/image$/u;
 const RECORD_ICON_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -687,6 +711,8 @@ export function createWebHandler({ fetcher = fetch, now = () => Date.now() } = {
         if (url.pathname === '/api/integrations' || url.pathname.startsWith('/api/integrations/')) {
           return await handleIntegrationRequest(request, env, { fetcher, assertion, id });
         }
+        const healthFileRoute = HEALTH_DOCUMENT_FILE.exec(url.pathname);
+        if (healthFileRoute) return await healthDocumentFile(request, env, fetcher, assertion, id, nowMs, healthFileRoute);
         const iconImageRoute = RECORD_ICON_IMAGE.exec(url.pathname) || RECORD_ICON_UPLOAD.exec(url.pathname);
         if (iconImageRoute) {
           if (RECORD_ICON_UPLOAD.test(url.pathname) && request.method !== 'POST') {

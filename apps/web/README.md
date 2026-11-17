@@ -37,6 +37,7 @@ Keep dependencies demand-driven:
 - `/habits` — Habit 单人归属、Check-in 与历史
 - `/anniversaries` — Anniversary 年度纪念日（日历中同时展示）
 - `/football` — FootballMatch + FootballPerformance：记录／统计双入口；快捷按钮只预填统一表单，确认后才保存；参赛人员优先家庭成员，其他 Person 可搜索；Performance 需要在 LifeSpace Staging/Production 独立 Publish 并完成旧 FootballGoal 迁移后才能正式写入。
+- `/family-health` — 家庭共享健康档案；四个健康模型、成员切换与测量/事件/档案；保留 `/health` Worker 运维探针。
 - `/wishes`
 - `/family`
 - `/settings`
