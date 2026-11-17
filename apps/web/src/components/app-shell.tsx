@@ -36,7 +36,7 @@ const growthNavigation = [
 ];
 
 const memoriesNavigation = [
-  { to: '/health', label: '健康', icon: HeartPulse },
+  { to: '/family-health', label: '健康', icon: HeartPulse },
   { to: '/days', label: '日子', icon: Clock3 },
   { to: '/anniversaries', label: '纪念日', icon: Gift },
   { to: '/wishes', label: '许愿池', icon: Heart },

@@ -38,7 +38,7 @@ export function App() {
             <Route path="football" element={<FootballPage />} />
             <Route path="football/:matchId" element={<FootballPage />} />
             <Route path="football/manage" element={<FootballManagePage />} />
-            <Route path="health" element={<HealthPage />} />
+            <Route path="family-health" element={<HealthPage />} />
             <Route path="wishes" element={<WishesPage />} />
             <Route path="family" element={<FamilyPage />} />
             <Route path="more" element={<MorePage />} />

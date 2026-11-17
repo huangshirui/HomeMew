@@ -14,7 +14,7 @@ test('health scope is the household Space and selected Person, not actor identit
 });
 test('health uses four tabs, existing BFF and versioned writes', () => {
   for (const label of ['概览','健康指标','健康事件','健康档案']) assert.ok(page.includes(label));
-  assert.match(source('./src/app.tsx'), /path="health" element=\{<HealthPage \/>\}/u);
+  assert.match(source('./src/app.tsx'), /path="family-health" element=\{<HealthPage \/>\}/u);
   assert.match(domain, /\/api\/lifespace\/core\/v1\/spaces\//u);
   assert.match(domain, /version: existing\.version/u);
   assert.match(page, /currentFamily\.role !== 'viewer'/u);
@@ -25,4 +25,16 @@ test('health never displays a mismatched subject and uses the native atomic batc
   assert.match(page, /result\.items\.some\(item => item\.subjectPersonId !== personId\)/u);
   assert.match(domain, /atomicConsistency: true/u);
   assert.match(page, /readHealthSchema\(spaceId, 'health_event'\)/u);
+});
+
+test('product route never shadows reserved worker readiness endpoint',()=>{
+  assert.match(source('./src/app.tsx'),/path="family-health"/u);
+  assert.doesNotMatch(source('./src/app.tsx'),/path="health"/u);
+  assert.match(source('./wrangler.production.jsonc'),/"\/health"/u);
+});
+test('health relations reuse declared source predicate and document event field',()=>{
+  assert.match(domain,/sourceModelKey:'health_event'/u);
+  assert.match(domain,/predicate:'relates_to'/u);
+  assert.match(page,/verifyDocumentEvent\(spaceId,personId,eventId\)/u);
+  assert.match(domain,/delete fields.subjectPersonId/u);
 });

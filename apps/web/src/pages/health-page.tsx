@@ -2,8 +2,10 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { PageHeader } from '../components/ui/page-header';
 import { useHousehold } from '../components/household-provider';
 import { ModalScrollLock } from '../components/ui/modal-behavior';
+import { growthMetrics, derivedBmi } from './health-values';
+import { HealthEventLinks } from './health-event-links';
 import { ApiError, apiRequest } from '../lib/api-client';
-import { deleteHealthRecord, eventPayload, familyToday, measurementPayload, observationValue, readHealthPage, readHealthSchema, saveHealthBatch, saveHealthRecord, type HealthDocument, type HealthEvent, type HealthMetric, type HealthModel, type HealthObservation, type HealthRecord } from './health-domain';
+import { checkMetricName, verifyDocumentEvent, deleteHealthRecord, eventPayload, familyToday, measurementPayload, observationValue, readHealthPage, readHealthSchema, saveHealthBatch, saveHealthRecord, type HealthDocument, type HealthEvent, type HealthMetric, type HealthModel, type HealthObservation, type HealthRecord } from './health-domain';
 
 const tabs = ['概览', '健康指标', '健康事件', '健康档案'] as const;
 type Tab = typeof tabs[number];
@@ -16,7 +18,7 @@ function message(error: unknown) {
   if (error instanceof ApiError && error.status === 409) return '记录已更新，请刷新后再操作。';
   return '操作未完成，请重试或检查当前权限。';
 }
-function useHealthList<T extends HealthRecord>(spaceId: string, model: HealthModel, personId: string, metricId?: string) {
+function useHealthList<T extends HealthRecord>(spaceId: string, model: HealthModel, personId: string, metricId?: string, timezone = 'UTC') {
   const [items, setItems] = useState<T[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +29,7 @@ function useHealthList<T extends HealthRecord>(spaceId: string, model: HealthMod
     setLoading(true); setError('');
     if (!append) { setItems([]); setCursor(null); }
     try {
-      const result = await readHealthPage<T>(spaceId, model, personId, next, metricId);
+      const result = await readHealthPage<T>(spaceId, model, personId, next, metricId, timezone);
       if (id !== generation.current) return;
       // Defense in depth: the server query is still authoritative. Never display a
       // mis-scoped response under the selected person if the response contract drifts.
@@ -44,7 +46,7 @@ function useHealthList<T extends HealthRecord>(spaceId: string, model: HealthMod
     void request(null, false);
     return () => { generation.current += 1; };
     // The list is remounted for a new family, subject, model or metric.
-  }, [spaceId, model, personId, metricId]);
+  }, [spaceId, model, personId, metricId, timezone]);
   return { items, loading, error, cursor, reload: () => request(null, false), more: () => request(cursor, true) };
 }
 function ListStatus({ loading, error, empty, retry, more, cursor }: {
@@ -96,20 +98,20 @@ function MeasurementDialog({ spaceId, personId, metric, record, timezone, close,
     </form>
   </Dialog>;
 }
-function MetricDialog({ spaceId, close, saved }: { spaceId: string; close: () => void; saved: () => void }) {
-  const [name, setName] = useState(''); const [unit, setUnit] = useState(''); const [type, setType] = useState<HealthMetric['valueType']>('number');
+function MetricDialog({ spaceId, record, close, saved }: { spaceId: string; record?: HealthMetric; close: () => void; saved: () => void }) {
+  const [name, setName] = useState(record?.name ?? ''); const [unit, setUnit] = useState(record?.defaultUnit ?? ''); const [type, setType] = useState<HealthMetric['valueType']>(record?.valueType ?? 'number');
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-  return <Dialog title="添加家庭健康指标" close={close} busy={busy}>
+  return <Dialog title={record ? "编辑家庭健康指标" : "添加家庭健康指标"} close={close} busy={busy}>
     <form className="space-y-3" onSubmit={async e => {
       e.preventDefault(); if (busy || !name.trim()) return; setBusy(true); setError('');
-      try { await saveHealthRecord(spaceId, 'health_metric', { name: name.trim(), valueType: type, defaultUnit: unit.trim() || null }); saved(); }
-      catch (cause) { setError(message(cause)); } finally { setBusy(false); }
+      try { await checkMetricName(spaceId,name.trim(),record?.id); await saveHealthRecord(spaceId, 'health_metric', record ? {name:name.trim()} : { name: name.trim(), valueType: type, defaultUnit: unit.trim() || null },record); saved(); }
+      catch (cause) { setError(cause instanceof ApiError ? message(cause) : cause instanceof Error && ['已存在同名指标，请复用。','同名指标检查未完成，请缩小搜索范围。'].includes(cause.message) ? cause.message : message(cause)); } finally { setBusy(false); }
     }}>
-      <label className="block text-sm">常用指标<select className={control} value="" onChange={e => { const [n,u] = e.target.value.split('|'); if(n) { setName(n); setUnit(u); setType('number'); } }}><option value="">选择预设或自定义</option>{['身高|cm','体重|kg','体温|°C','收缩压|mmHg','舒张压|mmHg','心率|次/分','血氧|%','左眼裸眼视力|','右眼裸眼视力|','体脂率|%','骨骼肌量|kg'].map(p => <option key={p} value={p}>{p.split('|')[0]}</option>)}</select></label>
-      <label className="block text-sm">名称<input required className={control} value={name} onChange={e => setName(e.target.value)} /></label>
-      <label className="block text-sm">值类型<select className={control} value={type} onChange={e => setType(e.target.value as HealthMetric['valueType'])}><option value="number">数值</option><option value="text">文本</option><option value="boolean">是/否</option></select></label>
-      <label className="block text-sm">默认单位<input className={control} value={unit} onChange={e => setUnit(e.target.value)} /></label>
-      <p className="text-xs text-stone-500">指标定义由整个家庭共享，请勿重复添加已有指标。</p>
+      {!record ? <label className="block text-sm">常用指标<select className={control} value="" onChange={e => { const [n,u] = e.target.value.split('|'); if(n) { setName(n); setUnit(u); setType('number'); } }}><option value="">选择预设或自定义</option>{['身高|cm','体重|kg','体温|°C','收缩压|mmHg','舒张压|mmHg','心率|次/分','血氧|%','左眼裸眼视力|','右眼裸眼视力|','体脂率|%','骨骼肌量|kg'].map(p => <option key={p} value={p}>{p.split('|')[0]}</option>)}</select></label> : null}
+      <label className="block text-sm">名称<input required maxLength={160} className={control} value={name} onChange={e => setName(e.target.value)} /></label>
+      <label className="block text-sm">值类型<select disabled={!!record} className={control} value={type} onChange={e => setType(e.target.value as HealthMetric['valueType'])}><option value="number">数值</option><option value="text">文本</option><option value="boolean">是/否</option></select></label>
+      <label className="block text-sm">默认单位<input disabled={!!record} className={control} value={unit} onChange={e => setUnit(e.target.value)} /></label>
+      <p className="text-xs text-stone-500">{record ? '指标由整个家庭共享。为保护已有测量，暂只允许修改名称；类型和单位保持不变。' : '指标定义由整个家庭共享，请勿重复添加已有指标。'}</p>
       {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
       <button type="submit" className={primary} disabled={busy}>保存指标</button>
     </form>
@@ -177,21 +179,20 @@ function GrowthDialog({ spaceId, personId, height, weight, timezone, close, save
 }
 function Metrics({ spaceId, personId, timezone, writable }: { spaceId: string; personId: string; timezone: string; writable: boolean }) {
   const list = useHealthList<HealthMetric>(spaceId, 'health_metric', personId);
-  const [selected, setSelected] = useState(''); const [adding, setAdding] = useState(false); const [growth, setGrowth] = useState(false); const [revision, setRevision] = useState(0);
+  const [selected, setSelected] = useState(''); const [adding, setAdding] = useState(false); const [editingMetric,setEditingMetric]=useState<HealthMetric|null>(null); const [growth, setGrowth] = useState(false); const [revision, setRevision] = useState(0);
   const metric = list.items.find(m => m.id === selected) ?? list.items[0];
-  const heights = list.items.filter(m => m.name === '身高' && m.valueType === 'number' && m.defaultUnit === 'cm');
-  const weights = list.items.filter(m => m.name === '体重' && m.valueType === 'number' && m.defaultUnit === 'kg');
-  const height = !list.cursor && heights.length === 1 ? heights[0] : undefined;
-  const weight = !list.cursor && weights.length === 1 ? weights[0] : undefined;
+  const {height,weight}=growthMetrics(list.items,!list.cursor&&!list.loading&&!list.error);
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center gap-2">
       <label className="min-w-40 flex-1 text-sm">指标<select className={control} value={metric?.id ?? ''} onChange={e => setSelected(e.target.value)}><option value="" disabled>请选择指标</option>{list.items.map(m => <option key={m.id} value={m.id}>{m.name}{m.defaultUnit ? ' · '+m.defaultUnit : ''}</option>)}</select></label>
       {writable && !list.error && !list.loading ? <button className={button} onClick={() => setAdding(true)}>添加指标</button> : null}
+      {writable && metric && !list.error && !list.loading ? <button className={button} onClick={()=>setEditingMetric(metric)}>编辑指标</button> : null}
       {writable && height && weight && !list.error && !list.loading ? <button className={primary} onClick={() => setGrowth(true)}>记录身高体重</button> : null}
     </div>
     <ListStatus {...list} empty={!list.items.length} retry={list.reload} />
     {metric ? <Measurements key={metric.id + ':' + revision} spaceId={spaceId} personId={personId} metric={metric} timezone={timezone} writable={writable} /> : null}
     {growth && height && weight ? <GrowthDialog spaceId={spaceId} personId={personId} timezone={timezone} height={height} weight={weight} close={() => setGrowth(false)} saved={() => { setGrowth(false); setRevision(v => v + 1); }} /> : null}
+    {editingMetric ? <MetricDialog spaceId={spaceId} record={editingMetric} close={()=>setEditingMetric(null)} saved={()=>{setEditingMetric(null);void list.reload();}} /> : null}
     {adding ? <MetricDialog spaceId={spaceId} close={() => setAdding(false)} saved={() => { setAdding(false); void list.reload(); }} /> : null}
   </div>;
 }
@@ -230,11 +231,13 @@ function EventDialog({ spaceId, personId, timezone, record, close, saved }: { sp
   </Dialog>;
 }
 function Events({ spaceId, personId, timezone, writable }: { spaceId: string; personId: string; timezone: string; writable: boolean }) {
-  const list = useHealthList<HealthEvent>(spaceId, 'health_event', personId);
+  const list = useHealthList<HealthEvent>(spaceId, 'health_event', personId, undefined, timezone);
   const [editing, setEditing] = useState<HealthEvent | 'new' | null>(null);
+  const [linking,setLinking]=useState<HealthEvent|null>(null);
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   return <section className={panel + ' space-y-3'}><div className="flex items-center justify-between gap-2"><h2 className="font-semibold">健康事件</h2>{writable && !list.error && !list.loading ? <button className={primary} onClick={() => setEditing('new')}>添加事件</button> : null}</div>
     {list.items.map(r => <article key={r.id} className="border-b border-stone-100 pb-3"><p className="font-medium">{r.summary}</p><p className="text-xs text-stone-500">{r.when?.kind === 'instant' ? new Date(r.when.start).toLocaleString('zh-CN', { timeZone: timezone }) : r.when?.start} · {eventLabels[r.eventType] ?? r.eventType} {r.status === 'cancelled' ? '已取消' : ''}</p>{r.location?.name ? <p className="text-xs text-stone-500">{r.location.name}</p> : null}{r.description ? <p className="mt-1 whitespace-pre-wrap break-words text-sm">{r.description}</p> : null}
+      <button className={button+' mt-2'} onClick={()=>setLinking(r)}>相关日程与待办</button>
       {writable && r.subjectPersonId === personId ? <div className="mt-2 flex gap-2"><button className={button} disabled={busy} onClick={() => setEditing(r)}>编辑</button><button className={button} disabled={busy} onClick={async () => {
         if (busy || !window.confirm('确认删除这条健康事件？')) return;
         setBusy(true); setError('');
@@ -244,14 +247,17 @@ function Events({ spaceId, personId, timezone, writable }: { spaceId: string; pe
     </article>)}
     {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
     <ListStatus {...list} empty={!list.items.length} retry={list.reload} />
+    {linking ? <Dialog title="相关日程与待办" close={()=>setLinking(null)} busy={false}><HealthEventLinks spaceId={spaceId} eventId={linking.id} writable={writable} timezone={timezone}/></Dialog> : null}
     {editing ? <EventDialog spaceId={spaceId} personId={personId} timezone={timezone} record={editing === 'new' ? undefined : editing} close={() => setEditing(null)} saved={() => { setEditing(null); void list.reload(); }} /> : null}
   </section>;
 }
 const documentLabels: Record<string,string> = {lab_report:'化验报告',imaging_report:'影像报告',physical_exam:'体检报告',prescription:'处方',visit_note:'门诊病历',discharge_summary:'出院记录',rehabilitation_plan:'康复方案',other:'其他'};
 const documentPath = (spaceId: string, personId: string) => '/api/health/spaces/' + encodeURIComponent(spaceId) + '/persons/' + encodeURIComponent(personId) + '/documents';
-function DocumentDialog({ spaceId, personId, record, close, saved }: { spaceId: string; personId: string; record?: HealthDocument; close: () => void; saved: () => void }) {
+function DocumentDialog({ spaceId, personId, timezone, record, close, saved }: { spaceId: string; personId: string; timezone:string; record?: HealthDocument; close: () => void; saved: () => void }) {
   const [title,setTitle] = useState(record?.title ?? ''); const [type,setType] = useState(record?.documentType ?? '');
   const [date,setDate] = useState(record?.issuedDate ?? ''); const [issuer,setIssuer] = useState(record?.issuerName ?? ''); const [notes,setNotes] = useState(record?.notes ?? '');
+  const [eventId,setEventId]=useState(record?.eventId??'');
+  const events=useHealthList<HealthEvent>(spaceId,'health_event',personId,undefined,timezone);
   const [file,setFile] = useState<File | null>(null); const [shared,setShared] = useState(false);
   const [types,setTypes] = useState<string[]>([]); const [schemaLoading,setSchemaLoading] = useState(true);
   const [busy,setBusy] = useState(false); const [error,setError] = useState('');
@@ -270,14 +276,15 @@ function DocumentDialog({ spaceId, personId, record, close, saved }: { spaceId: 
       e.preventDefault(); if(busy || !title.trim() || !types.includes(type) || (!record && (!file || !shared)))return;
       setBusy(true);setError('');
       try {
+        if(eventId!== (record?.eventId??'')) await verifyDocumentEvent(spaceId,personId,eventId);
         if(record) {
           if(record.subjectPersonId!==personId)throw Error('成员不匹配');
           // artifactRef is immutable; metadata edits never replace it or the existing event.
-          await saveHealthRecord(spaceId,'health_document',{title:title.trim(),documentType:type,issuedDate:date||null,issuerName:issuer.trim()||null,notes:notes.trim()||null},record);
+          await saveHealthRecord(spaceId,'health_document',{title:title.trim(),documentType:type,issuedDate:date||null,issuerName:issuer.trim()||null,notes:notes.trim()||null,...(eventId!==(record.eventId??'')?{eventId:eventId||null}:{})},record);
         } else if(file) {
           if(file.size>15*1024*1024 || !file.size)throw Error('文件大小无效');
           const form=new FormData();
-          form.set('file',file);form.set('title',title.trim());form.set('documentType',type);form.set('issuedDate',date);form.set('issuerName',issuer.trim());form.set('notes',notes.trim());
+          form.set('file',file);form.set('title',title.trim());form.set('documentType',type);form.set('issuedDate',date);form.set('issuerName',issuer.trim());form.set('notes',notes.trim());form.set('eventId',eventId);
           await apiRequest<HealthDocument>(documentPath(spaceId,personId),{method:'POST',body:form});
         }
         saved();
@@ -288,6 +295,9 @@ function DocumentDialog({ spaceId, personId, record, close, saved }: { spaceId: 
       <label className="block text-sm">报告日期<input type="date" className={control} value={date} onChange={e=>setDate(e.target.value)}/></label>
       <label className="block text-sm">出具机构<input maxLength={200} className={control} value={issuer} onChange={e=>setIssuer(e.target.value)}/></label>
       <label className="block text-sm">说明<textarea maxLength={4000} className={control} value={notes} onChange={e=>setNotes(e.target.value)}/></label>
+      <label className="block text-sm">关联健康事件（可选）<select className={control} value={eventId} onChange={e=>setEventId(e.target.value)}><option value="">不关联</option>{eventId&&!events.items.some(e=>e.id===eventId)?<option value={eventId}>保留已有事件</option>:null}{events.items.map(e=><option key={e.id} value={e.id}>{e.summary} · {e.when?.start.slice(0,10)}</option>)}</select></label>
+      {events.cursor&&!events.loading&&!events.error?<button type="button" className={button} onClick={()=>void events.more()}>加载更多事件</button>:null}
+      {events.error?<p className="text-xs text-stone-500">健康事件暂不可读取，可保留已有关系。</p>:null}
       {!record ? <><label className="block text-sm">附件（PDF 或图片，最大 15 MB）<input required type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" className={control} onChange={e=>{const f=e.target.files?.[0]??null;setFile(f);if(f&&!title.trim())setTitle(f.name.replace(/\.[^.]+$/u,''));}}/></label>
       <label className="flex gap-2 text-sm"><input type="checkbox" required checked={shared} onChange={e=>setShared(e.target.checked)}/>确认该档案适合在当前家庭共享</label></> : <p className="text-xs text-stone-500">已有附件不随资料信息编辑而替换。</p>}
       {error ? <p role="alert" className="text-sm text-red-700">{error}</p>:null}
@@ -295,7 +305,7 @@ function DocumentDialog({ spaceId, personId, record, close, saved }: { spaceId: 
     </form>
   </Dialog>;
 }
-function Documents({ spaceId, personId, writable }: { spaceId: string; personId: string; writable: boolean }) {
+function Documents({ spaceId, personId, timezone, writable }: { spaceId: string; personId: string; timezone:string; writable: boolean }) {
   const list = useHealthList<HealthDocument>(spaceId, 'health_document', personId);
   const [editing,setEditing] = useState<HealthDocument | 'new' | null>(null);
   const [busy,setBusy] = useState(false); const [error,setError] = useState('');
@@ -313,14 +323,17 @@ function Documents({ spaceId, personId, writable }: { spaceId: string; personId:
     </article>)}
     {error?<p role="alert" className="text-sm text-red-700">{error}</p>:null}
     <ListStatus {...list} empty={!list.items.length} retry={list.reload} />
-    {editing?<DocumentDialog spaceId={spaceId} personId={personId} record={editing==='new'?undefined:editing} close={()=>setEditing(null)} saved={()=>{setEditing(null);void list.reload();}}/>:null}
+    {editing?<DocumentDialog spaceId={spaceId} personId={personId} timezone={timezone} record={editing==='new'?undefined:editing} close={()=>setEditing(null)} saved={()=>{setEditing(null);void list.reload();}}/>:null}
   </section>;
 }
 function Overview({ spaceId, personId, go }: { spaceId: string; personId: string; go: (tab: Tab) => void }) {
   const metrics = useHealthList<HealthMetric>(spaceId, 'health_metric', personId);
   const obs = useHealthList<HealthObservation>(spaceId, 'health_observation', personId);
   const known = new Map(metrics.items.map(m => [m.id,m.name]));
+  const {height,weight}=growthMetrics(metrics.items,!metrics.loading&&!metrics.error&&!metrics.cursor);
+  const bmi=height&&weight&&!obs.loading&&!obs.error&&!obs.cursor?derivedBmi(obs.items,height.id,weight.id,personId):null;
   return <div className="space-y-3">
+    {bmi?<section className={panel}><h2 className="text-sm text-stone-500">BMI（同日身高体重计算）</h2><p className="text-2xl font-semibold">{bmi.value} <span className="text-sm font-normal">kg/m²</span></p><p className="text-xs text-stone-500">{bmi.date} · 仅计算数值，不作成人或儿童健康分级</p></section>:null}
     <section className={panel + ' space-y-3'}><div className="flex justify-between gap-2"><h2 className="font-semibold">最近测量</h2><button className={button} onClick={() => go('健康指标')}>记录与趋势</button></div>
       {obs.items.slice(0,6).map(r => <div key={r.id} className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2 text-sm"><span>{known.get(r.metricId) ?? '健康指标'}<span className="ml-2 text-xs text-stone-500">{r.observedDate}</span></span><strong>{observationValue(r)} {r.unit}</strong></div>)}
       <ListStatus {...obs} empty={!obs.items.length} retry={obs.reload} />
@@ -343,7 +356,7 @@ export function HealthPage() {
         {tab === '概览' ? <Overview spaceId={currentFamily.id} personId={selected.personId} go={setTab} />
         : tab === '健康指标' ? <Metrics spaceId={currentFamily.id} personId={selected.personId} timezone={currentFamily.timezone} writable={currentFamily.role !== 'viewer'} />
         : tab === '健康事件' ? <Events spaceId={currentFamily.id} personId={selected.personId} timezone={currentFamily.timezone} writable={currentFamily.role !== 'viewer'} />
-        : <Documents spaceId={currentFamily.id} personId={selected.personId} writable={currentFamily.role !== 'viewer'} />}
+        : <Documents spaceId={currentFamily.id} personId={selected.personId} timezone={currentFamily.timezone} writable={currentFamily.role !== 'viewer'} />}
       </div>
     </>}
   </div>;

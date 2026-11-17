@@ -54,7 +54,7 @@ test('More uses compact grouped icon tiles and shows the staging family role', (
   assert.match(more, /min-h-28 flex-col items-center/u);
   assert.match(more, /当前身份：\{roleLabels\[currentFamily\.role\]\}/u);
   assert.doesNotMatch(more, /h-full p-5/u, 'Do not use old full-width descriptive cards on mobile');
-  assert.match(more, /to: '\/health', title: '健康'/u);
+  assert.match(more, /to: '\/family-health', title: '健康'/u);
   assert.match(more, /to: '\/days', title: '日子'/u);
   assert.match(more, /to: '\/family', title: '家庭与成员'/u);
   assert.match(more, /to: '\/settings', title: '设置'/u);

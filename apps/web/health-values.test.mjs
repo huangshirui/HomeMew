@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validDate, dateRange, measurementPayload, eventPayload } from './src/pages/health-values.ts';
+import { validDate, dateRange, measurementPayload, eventPayload, growthMetrics, derivedBmi } from './src/pages/health-values.ts';
 
 const metric = { id: 'rec_synthetic', version: 1, valueType: 'number', name: 'Synthetic' };
 test('strict date-only validation and leap-day half-open ranges', () => {
@@ -29,4 +29,18 @@ test('event editing preserves existing instants and rich location; prevents subj
   const shifted = eventPayload('per_synthetic','Example','visit','2026-02-01','Other','',{...record,when:{kind:'date',start:'2026-01-01',endExclusive:'2026-01-04'}});
   assert.deepEqual(shifted.when,{kind:'date',start:'2026-02-01',endExclusive:'2026-02-04'});
   assert.deepEqual(shifted.location,{name:'Other'});
+});
+
+test('BMI uses unique same-date subject measurements, explicit units, no inferred pairing',()=>{
+  const h={...metric,id:'rec_height',name:'身高',defaultUnit:'cm'},w={...metric,id:'rec_weight',name:'体重',defaultUnit:'kg'};
+  assert.equal(growthMetrics([h,w],true).height.id,h.id);
+  assert.equal(growthMetrics([h,w,{...h,id:'rec_duplicate'}],true).height,undefined);
+  assert.equal(growthMetrics([h,w],false).weight,undefined);
+  const row=(id,metricId,valueNumber,unit,observedDate='2026-01-01',subjectPersonId='per_synthetic')=>({id,metricId,valueNumber,unit,observedDate,subjectPersonId,version:1});
+  const height=row('h',h.id,150,'cm'),weight=row('w',w.id,45,'kg');
+  assert.deepEqual(derivedBmi([height,weight],h.id,w.id,'per_synthetic'),{date:'2026-01-01',value:20});
+  assert.equal(derivedBmi([height,{...weight,observedDate:'2026-01-02'}],h.id,w.id,'per_synthetic'),null);
+  assert.equal(derivedBmi([height,weight,{...weight,id:'w2'}],h.id,w.id,'per_synthetic'),null);
+  assert.equal(derivedBmi([height,{...weight,unit:'lb'}],h.id,w.id,'per_synthetic'),null);
+  assert.equal(derivedBmi([height,{...weight,subjectPersonId:'per_other'}],h.id,w.id,'per_synthetic'),null);
 });

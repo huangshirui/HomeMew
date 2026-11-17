@@ -16,19 +16,20 @@ function spaceRoot(spaceId: string) {
 export function healthRecordUrl(spaceId: string, model: HealthModel, id?: string) {
   return spaceRoot(spaceId) + '/models/' + model + '/records' + (id ? '/' + encodeURIComponent(id) : '');
 }
-export function healthQuery(model: HealthModel, personId: string, cursor: string | null, metricId?: string): CanonicalQuery {
+export function healthQuery(model: HealthModel, personId: string, cursor: string | null, metricId?: string, timezone = 'UTC'): CanonicalQuery {
   if (model !== 'health_metric' && !/^per_[A-Za-z0-9_-]+$/.test(personId)) throw Error('请选择有效家庭成员');
   const subject = { field: 'subjectPersonId', op: 'contains' as const, value: personId };
   return {
     ...(model === 'health_metric' ? {} : { filter: model === 'health_observation' && metricId
       ? { and: [subject, { field: 'metricId', op: 'contains' as const, value: metricId }] } : subject }),
-    sort: [{ field: model === 'health_observation' ? 'observedDate' : 'updatedAt', direction: 'desc' }],
+    sort: [{ field: model === 'health_observation' ? 'observedDate' : model === 'health_event' ? 'when' : model === 'health_document' ? 'issuedDate' : 'name', direction: model === 'health_metric' ? 'asc' : 'desc' }],
+    ...(model === 'health_event' ? { context: { viewingTimezone: timezone } } : {}),
     page: { limit: 40, cursor },
   };
 }
-export function readHealthPage<T extends HealthRecord>(spaceId: string, model: HealthModel, personId: string, cursor: string | null, metricId?: string) {
+export function readHealthPage<T extends HealthRecord>(spaceId: string, model: HealthModel, personId: string, cursor: string | null, metricId?: string, timezone = 'UTC') {
   spaceRoot(spaceId);
-  return queryModelRecords<T>(spaceId, model, healthQuery(model, personId, cursor, metricId));
+  return queryModelRecords<T>(spaceId, model, healthQuery(model, personId, cursor, metricId, timezone));
 }
 export async function readHealthSchema(spaceId: string, model: HealthModel) {
   const schema = await apiRequest<HealthSchema>(spaceRoot(spaceId) + '/_discovery/models/' + model);
@@ -36,9 +37,15 @@ export async function readHealthSchema(spaceId: string, model: HealthModel) {
   return schema;
 }
 export function saveHealthRecord(spaceId: string, model: HealthModel, payload: Record<string, unknown>, existing?: HealthRecord) {
+  const fields = { ...payload };
+  if (existing) {
+    if ('subjectPersonId' in fields && fields.subjectPersonId !== existing.subjectPersonId) throw Error('成员不可变更');
+    delete fields.subjectPersonId;
+    if (model === 'health_document') delete fields.artifactRef;
+  }
   return apiRequest<HealthRecord>(healthRecordUrl(spaceId, model, existing?.id), {
     method: existing ? 'PATCH' : 'POST',
-    body: JSON.stringify({ ...payload, ...(existing ? { version: existing.version } : {}) }),
+    body: JSON.stringify({ ...fields, ...(existing ? { version: existing.version } : {}) }),
   });
 }
 export function deleteHealthRecord(spaceId: string, model: HealthModel, existing: HealthRecord) {
@@ -60,4 +67,38 @@ export async function saveHealthBatch(spaceId: string, payloads: Record<string, 
 export function familyToday(timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   return ['year','month','day'].map(key => parts.find(p => p.type === key)?.value).join('-');
+}
+
+export async function checkMetricName(spaceId: string, name: string, existingId?: string) {
+  // Name is searchable, not filterable. Page all matching candidates within
+  // a bounded budget; never claim uniqueness if search is incomplete.
+  let cursor: string | null = null;
+  for (let i = 0; i < 4; i++) {
+    const page = await queryModelRecords<HealthMetric>(spaceId, 'health_metric', {search:{text:name},page:{limit:40,cursor}});
+    if (page.items.some(m => m.id !== existingId && m.name.trim().normalize('NFKC').toLowerCase() === name.trim().normalize('NFKC').toLowerCase())) throw Error('已存在同名指标，请复用。');
+    cursor = page.nextCursor;
+    if (!cursor) return;
+  }
+  throw Error('同名指标检查未完成，请缩小搜索范围。');
+}
+export type RelatedHealthTarget = { id: string; name?: string; summary?: string; dueDate?: string | null; when?: HealthEvent['when'] };
+export type HealthRelation = { id: string; target: {modelKey:string;recordId:string}; targetLabel?: string; targetRecord?: RelatedHealthTarget };
+export function searchHealthTargets(spaceId:string, model:'event'|'task', text:string, cursor:string|null) {
+  return queryModelRecords<RelatedHealthTarget>(spaceId,model,{search:{text},page:{limit:30,cursor}});
+}
+export function listHealthRelations(spaceId:string, eventId:string, cursor:string|null) {
+  const params = new URLSearchParams({sourceModelKey:'health_event',sourceRecordId:eventId,predicate:'relates_to',hydrate:'target',limit:'30'});
+  if(cursor)params.set('cursor',cursor);
+  return apiRequest<{items:HealthRelation[];nextCursor:string|null}>(spaceRoot(spaceId)+'/semantic-relations?'+params);
+}
+export function linkHealthEvent(spaceId:string,eventId:string,model:'event'|'task',targetId:string) {
+  return apiRequest(spaceRoot(spaceId)+'/semantic-relations',{method:'POST',body:JSON.stringify({predicate:'relates_to',source:{kind:'record',modelKey:'health_event',recordId:eventId},target:{kind:'record',modelKey:model,recordId:targetId}})});
+}
+export function unlinkHealthEvent(spaceId:string,relationId:string) {
+  return apiRequest(spaceRoot(spaceId)+'/semantic-relations/'+encodeURIComponent(relationId),{method:'DELETE'});
+}
+export async function verifyDocumentEvent(spaceId:string,personId:string,eventId:string) {
+  if(!eventId)return;
+  const event=await apiRequest<HealthEvent>(healthRecordUrl(spaceId,'health_event',eventId));
+  if(event.id!==eventId||event.subjectPersonId!==personId)throw Error('只能关联同一成员的健康事件');
 }

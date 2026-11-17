@@ -1,4 +1,4 @@
-import type { HealthMetric, HealthEvent } from './health-domain';
+import type { HealthMetric, HealthEvent, HealthObservation } from './health-domain';
 
 export function validDate(date: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
@@ -43,4 +43,30 @@ export function eventPayload(personId: string, summary: string, eventType: strin
     ...(existing ? {} : { status: 'active' }),
     location: location.trim() ? existing?.location?.name === location.trim() ? existing.location : { name: location.trim() } : null,
     description: description.trim() || null };
+}
+
+export function growthMetrics(metrics: HealthMetric[], complete: boolean) {
+  const find = (name:string,unit:string) => {
+    const matches=metrics.filter(m=>m.name===name);
+    return complete && matches.length===1 && matches[0].valueType==='number' && matches[0].defaultUnit===unit ? matches[0] : undefined;
+  };
+  return {height:find('身高','cm'),weight:find('体重','kg')};
+}
+export function derivedBmi(rows:HealthObservation[],heightId:string,weightId:string,personId:string) {
+  // Same subject and date only. Ambiguous repeated measurements are not paired.
+  const byDate=new Map<string,HealthObservation[]>();
+  for(const row of rows) {
+    if(row.subjectPersonId!==personId||!validDate(row.observedDate)||![heightId,weightId].includes(row.metricId))continue;
+    const list=byDate.get(row.observedDate)??[];list.push(row);byDate.set(row.observedDate,list);
+  }
+  for(const date of [...byDate.keys()].sort().reverse()) {
+    const entries=byDate.get(date)!;
+    const h=entries.filter(r=>r.metricId===heightId),w=entries.filter(r=>r.metricId===weightId);
+    if(h.length!==1||w.length!==1||h[0].unit!=='cm'||w[0].unit!=='kg')continue;
+    const height=h[0].valueNumber,weight=w[0].valueNumber;
+    if(typeof height!=='number'||typeof weight!=='number'||!Number.isFinite(height)||!Number.isFinite(weight)||height<=0||weight<=0)continue;
+    const bmi=weight/((height/100)**2);
+    if(Number.isFinite(bmi))return {date,value:Math.round(bmi*10)/10};
+  }
+  return null;
 }
