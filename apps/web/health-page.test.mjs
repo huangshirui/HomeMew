@@ -46,3 +46,7 @@ test('bounded growth and on-demand query and file access',()=>{
   assert.match(page,/URL.revokeObjectURL/u);
   assert.match(page,/iframe sandbox=""/u);
 });
+
+ test('stable empty list avoids repeated effects while access or data is unavailable',()=>{
+ assert.match(page,/const EMPTY_HEALTH_ROWS:never\[\]=\[\]/u);assert.match(page,/items:ready\?items:EMPTY_HEALTH_ROWS/u);assert.match(page,/!obs.loading&&!obs.error\?extra:EMPTY_HEALTH_ROWS/u);
+ });
