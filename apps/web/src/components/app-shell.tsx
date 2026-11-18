@@ -35,12 +35,15 @@ const growthNavigation = [
   { to: '/habits', label: '习惯', icon: Flame },
 ];
 
-const memoriesNavigation = [
+const healthNavigation = [
   { to: '/family-health', label: '健康', icon: HeartPulse },
+  { to: '/football', label: '足球比赛', icon: Trophy },
+];
+
+const memoriesNavigation = [
   { to: '/days', label: '日子', icon: Clock3 },
   { to: '/anniversaries', label: '纪念日', icon: Gift },
   { to: '/wishes', label: '许愿池', icon: Heart },
-  { to: '/football', label: '足球比赛', icon: Trophy },
 ];
 
 const managementNavigation = [
@@ -226,6 +229,7 @@ function DesktopNav() {
       <nav aria-label="家庭主导航" className="mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 scrollbar-overlay">
         <SidebarSection title="日常" entries={dailyNavigation} first />
         <SidebarSection title="计划与成长" entries={growthNavigation} />
+        <SidebarSection title="健康与运动" entries={healthNavigation} />
         <SidebarSection title="家庭生活" entries={memoriesNavigation} />
         <SidebarSection title="家庭管理" entries={managementNavigation} />
       </nav>

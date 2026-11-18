@@ -14,13 +14,18 @@ const groups = [
     ],
   },
   {
-    title: '家庭生活',
+    title: '健康与运动',
     entries: [
       { to: '/family-health', title: '健康', icon: HeartPulse, tone: 'bg-rose-100 text-rose-700' },
+      { to: '/football', title: '足球比赛', icon: Trophy, tone: 'bg-blue-100 text-blue-700' },
+    ],
+  },
+  {
+    title: '家庭生活',
+    entries: [
       { to: '/days', title: '日子', icon: Clock3, tone: 'bg-amber-100 text-amber-700' },
       { to: '/anniversaries', title: '纪念日', icon: Gift, tone: 'bg-violet-100 text-violet-700' },
       { to: '/wishes', title: '许愿池', icon: Heart, tone: 'bg-pink-100 text-pink-700' },
-      { to: '/football', title: '足球比赛', icon: Trophy, tone: 'bg-blue-100 text-blue-700' },
     ],
   },
   {
