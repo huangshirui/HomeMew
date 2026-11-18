@@ -1,0 +1,10 @@
+# Decision: Mini Family Health / 小程序家庭健康
+
+Date: 2026-11-18
+Status: Owner requested implementation; Web production verified by Owner; Mini candidate not released.
+
+- Port the existing Web UX and four models (metric, observation, event, document) to native Mini TypeScript and WXML. More → 健康与运动 → 健康; align football group with Web, keep the four bottom tabs and existing family/settings/about entries. Shared member portraits and persistent selector; 概览 / 指标 / 事件 / 档案. Web product semantics are the baseline, not an excuse to implement a second model.
+- BFF owns explicit /families/:familyId/health product paths, capability projection, bounded queries, time and field mapping, atomic growth, optimistic versions, file and relation operations. Mini never supplies generic LifeSpace model keys, query AST, raw upload IDs or arbitrary URLs. Same-family active Person check, Family Catalog, user bearer, Core authoritative; no persistence, no new LifeSpace permissions. File lifecycle reuses the existing Web helper, with Mini bearer and Core Service Binding; signed R2 URL never goes to Mini.
+- Request budget: one capability/member context per scope (2 upstream calls), metrics once per current workspace, overview recent 12 and at most one growth query 20, histories 30, events/documents 20, explicit more; subject routes perform a fresh member-scope check (one additional bounded Core members call per request) to avoid admitting arbitrary non-member Person. No per-row profile/file loads, no all-member health prefetch, no polling, no persistent health data; actual D1 rows not measured yet.
+- Native Mini file chooser/viewer and temporary files only; retain family-sharing confirmation, no automatic save to album/device, safe upload types and limit 15 MB, cleanup. Must validate device support and lifecycle before release.
+- Mini development/trial/release point to Production. Publish new bounded BFF through exact Preview + Production release gate before distributing Mini; use isolated test family. Existing Web and Mini behavior must remain compatible. No backend worker, LifeSpace code or schema change. Separate permission review for any future expansion.

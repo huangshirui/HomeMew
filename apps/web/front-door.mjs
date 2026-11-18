@@ -1,4 +1,5 @@
 import webHandler from './worker.mjs';
+import { handleMiniHealthBff } from './miniprogram-health-bff.mjs';
 import { handleMiniNewDomainBff } from './miniprogram-new-domains-bff.mjs';
 import { handleMiniProgramBff } from './miniprogram-bff.mjs';
 import { handleMiniProgramFinalEventBff } from './miniprogram-final-event-bff.mjs';
@@ -57,6 +58,9 @@ export function createFrontDoorHandler({ app = webHandler } = {}) {
       if (recentResponse) return recentResponse;
       const placeBffResponse = await handleMiniPlaceSearch(request, env);
       if (placeBffResponse) return placeBffResponse;
+
+      const healthResponse = await handleMiniHealthBff(request, env);
+      if (healthResponse) return healthResponse;
 
       const newDomainResponse = await handleMiniNewDomainBff(request, env);
       if (newDomainResponse) return newDomainResponse;
