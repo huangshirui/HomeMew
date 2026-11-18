@@ -147,7 +147,7 @@ export async function handleMiniHealthBff(request,env,{externalFetch=fetch}={}){
       if(!recordId&&request.method==='GET'){
         const q=params(url,['limit','cursor','q']);if(!q)return bad();
         const name=q.p.get('q')||'';if(!str(name,160))return bad();
-        return page(path,{...(name?{search:{text:name}}:{}),sort:[{field:'name',direction:'asc'}],page:{limit:q.limit,cursor:q.cursor}},'metrics');
+        return await page(path,{...(name?{search:{text:name}}:{}),sort:[{field:'name',direction:'asc'}],page:{limit:q.limit,cursor:q.cursor}},'metrics');
       }
       if(url.search)return bad();
       const v=await body(request);
@@ -170,7 +170,7 @@ export async function handleMiniHealthBff(request,env,{externalFetch=fetch}={}){
         const q=params(url,['heightId','weightId'],20);
         const h=q?.p.get('heightId'),w=q?.p.get('weightId');
         if(!q||!RECORD.test(h||'')||!RECORD.test(w||'')||h===w)return bad();
-        return page(col(root,'measurements'),{filter:and([f('subjectPersonId','contains',personId),{or:[f('metricId','contains',h),f('metricId','contains',w)]}]),sort:[{field:'observedDate',direction:'desc'}],page:{limit:20}},'measurements',timezone,personId);
+        return await page(col(root,'measurements'),{filter:and([f('subjectPersonId','contains',personId),{or:[f('metricId','contains',h),f('metricId','contains',w)]}]),sort:[{field:'observedDate',direction:'desc'}],page:{limit:20}},'measurements',timezone,personId);
       }
       if(request.method!=='POST'||url.search)return bad();
       const v=await body(request);
@@ -184,7 +184,11 @@ export async function handleMiniHealthBff(request,env,{externalFetch=fetch}={}){
         operations.push({operation:'create',modelKey:MODELS.measurements,data:{subjectPersonId:personId,metricId:e.metricId,observedDate:v.date,valueNumber:e.value,valueText:null,valueBoolean:null,unit:e.unit,notes:null}});
       }
       const response=await core(root+'/models/batch','POST',{atomicConsistency:true,operations});
-      return response.ok?ok({saved:true},201):response;
+      if(!response.ok)return response;
+      const result=(await response.json().catch(()=>null))?.data;
+      if(result?.atomicConsistency!==true||!Array.isArray(result.items)||result.items.length!==operations.length||result.items.some(item=>item.status!=='succeeded'))
+        return fail(502,'HEALTH_GROWTH_UNCONFIRMED','保存结果暂不可确认，请刷新后核对');
+      return ok({saved:true},201);
     }
     if(recordId&&!RECORD.test(recordId))return bad();
     const collection=col(root,kind),path=recordId?collection+'/'+recordId:collection;
@@ -246,7 +250,7 @@ export async function handleMiniHealthBff(request,env,{externalFetch=fetch}={}){
       if(metricId){if(!RECORD.test(metricId))return bad();clauses.push(f('metricId','contains',metricId));}
       if(since){if(!validDate(since))return bad();clauses.push(f('observedDate','gte',since));}
       if(documentType){if(!DOCUMENT_TYPES.includes(documentType))return bad();clauses.push(f('documentType','eq',documentType));}
-      return page(collection,{filter:and(clauses),sort:[{field:kind==='measurements'?'observedDate':kind==='events'?'when':'issuedDate',direction:'desc'}],...(kind==='events'?{context:{viewingTimezone:timezone}}:{}),page:{limit:q.limit,cursor:q.cursor}},kind,timezone,personId);
+      return await page(collection,{filter:and(clauses),sort:[{field:kind==='measurements'?'observedDate':kind==='events'?'when':'issuedDate',direction:'desc'}],...(kind==='events'?{context:{viewingTimezone:timezone}}:{}),page:{limit:q.limit,cursor:q.cursor}},kind,timezone,personId);
     }
     if(url.search&&!(kind==='events'&&[...url.searchParams.keys()].every(k=>k==='timezone')))return bad();
     if(recordId&&request.method==='GET')return ok(row(kind,await sameSubject(kind,recordId,personId),timezone));

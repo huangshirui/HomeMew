@@ -82,7 +82,7 @@ function utf8Encode(str: string): Uint8Array {
   return new Uint8Array(bytes);
 }
 
-function buildMultipartBody(
+export function buildMultipartBody(
   buffer: ArrayBuffer,
   filename: string,
   mime: string,

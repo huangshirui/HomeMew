@@ -53,7 +53,7 @@ test('measurement false is preserved, immutable subject and stale version passed
 });
 test('growth uses one atomic batch and fixed metrics, and event edit preserves precise time',async()=>{
   const when={kind:'instant',start:'2026-01-01T10:00:00Z',endExclusive:'2026-01-01T11:00:00Z'};
-  const {env,calls}=setup((p,m,d)=>p.endsWith('/rec_h')?reply({name:'身高',valueType:'number',defaultUnit:'cm'}):p.endsWith('/rec_w')?reply({name:'体重',valueType:'number',defaultUnit:'kg'}):p.endsWith('/batch')?reply({results:[]}):m==='GET'?reply({id:'rec_e',subjectPersonId:'per_me',when,version:2}):reply({id:'rec_e',subjectPersonId:'per_me',version:3,...d}));
+  const {env,calls}=setup((p,m,d)=>p.endsWith('/rec_h')?reply({name:'身高',valueType:'number',defaultUnit:'cm'}):p.endsWith('/rec_w')?reply({name:'体重',valueType:'number',defaultUnit:'kg'}):p.endsWith('/batch')?reply({atomicConsistency:true,items:[{status:'succeeded'},{status:'succeeded'}]}):m==='GET'?reply({id:'rec_e',subjectPersonId:'per_me',when,version:2}):reply({id:'rec_e',subjectPersonId:'per_me',version:3,...d}));
   assert.equal((await handleMiniHealthBff(req(subject+'/growth','POST',{date:'2026-01-01',entries:[{metricId:'rec_h',value:150,unit:'cm'},{metricId:'rec_w',value:40,unit:'kg'}]}),env)).status,201);
   assert.equal(calls.at(-1).data.atomicConsistency,true);assert.equal(calls.at(-1).data.operations.length,2);
   assert.equal((await handleMiniHealthBff(req(subject+'/events/rec_e','PATCH',{summary:'Synthetic',eventType:'visit',date:'2026-02-01',version:2}),env)).status,200);
