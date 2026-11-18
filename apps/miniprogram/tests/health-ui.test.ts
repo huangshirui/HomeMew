@@ -50,3 +50,41 @@ test('Mini health transport stays bounded and explicit',()=>{
   assert.match(page,/this\.data\.shared/);
   assert.match(page,/this\.data\.busy/);
 });
+
+test('health page reuses context/metrics while switching member and tab, ignores old subject responses',async()=>{
+  const source=src('pages/health/health.ts').replace(/^import[\s\S]*?from ['"][^'"]+['"];?\r?$/gm,'');
+  const vcode=src('utils/health-values.ts').replace(/^import type .*?;$/m,'').replace(/export function /g,'function ');
+  const utils=runInNewContext(stripTypeScriptTypes(vcode)+'\n({derivedBmi,growthMetrics,healthSince,healthMonth,familyToday,observationValue,measurementFields,trendSeries,validDate})');
+  const family={id:'spc_home',timezone:'Asia/Shanghai'};
+  const user={id:'usr_a'};
+  const members=[{userId:'usr_a',personId:'per_a',displayName:'A',role:'editor'},{userId:'usr_b',personId:'per_b',displayName:'B',role:'editor'}];
+  const metric={id:'rec_h',version:1,name:'身高',valueType:'number',defaultUnit:'cm'};
+  const calls:string[]=[];let resolveOld:((value:any)=>void)|undefined;let hold=false;let page:any;
+  runInNewContext(stripTypeScriptTypes(source),{
+    ...utils,currentFamilyStore:{value:family},userStore:{value:user},
+    ensureRuntimeReady:async()=>{},AutoRefreshGate:class{shouldRefresh(){return false;}noteRequest(){}},markRefreshDirty:()=>{},
+    getHealthContext:async()=>{calls.push('context');return {people:members,permissions:{metrics:{read:true,write:true},measurements:{read:true,write:true},events:{read:true,write:true},documents:{read:true,write:true}},eventTypes:['visit'],documentTypes:['physical_exam']};},
+    listHealthMetrics:async()=>{calls.push('metrics');return {items:[metric],nextCursor:null};},
+    listMeasurements:async(_space:string,person:string,opts:any)=>{
+      calls.push(person+':'+opts.limit);
+      if(hold&&person==='per_a')return new Promise(resolve=>{resolveOld=resolve;});
+      return {items:[{id:'rec_'+person,subjectPersonId:person,version:1,metricId:metric.id,observedDate:'2026-01-01',valueNumber:150,valueText:null,valueBoolean:null,unit:'cm',notes:null}],nextCursor:null};
+    },
+    listHealthEvents:async(_space:string,person:string)=>{calls.push(person+':events');return {items:[],nextCursor:null};},
+    eventLabels:{visit:'就诊'},documentLabels:{physical_exam:'体检报告'},valueTypeLabels:{number:'数值',text:'文本',boolean:'是/否'},
+    Page:(definition:any)=>{page=definition;},wx:{nextTick:()=>{},showToast:()=>{}},
+  });
+  page.setData=(patch:any,cb?:()=>void)=>{Object.assign(page.data,patch);cb?.();};
+  await page.onShow();
+  assert.equal(page.data.personId,'per_a');assert.equal(page.data.recent[0].subjectPersonId,'per_a');
+  assert.deepEqual(calls,['context','metrics','per_a:12']);
+  hold=true;page.switchTab('metrics','rec_h');assert.ok(resolveOld);
+  page.onPerson({currentTarget:{dataset:{id:'per_b'}}});
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  resolveOld!({items:[{id:'rec_old',subjectPersonId:'per_a',metricId:'rec_h',observedDate:'2026-01-01',valueNumber:99,unit:'cm',version:1}],nextCursor:null});
+  await Promise.resolve();await Promise.resolve();
+  assert.equal(page.data.personId,'per_b');assert.equal(page.data.tab,'metrics');
+  assert.equal(page.data.observations[0].subjectPersonId,'per_b');
+  assert.equal(page.data.selectedMetricId,'rec_h');
+  assert.equal(calls.filter(c=>c==='context').length,1);assert.equal(calls.filter(c=>c==='metrics').length,1);
+});

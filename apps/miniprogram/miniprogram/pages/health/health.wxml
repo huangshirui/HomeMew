@@ -99,8 +99,8 @@
       </block>
     </block>
   </block>
-  <view wx:if="{{modal}}" class="health-mask" bindtap="onCloseModal" catchtouchmove="stopTap">
-    <view class="health-sheet" catchtap="stopTap">
+  <view wx:if="{{modal}}" class="health-mask" bindtap="onCloseModal">
+    <view class="health-sheet" catchtap="stopTap" catchtouchmove="stopTap">
       <view class="health-sheet-head"><text class="health-sheet-title">{{modalTitle}}</text><view class="health-icon-button" bindtap="onCloseModal" aria-label="关闭"><lucide-icon name="x" color="#78716c" size="22"/></view></view>
       <scroll-view scroll-y class="health-sheet-body">
         <block wx:if="{{modal==='manage'}}">

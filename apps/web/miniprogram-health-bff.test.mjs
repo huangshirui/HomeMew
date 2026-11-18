@@ -71,3 +71,36 @@ test('health link deletion validates source and target',async()=>{
   assert.equal(calls.filter(c=>c.method==='DELETE').length,0);
 });
 test('non-health route is not intercepted',async()=>assert.equal(await handleMiniHealthBff(req('/api/v1/miniprogram/families/spc_home/tasks'),{}),null));
+
+test('Mini health file upload/download uses trusted Core binding and does not forward bearer to R2',async()=>{
+  const signed='https://'+'a'.repeat(32)+'.r2.cloudflarestorage.com/synthetic/health.pdf?sig=synthetic';
+  const fileId='fil_'+'b'.repeat(32),uploadId='upl_'+'c'.repeat(32);
+  const calls=[];
+  const env={HOMEMEW_BACKEND:{fetch:async()=>reply({familySpaceIds:['spc_home']})},LIFESPACE_CORE:{fetch:async r=>{
+    assert.equal(r.headers.get('authorization'),'Bearer synthetic-user-token');
+    assert.equal(new URL(r.url).hostname,'lifespace.internal');
+    const path=new URL(r.url).pathname;
+    const data=r.method==='GET'?null:await r.json().catch(()=>null);
+    calls.push({path,method:r.method,data});
+    if(path.endsWith('/members'))return reply([{personId:'per_me',userId:'usr_me',displayName:'Synthetic',role:'editor'}]);
+    if(path.endsWith('/file-uploads'))return reply({id:uploadId,destination:'native',upload:{method:'PUT',url:signed}},201);
+    if(path.endsWith('/complete'))return reply({id:fileId});
+    if(path.endsWith('/file-downloads'))return reply({id:fileId,url:signed,contentType:'application/pdf',name:'synthetic.pdf'});
+    if(path.endsWith('/records')&&r.method==='POST'){assert.equal(data.subjectPersonId,'per_me');assert.equal(data.artifactRef,fileId);return reply({id:'rec_d',version:1,...data},201);}
+    if(path.endsWith('/records/rec_d'))return reply({id:'rec_d',version:1,subjectPersonId:'per_me',artifactRef:fileId,title:'Synthetic',documentType:'physical_exam'});
+    throw Error('unexpected '+path);
+  }}};
+  const externalFetch=async(url,init)=>{assert.equal(url,signed);assert.equal(init.headers?.authorization,undefined);assert.equal(init.redirect,'manual');return init.method==='PUT'?new Response(null,{status:200}):new Response('%PDF-1.7 synthetic',{headers:{'content-type':'application/pdf'}});};
+  const form=new FormData();form.set('file',new File(['%PDF-1.7 synthetic'],'synthetic.pdf',{type:'application/pdf'}));form.set('title','Synthetic');form.set('documentType','physical_exam');
+  const upload=new Request('https://app.test'+subject+'/documents',{method:'POST',headers:{authorization:'Bearer synthetic-user-token'},body:form});
+  const saved=await handleMiniHealthBff(upload,env,{externalFetch});assert.equal(saved.status,201);
+  const data=(await saved.json()).data;assert.equal(data.hasFile,true);assert.ok(!('artifactRef'in data));assert.ok(!JSON.stringify(data).includes(signed));
+  const download=await handleMiniHealthBff(req(subject+'/documents/rec_d/file'),env,{externalFetch});
+  assert.equal(download.status,200);assert.equal(download.headers.get('cache-control'),'private, no-store');assert.equal(await download.text(),'%PDF-1.7 synthetic');
+  assert.ok(calls.some(c=>c.path.endsWith('/file-downloads')&&c.data.recordId==='rec_d'));
+});
+test('growth response cannot report success when the atomic result is incomplete',async()=>{
+  const {env}=setup(p=>p.endsWith('/rec_h')?reply({name:'身高',valueType:'number',defaultUnit:'cm'}):reply({atomicConsistency:true,items:[]}));
+  const r=await handleMiniHealthBff(req(subject+'/growth','POST',{date:'2026-01-01',entries:[{metricId:'rec_h',value:150,unit:'cm'}]}),env);
+  assert.equal(r.status,502);
+});

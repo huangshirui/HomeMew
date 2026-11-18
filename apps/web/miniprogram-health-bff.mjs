@@ -76,7 +76,10 @@ export async function handleMiniHealthBff(request,env,{externalFetch=fetch}={}){
   if(health!=='health'||!SPACE.test(spaceId)||!tail.length)return bad();
   const root='/api/v1/spaces/'+spaceId;
   const ok=(value,status=200)=>json({data:value},status,id);
-  const core=async(path,method='GET',data)=>forwardLifeSpace(derived(request,method,data),env,{target:'core',upstreamPath:path});
+  const core=async(path,method='GET',data)=>{
+    const next=derived(request,method,data);next.headers.set('x-request-id',id);
+    return forwardLifeSpace(next,env,{target:'core',upstreamPath:path});
+  };
   const read=async(path,method='GET',data)=>{
     const response=await core(path,method,data);
     if(!response.ok)throw response;

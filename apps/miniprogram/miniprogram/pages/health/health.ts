@@ -79,16 +79,18 @@ Page({
   },
   clearedRows(){return {loading:false,loaded:false,loadingMore:false,error:'',tabMessage:'',nextCursor:null,observations:[] as ObservationRow[],events:[] as EventRow[],documents:[] as DocumentRow[],recent:[] as ObservationRow[],growthCards:emptyCards(),latestValue:'—',latestUnit:'',latestDate:'暂无测量',deltaLabel:'',trendReady:false,trendMessage:'',trendCount:0};},
   async loadWorkspace():Promise<void>{
-    if(!this.data.familyId||!this.data.userId){this.setData({contextLoading:false,contextError:'请先创建或加入家庭'});return;}
+    if(!this.validScope()){this.setData({contextLoading:false,contextError:'请先创建或加入家庭'});return;}
     const scope=this._scope;if(this._workspacePending===scope)return;
     this._workspacePending=scope;const gen=++this._workspaceGeneration;
+    ++this._metricGeneration;this.setData({metricLoading:false});
     ++this._generation;this._tabPending='';this._refreshGate.noteRequest(scope,'health');
     this.setData({contextLoading:!this.data.contextReady,contextError:'',loading:false,loadingMore:false});
     try{
       const context=await getHealthContext(this.data.familyId);
       if(!this.validScope()||gen!==this._workspaceGeneration)return;
       const person=context.people.find(p=>p.personId===this.data.personId)||context.people.find(p=>p.userId===this.data.userId)||context.people[0];
-      const viewer=context.people.find(p=>p.userId===this.data.userId)?.role==='viewer';
+      const me=context.people.find(p=>p.userId===this.data.userId);
+      const viewer=!me||me.role==='viewer';
       const perms=context.permissions;const changed=person?.personId!==this.data.personId;
       this.setData({people:context.people,personId:person?.personId||'',personName:person?.displayName||'',permissions:perms,viewer,
         canMeasure:!viewer&&perms.measurements.write&&perms.metrics.read,canManage:!viewer&&perms.metrics.write,
@@ -118,7 +120,7 @@ Page({
     this.setData({metrics,metricCursor:cursor,metricError:error,selectedMetric,selectedMetricId:selectedMetric?.id||'',canGrow:!!growth.height&&!!growth.weight&&this.data.canMeasure});
   },
   async loadMoreMetrics():Promise<void>{
-    if(!this.validScope()||this.data.metricLoading||!this.data.metricCursor)return;
+    if(!this.validScope()||this._workspacePending||this.data.metricLoading||!this.data.metricCursor)return;
     const gen=++this._metricGeneration,scope=this._scope,cursor=this.data.metricCursor;
     this.setData({metricLoading:true,metricError:''});
     try{const p=await listHealthMetrics(this.data.familyId,cursor);if(this.validScope()&&scope===this._scope&&gen===this._metricGeneration)this.applyMetrics(merge(this.data.metrics,p.items),p.nextCursor);}
@@ -211,14 +213,14 @@ Page({
     }).exec();
   },
   onPerson(e:WechatMiniprogram.TouchEvent):void{
-    if(this.data.busy||this._workspacePending)return;
+    if(this.data.busy||this._workspacePending||!this.validScope())return;
     const id=String(e.currentTarget.dataset.id||''),person=this.data.people.find(p=>p.personId===id);
     if(!person||id===this.data.personId)return;
     ++this._generation;this._tabPending='';this.closeModal(true);
     this.setData({personId:id,personName:person.displayName,...this.clearedRows()});void this.loadTab();
   },
   switchTab(tab:HealthTab,metricId?:string):void{
-    if(this.data.busy||this._workspacePending)return;
+    if(this.data.busy||this._workspacePending||!this.validScope())return;
     if(!['overview','metrics','events','documents'].includes(tab))return;
     ++this._generation;this._tabPending='';this.closeModal(true);
     const selectedMetric=this.data.metrics.find(m=>m.id===(metricId||this.data.selectedMetricId))||this.data.metrics[0]||null;
@@ -238,8 +240,8 @@ Page({
     this.setData({documentFilter:filter,...this.clearedRows()});void this.loadTab();
   },
   onLoadMore():void{if(!this.data.loading&&!this.data.loadingMore&&!this.data.error&&this.data.nextCursor)void this.loadTab(true);},
-  onRefresh():void{if(!this.data.modal&&!this.data.busy)void this.loadWorkspace();},
-  onPullDownRefresh():void{if(this.data.modal||this.data.busy){wx.stopPullDownRefresh();return;}void this.loadWorkspace().finally(()=>wx.stopPullDownRefresh());},
+  async onRefresh():Promise<void>{if(this.data.modal||this.data.busy)return;try{await ensureRuntimeReady();if(!this._alive)return;if(scopeNow()!==this._scope)this.resetScope(scopeNow());await this.loadWorkspace();}catch(cause){if(this._alive)this.setData({contextLoading:false,contextError:describe(cause)});}},
+  onPullDownRefresh():void{if(this.data.modal||this.data.busy){wx.stopPullDownRefresh();return;}void this.onRefresh().then(()=>wx.stopPullDownRefresh(),()=>wx.stopPullDownRefresh());},
   releasePreview():void{if(this._previewPath){removeTemporaryFile(this._previewPath);this._previewPath='';}},
   closeModal(force=false):void{
     if(this.data.busy&&!force)return;
@@ -272,7 +274,7 @@ Page({
     wx.showActionSheet({itemList:['编辑','删除'],success:r=>{if(this.validScope()&&scope===this._scope&&person===this.data.personId){if(r.tapIndex===0)this.openMeasurement(record);else if(r.tapIndex===1)void this.removeRecord('measurements',record);}}});
   },
   onGrowth():void{
-    if(!this.data.canMeasure)return;
+    if(!this.validScope()||!this.data.canMeasure)return;
     const {height,weight}=growthMetrics(this.data.metrics,!this.data.metricCursor&&!this.data.metricError);
     if(!height||!weight){this.switchTab('metrics');return;}
     this.openForm('growth','记录身高体重',{...formDefault(),date:familyToday(this.data.timezone)});
@@ -303,7 +305,7 @@ Page({
   onBoolean(e:WechatMiniprogram.TouchEvent):void{const raw=String(e.currentTarget.dataset.value||'');if(!this.data.busy&&['true','false'].includes(raw))this.setData({'form.raw':raw});},
   onShared(e:WechatMiniprogram.CustomEvent<{value:string[]}>):void{if(!this.data.busy)this.setData({shared:e.detail.value.includes('shared')});},
   chooseFile():void{
-    if(this.data.busy||this.data.editing||this.data.modal!=='document')return;
+    if(!this.validScope()||this.data.busy||this.data.editing||this.data.modal!=='document')return;
     const gen=this._modalGeneration;
     const accept=(path:string,name:string,size:number)=>{
       if(!this.validModal(gen))return;
@@ -317,11 +319,11 @@ Page({
     }});
   },
   onToggleEventChooser():void{
-    if(this.data.busy)return;
+    if(this.data.busy||!this.validScope())return;
     const open=!this.data.chooseEvent;this.setData({chooseEvent:open});if(open&&!this.data.eventChoices.length)void this.loadEventChoices(false);
   },
   async loadEventChoices(append=false):Promise<void>{
-    if(!this.data.chooseEvent||this.data.eventChoiceLoading||this.data.modal!=='document')return;
+    if(!this.validScope()||!this.data.chooseEvent||this.data.eventChoiceLoading||this.data.modal!=='document')return;
     if(append&&!this.data.eventChoiceCursor)return;
     const gen=this._modalGeneration;this.setData({eventChoiceLoading:true,formError:''});
     try{const p=await listHealthEvents(this.data.familyId,this.data.personId,this.data.timezone,append?this.data.eventChoiceCursor:null);
@@ -377,7 +379,7 @@ Page({
     finally{if(this.validModal(gen))this.setData({busy:false});}
   },
   onDetail(e:WechatMiniprogram.TouchEvent):void{
-    if(this.data.busy)return;
+    if(this.data.busy||this._workspacePending||!this.validScope())return;
     const id=String(e.currentTarget.dataset.id||''),kind=this.data.tab==='events'?'events':'documents';
     const record=kind==='events'?this.data.events.find(x=>x.id===id):this.data.documents.find(x=>x.id===id);
     if(!record)return;
@@ -391,7 +393,7 @@ Page({
     }
   },
   onEditDetail():void{
-    const record=this._detail;if(!record||!this.data.detailWritable||this.data.busy)return;
+    const record=this._detail;if(!record||!this.data.detailWritable||this.data.busy||!this.validScope())return;
     if(this.data.detailKind==='events')this.openEvent(record as HealthEvent);else this.openDocument(record as HealthDocument);
   },
   async removeRecord(kind:Exclude<HealthKind,'metrics'>,record:HealthRecord):Promise<void>{
@@ -406,7 +408,7 @@ Page({
   },
   onDeleteDetail():void{if(this._detail)void this.removeRecord(this.data.detailKind,this._detail);},
   async onPreviewFile(e:WechatMiniprogram.TouchEvent):Promise<void>{
-    if(this.data.busy||this.data.detailKind!=='documents'||!this._detail||!this.data.detailHasFile)return;
+    if(!this.validScope()||this.data.busy||this.data.detailKind!=='documents'||!this._detail||!this.data.detailHasFile)return;
     const gen=this._modalGeneration,id=this._detail.id,allowExport=e.currentTarget.dataset.export===true||e.currentTarget.dataset.export==='true';
     this.releasePreview();this.setData({busy:true,formError:''});
     try{
@@ -417,12 +419,12 @@ Page({
     finally{if(this.validModal(gen))this.setData({busy:false});}
   },
   onOpenLinks():void{
-    if(this.data.busy||this.data.detailKind!=='events'||!this._detail)return;
+    if(!this.validScope()||this.data.busy||this.data.detailKind!=='events'||!this._detail)return;
     const id=this._detail.id;this.closeModal(true);this._linkEventId=id;
     this.setData({modal:'links',modalTitle:'相关日程与待办',linkType:'event',linkTypeIndex:0});void this.loadLinks(false);
   },
   async loadLinks(append=false):Promise<void>{
-    if(this.data.linkLoading||!this._linkEventId||append&&!this.data.linkCursor)return;
+    if(!this.validScope()||this.data.linkLoading||!this._linkEventId||append&&!this.data.linkCursor)return;
     const gen=this._modalGeneration;this.setData({linkLoading:true,formError:''});
     try{const p=await listHealthLinks(this.data.familyId,this.data.personId,this._linkEventId,this.data.timezone,append?this.data.linkCursor:null);
       if(this.validModal(gen))this.setData({links:append?merge(this.data.links,p.items):p.items,linkCursor:p.nextCursor});}
@@ -435,7 +437,7 @@ Page({
   },
   onLinkQuery(e:WechatMiniprogram.Input):void{if(!this.data.linkLoading&&!this.data.busy)this.setData({linkQuery:e.detail.value,linkCandidates:[],candidateCursor:null});},
   async searchLinks(append=false):Promise<void>{
-    if(this.data.linkLoading||this.data.busy||!this.data.canEvent||!this._linkEventId||!this.data.linkQuery.trim()||append&&!this.data.candidateCursor)return;
+    if(!this.validScope()||this.data.linkLoading||this.data.busy||!this.data.canEvent||!this._linkEventId||!this.data.linkQuery.trim()||append&&!this.data.candidateCursor)return;
     const gen=this._modalGeneration;this.setData({linkLoading:true,formError:''});
     try{const p=await searchHealthTargets(this.data.familyId,this.data.personId,this._linkEventId,this.data.linkType,this.data.linkQuery.trim(),this.data.timezone,append?this.data.candidateCursor:null);
       if(this.validModal(gen))this.setData({linkCandidates:append?merge(this.data.linkCandidates,p.items):p.items,candidateCursor:p.nextCursor});}
