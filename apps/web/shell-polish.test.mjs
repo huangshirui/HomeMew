@@ -16,8 +16,8 @@ test('mobile shell exposes household context and real avatars', () => {
   assert.ok(shell.includes("detailTitles[segments[0]]"));
   assert.match(shell, /currentFamily\?\.avatarUrl/u);
   const more = source('./src/pages/more-page.tsx');
-  assert.match(more, /user\?\.avatarUrl/u);
-  assert.match(more, /<Avatar src=\{user\?\.avatarUrl\}/u);
+  assert.match(more, /<AccountEntry mobile \/>/u);
+  assert.match(shell, /<Avatar src=\{user\?\.avatarUrl\}/u);
   assert.match(shell, /safe-area-inset-bottom/u);
 });
 

@@ -73,3 +73,15 @@ test('More uses compact grouped icon tiles and shows the staging family role', (
   assert.match(more, /to: '\/family', title: '家庭与成员'/u);
   assert.match(more, /to: '\/settings', title: '设置'/u);
 });
+
+ test('desktop and mobile share the accessible account center entry without duplicate fetches', () => {
+  assert.match(shell,/export function AccountEntry/u);
+  assert.match(shell,/<AccountEntry \/>/u);
+  assert.match(more,/<AccountEntry mobile \/>/u);
+  assert.match(shell,/href=\{accountCenterUrl\} target="_blank" rel="noopener noreferrer"/u);
+  assert.match(shell,/accountCenterUrl && user/u);
+  assert.match(shell,/账户中心/u);
+  const provider=readFileSync(fileURLToPath(new URL('./src/components/household-provider.tsx',import.meta.url)),'utf8');
+  assert.match(provider,/session\.accountCenterUrl/u);
+  assert.equal((provider.match(/apiRequest<SessionResponse>\('\/api\/session'\)/gu)||[]).length,1);
+ });

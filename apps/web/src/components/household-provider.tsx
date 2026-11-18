@@ -28,10 +28,11 @@ export type FamilyMember = {
   createdAt?: string;
 };
 
-type SessionResponse = { authenticated: boolean; user: SessionUser };
+type SessionResponse = { authenticated: boolean; user: SessionUser; accountCenterUrl?: string | null };
 
 type HouseholdContextValue = {
   user: SessionUser | null;
+  accountCenterUrl: string | null;
   families: FamilySpace[];
   currentFamily: FamilySpace | null;
   members: FamilyMember[];
@@ -63,6 +64,7 @@ function rememberFamilyId(familyId: string | null) {
 
 export function HouseholdProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [accountCenterUrl, setAccountCenterUrl] = useState<string | null>(null);
   const [families, setFamilies] = useState<FamilySpace[]>([]);
   const [currentFamilyId, setCurrentFamilyIdState] = useState<string | null>(() => rememberedFamilyId());
   const [members, setMembers] = useState<FamilyMember[]>([]);
@@ -101,6 +103,8 @@ export function HouseholdProvider({ children }: PropsWithChildren) {
       const remembered = rememberedFamilyId();
       const selected = nextFamilies.find((space) => space.id === remembered)?.id ?? nextFamilies[0]?.id ?? null;
       setUser(session.user);
+      const accountUrl = session.accountCenterUrl;
+      setAccountCenterUrl(accountUrl === 'https://account.aisr.online/center#account' || accountUrl === 'https://account-staging.aisr.online/center#account' ? accountUrl : null);
       setFamilies(nextFamilies);
       setCurrentFamilyIdState(selected);
       setMembers([]);
@@ -140,6 +144,7 @@ export function HouseholdProvider({ children }: PropsWithChildren) {
   return (
     <HouseholdContext.Provider value={{
       user,
+      accountCenterUrl,
       families,
       currentFamily,
       members,

@@ -11,6 +11,7 @@ import {
   CircleAlert,
   Clock3,
   Ellipsis,
+  ExternalLink,
   Heart,
   HeartPulse,
   Home,
@@ -221,8 +222,27 @@ function SidebarSection({ title, entries, first = false }: { title: string; entr
   );
 }
 
+export function AccountEntry({ mobile = false }: { mobile?: boolean }) {
+  const { user, accountCenterUrl } = useHousehold();
+  const className = cn(
+    'flex min-w-0 items-center gap-3 rounded-xl text-left',
+    mobile ? 'min-h-16 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-stone-200/80 lg:hidden' : 'min-h-12 w-full px-2 py-2',
+    accountCenterUrl && user ? 'transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500' : '',
+  );
+  const content = <>
+    <Avatar src={user?.avatarUrl} alt="我的头像" fallback={user?.displayName || '我'} className={mobile ? 'size-10 ring-2 ring-white' : 'size-9 ring-2 ring-white'} />
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-sm font-medium text-stone-700">{user?.displayName || '我的账号'}</p>
+      <p className="text-xs text-stone-500">账户中心</p>
+    </div>
+    {accountCenterUrl && user ? <ExternalLink aria-hidden="true" className="size-4 shrink-0 text-stone-400" /> : null}
+  </>;
+  return accountCenterUrl && user
+    ? <a href={accountCenterUrl} target="_blank" rel="noopener noreferrer" aria-label="打开账户中心（新标签页）" className={className}>{content}</a>
+    : <div className={className} aria-label="当前账号">{content}</div>;
+}
+
 function DesktopNav() {
-  const { user } = useHousehold();
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-hidden border-r border-stone-200/80 bg-[#fbfcfa] px-4 py-5 lg:flex">
       <div className="shrink-0"><FamilyIdentity /></div>
@@ -233,14 +253,8 @@ function DesktopNav() {
         <SidebarSection title="家庭生活" entries={memoriesNavigation} />
         <SidebarSection title="家庭管理" entries={managementNavigation} />
       </nav>
-      <div className="mt-3 flex shrink-0 items-center gap-3 border-t border-stone-200/80 px-2 pt-4">
-        <Avatar
-          src={user?.avatarUrl}
-          alt={user?.displayName ? `${user.displayName}的头像` : '我的头像'}
-          fallback={user?.displayName || '我'}
-          className="size-9 ring-2 ring-white"
-        />
-        <p className="min-w-0 truncate text-sm font-medium text-stone-700">{user?.displayName || '我的账号'}</p>
+      <div className="mt-3 flex shrink-0 items-center border-t border-stone-200/80 pt-3">
+        <AccountEntry />
       </div>
     </aside>
   );

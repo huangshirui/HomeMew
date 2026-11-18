@@ -334,6 +334,9 @@ async function sessionStatus(request, env, fetcher, assertion, id, nowMs) {
   return json({
     data: {
       authenticated: true,
+      // Account Center follows the trusted Worker deployment, never a browser query or Host.
+      accountCenterUrl: env.ENVIRONMENT === 'production' ? 'https://account.aisr.online/center#account'
+        : env.ENVIRONMENT === 'staging' ? 'https://account-staging.aisr.online/center#account' : null,
       expiresAt: new Date(session.expiresAt).toISOString(),
       user: current.payload.data,
     },
