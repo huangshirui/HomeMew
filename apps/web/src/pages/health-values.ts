@@ -70,3 +70,9 @@ export function derivedBmi(rows:HealthObservation[],heightId:string,weightId:str
   }
   return null;
 }
+
+export function healthSince(today:string,days:number) {
+  if(!validDate(today)||!Number.isInteger(days)||days<=0)throw Error('日期范围无效');
+  const start=new Date(today+'T00:00:00Z');start.setUTCDate(start.getUTCDate()-days+1);return start.toISOString().slice(0,10);
+}
+export function healthMonth(date:string) {return /^\d{4}-\d{2}/u.test(date)?date.slice(0,7).replace('-','年')+'月':'日期未记录';}

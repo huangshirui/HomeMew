@@ -1,5 +1,5 @@
 import { apiRequest } from '../lib/api-client';
-import { queryModelRecords, type CanonicalQuery, type CanonicalQueryPage } from '../lib/canonical-query';
+import { queryModelRecords, type CanonicalQuery, type CanonicalQueryPage, type CanonicalQueryFilter } from '../lib/canonical-query';
 
 export type HealthModel = 'health_metric' | 'health_observation' | 'health_event' | 'health_document';
 export type HealthRecord = { id: string; version: number; subjectPersonId?: string; updatedAt?: string };
@@ -8,6 +8,13 @@ export type HealthObservation = HealthRecord & { metricId: string; observedDate:
 export type HealthEvent = HealthRecord & { summary: string; eventType: string; when?: { kind: 'date' | 'instant'; start: string; endExclusive: string }; status?: string; description?: string | null; location?: { name: string; address?: string; coordinates?: unknown } | null };
 export type HealthDocument = HealthRecord & { title: string; documentType: string; issuedDate?: string | null; issuerName?: string | null; notes?: string | null; artifactRef?: string; eventId?: string | null };
 export type HealthSchema = { key: string; fields: Array<{ key: string; values?: string[] }> };
+export type HealthRuntimeModel = HealthSchema & { access: Array<'read'|'write'|'manage'> };
+export type HealthQueryOptions = { limit?: number; since?: string; documentType?: string };
+export async function readHealthRuntime(spaceId:string) {
+  const result=await apiRequest<{spaceId:string;models:HealthRuntimeModel[]}>(spaceRoot(spaceId)+'/_discovery');
+  if(result.spaceId!==spaceId||!Array.isArray(result.models))throw Error('健康权限预览不可用');
+  return result.models.filter(m=>['health_metric','health_observation','health_event','health_document'].includes(m.key)&&Array.isArray(m.access)&&Array.isArray(m.fields));
+}
 
 function spaceRoot(spaceId: string) {
   if (!/^spc_[A-Za-z0-9_-]+$/.test(spaceId)) throw Error('家庭空间无效');
@@ -16,20 +23,22 @@ function spaceRoot(spaceId: string) {
 export function healthRecordUrl(spaceId: string, model: HealthModel, id?: string) {
   return spaceRoot(spaceId) + '/models/' + model + '/records' + (id ? '/' + encodeURIComponent(id) : '');
 }
-export function healthQuery(model: HealthModel, personId: string, cursor: string | null, metricId?: string, timezone = 'UTC'): CanonicalQuery {
+export function healthQuery(model: HealthModel, personId: string, cursor: string | null, metricId?: string, timezone = 'UTC', options:HealthQueryOptions={}): CanonicalQuery {
   if (model !== 'health_metric' && !/^per_[A-Za-z0-9_-]+$/.test(personId)) throw Error('请选择有效家庭成员');
-  const subject = { field: 'subjectPersonId', op: 'contains' as const, value: personId };
+  const filters:CanonicalQueryFilter[]=[{field:'subjectPersonId',op:'contains',value:personId}];
+  if(model==='health_observation'&&metricId)filters.push({field:'metricId',op:'contains',value:metricId});
+  if(model==='health_observation'&&options.since)filters.push({field:'observedDate',op:'gte',value:options.since});
+  if(model==='health_document'&&options.documentType)filters.push({field:'documentType',op:'eq',value:options.documentType});
   return {
-    ...(model === 'health_metric' ? {} : { filter: model === 'health_observation' && metricId
-      ? { and: [subject, { field: 'metricId', op: 'contains' as const, value: metricId }] } : subject }),
+    ...(model==='health_metric'?{}:{filter:filters.length===1?filters[0]:{and:filters}}),
     sort: [{ field: model === 'health_observation' ? 'observedDate' : model === 'health_event' ? 'when' : model === 'health_document' ? 'issuedDate' : 'name', direction: model === 'health_metric' ? 'asc' : 'desc' }],
     ...(model === 'health_event' ? { context: { viewingTimezone: timezone } } : {}),
-    page: { limit: 40, cursor },
+    page: { limit: Math.max(1,Math.min(40,options.limit??(model==='health_metric'?40:20))), cursor },
   };
 }
-export function readHealthPage<T extends HealthRecord>(spaceId: string, model: HealthModel, personId: string, cursor: string | null, metricId?: string, timezone = 'UTC') {
+export function readHealthPage<T extends HealthRecord>(spaceId: string, model: HealthModel, personId: string, cursor: string | null, metricId?: string, timezone = 'UTC',options:HealthQueryOptions={}) {
   spaceRoot(spaceId);
-  return queryModelRecords<T>(spaceId, model, healthQuery(model, personId, cursor, metricId, timezone));
+  return queryModelRecords<T>(spaceId, model, healthQuery(model, personId, cursor, metricId, timezone,options));
 }
 export async function readHealthSchema(spaceId: string, model: HealthModel) {
   const schema = await apiRequest<HealthSchema>(spaceRoot(spaceId) + '/_discovery/models/' + model);
@@ -108,6 +117,6 @@ export function readGrowthObservations(spaceId:string,personId:string,heightId:s
   return queryModelRecords<HealthObservation>(spaceId,'health_observation',{
     filter:{and:[{field:'subjectPersonId',op:'contains',value:personId},
       {or:[{field:'metricId',op:'contains',value:heightId},{field:'metricId',op:'contains',value:weightId}]}]},
-    sort:[{field:'observedDate',direction:'desc'}],page:{limit:40}
+    sort:[{field:'observedDate',direction:'desc'}],page:{limit:20}
   });
 }

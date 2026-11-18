@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validDate, dateRange, measurementPayload, eventPayload, growthMetrics, derivedBmi } from './src/pages/health-values.ts';
+import { validDate, dateRange, measurementPayload, eventPayload, growthMetrics, derivedBmi, healthSince, healthMonth } from './src/pages/health-values.ts';
 
 const metric = { id: 'rec_synthetic', version: 1, valueType: 'number', name: 'Synthetic' };
 test('strict date-only validation and leap-day half-open ranges', () => {
@@ -51,3 +51,7 @@ test('BMI excludes a date split across pagination without suppressing complete n
   assert.equal(derivedBmi([h,w],'rec_height','rec_weight','per_synthetic','2026-01-01'),null);
   assert.deepEqual(derivedBmi([h,w],'rec_height','rec_weight','per_synthetic','2025-12-31'),{date:'2026-01-01',value:20});
 });
+
+ test('family date presets include the current day and keep calendar boundaries',()=>{
+ assert.equal(healthSince('2024-03-01',2),'2024-02-29');assert.equal(healthSince('2026-01-01',1),'2026-01-01');assert.equal(healthMonth('2026-11-18'),'2026年11月');assert.throws(()=>healthSince('invalid',90));
+ });
