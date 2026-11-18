@@ -173,3 +173,18 @@ test('Identity 0.15 global mailbox uniqueness conflict remains 409 for existing 
   assert.equal((await response.json()).error.code, 'EMAIL_ALREADY_LINKED');
   assert.equal(response.headers.get('x-request-id'), 'req_conflict');
 });
+
+ test('user avatar forwards cache headers via the existing Identity binding without a bearer',async()=>{
+  let calls=0;
+  const env={LIFESPACE_IDENTITY:service(async incoming=>{
+    calls++;
+    assert.equal(new URL(incoming.url).pathname,'/assets/users/usr_123/avatar');
+    assert.equal(incoming.headers.has('authorization'),false);
+    return new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/png','cache-control':'public, max-age=300, must-revalidate',etag:'avatar-v1'}});
+  })};
+  const response=await handleMiniProgramBff(request('/api/v1/miniprogram/media/users/usr_123/avatar',{token:''}),env);
+  assert.equal(response.status,200);assert.equal(calls,1);
+  assert.equal(response.headers.get('cache-control'),'public, max-age=300, must-revalidate');
+  assert.equal(response.headers.get('etag'),'avatar-v1');
+  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())],[1,2,3]);
+ });

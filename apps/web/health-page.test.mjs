@@ -55,3 +55,10 @@ test('bounded growth and on-demand query and file access',()=>{
   assert.match(page,/const tabLabels: Record<Tab,string> = \{ 概览: '概览', 健康指标: '指标', 健康事件: '事件', 健康档案: '档案' \}/u);
   assert.match(page,/onClick=\{\(\)=>setTab\(t\)\}>\{tabLabels\[t\]\}/u);
  });
+
+ test('health uses real member avatars outside the remounted tab content',()=>{
+  assert.match(page,/import \{ MemberAvatar \} from '\.\.\/components\/app-shell'/u);
+  assert.match(page,/choices\.map\(m=><button key=\{m\.id\}.*?<MemberAvatar member=\{m\}/u);
+  assert.ok(page.indexOf('<MemberAvatar member={m}')<page.indexOf("<div key={currentFamily.id+':'+selected.personId+':'+tab+':'+revision}"));
+  assert.doesNotMatch(page,/media\/users|\/api\/v1\/me/u);
+ });

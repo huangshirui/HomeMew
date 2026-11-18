@@ -81,9 +81,15 @@ export function Avatar({ src, alt, fallback, className }: { src: string | null |
 const familyAvatarSource = (id: string, available: string | null | undefined) =>
   available ? `/api/v1/miniprogram/media/families/${encodeURIComponent(id)}/avatar` : null;
 
+const userAvatarSource = (userId: string | null | undefined) =>
+  userId ? `/api/v1/miniprogram/media/users/${encodeURIComponent(userId)}/avatar` : null;
+
 export function MemberAvatar({ member, className }: { member: FamilyMember; className?: string }) {
+  const { user } = useHousehold();
+  // The existing session tells us whether the signed-in user has an avatar.
+  const src = member.userId === user?.id && !user?.avatarUrl ? null : userAvatarSource(member.userId);
   return <Avatar
-    src={member.userId ? `/api/v1/miniprogram/media/users/${encodeURIComponent(member.userId)}/avatar` : null}
+    src={src}
     alt={`${member.displayName || '家庭成员'}的头像`}
     fallback={member.displayName || '成'}
     className={className}
@@ -230,7 +236,7 @@ export function AccountEntry({ mobile = false }: { mobile?: boolean }) {
     accountCenterUrl && user ? 'transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500' : '',
   );
   const content = <>
-    <Avatar src={user?.avatarUrl} alt="我的头像" fallback={user?.displayName || '我'} className={mobile ? 'size-10 ring-2 ring-white' : 'size-9 ring-2 ring-white'} />
+    <Avatar src={user?.avatarUrl ? userAvatarSource(user.id) : null} alt="我的头像" fallback={user?.displayName || '我'} className={mobile ? 'size-10 ring-2 ring-white' : 'size-9 ring-2 ring-white'} />
     <div className="min-w-0 flex-1">
       <p className="truncate text-sm font-medium text-stone-700">{user?.displayName || '我的账号'}</p>
       <p className="text-xs text-stone-500">账户中心</p>
