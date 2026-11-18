@@ -86,6 +86,7 @@ test('session exchange keeps LifeSpace bearer server-side and creates a signed h
   assert.equal(response.status, 200);
   const data = (await payload(response)).data;
   assert.equal(data.authenticated, true);
+  assert.equal(data.accountCenterUrl, null);
   assert.equal(data.user.id, 'usr_1');
   assert.equal(JSON.stringify(data).includes('life-token-a'), false);
   const setCookie = response.headers.get('set-cookie');
@@ -482,3 +483,24 @@ test('Web Event writes always normalize locations without an upstream format swi
     assert.equal(writes, 1);
   }
 });
+
+ test('account center navigation is bound to deployment environment without extra upstream calls', async () => {
+  for (const [environment, expected] of [
+    ['production','https://account.aisr.online/center#account'],
+    ['staging','https://account-staging.aisr.online/center#account'],
+    ['local',null], ['unknown',null], [undefined,null],
+  ]) {
+    let calls=0;
+    const handler=createWebHandler({now:()=>NOW,fetcher:async input=>{
+      calls++;
+      const url=String(input);
+      if(url.endsWith('/internal/v1/access/tokens'))return jsonResponse(200,{data:{accessToken:'life-token-a',expiresIn:900}});
+      if(url.endsWith('/api/v1/me'))return jsonResponse(200,{data:{id:'usr_1',displayName:'Test'}});
+      assert.fail('unexpected upstream '+url);
+    }});
+    const response=await handler.fetch(request('/api/session?env=production&accountCenterUrl=https://evil.example.test'),{...ENV,ENVIRONMENT:environment});
+    assert.equal(response.status,200);
+    assert.equal((await payload(response)).data.accountCenterUrl,expected);
+    assert.equal(calls,2);
+  }
+ });
