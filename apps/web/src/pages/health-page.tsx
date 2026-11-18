@@ -10,6 +10,7 @@ import { checkMetricName, verifyDocumentEvent, deleteHealthRecord, eventPayload,
 
 const tabs = ['概览', '健康指标', '健康事件', '健康档案'] as const;
 type Tab = typeof tabs[number];
+const tabLabels: Record<Tab,string> = { 概览: '概览', 健康指标: '指标', 健康事件: '事件', 健康档案: '档案' };
 const control = 'min-h-10 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm';
 const button = 'min-h-10 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium hover:bg-stone-50 disabled:opacity-50';
 const primary = 'min-h-10 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50';
@@ -390,7 +391,7 @@ function HealthWorkspace() {
   return <div className="space-y-4"><PageHeader title="健康"><button className={iconButton} onClick={()=>setRevision(v=>v+1)} aria-label="刷新健康数据"><RefreshCw className="size-4"/>刷新</button></PageHeader>
     {!currentFamily||!selected?.personId?<Empty>{loading?'正在加载家庭成员…':'请选择有有效成员身份的家庭。'}</Empty>:<>
       <section aria-label="选择家庭成员" className="flex flex-wrap gap-2 sm:gap-3">{choices.map(m=><button key={m.id} aria-pressed={selected.personId===m.personId} className={'flex min-w-16 max-w-28 flex-col items-center gap-1.5 rounded-xl px-2 py-2 text-xs sm:text-sm '+(selected.personId===m.personId?'bg-emerald-50 font-semibold text-emerald-900':'text-stone-600 hover:bg-stone-100')} onClick={()=>setPersonId(m.personId??'')}><span className={'grid size-11 place-items-center rounded-full text-base '+(selected.personId===m.personId?'bg-emerald-100 ring-2 ring-emerald-600 ring-offset-2 ring-offset-emerald-50':'bg-stone-200 text-stone-600')}>{(m.displayName||'成').slice(0,1)}</span><span className="max-w-full truncate">{m.userId===user?.id?'我':m.displayName||'家庭成员'}</span></button>)}</section>
-      <nav aria-label="健康模块" className="flex gap-2 border-b border-stone-200 sm:gap-5">{tabs.map(t=><button key={t} type="button" aria-current={t===tab?'page':undefined} className={'min-h-11 whitespace-nowrap border-b-2 px-2 text-sm sm:px-4 '+(t===tab?'border-emerald-700 font-semibold text-emerald-800':'border-transparent text-stone-500 hover:text-stone-900')} onClick={()=>setTab(t)}>{t}</button>)}</nav>
+      <nav aria-label="健康模块" className="flex gap-2 border-b border-stone-200 sm:gap-5">{tabs.map(t=><button key={t} type="button" aria-current={t===tab?'page':undefined} className={'min-h-11 whitespace-nowrap border-b-2 px-2 text-sm sm:px-4 '+(t===tab?'border-emerald-700 font-semibold text-emerald-800':'border-transparent text-stone-500 hover:text-stone-900')} onClick={()=>setTab(t)}>{tabLabels[t]}</button>)}</nav>
       {accessLoading?<Empty>正在读取健康权限…</Empty>:accessError?<Empty>{accessError} <button className={button} onClick={()=>setRevision(v=>v+1)}>重试</button></Empty>:<div key={currentFamily.id+':'+selected.personId+':'+tab+':'+revision}>
         {tab==='概览'?<Overview spaceId={spaceId} personId={selected.personId} timezone={currentFamily.timezone} metrics={metrics} models={effectiveModels} go={setTab} selectMetric={setSelectedMetric}/>
         :tab==='健康指标'?(read('health_metric')&&read('health_observation')?<Metrics spaceId={spaceId} personId={selected.personId} timezone={currentFamily.timezone} metrics={metrics} selected={selectedMetric} setSelected={setSelectedMetric} canMeasure={write('health_observation')} canManage={write('health_metric')}/>:<Empty>当前没有健康指标访问权限。</Empty>)

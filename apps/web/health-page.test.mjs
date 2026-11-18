@@ -50,3 +50,8 @@ test('bounded growth and on-demand query and file access',()=>{
  test('stable empty list avoids repeated effects while access or data is unavailable',()=>{
  assert.match(page,/const EMPTY_HEALTH_ROWS:never\[\]=\[\]/u);assert.match(page,/items:ready\?items:EMPTY_HEALTH_ROWS/u);assert.match(page,/!obs.loading&&!obs.error\?extra:EMPTY_HEALTH_ROWS/u);
  });
+
+ test('health navigation uses short labels while preserving internal tab keys',()=>{
+  assert.match(page,/const tabLabels: Record<Tab,string> = \{ 概览: '概览', 健康指标: '指标', 健康事件: '事件', 健康档案: '档案' \}/u);
+  assert.match(page,/onClick=\{\(\)=>setTab\(t\)\}>\{tabLabels\[t\]\}/u);
+ });

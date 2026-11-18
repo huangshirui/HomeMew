@@ -15,10 +15,11 @@ function ordered(source, labels) {
   }
 }
 
-test('desktop navigation follows the four approved groups and model placement', () => {
+test('desktop navigation follows the five approved groups and model placement', () => {
   ordered(shell, [
     'title="日常" entries={dailyNavigation}',
     'title="计划与成长" entries={growthNavigation}',
+    'title="健康与运动" entries={healthNavigation}',
     'title="家庭生活" entries={memoriesNavigation}',
     'title="家庭管理" entries={managementNavigation}',
   ]);
@@ -31,9 +32,16 @@ test('desktop navigation follows the four approved groups and model placement', 
   assert.ok(growth);
   ordered(growth, ["label: '活动'", "label: '目标'", "label: '习惯'"]);
 
+  const health = shell.match(/const healthNavigation = \[([\s\S]*?)\n\];/u)?.[1];
+  assert.ok(health);
+  ordered(health, ["label: '健康'", "label: '足球比赛'"]);
+  assert.equal((health.match(/label:/gu)||[]).length, 2);
   const memories = shell.match(/const memoriesNavigation = \[([\s\S]*?)\n\];/u)?.[1];
   assert.ok(memories);
-  ordered(memories, ["label: '健康'", "label: '日子'", "label: '纪念日'", "label: '许愿池'", "label: '足球比赛'"]);
+  ordered(memories, ["label: '日子'", "label: '纪念日'", "label: '许愿池'"]);
+  assert.equal((memories.match(/label:/gu)||[]).length, 3);
+  assert.doesNotMatch(memories, /family-health|football/u);
+  assert.equal((shell.match(/<SidebarSection title=/gu)||[]).length, 5);
 });
 
 test('family management is visible to all roles while actions remain server-authorized', () => {
@@ -49,7 +57,13 @@ test('family management is visible to all roles while actions remain server-auth
 });
 
 test('More uses compact grouped icon tiles and shows the staging family role', () => {
-  ordered(more, ["title: '计划与成长'", "title: '家庭生活'", "title: '家庭管理'"]);
+  ordered(more, ["title: '计划与成长'", "title: '健康与运动'", "title: '家庭生活'", "title: '家庭管理'"]);
+  const health = more.slice(more.indexOf("title: '健康与运动'"), more.indexOf("title: '家庭生活'"));
+  ordered(health, ["to: '/family-health'", "to: '/football'"]);
+  const life = more.slice(more.indexOf("title: '家庭生活'"), more.indexOf("title: '家庭管理'"));
+  ordered(life, ["to: '/days'", "to: '/anniversaries'", "to: '/wishes'"]);
+  assert.doesNotMatch(life, /family-health|football/u);
+  assert.doesNotMatch(more, /to: '\/(calendar|tasks)'/u);
   assert.match(more, /grid grid-cols-3 gap-2\.5 sm:grid-cols-4/u);
   assert.match(more, /min-h-28 flex-col items-center/u);
   assert.match(more, /当前身份：\{roleLabels\[currentFamily\.role\]\}/u);
