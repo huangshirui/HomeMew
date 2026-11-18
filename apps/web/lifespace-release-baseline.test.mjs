@@ -6,14 +6,17 @@ function payload(service, environment, contractVersion, schemaVersion) {
   return { data: { status: 'ok', service, environment, contractVersion, schemaVersion } };
 }
 
-test('release pins reviewed Identity 0.19 and Activity Core schema 79', () => {
-  assert.equal(LIFESPACE_RELEASE_BASELINE.core.contractVersion, '0.54.0');
+test('release pins reviewed Identity 0.19 and Core 0.54/0.55 schemas', () => {
+  assert.equal(LIFESPACE_RELEASE_BASELINE.core.contractVersion, '0.55.0');
   assert.equal(LIFESPACE_RELEASE_BASELINE.identity.contractVersion, '0.19.0');
   for (const environment of ['staging', 'production']) {
     for (const schema of [79, '79']) {
       assert.equal(assertLifeSpaceStatus(payload('core', environment, '0.54.0', schema), 'core', environment).schemaVersion, schema);
     }
-    for (const version of ['0.48.0', '0.49.0', '0.53.0']) {
+    for (const schema of [82, '82']) {
+      assert.equal(assertLifeSpaceStatus(payload('core', environment, '0.55.0', schema), 'core', environment).schemaVersion, schema);
+    }
+    for (const version of ['0.48.0', '0.49.0', '0.53.0', '0.56.0']) {
       assert.throws(() => assertLifeSpaceStatus(payload('core', environment, version, 79), 'core', environment), /contract mismatch/);
     }
   }
@@ -23,6 +26,10 @@ test('rejects partial upgrades, rejected Identity versions and unreviewed contra
   for (const [service, version, schema] of [
     ['core', '0.54.0', 78],
     ['core', '0.54.0', 75],
+    ['core', '0.55.0', 76],
+    ['core', '0.55.0', 79],
+    ['core', '0.55.0', 80],
+    ['core', '0.55.0', 81],
     ['identity', '0.15.0', 13],
     ['identity', '0.16.0', 13],
     ['identity', '0.17.0', 13],
@@ -34,7 +41,7 @@ test('rejects partial upgrades, rejected Identity versions and unreviewed contra
   for (const [service, version, schema] of [
     ['core', '0.47.0', 72],
     ['core', '0.50.0', 72],
-    ['core', '0.55.0', 76],
+    ['core', '0.56.0', 82],
     ['identity', '0.10.0', 11],
     ['identity', '0.13.0', 12],
     ['identity', '0.14.0', 13],
@@ -79,5 +86,15 @@ test('reviewed Identity 0.19 requires schema 18 in both environments', () => {
     assert.throws(() => assertLifeSpaceStatus(payload('identity', environment, '0.19.0', undefined), 'identity', environment), /must be an integer/);
     const other = environment === 'staging' ? 'production' : 'staging';
     assert.throws(() => assertLifeSpaceStatus(payload('identity', other, '0.19.0', 18), 'identity', environment), /environment/);
+  }
+});
+
+
+test('reviewed Core 0.55 remains fail-closed for partial schema upgrades and environment mismatch', () => {
+  for (const environment of ['staging', 'production']) {
+    const other = environment === 'staging' ? 'production' : 'staging';
+    assert.throws(() => assertLifeSpaceStatus(payload('core', other, '0.55.0', 82), 'core', environment), /environment/);
+    assert.throws(() => assertLifeSpaceStatus(payload('core', environment, '0.55.0', 81), 'core', environment), /schema is behind/);
+    assert.throws(() => assertLifeSpaceStatus(payload('core', environment, '0.55.0', undefined), 'core', environment), /must be an integer/);
   }
 });

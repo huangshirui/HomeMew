@@ -17,11 +17,14 @@ export const LIFESPACE_RELEASE_BASELINE = Object.freeze({
     minimumSchemaByContract: Object.freeze({ '0.15.0': 14, '0.16.0': 14, '0.17.0': 14, '0.18.0': 15, '0.19.0': 18 }),
   }),
   core: Object.freeze({
-    contractVersion: '0.54.0',
-    // Activity lifecycle requires the explicit status and Actions in schema 79.
-    compatibleContractVersions: Object.freeze(['0.54.0']),
+    contractVersion: '0.55.0',
+    // Activity lifecycle requires schema 79 on 0.54.0. Kernel 0.55.0
+    // adds member model access ceilings without removing existing operations.
+    // Review pinned staging schema 82; do not infer compatibility with
+    // intermediate schemas or unknown future contracts. Keep 0.54 for production.
+    compatibleContractVersions: Object.freeze(['0.54.0', '0.55.0']),
     minimumSchemaVersion: 79,
-    minimumSchemaByContract: Object.freeze({ '0.54.0': 79 }),
+    minimumSchemaByContract: Object.freeze({ '0.54.0': 79, '0.55.0': 82 }),
   }),
 });
 
