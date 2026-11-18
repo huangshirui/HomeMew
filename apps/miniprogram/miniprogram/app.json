@@ -35,7 +35,8 @@
     "pages/football/detail",
     "pages/football/edit",
     "pages/football/stats",
-    "pages/football/manage"
+    "pages/football/manage",
+    "pages/health/health"
   ],
   "usingComponents": {
     "user-avatar": "/components/user-avatar/index",

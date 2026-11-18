@@ -11,11 +11,14 @@ Page({
         {key:'goal',title:'目标',icon:'🎯',path:'/pages/domains/list?kind=goals'},
         {key:'habit',title:'习惯',icon:'🌱',path:'/pages/domains/list?kind=habits'},
       ]},
-      {key:'life',title:'生活与回忆',items:[
+      {key:'health',title:'健康与运动',items:[
+        {key:'health',title:'健康',icon:'💚',path:'/pages/health/health'},
+        {key:'football',title:'足球比赛',icon:'⚽',path:'/pages/football/list'},
+      ]},
+      {key:'life',title:'家庭生活',items:[
         {key:'days',title:'日子',icon:'⏳',path:'/pages/days/list'},
         {key:'anniversary',title:'纪念日',icon:'🎁',path:'/pages/domains/list?kind=anniversaries'},
         {key:'wish',title:'许愿池',icon:'⭐',path:'/pages/wishes/list'},
-        {key:'football',title:'足球比赛',icon:'⚽',path:'/pages/football/list'},
       ]},
       {key:'management',title:'家庭管理',items:[
         {key:'family',title:'加入家庭',icon:'🏡',path:'/pages/family/detail'},

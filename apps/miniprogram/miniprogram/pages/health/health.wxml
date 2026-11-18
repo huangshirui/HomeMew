@@ -1,0 +1,170 @@
+<view class="container health-page">
+  <nav-bar title="健康" showBack="{{true}}">
+    <view slot="right" class="health-icon-button" bindtap="onRefresh" aria-role="button" aria-label="刷新健康数据"><lucide-icon name="refresh-cw" size="20" color="#57534e"/></view>
+  </nav-bar>
+  <view wx:if="{{contextLoading}}" class="health-empty">正在读取家庭健康…</view>
+  <view wx:elif="{{contextError}}" class="health-panel health-empty"><text>{{contextError}}</text><button class="health-secondary" bindtap="onRefresh">重试</button></view>
+  <block wx:elif="{{contextReady}}">
+    <scroll-view scroll-x show-scrollbar="{{false}}" class="health-people"><view class="health-people-row">
+      <view wx:for="{{people}}" wx:key="personId" class="health-person {{personId===item.personId?'selected':''}}" data-id="{{item.personId}}" bindtap="onPerson" aria-role="button" aria-label="{{item.displayName}}">
+        <view class="health-avatar {{personId===item.personId?'selected-avatar':''}}"><user-avatar user-id="{{item.userId}}" size="{{84}}" alt="{{item.displayName}}的头像"/></view>
+        <text class="health-person-name">{{item.userId===userId?'我':item.displayName}}</text>
+      </view>
+    </view></scroll-view>
+    <view class="health-tabs"><view wx:for="{{tabs}}" wx:key="key" class="health-tab {{tab===item.key?'selected':''}}" data-tab="{{item.key}}" bindtap="onTab" aria-role="button">{{item.label}}</view></view>
+    <view wx:if="{{!personId}}" class="health-panel health-empty">暂无有效家庭成员</view>
+    <view wx:elif="{{loading}}" class="health-empty">正在读取健康记录…</view>
+    <view wx:elif="{{error}}" class="health-panel health-empty"><text>{{error}}</text><button class="health-secondary" bindtap="onRefresh">重试</button></view>
+    <view wx:elif="{{tabMessage}}" class="health-panel health-empty">{{tabMessage}}</view>
+    <block wx:else>
+      <block wx:if="{{tab==='overview'}}">
+        <view wx:if="{{permissions.measurements.read}}" class="health-growth-grid">
+          <view wx:for="{{growthCards}}" wx:key="label" class="health-panel health-growth" data-id="{{item.metricId}}" bindtap="onMetric">
+            <text class="health-muted">{{item.label}}</text><view class="health-growth-value">{{item.value}} <text class="health-unit">{{item.unit}}</text></view><text class="health-caption">{{item.date}}</text>
+          </view>
+        </view>
+        <view class="health-panel">
+          <view class="health-heading">快速记录</view>
+          <view class="health-shortcuts">
+            <view wx:if="{{canMeasure}}" class="health-shortcut primary" bindtap="onGrowth" aria-role="button"><text class="health-shortcut-icon">📏</text><text>身高体重</text></view>
+            <view wx:if="{{canEvent}}" class="health-shortcut" bindtap="onNewEvent" aria-role="button"><text class="health-shortcut-icon">💚</text><text>记录事件</text></view>
+            <view wx:if="{{canDocument}}" class="health-shortcut" bindtap="onNewDocument" aria-role="button"><text class="health-shortcut-icon">📄</text><text>上传档案</text></view>
+          </view>
+          <text wx:if="{{!canMeasure&&!canEvent&&!canDocument}}" class="health-muted">当前仅可查看已授权内容。</text>
+        </view>
+        <view wx:if="{{permissions.measurements.read}}" class="health-panel">
+          <view class="health-heading-row"><text class="health-heading">最近测量</text><text class="health-link" data-tab="metrics" bindtap="onTab">全部指标 ›</text></view>
+          <view wx:for="{{recent}}" wx:key="id" class="health-row" data-id="{{item.metricId}}" bindtap="onMetric">
+            <view class="health-row-main"><text class="health-row-title">{{item.metricName}}</text><text class="health-caption">{{item.observedDate}}</text></view>
+            <text class="health-record-value">{{item.valueLabel}} {{item.unit||''}}</text>
+          </view>
+          <view wx:if="{{!recent.length}}" class="health-empty small">暂无测量</view>
+          <text wx:if="{{metricError}}" class="health-error">{{metricError}}</text>
+        </view>
+        <view class="health-entry-grid">
+          <view wx:if="{{permissions.events.read}}" class="health-panel health-entry" data-tab="events" bindtap="onTab"><text class="health-entry-icon">💚</text><view class="health-row-main"><text class="health-row-title">健康事件</text><text class="health-caption">就诊、受伤与健康记录</text></view><text class="health-chevron">›</text></view>
+          <view wx:if="{{permissions.documents.read}}" class="health-panel health-entry" data-tab="documents" bindtap="onTab"><text class="health-entry-icon">📄</text><view class="health-row-main"><text class="health-row-title">健康档案</text><text class="health-caption">体检、化验与原始资料</text></view><text class="health-chevron">›</text></view>
+        </view>
+      </block>
+      <block wx:elif="{{tab==='metrics'}}">
+        <view class="health-panel">
+          <view class="health-heading-row"><text class="health-heading">选择指标</text><view class="health-actions">
+            <button wx:if="{{canGrow}}" class="health-secondary" bindtap="onGrowth">身高体重</button><button wx:if="{{canManage}}" class="health-secondary" bindtap="onManage">指标管理</button>
+          </view></view>
+          <view class="health-metric-grid"><view wx:for="{{metrics}}" wx:key="id" class="health-metric {{selectedMetricId===item.id?'selected':''}}" data-id="{{item.id}}" bindtap="onMetric"><text>{{item.name}}</text><text class="health-caption">{{item.defaultUnit||'健康记录'}}</text></view></view>
+          <view wx:if="{{!metrics.length}}" class="health-empty small">{{metricError||'暂无指标，请先添加指标'}}</view>
+          <button wx:if="{{metricCursor}}" class="health-more" bindtap="loadMoreMetrics" disabled="{{metricLoading}}">加载更多指标</button>
+        </view>
+        <view wx:if="{{selectedMetric}}" class="health-panel">
+          <view class="health-heading-row"><view class="health-row-main"><text class="health-muted">{{selectedMetric.name}} · 最近一次（所选时段）</text><view class="health-latest">{{latestValue}} <text class="health-unit">{{latestUnit}}</text></view><text class="health-caption">{{latestDate}} {{deltaLabel}}</text></view>
+            <button wx:if="{{canMeasure}}" class="health-primary" bindtap="onNewMeasurement">＋ 记录测量</button></view>
+          <view class="health-range"><view wx:for="{{ranges}}" wx:key="key" class="health-range-item {{range===item.key?'selected':''}}" data-range="{{item.key}}" bindtap="onRange">{{item.label}}</view></view>
+          <block wx:if="{{selectedMetric.valueType==='number'}}">
+            <view wx:if="{{trendReady}}" class="health-chart">
+              <canvas wx:if="{{!modal}}" canvas-id="healthTrend" id="healthTrend" style="width:100%;height:300rpx;"/>
+              <view wx:else class="health-chart-placeholder"/>
+              <text class="health-caption">已加载 {{trendCount}} 次测量 · 纵轴按实际数值缩放</text>
+            </view>
+            <view wx:else class="health-empty small">{{trendMessage}}</view>
+          </block>
+          <view class="health-heading-row health-list-title"><text class="health-heading">测量记录</text><text class="health-caption">已加载 {{observations.length}} 条</text></view>
+          <view wx:for="{{observations}}" wx:key="id" class="health-row">
+            <view class="health-row-main"><text class="health-muted">{{item.observedDate}}</text><text wx:if="{{item.notes}}" class="health-caption health-truncate">{{item.notes}}</text></view><text class="health-record-value">{{item.valueLabel}} {{item.unit||''}}</text>
+            <view wx:if="{{canMeasure}}" class="health-icon-button" data-id="{{item.id}}" bindtap="onMeasurementMenu" aria-role="button" aria-label="更多操作">···</view>
+          </view>
+          <view wx:if="{{!observations.length}}" class="health-empty small">暂无测量记录</view>
+          <button wx:if="{{nextCursor}}" class="health-more" bindtap="onLoadMore" disabled="{{loadingMore}}">{{loadingMore?'加载中…':'加载更多'}}</button>
+        </view>
+      </block>
+      <block wx:elif="{{tab==='events'}}">
+        <view class="health-panel">
+          <view class="health-heading-row"><text class="health-heading">健康时间线</text><button wx:if="{{canEvent}}" class="health-primary" bindtap="onNewEvent">＋ 记录事件</button></view>
+          <text class="health-caption">记录已经发生的健康情况；未来预约和提醒请使用日程、待办。</text>
+          <view wx:for="{{events}}" wx:key="id" class="health-timeline-block">
+            <text wx:if="{{item.monthLabel}}" class="health-month">{{item.monthLabel}}</text>
+            <view class="health-timeline-row" data-id="{{item.id}}" bindtap="onDetail"><view class="health-timeline-dot">♥</view><view class="health-row-main"><text class="health-row-title">{{item.summary}}</text><text class="health-caption">{{item.date}} · {{item.typeLabel}}{{item.status==='cancelled'?' · 已取消':''}}</text><text wx:if="{{item.location}}" class="health-caption">{{item.location}}</text><text wx:if="{{item.description}}" class="health-description">{{item.description}}</text></view><text class="health-chevron">›</text></view>
+          </view>
+          <view wx:if="{{!events.length}}" class="health-empty small">暂无健康事件</view>
+          <button wx:if="{{nextCursor}}" class="health-more" bindtap="onLoadMore" disabled="{{loadingMore}}">加载更多</button>
+        </view>
+      </block>
+      <block wx:else>
+        <view class="health-panel">
+          <view class="health-heading-row"><text class="health-heading">健康档案</text><button wx:if="{{canDocument}}" class="health-primary" bindtap="onNewDocument">＋ 上传档案</button></view>
+          <view class="health-filters"><view wx:for="{{docFilters}}" wx:key="key" class="health-chip {{documentFilter===item.key?'selected':''}}" data-key="{{item.key}}" bindtap="onDocFilter">{{item.label}}</view></view>
+          <view wx:for="{{documents}}" wx:key="id" class="health-row" data-id="{{item.id}}" bindtap="onDetail"><view class="health-file-icon">📄</view><view class="health-row-main"><text class="health-row-title health-truncate">{{item.title}}</text><text class="health-caption">{{item.issuedDate||'日期未记录'}} · {{item.typeLabel}}</text><text wx:if="{{item.issuerName}}" class="health-caption">{{item.issuerName}}</text></view><text class="health-chevron">›</text></view>
+          <view wx:if="{{!documents.length}}" class="health-empty small">暂无健康档案</view>
+          <button wx:if="{{nextCursor}}" class="health-more" bindtap="onLoadMore" disabled="{{loadingMore}}">加载更多</button>
+        </view>
+      </block>
+    </block>
+  </block>
+  <view wx:if="{{modal}}" class="health-mask" bindtap="onCloseModal" catchtouchmove="stopTap">
+    <view class="health-sheet" catchtap="stopTap">
+      <view class="health-sheet-head"><text class="health-sheet-title">{{modalTitle}}</text><view class="health-icon-button" bindtap="onCloseModal" aria-label="关闭"><lucide-icon name="x" color="#78716c" size="22"/></view></view>
+      <scroll-view scroll-y class="health-sheet-body">
+        <block wx:if="{{modal==='manage'}}">
+          <text class="health-muted">同一家人的指标定义共享，测量记录按成员分别保存。</text>
+          <button class="health-primary full" bindtap="onNewMetric">＋ 新增指标</button>
+          <view wx:for="{{metrics}}" wx:key="id" class="health-row" data-id="{{item.id}}" bindtap="onEditMetric"><view class="health-row-main"><text>{{item.name}}</text><text class="health-caption">{{item.defaultUnit||'健康记录'}}</text></view><text class="health-chevron">›</text></view>
+          <button wx:if="{{metricCursor}}" class="health-more" bindtap="loadMoreMetrics">加载更多指标</button>
+        </block>
+        <block wx:elif="{{modal==='metric'}}">
+          <view class="health-field"><text>指标名称</text><input value="{{form.name}}" data-key="name" bindinput="onField" maxlength="160" placeholder="例如：身高"/></view>
+          <view wx:if="{{!editing}}" class="health-field"><text>值类型</text><picker mode="selector" range="{{valueTypeOptions}}" range-key="label" value="{{form.typeIndex}}" bindchange="onType"><view class="health-control">{{valueTypeOptions[form.typeIndex].label}} ▾</view></picker></view>
+          <view wx:if="{{!editing}}" class="health-field"><text>默认单位（可选）</text><input value="{{form.unit}}" data-key="unit" bindinput="onField" maxlength="80" placeholder="例如：cm"/></view>
+          <text wx:if="{{editing}}" class="health-caption">已有指标只修改名称，类型和默认单位保持不变。</text>
+        </block>
+        <block wx:elif="{{modal==='measure'}}">
+          <view class="health-field"><text>测量日期</text><picker mode="date" value="{{form.date}}" bindchange="onDate"><view class="health-control">{{form.date}} ▾</view></picker></view>
+          <view class="health-field"><text>测量值</text><view wx:if="{{formValueType==='boolean'}}" class="health-range"><view wx:for="{{booleanOptions}}" wx:key="key" class="health-range-item {{form.raw===item.key?'selected':''}}" data-value="{{item.key}}" bindtap="onBoolean">{{item.label}}</view></view><input wx:else value="{{form.raw}}" type="{{formValueType==='number'?'digit':'text'}}" data-key="raw" bindinput="onField" placeholder="填写测量值"/></view>
+          <view class="health-field"><text>单位（可选）</text><input value="{{form.unit}}" data-key="unit" bindinput="onField"/></view>
+          <view class="health-field"><text>说明（可选）</text><textarea value="{{form.notes}}" data-key="notes" bindinput="onField" maxlength="4000" auto-height/></view>
+        </block>
+        <block wx:elif="{{modal==='growth'}}">
+          <text class="health-caption">可以只填一项；两项同时填写会一起保存。</text>
+          <view class="health-field"><text>测量日期</text><picker mode="date" value="{{form.date}}" bindchange="onDate"><view class="health-control">{{form.date}} ▾</view></picker></view>
+          <view class="health-field"><text>身高（cm）</text><input type="digit" value="{{form.height}}" data-key="height" bindinput="onField" placeholder="可选"/></view>
+          <view class="health-field"><text>体重（kg）</text><input type="digit" value="{{form.weight}}" data-key="weight" bindinput="onField" placeholder="可选"/></view>
+        </block>
+        <block wx:elif="{{modal==='event'}}">
+          <view class="health-field"><text>标题</text><input value="{{form.name}}" data-key="name" bindinput="onField" maxlength="200"/></view>
+          <view class="health-field"><text>类型</text><picker mode="selector" range="{{eventTypeOptions}}" range-key="label" value="{{form.typeIndex}}" bindchange="onType"><view class="health-control">{{eventTypeOptions[form.typeIndex].label}} ▾</view></picker></view>
+          <text wx:if="{{form.timeLabel}}" class="health-caption">保留已有精确时间：{{form.timeLabel}}</text>
+          <view wx:else class="health-field"><text>日期</text><picker mode="date" value="{{form.date}}" bindchange="onDate"><view class="health-control">{{form.date}} ▾</view></picker></view>
+          <view class="health-field"><text>地点/机构</text><input value="{{form.location}}" data-key="location" bindinput="onField"/></view>
+          <view class="health-field"><text>说明</text><textarea value="{{form.description}}" data-key="description" bindinput="onField" maxlength="4000" auto-height/></view>
+        </block>
+        <block wx:elif="{{modal==='document'}}">
+          <view class="health-field"><text>名称</text><input value="{{form.name}}" data-key="name" bindinput="onField" maxlength="200"/></view>
+          <view class="health-field"><text>类型</text><picker mode="selector" range="{{documentTypeOptions}}" range-key="label" value="{{form.typeIndex}}" bindchange="onType"><view class="health-control">{{documentTypeOptions[form.typeIndex].label}} ▾</view></picker></view>
+          <view class="health-field"><text>报告日期（可选）</text><view class="health-actions"><picker class="health-flex" mode="date" value="{{form.date}}" bindchange="onDate"><view class="health-control">{{form.date||'选择日期'}} ▾</view></picker><text wx:if="{{form.date}}" class="health-link" bindtap="onClearDate">清除</text></view></view>
+          <view class="health-field"><text>出具机构</text><input value="{{form.issuer}}" data-key="issuer" bindinput="onField" maxlength="200"/></view>
+          <view class="health-field"><text>说明</text><textarea value="{{form.notes}}" data-key="notes" bindinput="onField" maxlength="4000" auto-height/></view>
+          <button class="health-secondary full" bindtap="onToggleEventChooser">{{chooseEvent?'收起关联事件':'关联健康事件（可选）'}} · {{form.eventLabel}}</button>
+          <view wx:if="{{chooseEvent}}" class="health-chooser"><view class="health-row" data-id="" bindtap="onChooseEvent">不关联</view><view wx:for="{{eventChoices}}" wx:key="id" class="health-row" data-id="{{item.id}}" bindtap="onChooseEvent"><view class="health-row-main"><text>{{item.summary}}</text><text class="health-caption">{{item.date}}</text></view></view><button wx:if="{{eventChoiceCursor}}" class="health-more" bindtap="onMoreEventChoices">更多事件</button><text wx:if="{{eventChoiceLoading}}" class="health-caption">正在加载…</text></view>
+          <block wx:if="{{!editing}}"><view class="health-field"><text>附件（PDF或图片，最大15 MB）</text><button class="health-secondary full" bindtap="chooseFile">{{fileName||'选择文件'}}</button></view><checkbox-group bindchange="onShared"><label class="health-share"><checkbox value="shared" checked="{{shared}}" color="#43A047"/><text>确认该档案适合在当前家庭共享</text></label></checkbox-group></block>
+          <text wx:else class="health-caption">已有附件不随资料信息编辑而替换。</text>
+        </block>
+        <block wx:elif="{{modal==='detail'}}">
+          <text class="health-muted">{{detailDate}} · {{detailMeta}}</text><text wx:if="{{detailLocation}}" class="health-detail-text">{{detailLocation}}</text><text wx:if="{{detailDescription}}" class="health-detail-text">{{detailDescription}}</text>
+          <button wx:if="{{detailKind==='events'}}" class="health-secondary full" bindtap="onOpenLinks">相关日程与待办 ›</button>
+          <block wx:else><text wx:if="{{detailLinked}}" class="health-caption">已关联健康事件</text><button wx:if="{{detailHasFile}}" class="health-primary full" data-export="{{false}}" bindtap="onPreviewFile" disabled="{{busy}}">查看原始资料</button><button wx:if="{{detailHasFile}}" class="health-secondary full" data-export="{{true}}" bindtap="onPreviewFile" disabled="{{busy}}">下载 / 打开原始资料</button><text wx:else class="health-caption">暂无附件</text></block>
+          <view wx:if="{{detailWritable}}" class="health-actions detail-actions"><button class="health-secondary" bindtap="onEditDetail" disabled="{{busy}}">编辑</button><button class="health-danger" bindtap="onDeleteDetail" disabled="{{busy}}">删除</button></view>
+        </block>
+        <block wx:elif="{{modal==='links'}}">
+          <view wx:for="{{links}}" wx:key="id" class="health-row"><view class="health-row-main"><text>{{item.title}}</text><text class="health-caption">{{item.type==='event'?'日程':'待办'}} · {{item.date||''}}</text></view><button wx:if="{{canEvent}}" class="health-secondary" data-id="{{item.id}}" bindtap="onRemoveLink" disabled="{{busy||linkLoading}}">解除</button></view>
+          <view wx:if="{{!links.length&&!linkLoading}}" class="health-empty small">暂无已关联的日程或待办</view><button wx:if="{{linkCursor}}" class="health-more" bindtap="onMoreLinks">更多关联</button>
+          <block wx:if="{{canEvent}}"><view class="health-field"><text>关联类型</text><picker mode="selector" range="{{linkTypes}}" range-key="label" value="{{linkTypeIndex}}" bindchange="onLinkType"><view class="health-control">{{linkTypes[linkTypeIndex].label}} ▾</view></picker></view>
+            <view class="health-field"><text>搜索已有内容</text><view class="health-actions"><input class="health-flex" value="{{linkQuery}}" bindinput="onLinkQuery" placeholder="输入名称"/><button class="health-secondary" bindtap="onSearchLinks" disabled="{{busy||linkLoading}}">搜索</button></view></view>
+            <view wx:for="{{linkCandidates}}" wx:key="id" class="health-row"><view class="health-row-main"><text>{{item.title}}</text><text class="health-caption">{{item.date||''}}</text></view><button class="health-secondary" data-id="{{item.id}}" bindtap="onAddLink" disabled="{{busy||linkLoading}}">关联</button></view>
+            <button wx:if="{{candidateCursor}}" class="health-more" bindtap="onMoreCandidates">更多搜索结果</button>
+          </block>
+          <text wx:if="{{linkLoading}}" class="health-caption">正在加载…</text>
+        </block>
+        <text wx:if="{{formError}}" class="health-error">{{formError}}</text>
+        <button wx:if="{{modal==='metric'||modal==='measure'||modal==='growth'||modal==='event'||modal==='document'}}" class="health-primary full save" bindtap="onSave" disabled="{{busy}}">{{busy?'正在保存…':'保存'}}</button>
+      </scroll-view>
+    </view>
+  </view>
+</view>

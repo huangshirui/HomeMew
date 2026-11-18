@@ -1786,3 +1786,7 @@ Native 小程序提供 utils/football-recent-cache.ts 及 components/football-re
 ## 2026-10-26 unified Access link correction
 
 The user rejected the independent mailbox authorization model. The accepted `docs/decisions/2026-10-26-unified-access-account-link.md` supersedes that wording: email-first and code-first bind one LifeSpace Access principal, and confirmed login resolves issuer/subject only. The correction is in normal PR/CI, not deployed. See the fix plan and require merged-PR/exact-candidate release provenance; no working-tree or direct Cloudflare deployment.
+
+## 家庭健康（2026-11-18 开发候选）
+
+更多 → 健康与运动 → 健康；四页签和功能与 Web 一致。使用既有四个模型，新增稳定 Mini 健康产品 BFF。家庭成员、指标、范围、权限和临时文件均按页面工作区隔离。无后台轮询或健康数据持久缓存。先部署受控 Web BFF，再上传 Mini 开发/体验版，以独立生产测试家庭验收。详见 `docs/decisions/2026-11-18-miniprogram-family-health.md`。
