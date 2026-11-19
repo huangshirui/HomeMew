@@ -43,8 +43,10 @@ test('bounded growth and on-demand query and file access',()=>{
   assert.match(domain,/field:'documentType',op:'eq'/u);
   assert.match(page,/\{limit:20\},chooseEvent/u);
   assert.match(page,/preview\?<DocumentPreview/u);
-  assert.match(page,/URL.revokeObjectURL/u);
-  assert.match(page,/iframe sandbox=""/u);
+  const preview=source('./src/components/ui/document-preview.tsx');
+  assert.match(preview,/URL.revokeObjectURL/u);
+  assert.match(preview,/lazy\(\(\)=>import\('\.\/pdf-preview'\)\)/u);
+  assert.doesNotMatch(preview,/iframe/u);
 });
 
  test('stable empty list avoids repeated effects while access or data is unavailable',()=>{
