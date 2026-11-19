@@ -3,6 +3,7 @@ import {request,downloadHealthTemporaryFile} from './api';
 import {productQuery} from './product-routes';
 import {UPLOAD_TIMEOUT} from './config';
 import {buildMultipartBody} from './media';
+import {healthFileType} from '../utils/health-file-type';
 
 export type HealthKind='metrics'|'measurements'|'events'|'documents';
 export type HealthTab='overview'|'metrics'|'events'|'documents';
@@ -42,14 +43,7 @@ export const removeHealthLink=(familyId:string,personId:string,eventId:string,re
 export function readTemporaryFile(filePath:string):Promise<ArrayBuffer>{
   return new Promise((resolve,reject)=>wx.getFileSystemManager().readFile({filePath,success:r=>resolve(r.data as ArrayBuffer),fail:()=>reject(Error('无法读取所选文件'))}));
 }
-export function healthFileType(buffer:ArrayBuffer):{ext:string;mime:string}|null{
-  const b=new Uint8Array(buffer,0,Math.min(buffer.byteLength,16));const ascii=(a:number,z:number)=>String.fromCharCode(...Array.from(b.slice(a,z)));
-  if(ascii(0,5)==='%PDF-')return{ext:'pdf',mime:'application/pdf'};
-  if([137,80,78,71,13,10,26,10].every((v,i)=>b[i]===v))return{ext:'png',mime:'image/png'};
-  if(b[0]===255&&b[1]===216&&b[2]===255)return{ext:'jpg',mime:'image/jpeg'};
-  if(ascii(0,4)==='RIFF'&&ascii(8,12)==='WEBP')return{ext:'webp',mime:'image/webp'};
-  return null;
-}
+export { healthFileType } from '../utils/health-file-type';
 export async function uploadHealthDocument(familyId:string,personId:string,file:PickedHealthFile,fields:Record<string,string>){
   if(!file.path||file.size<1||file.size>HEALTH_MAX_FILE)throw Error('请选择不超过15 MB的PDF或图片');
   const bytes=await readTemporaryFile(file.path),type=healthFileType(bytes);

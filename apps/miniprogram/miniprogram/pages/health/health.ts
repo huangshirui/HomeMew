@@ -1,5 +1,6 @@
 import {currentFamilyStore,userStore} from '../../stores/index';
 import {ensureRuntimeReady} from '../../services/runtime-bootstrap';
+import {AppError} from '../../services/api';
 import {AutoRefreshGate,markRefreshDirty} from '../../services/refresh-policy';
 import {
   getHealthContext,listHealthMetrics,listMeasurements,listGrowth,listHealthEvents,listHealthDocuments,
@@ -415,7 +416,7 @@ Page({
       const path=await downloadHealthDocument(this.data.familyId,this.data.personId,id);
       if(!this.validModal(gen)){removeTemporaryFile(path);return;}
       this._previewPath=path;await openHealthTemporaryFile(path,allowExport);
-    }catch(cause){if(this.validModal(gen)){this.releasePreview();this.setData({formError:describe(cause)});}}
+    }catch(cause){if(this.validModal(gen)){this.releasePreview();const diagnostic=cause instanceof AppError?'（'+cause.code+(cause.requestId?' · '+cause.requestId:'')+'）':'';this.setData({formError:describe(cause)+diagnostic});}}
     finally{if(this.validModal(gen))this.setData({busy:false});}
   },
   onOpenLinks():void{
