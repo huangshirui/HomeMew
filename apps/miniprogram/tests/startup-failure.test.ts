@@ -45,3 +45,13 @@ test('home first-load UI uses mutually exclusive error and confirmed empty branc
   const w=source('pages/home/home.wxml');
   assert.match(w,/wx:elif="\{\{contextError\}\}"/);assert.match(w,/wx:elif="\{\{loaded && !loading && !contextError\}\}"/);
 });
+
+test('all direct-entry startup failure branches outrank no-family onboarding',()=>{
+  for(const p of ['tasks/tasks','events/events','domains/list','football/list']){
+    const ts=source('pages/'+p+'.ts'),w=source('pages/'+p+'.wxml');
+    assert.match(ts,/initError:\s*true/);
+    assert.match(w,/系统暂时不可用/);
+    if(p!=='football/list')assert.ok(w.indexOf('{{initError}}')<w.indexOf('{{noFamily}}'));
+  }
+  assert.match(source('pages/more/more.wxml'),/contextReady/);
+});

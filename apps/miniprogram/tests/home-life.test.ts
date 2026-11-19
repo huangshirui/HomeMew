@@ -227,6 +227,7 @@ test('home foreground recovery skips already fresh Life models and edits force i
   page._startPoll = () => {};
   page._subscribeDirty = () => {};
   page.data.loaded = true;
+  page._contextUserId = 'usr_me'; // successful runtime context for the rendered family
   page._lifeFetched = { habits: true, activities: true, goals: true };
   page._lifeOnShowGate.noteRequest(page.lifeRefreshContext('spc_a'), 'domains');
   page.onShow();

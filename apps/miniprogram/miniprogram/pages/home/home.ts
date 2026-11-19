@@ -473,7 +473,12 @@ Page({
     const epoch = ++this._contextEpoch;
     const previousUser = this._contextUserId;
     const previousFamily = this.data.currentFamily;
-    const hadView = this.data.loaded && !!previousFamily;
+    const hadView = this.data.loaded && !!previousFamily && previousUser === userStore.value?.id && previousFamily.id === currentFamilyStore.value?.id;
+    const previouslyLoaded = this.data.loaded;
+    if (!hadView && previousFamily) {
+      this._resetFamilyData();
+      this.setData({ currentFamily: null });
+    }
     this._markFetched();
     if (!hadView) this.setData({ loading: true, loaded: false, contextError: false, contextRequestId: '' });
     try {
@@ -483,7 +488,7 @@ Page({
       if (epoch !== this._contextEpoch) return;
       const user = userStore.value;
       if (!user || user.status === 'disabled') throw Error('当前账号不可用');
-      const families = this.data.loaded && !force ? await loadFamilies() : familiesStore.value;
+      const families = previouslyLoaded && !force ? await loadFamilies() : familiesStore.value;
       if (epoch !== this._contextEpoch || userStore.value?.id !== user.id) return;
       if (!Array.isArray(families)) throw Error('家庭列表响应无效');
       const current = refreshFamilyState(families);
