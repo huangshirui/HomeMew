@@ -85,7 +85,7 @@ Page({
       score:typeof a==='number'&&typeof b==='number'?a+' : '+b:'— : —',dateText:m.matchDate+(m.matchType==='friendly'?' · 友谊赛':' · 正式比赛')};
   },
   onReachBottom():void{if(!this.data.loading&&!this.data.loadingMore&&this.data.nextCursor)void this.load(false);},
-  onPullDownRefresh():void{void (this.data.initError||!this.data.familyId?this.onShow():this.load(true)).then(()=>wx.stopPullDownRefresh(),()=>wx.stopPullDownRefresh());},
+  onPullDownRefresh():void{void Promise.resolve(this.data.initError||!this.data.familyId?this.onShow():this.load(true)).then(()=>wx.stopPullDownRefresh(),()=>wx.stopPullDownRefresh());},
   onToggleFilter():void{this.setData({filterOpen:!this.data.filterOpen});},
   onFilterInput(e:WechatMiniprogram.Input):void{this.setData({search:e.detail.value});},
   onYear(e:WechatMiniprogram.CustomEvent<{value:string}>):void{
