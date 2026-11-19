@@ -1,6 +1,6 @@
 <view class="container more-page">
   <nav-bar title="更多" />
-  <view wx:if="{{loadError}}" class="load-error" bindtap="loadData" aria-role="button">加载失败，点此重试</view>
+  <view wx:if="{{loadError}}" class="load-error" bindtap="loadData" aria-role="button">系统暂时不可用，点此重试</view>
   <view wx:for="{{groups}}" wx:for-item="group" wx:key="key" class="more-group {{group.key === 'plans' ? 'first-group' : ''}}">
     <view class="more-group-label">{{group.title}}</view>
     <view class="tile-grid">
@@ -10,7 +10,7 @@
           <image wx:elif="{{tile.key === 'about'}}" class="brand-icon" src="/assets/images/logo.png" mode="aspectFit" />
           <text wx:else>{{tile.icon}}</text>
         </view>
-        <text class="tile-name">{{tile.key === 'family' ? (familyCount > 0 ? familyName : '加入家庭') : tile.title}}</text>
+        <text class="tile-name">{{tile.key === 'family' ? (familyCount > 0 ? familyName : (loadError ? '家庭信息' : (contextReady ? '加入家庭' : '家庭信息'))) : tile.title}}</text>
       </view>
     </view>
   </view>

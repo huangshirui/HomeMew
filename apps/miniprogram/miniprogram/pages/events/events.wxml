@@ -3,7 +3,10 @@
   <nav-bar title="家庭日程" topInset="0" />
 
   <!-- 无家庭引导 -->
-  <block wx:if="{{noFamily}}">
+  <block wx:if="{{initError}}">
+    <view class="empty-state"><text class="empty-title">系统暂时不可用</text><text class="empty-desc">暂时无法读取家庭信息，请检查网络或稍后重试。</text><view class="empty-actions"><button class="btn-primary" bindtap="onRetryInit">重新加载</button></view></view>
+  </block>
+  <block wx:elif="{{noFamily}}">
     <view class="empty-state">
       <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
       <text class="empty-title">还没有家庭</text>
@@ -11,16 +14,6 @@
       <view class="empty-actions">
         <button class="btn-primary" bindtap="onCreateFamily">创建家庭</button>
         <button class="btn-outline" style="margin-top: 24rpx;" bindtap="onJoinFamily">加入家庭</button>
-      </view>
-    </view>
-  </block>
-
-  <!-- 首屏加载失败 -->
-  <block wx:elif="{{initError}}">
-    <view class="empty-state">
-      <text class="empty-title">日程加载失败</text>
-      <view class="empty-actions empty-actions-row">
-        <button class="btn-outline btn-sm" bindtap="onRetryInit">点击重试</button>
       </view>
     </view>
   </block>

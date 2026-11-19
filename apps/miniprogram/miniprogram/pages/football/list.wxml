@@ -1,5 +1,7 @@
 <view class="container football-page">
   <nav-bar title="足球比赛" showBack="true" />
+  <view wx:if="{{initError}}" class="empty-state"><text class="empty-title">系统暂时不可用</text><text class="empty-desc">暂时无法读取家庭信息，请稍后重试。</text><button class="btn-primary" bindtap="onRefresh">重新加载</button></view>
+  <block wx:else>
   <football-toolbar mode="{{mode}}" people="{{personOptions}}" person-index="{{personIndex}}" filter-open="{{filterOpen}}" has-filters="{{hasFilters}}" bind:mode="onMode" bind:person="onPerson" bind:filter="onToggleFilter" bind:create="onCreate" bind:manage="onManage" bind:activities="onActivities" />
   <view wx:if="{{filterOpen}}" class="card football-filter">
     <view class="football-search-row"><input value="{{search}}" placeholder="搜索比赛备注" bindinput="onFilterInput" bindconfirm="onApply" confirm-type="search"/><button class="football-icon-button" bindtap="onApply" aria-label="搜索比赛备注"><lucide-icon name="search" size="18" color="#047857"/></button></view>
@@ -29,4 +31,5 @@
   <view wx:if="{{nextCursor}}" class="football-more" bindtap="onReachBottom">{{loadingMore?'加载中…':'加载更多比赛'}}</view>
   </block>
   <football-dashboard wx:if="{{mode==='stats'}}" family-id="{{familyId}}" scope="{{activeScope}}" />
+  </block>
 </view>

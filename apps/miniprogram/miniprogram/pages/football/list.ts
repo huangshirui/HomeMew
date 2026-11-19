@@ -8,7 +8,7 @@ import { preferredFootballPerson,rememberFootballPerson,parseFootballScope,type 
 type MatchRow=Match&{representativeName:string;opponentName:string;competitionName:string;score:string;dateText:string;representativeIcon:DomainIcon|null;opponentIcon:DomainIcon|null};
 Page({
   data:{
-    mode:'record' as 'record'|'stats',activeScope:{} as FootballScope,hasFilters:false,teamIcons:{} as Record<string,DomainIcon|null>,userId:'',familyId:'',loading:true,loadedOnce:false,loadingMore:false,error:'',rows:[] as MatchRow[],nextCursor:null as string|null,
+    initError:false,mode:'record' as 'record'|'stats',activeScope:{} as FootballScope,hasFilters:false,teamIcons:{} as Record<string,DomainIcon|null>,userId:'',familyId:'',loading:true,loadedOnce:false,loadingMore:false,error:'',rows:[] as MatchRow[],nextCursor:null as string|null,
     people:[] as PersonOption[],personIndex:0,personOptions:[] as {id:string;label:string}[],personId:'',
     filterOpen:false,year:'',matchType:'',matchTypeIndex:0,matchTypes:[{key:'',label:'全部类型'},{key:'official',label:'正式比赛'},{key:'friendly',label:'友谊赛'}],
     years:['全部年份',...Array.from({length:5},(_,i)=>String(new Date().getFullYear()-i)),'其他年份…'],yearIndex:0,
@@ -32,7 +32,8 @@ Page({
     if(mode==='record')void this.load(true);
   },
   async onShow():Promise<void>{
-    try{await ensureRuntimeReady();}catch{}
+    try{await ensureRuntimeReady();}catch{++this._generation;this.setData({initError:true,loading:false,loadingMore:false});return;}
+    this.setData({initError:false});
     const familyId=currentFamilyStore.value?.id||'';
     if(!familyId){++this._generation;this.setData({loading:false,error:'请先加入家庭',familyId:'',rows:[],loadedOnce:false});return;}
     if(familyId!==this.data.familyId){
@@ -104,7 +105,7 @@ Page({
     const index=Number(e.detail.value),personId=this.data.personOptions[index]?.id||'';
     this.setData({personIndex:index,personId});rememberFootballPerson(userStore.value?.id||'',this.data.familyId,personId);void this.load(true);
   },
-  onRefresh():void{void this.load(true);},
+  onRefresh():void{if(this.data.initError||!this.data.familyId){void this.onShow();return;}void this.load(true);},
   onApply():void{this.setData({appliedSearch:this.data.search.trim()});void this.load(true);},
   onReset():void{this.setData({year:'',yearIndex:0,matchType:'',matchTypeIndex:0,search:'',appliedSearch:'',
     representativeTeamId:'',opponentTeamId:'',competitionActivityId:'',representativeTeamName:'全部代表球队',opponentTeamName:'全部对手球队',competitionName:'全部赛事'});void this.load(true);},

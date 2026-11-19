@@ -3,8 +3,8 @@ import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 
 Page({
   data:{
-    familyName:'尚未加入家庭',familyAvatar:null as string|null,familyCount:0,
-    loadError:false,
+    familyName:'家庭信息',familyAvatar:null as string|null,familyCount:0,
+    loadError:false,contextReady:false,
     groups:[
       {key:'plans',title:'计划与成长',items:[
         {key:'activity',title:'活动',icon:'🗓️',path:'/pages/domains/list?kind=activities'},
@@ -38,15 +38,16 @@ Page({
       await ensureRuntimeReady();
       const families=await loadFamilies();
       refreshFamilyState(families);
+      this.setData({contextReady:true});
       this.showStores();
     }catch{
-      this.showStores();
       this.setData({loadError:true});
+      this.showStores();
     }
   },
   showStores():void{
     const family=currentFamilyStore.value;
-    this.setData({familyName:family?.name||'尚未加入家庭',familyAvatar:family?.avatarUrl||null,
+    this.setData({familyName:family?.name||(this.data.contextReady&&!this.data.loadError?'尚未加入家庭':'家庭信息暂不可用'),familyAvatar:family?.avatarUrl||null,
       familyCount:familiesStore.value.length});
   },
   onNav(e:WechatMiniprogram.TouchEvent):void{

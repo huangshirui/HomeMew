@@ -64,6 +64,7 @@ const POLL_INTERVAL_MS = 60 * 1000;
 
 Page({
   data: {
+    initError: false,
     // 成员范围
     scope: 'me' as TasksScope,
     scopeLabel: '我的待办',
@@ -104,9 +105,10 @@ Page({
       await ensureRuntimeReady();
     } catch (error) {
       console.error('[Tasks] Runtime bootstrap failed:', error);
-      this.setData({ loaded: true, listError: true });
+      this.setData({ loaded: true, noFamily: false, initError: true, listError: true });
       return;
     }
+    this.setData({ initError: false, listError: false });
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
     if (!familyId) {
       this.setData({ loaded: true, noFamily: true });
@@ -128,6 +130,8 @@ Page({
     this._subscribeDirty();
     this._startPoll();
     const familyId = currentFamilyStore.value?.id || '';
+    // The failed initialization is not a successful empty household.
+    if (this.data.initError) return;
     // 从无家庭恢复到有家庭
     if (familyId && this.data.noFamily) {
       this.resetForFamily(familyId);
