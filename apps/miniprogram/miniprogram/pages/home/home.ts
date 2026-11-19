@@ -21,8 +21,9 @@ import {
   userStore,
   loadFamilies,
   loadCurrentUser,
-  restoreCurrentFamily,
+  refreshFamilyState,
 } from '../../stores/index';
+import { ensureRuntimeReady } from '../../services/runtime-bootstrap';
 import {
   showSuccess,
   showError,
@@ -161,6 +162,8 @@ Page({
 
     currentFamily: null as FamilyView | null,
     loaded: false,
+    contextError: false,
+    contextRequestId: '',
     /** 当前生效的首页数据范围（设置页「首页数据范围」）：'me' 只看我的 / 'all' 看全家 */
     homeScope: 'me' as HomeScope,
 
@@ -215,7 +218,9 @@ Page({
   _homeCacheHydratedFamilyId: '' as string,
 
   _familyUnsubscribe: null as (() => void) | null,
-  _familiesUnsubscribe: null as (() => void) | null,
+  _contextPending: false,
+  _contextUserId: '',
+  _contextEpoch: 0,
   _dirtyUnsubscribe: null as (() => void) | null,
   /** 每分钟本地重算定时器（只重算展示态，不重新拉后台） */
   _tickTimer: null as ReturnType<typeof setInterval> | null,
@@ -253,8 +258,8 @@ Page({
     this.setData({ homeScope: scope });
     // 首次加载、家庭在其他页被切换过、关心的域被标记变更（新建/完成/删除后返回）、
     // 或数据范围设置变更时重新拉取；普通切换 tab 不重复请求。
-    if (!this.data.loaded || (storeFamilyId && storeFamilyId !== shownFamilyId) || dirty.size > 0 || scopeChanged) {
-      this.loadData();
+    if (!this.data.loaded || this.data.contextError || storeFamilyId !== shownFamilyId || this._contextUserId !== (userStore.value?.id || '') || dirty.size > 0 || scopeChanged) {
+      if (!this.data.contextError || Date.now() - this._lastFetchAt >= 10000) void this.loadData();
     } else if (storeFamilyId && this._lifeOnShowGate.shouldRefresh(
       this.lifeRefreshContext(storeFamilyId), 'domains',
       this._lifeFetched.habits && this._lifeFetched.activities && this._lifeFetched.goals)) {
@@ -264,6 +269,13 @@ Page({
     }
 
     this._familyUnsubscribe = currentFamilyStore.subscribe((family) => {
+      // A partially completed bootstrap must not commit the initial view.
+      if (this._contextPending || !this.data.loaded || this.data.contextError) return;
+      if (!userStore.value || this._contextUserId !== userStore.value.id) {
+        this._resetFamilyData();
+        this.setData({ currentFamily: null, loaded: false, loading: true });
+        return;
+      }
       const newFamily = family as FamilyView | null;
       const prevId = this.data.currentFamily?.id;
       this.setData({ currentFamily: newFamily }, () => {
@@ -284,16 +296,7 @@ Page({
         void this.loadLife(newId);
       }
     });
-    this._familiesUnsubscribe = familiesStore.subscribe((families) => {
-      const cf = currentFamilyStore.value;
-      this.setData({
-        loaded: true,
-        loading: false,
-        currentFamily: cf as FamilyView | null,
-      }, () => {
-        this.applyNavTitle(cf as FamilyView | null);
-      });
-    });
+
 
     this._subscribeDirty();
     this._startTick();
@@ -302,15 +305,14 @@ Page({
 
   onHide(): void {
     if (this._familyUnsubscribe) this._familyUnsubscribe();
-    if (this._familiesUnsubscribe) this._familiesUnsubscribe();
     this._unsubscribeDirty();
     this._stopTick();
     this._stopPoll();
   },
 
   onUnload(): void {
+    this._contextEpoch++;
     if (this._familyUnsubscribe) this._familyUnsubscribe();
-    if (this._familiesUnsubscribe) this._familiesUnsubscribe();
     this._unsubscribeDirty();
     this._stopTick();
     this._stopPoll();
@@ -357,7 +359,7 @@ Page({
 
   /** 轮询一次：带节流与家庭校验，复用已有的加载函数 */
   _poll(): void {
-    if (!this.data.loaded) return;
+    if (!this.data.loaded || this.data.contextError || this._contextPending) return;
     // 以 store 为准：家庭可能在其它页被切换，此处不能用可能滞后的 data 快照
     const familyId = currentFamilyStore.value?.id || '';
     if (!familyId || familyId !== this.data.currentFamily?.id) return;
@@ -443,7 +445,7 @@ Page({
     this._unsubscribeDirty();
     this._dirtyUnsubscribe = subscribe((domain) => {
       const cf = this.data.currentFamily;
-      if (!cf || !this.data.loaded) return;
+      if (!cf || !this.data.loaded || this.data.contextError || this._contextPending) return;
       if (domain === 'tasks') this.loadTasks(cf.id);
       else if (domain === 'events') this.loadTodayEvents(cf.id);
       else if (domain === 'days') this.loadAttentionDays(cf.id);
@@ -457,74 +459,68 @@ Page({
     }
   },
 
-  /** 下拉刷新：仅内容区下拉（nav-bar 固定），家庭信息 + 今日日程 + 待办 */
+  /** One context refresh, followed by the existing business loads. */
   onRefresh(): void {
-    this._markFetched();
     this.setData({ refreshing: true });
-    Promise.all([
-      this.loadData(),
-      this.data.currentFamily ? this.loadTodayEvents(this.data.currentFamily.id) : Promise.resolve(),
-      this.data.currentFamily ? this.loadTasks(this.data.currentFamily.id) : Promise.resolve(),
-    ])
-      .then(() => this.setData({ refreshing: false }))
-      .catch(() => this.setData({ refreshing: false }));
+    void this.loadData(true).then(() => this.setData({ refreshing: false }), () => this.setData({ refreshing: false }));
   },
 
-  async loadData(): Promise<void> {
+  onRetryContext(): void { void this.loadData(true); },
+
+  async loadData(force = false): Promise<void> {
+    if (this._contextPending) return;
+    this._contextPending = true;
+    const epoch = ++this._contextEpoch;
+    const previousUser = this._contextUserId;
+    const previousFamily = this.data.currentFamily;
+    const hadView = this.data.loaded && !!previousFamily;
     this._markFetched();
+    if (!hadView) this.setData({ loading: true, loaded: false, contextError: false, contextRequestId: '' });
     try {
-      await Promise.all([loadFamilies(), this.ensureUser()]);
-      const families = familiesStore.value;
-      // 优先信任 store 中当前家庭（其它页面切换后已同步），若无效再尝试恢复缓存。
-      const storeCurrent = currentFamilyStore.value;
-      const current =
-        (storeCurrent && families.some((f) => f.id === storeCurrent.id)
-          ? storeCurrent
-          : restoreCurrentFamily(families)) || null;
-      const prevId = this.data.currentFamily?.id;
-      this.setData({
-        currentFamily: current as FamilyView | null,
-        loaded: true,
-        loading: false,
-      }, () => {
-        this.applyNavTitle(current as FamilyView | null);
-      });
-
-      const app = getApp<IAppOption>();
-      if (app) {
-        app.globalData.families = families;
-        app.globalData.currentFamily = current;
-      }
-
-      this.setData({ homeScope: loadHomeScope(current?.id || '', userStore.value?.id || '') });
-
+      // First entry shares the App's authoritative bootstrap; no extra family
+      // request or cache hydration before both identity and membership succeed.
+      await ensureRuntimeReady({ force });
+      if (epoch !== this._contextEpoch) return;
+      const user = userStore.value;
+      if (!user || user.status === 'disabled') throw Error('当前账号不可用');
+      const families = this.data.loaded && !force ? await loadFamilies() : familiesStore.value;
+      if (epoch !== this._contextEpoch || userStore.value?.id !== user.id) return;
+      if (!Array.isArray(families)) throw Error('家庭列表响应无效');
+      const current = refreshFamilyState(families);
+      if (families.length && !current) throw Error('家庭上下文初始化失败');
+      if (previousUser !== user.id || previousFamily?.id !== current?.id || !current) this._resetFamilyData();
+      this._contextUserId = user.id;
+      this.setData({ currentFamily: current as FamilyView | null, loaded: true, loading: false,
+        contextError: false, contextRequestId: '', homeScope: loadHomeScope(current?.id || '', user.id) },
+        () => this.applyNavTitle(current as FamilyView | null));
       if (current) {
-        // 家庭发生变化时先清空旧数据，避免新家庭加载完成前残留上一个家庭的内容
-        if (prevId && prevId !== current.id) {
-          this._resetFamilyData();
-        }
         this._hydrateHomeStartupCache(current.id);
         this.loadTodayEvents(current.id);
         this.loadTasks(current.id);
         this.loadAttentionDays(current.id);
         await this.loadLife(current.id);
-      } else {
-        this._resetFamilyData();
       }
-    } catch (e) {
-      console.error('[Home] Load data failed:', e);
-      this.setData({ loaded: true, loading: false });
+    } catch (cause) {
+      if (epoch !== this._contextEpoch) return;
+      const err = cause as { code?: string; requestId?: string } | null;
+      const code = err?.code || '';
+      const denied = ['USER_DISABLED','UNAUTHORIZED','FORBIDDEN','HTTP_401','HTTP_403','SPACE_ACCESS_DENIED','RESOURCE_NOT_FOUND'].includes(code);
+      const retain = hadView && !denied && previousUser === userStore.value?.id
+        && previousFamily?.id === currentFamilyStore.value?.id;
+      if (!retain) {
+        this._resetFamilyData();
+        this.setData({ currentFamily: null, loaded: false });
+      }
+      const requestId = typeof err?.requestId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(err.requestId) ? err.requestId : '';
+      this.setData({ loading: false, contextError: true, contextRequestId: requestId });
+    } finally {
+      if (epoch === this._contextEpoch) this._contextPending = false;
     }
   },
 
-  /** 确保当前用户已加载（用于问候昵称），不重复请求 */
   async ensureUser(): Promise<void> {
     if (userStore.value) return;
-    try {
-      await loadCurrentUser();
-    } catch (e) {
-      console.error('[Home] Load user failed:', e);
-    }
+    await loadCurrentUser();
   },
 
   /** 将导航栏标题同步为当前家庭名称（运行时替换固定的“家事喵”） */
@@ -1006,11 +1002,13 @@ Page({
 
   /** 创建家庭（无家庭时入口） */
   onCreateFamily(): void {
+    if (!this.data.loaded || this.data.contextError || this._contextPending || this.data.currentFamily) return;
     wx.navigateTo({ url: '/pages/family/create' });
   },
 
   /** 加入家庭（无家庭时入口） */
   onJoinFamily(): void {
+    if (!this.data.loaded || this.data.contextError || this._contextPending || this.data.currentFamily) return;
     wx.navigateTo({ url: '/pages/family/join' });
   },
 });

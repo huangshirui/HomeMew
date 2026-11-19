@@ -373,3 +373,23 @@ test('mini code validates version, binds fixed scene, and returns ephemeral imag
   assert.deepEqual((await okResponse.json()).data,
     { imageBase64: 'aGVsbG8=', mimeType: 'image/png', envVersion: 'trial' });
 });
+
+test('family list preserves quota and service errors', async () => {
+  for (const status of [429,500,503]) {
+    const response=await handleMiniProgramFamilyBff(request('/api/v1/miniprogram/families'),env(async()=>Response.json({error:{code:'UPSTREAM_UNAVAILABLE',message:'synthetic'}},{status,headers:{'x-request-id':'req_quota'}})));
+    assert.equal(response.status,status);assert.equal(response.headers.get('x-request-id'),'req_quota');
+  }
+});
+test('only valid family and catalog arrays can become a successful empty list',async()=>{
+  for (const value of [null,{}, {items:[]},[null],[{id:'invalid'}]]) {
+    const r=await handleMiniProgramFamilyBff(request('/api/v1/miniprogram/families'),env(async()=>ok(value)));assert.equal(r.status,502);
+  }
+  const healthy=await handleMiniProgramFamilyBff(request('/api/v1/miniprogram/families'),env(async()=>ok([])));
+  assert.deepEqual((await healthy.json()).data.items,[]);
+  const malformed=env(async()=>ok([{id:'spc_home',name:'Home',role:'owner',timezone:'UTC'}]));
+  malformed.HOMEMEW_BACKEND.fetch=async()=>ok({});
+  assert.equal((await handleMiniProgramFamilyBff(request('/api/v1/miniprogram/families'),malformed)).status,502);
+  malformed.HOMEMEW_BACKEND.fetch=async()=>{throw Error('catalog down');};
+  const down=await handleMiniProgramFamilyBff(request('/api/v1/miniprogram/families'),malformed);
+  assert.equal(down.status,503);assert.equal(down.headers.get('x-request-id'),'req_upstream');
+});

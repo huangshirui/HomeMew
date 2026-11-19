@@ -6,7 +6,7 @@
   <template is="skeleton" wx:if="{{loading}}" />
 
   <!-- 有家庭时 -->
-  <block wx:if="{{currentFamily}}">
+  <block wx:if="{{currentFamily && loaded}}">
 
     <!-- 自定义导航栏：家庭圆形徽章 + 家庭名称（统一 nav-bar 组件） -->
     <nav-bar>
@@ -25,6 +25,7 @@
       refresher-triggered="{{refreshing}}"
       bindrefresherrefresh="onRefresh"
     >
+    <view wx:if="{{contextError}}" class="home-context-warning" bindtap="onRetryContext" aria-role="button">家庭信息更新失败，点击重试 ›</view>
     <view wx:if="{{attentionCards.length > 0}}" class="attention-section">
       <view class="section-header">
         <text class="section-title">需要关注</text>
@@ -234,8 +235,20 @@
   </scroll-view>
   </block>
 
-  <!-- 无家庭时 -->
-  <block wx:elif="{{loaded}}">
+  <!-- 初始化失败与正常空家庭完全隔离 -->
+  <block wx:elif="{{contextError}}">
+    <nav-bar title="家事喵" />
+    <view class="home-unavailable">
+      <view class="home-unavailable-icon"><text>!</text></view>
+      <text class="home-unavailable-title">系统暂时不可用</text>
+      <text class="home-unavailable-desc">暂时无法读取家庭信息，请检查网络或稍后重试。</text>
+      <button class="btn-primary" bindtap="onRetryContext">重新加载</button>
+      <text wx:if="{{contextRequestId}}" class="home-unavailable-id" selectable>请求编号：{{contextRequestId}}</text>
+    </view>
+  </block>
+
+  <!-- 只有完整初始化成功才显示无家庭引导 -->
+  <block wx:elif="{{loaded && !loading && !contextError}}">
     <view class="empty-state">
       <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
       <text class="empty-title">还没有加入任何家庭</text>

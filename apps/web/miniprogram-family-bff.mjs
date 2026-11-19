@@ -91,11 +91,14 @@ async function callFamilyCatalog(env, path, data) {
   if (!backend || typeof backend.fetch !== 'function') {
     return { ok: false, response: errorResponse(503, 'FAMILY_CATALOG_UNAVAILABLE', 'HomeMew 家庭目录暂时不可用') };
   }
-  const response = await backend.fetch(new Request(`https://homemew-backend.internal${path}`, {
+  let response;
+  try { response = await backend.fetch(new Request(`https://homemew-backend.internal${path}`, {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json' },
     body: JSON.stringify(data),
-  }));
+  })); } catch {
+    return { ok: false, response: errorResponse(503, 'FAMILY_CATALOG_UNAVAILABLE', 'HomeMew 家庭目录暂时不可用') };
+  }
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload?.data) {
     return { ok: false, response: errorResponse(503, 'FAMILY_CATALOG_UNAVAILABLE', 'HomeMew 家庭目录暂时不可用') };
@@ -104,12 +107,18 @@ async function callFamilyCatalog(env, path, data) {
 }
 
 async function reconcileFamilySpaces(env, spaces) {
-  const list = Array.isArray(spaces) ? spaces.filter(space => space?.id && FAMILY_ID.test(space.id)) : [];
+  if (!Array.isArray(spaces) || spaces.some(space => !space || typeof space.id !== 'string' || !FAMILY_ID.test(space.id))) {
+    return { ok: false, response: errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'LifeSpace returned an invalid family list') };
+  }
+  const list = spaces;
   const catalog = await callFamilyCatalog(env, '/internal/v1/family-catalog/reconcile', {
     spaceIds: list.map(space => space.id),
   });
   if (!catalog.ok) return catalog;
-  const familyIds = new Set(catalog.data.familySpaceIds ?? []);
+  if (!Array.isArray(catalog.data.familySpaceIds) || catalog.data.familySpaceIds.some(id => typeof id !== 'string' || !FAMILY_ID.test(id))) {
+    return { ok: false, response: errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', 'HomeMew 家庭目录响应无效') };
+  }
+  const familyIds = new Set(catalog.data.familySpaceIds);
   return { ok: true, families: list.filter(space => familyIds.has(space.id)) };
 }
 
@@ -221,13 +230,18 @@ async function listFamilies(request, env) {
   const spaces = await callJson(request, env, 'core', '/api/v1/me/spaces');
   if (!spaces.ok) return spaces.response;
   const classified = await reconcileFamilySpaces(env, spaces.data);
-  if (!classified.ok) return classified.response;
+  if (!classified.ok) {
+    const headers = new Headers(classified.response.headers);
+    if (spaces.requestId) headers.set('x-request-id', spaces.requestId);
+    return new Response(classified.response.body, {status: classified.response.status, headers});
+  }
   const results = await Promise.all(classified.families.map(async space => {
     const members = await callJson(request, env, 'core', `/api/v1/spaces/${encodeURIComponent(space.id)}/members`);
     return { space, members };
   }));
   const failed = results.find(result => !result.members.ok);
   if (failed) return failed.members.response;
+  if (results.some(result => !Array.isArray(result.members.data))) return errorResponse(502, 'INVALID_UPSTREAM_RESPONSE', '家庭成员响应无效', spaces.requestId);
   return json({ data: { items: results.map(({ space, members }) => familyListItem(request, space, members.data.length)) } }, 200, spaces.requestId);
 }
 
