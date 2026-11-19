@@ -19,7 +19,7 @@ function harness(native:any,binary:any){
   };
   const type=src('utils/health-file-type.ts').replace(/export function /g,'function ');
   const source=src('services/api.ts').replace(/^import[\s\S]*?from ['"][^'"]+['"];?\r?$/gm,'').replace(/export /g,'');
-  const impl=runInNewContext(stripTypeScriptTypes(type+'\n'+source)+'\n({downloadHealthTemporaryFile})',{
+  const impl=runInNewContext(stripTypeScriptTypes(type+'\n'+source,{mode:'transform'})+'\n({downloadHealthTemporaryFile})',{
     wx,ArrayBuffer,Uint8Array,console:{warn(){},error(){}},getApplicationBaseUrl:()=>'https://homemew.example',generateRequestId:()=>String(1700000000000+(++seq))+'-test',ensureAccessToken:async(o:any)=>{refreshes.push(o.forceRefresh);return o.forceRefresh?'fresh':'initial';}
   });
   return {...impl,calls,writes,removed,refreshes};
