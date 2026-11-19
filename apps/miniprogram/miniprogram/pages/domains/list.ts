@@ -22,7 +22,7 @@ function formatted(record:DomainRecord,people:PersonOption[],kind:Kind):Display 
 Page({
   data:{
     kind:'activities' as Kind,title:'活动',familyId:'',loading:true,loadingMore:false,error:'',
-    records:[] as Display[],nextCursor:null as string|null,noFamily:false,loadedOnce:false,
+    records:[] as Display[],nextCursor:null as string|null,noFamily:false,loadedOnce:false,initError:false,
     filters:[] as {key:string;label:string}[],filter:'active',searchOpen:false,search:'',appliedSearch:'',
     people:[] as PersonOption[],personId:'',personOptions:[] as {id:string;label:string}[],selectedPersonIndex:0,
     mine:false,
@@ -41,7 +41,12 @@ Page({
     this.setData({kind,mine,title:mine?'我的习惯':DOMAIN_COPY[kind].title,filters,filter:'active'});
   },
   async onShow():Promise<void> {
-    try { await ensureRuntimeReady(); } catch {}
+    try { await ensureRuntimeReady(); } catch {
+      ++this._generation;
+      this.setData({initError:true,noFamily:false,loading:false,loadingMore:false});
+      return;
+    }
+    this.setData({initError:false});
     const familyId=currentFamilyStore.value?.id||'';
     if (!familyId) {
       ++this._generation;
@@ -106,7 +111,8 @@ Page({
   onFilterTap(e:WechatMiniprogram.TouchEvent):void{this.setData({filter:String(e.currentTarget.dataset.key),records:[],nextCursor:null});this.load(true);},
   onToggleSearch():void{this.setData({searchOpen:!this.data.searchOpen});},
   onSearchInput(e:WechatMiniprogram.Input):void{this.setData({search:e.detail.value});},
-  onApplySearch():void{this.setData({appliedSearch:this.data.search.trim()});this.load(true);},
+  onRetryContext():void{void this.onShow();},
+  onApplySearch():void{if(this.data.initError){this.onRetryContext();return;}this.setData({appliedSearch:this.data.search.trim()});this.load(true);},
   onClearSearch():void{this.setData({search:'',appliedSearch:'',personId:'',selectedPersonIndex:0});this.load(true);},
   onPersonChange(e:WechatMiniprogram.PickerChange):void{
     const index=Number(e.detail.value);this.setData({selectedPersonIndex:index,personId:this.data.personOptions[index]?.id||''});this.load(true);

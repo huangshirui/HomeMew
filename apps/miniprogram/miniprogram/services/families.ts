@@ -10,7 +10,9 @@ import {
 const base = (familyId: string) => `/api/v1/miniprogram/families/${encodeURIComponent(familyId)}`;
 
 export async function listMyFamilies(): Promise<FamilyListItem[]> {
-  return (await request<{ items: FamilyListItem[] }>('/api/v1/miniprogram/families')).items;
+  const result = await request<{ items: FamilyListItem[] }>('/api/v1/miniprogram/families');
+  if (!result || !Array.isArray(result.items) || result.items.some(f => !f || typeof f.id !== 'string' || !/^spc_[A-Za-z0-9_-]+$/.test(f.id))) throw Error('家庭列表响应无效');
+  return result.items;
 }
 export function createFamily(data: CreateFamilyRequest): Promise<CreateFamilyResult> {
   return request('/api/v1/miniprogram/families', { method: 'POST', data: data as unknown as Record<string, unknown>, skipRetry: true });

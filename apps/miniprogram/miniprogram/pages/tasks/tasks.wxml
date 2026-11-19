@@ -3,7 +3,10 @@
   <nav-bar title="待办任务" topInset="{{0}}" />
 
   <!-- 无家庭引导 -->
-  <block wx:if="{{noFamily}}">
+  <block wx:if="{{initError}}">
+    <view class="empty-state"><text class="empty-title">系统暂时不可用</text><text class="empty-desc">暂时无法读取家庭信息，请检查网络或稍后重试。</text><view class="empty-actions"><button class="btn-primary" bindtap="onRetry">重新加载</button></view></view>
+  </block>
+  <block wx:elif="{{noFamily}}">
     <view class="empty-state">
       <image class="empty-image" src="/assets/images/empty-family.png" mode="aspectFit" />
       <text class="empty-title">还没有家庭</text>

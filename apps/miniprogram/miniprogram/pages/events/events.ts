@@ -217,9 +217,10 @@ Page({
       await ensureRuntimeReady();
     } catch (error) {
       console.error('[Events] Runtime bootstrap failed:', error);
-      this.setData({ loaded: true, initError: true });
+      this.setData({ loaded: true, noFamily: false, initError: true });
       return;
     }
+    this.setData({ initError: false });
     const familyId = currentFamilyStore.value?.id || options.familyId || '';
     if (!familyId) {
       this.setData({ loaded: true, noFamily: true });
@@ -250,6 +251,8 @@ Page({
     this._subscribeDirty();
     this._startPoll();
     const familyId = currentFamilyStore.value?.id || '';
+    // The failed initialization is not a successful empty household.
+    if (this.data.initError) return;
     // 从无家庭恢复到有家庭
     if (familyId && this.data.noFamily) {
       this.resetForFamily(familyId);

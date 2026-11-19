@@ -84,13 +84,14 @@ test('profile customization is user-initiated and a saved nickname cannot be emp
 });
 
 test('home restores cache before issuing live domain refreshes', () => {
-  const loadData = homeSource.indexOf('async loadData(): Promise<void>');
+  const loadData = homeSource.indexOf('async loadData(force = false): Promise<void>');
   const hydrate = homeSource.indexOf('this._hydrateHomeStartupCache(current.id);', loadData);
   const events = homeSource.indexOf('this.loadTodayEvents(current.id);', loadData);
   const tasks = homeSource.indexOf('this.loadTasks(current.id);', loadData);
   const days = homeSource.indexOf('this.loadAttentionDays(current.id);', loadData);
 
   assert.ok(loadData >= 0 && hydrate > loadData, 'home loadData must hydrate local cache');
+  assert.ok(homeSource.indexOf('await ensureRuntimeReady({ force });', loadData) < hydrate, 'must verify runtime before hydrating');
   assert.ok(hydrate < events && hydrate < tasks && hydrate < days, 'cache must render before live refresh');
   assert.match(homeSource, /cacheHomeEvents\(/);
   assert.match(homeSource, /cacheHomeTasks\(/);

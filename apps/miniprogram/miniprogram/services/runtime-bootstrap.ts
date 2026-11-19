@@ -45,6 +45,7 @@ export async function ensureRuntimeReady(options: { force?: boolean } = {}): Pro
       loadFamilies({ force: true }),
     ]);
 
+    if (!user || typeof user.id !== 'string' || !Array.isArray(families)) throw runtimeError('RUNTIME_CONTEXT_INVALID', '家庭上下文初始化失败');
     if (user.status === 'disabled') {
       throw runtimeError('USER_DISABLED', '账号已被禁用');
     }

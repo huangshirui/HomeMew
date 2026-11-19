@@ -1,11 +1,12 @@
 <view class="container domain-page">
   <nav-bar title="{{title}}" showBack="{{true}}">
-    <view wx:if="{{!noFamily}}" slot="right" class="header-filter {{searchOpen || appliedSearch || personId ? 'header-filter-active' : ''}}" bindtap="onToggleSearch" hover-class="header-filter-hover" aria-role="button" aria-label="搜索与筛选{{appliedSearch || personId ? '，已启用' : ''}}">
+    <view wx:if="{{!noFamily && !initError}}" slot="right" class="header-filter {{searchOpen || appliedSearch || personId ? 'header-filter-active' : ''}}" bindtap="onToggleSearch" hover-class="header-filter-hover" aria-role="button" aria-label="搜索与筛选{{appliedSearch || personId ? '，已启用' : ''}}">
       <lucide-icon name="sliders-horizontal" size="20" stroke-width="{{1.75}}" color="{{searchOpen || appliedSearch || personId ? '#358539' : '#526059'}}" />
       <view wx:if="{{appliedSearch || personId}}" class="filter-indicator" />
     </view>
   </nav-bar>
-  <view wx:if="{{noFamily}}" class="empty-state"><text class="empty-title">先创建或加入家庭</text><button class="btn-primary" bindtap="onFamilySetup">前往首页</button></view>
+  <view wx:if="{{initError}}" class="empty-state"><text class="empty-title">系统暂时不可用</text><text class="empty-desc">暂时无法读取家庭信息，请稍后重试。</text><button class="btn-primary" bindtap="onRetryContext">重新加载</button></view>
+  <view wx:elif="{{noFamily}}" class="empty-state"><text class="empty-title">先创建或加入家庭</text><button class="btn-primary" bindtap="onFamilySetup">前往首页</button></view>
   <block wx:else>
     <view wx:if="{{searchOpen}}" class="card search-panel">
       <view class="search-row">
@@ -43,7 +44,7 @@
     <view class="page-footer" wx:if="{{loadingMore}}">加载更多…</view>
     <view class="page-footer" wx:elif="{{nextCursor}}" bindtap="onLoadMore">加载更多</view>
   </block>
-  <view wx:if="{{!noFamily}}" class="fab domain-fab" bindtap="onCreate" aria-role="button" aria-label="新建{{title}}">
+  <view wx:if="{{!noFamily && !initError}}" class="fab domain-fab" bindtap="onCreate" aria-role="button" aria-label="新建{{title}}">
     <view class="fab-plus"><view class="fab-plus-line fab-plus-horizontal" /><view class="fab-plus-line fab-plus-vertical" /></view>
   </view>
 </view>

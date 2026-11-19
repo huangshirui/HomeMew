@@ -494,3 +494,11 @@
 }
 
 
+
+.home-unavailable{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24rpx;padding:100rpx 48rpx 48rpx;text-align:center;flex:1;box-sizing:border-box}
+.home-unavailable-icon{width:120rpx;height:120rpx;border-radius:50%;background:#fff1df;color:#b45309;font-size:70rpx;font-weight:600;display:flex;align-items:center;justify-content:center}
+.home-unavailable-title{font-size:36rpx;font-weight:600;color:var(--color-text-primary)}
+.home-unavailable-desc{font-size:27rpx;line-height:1.7;color:#647067;max-width:500rpx}
+.home-unavailable .btn-primary{width:320rpx;margin-top:12rpx}
+.home-unavailable-id{font-size:21rpx;color:#9299a3;word-break:break-all}
+.home-context-warning{background:#fff6e8;color:#925b14;border-radius:16rpx;padding:18rpx 20rpx;margin-bottom:20rpx;font-size:25rpx}
