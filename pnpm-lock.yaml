@@ -1210,7 +1210,6 @@ packages:
     resolution: {integrity: sha512-sm6TxKTtWv1Oh6n3C6J6a8odejb5uO4A4zo/2dgkHuC0iu8ZMAXOezEODkVaoVp8nX1Xzr+0WxFJJmUr45hQzg==}
     engines: {node: '>=20.16.0 || >=22.3.0'}
 
-
 snapshots:
 
   '@napi-rs/canvas-android-arm64@0.1.100':
@@ -1261,22 +1260,13 @@ snapshots:
       '@napi-rs/canvas-win32-x64-msvc': 0.1.100
     optional: true
 
-  '@next/env@16.4.3': {}
-
   node-readable-to-web-readable-stream@0.4.2:
     optional: true
-
-  node-releases@2.0.58: {}
 
   pdfjs-dist@5.4.624:
     optionalDependencies:
       '@napi-rs/canvas': 0.1.100
       node-readable-to-web-readable-stream: 0.4.2
-
-  picocolors@1.1.1: {}
-
-  picomatch@4.0.7: {}
-
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
