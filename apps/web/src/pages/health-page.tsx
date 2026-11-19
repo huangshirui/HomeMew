@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { Activity, ChevronRight, FileText, HeartPulse, Ruler, Scale, Plus, Settings2, RefreshCw, CalendarDays, Stethoscope, Upload, X, Ellipsis, Download } from 'lucide-react';
+import { Activity, ChevronRight, FileText, HeartPulse, Ruler, Scale, Plus, Settings2, RefreshCw, CalendarDays, Stethoscope, Upload, X, Ellipsis } from 'lucide-react';
 import { PageHeader } from '../components/ui/page-header';
+import { DocumentPreview } from '../components/ui/document-preview';
 import { MemberAvatar } from '../components/app-shell';
 import { useHousehold } from '../components/household-provider';
 import { ModalScrollLock } from '../components/ui/modal-behavior';
@@ -18,7 +19,6 @@ const primary = 'min-h-10 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semib
 const panel = 'rounded-2xl bg-white p-4 sm:p-5 ring-1 ring-stone-200/80';
 const muted='text-xs text-stone-500';
 const EMPTY_HEALTH_ROWS:never[]=[];
-const FILE_EXTENSIONS:Record<string,string>={'application/pdf':'.pdf','image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp'};
 const iconButton=button+' inline-flex items-center justify-center gap-1.5';
 function message(error: unknown) {
   if (error instanceof ApiError && (error.status === 403 || error.status === 404)) return '当前健康模型未开放或没有访问权限。';
@@ -309,16 +309,6 @@ function DocumentDialog({ spaceId, personId, timezone, record, schema, close, sa
     </form>
   </Dialog>;
 }
-function DocumentPreview({url,title}:{url:string;title:string}) {
-  const [file,setFile]=useState<{url:string;type:string}|null>(null),[error,setError]=useState('');
-  useEffect(()=>{let active=true,objectUrl='';const abort=new AbortController();
-    void (async()=>{try{const response=await fetch(url,{credentials:'same-origin',cache:'no-store',signal:abort.signal});if(!response.ok||!response.body)throw Error('file');const type=(response.headers.get('content-type')??'').split(';')[0];const reader=response.body.getReader();const chunks:BlobPart[]=[];let size=0;try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>15*1024*1024){await reader.cancel();throw Error('file size');}chunks.push(new Uint8Array(value));}}finally{reader.releaseLock();}if(!active)return;objectUrl=URL.createObjectURL(new Blob(chunks,{type:['application/pdf','image/png','image/jpeg','image/webp'].includes(type)?type:'application/octet-stream'}));setFile({url:objectUrl,type});}catch{if(active)setError('文件暂时无法预览，请关闭后重试。');}})();
-    return()=>{active=false;abort.abort();if(objectUrl)URL.revokeObjectURL(objectUrl);};
-  },[url]);
-  if(error)return <p role="alert" className="text-sm text-red-700">{error}</p>;
-  if(!file)return <p role="status" className="p-6 text-center text-sm text-stone-500">正在安全读取档案…</p>;
-  return <div className="space-y-3">{file.type==='application/pdf'?<><iframe sandbox="" src={file.url} title="PDF 档案预览" className="h-[50dvh] w-full rounded-xl border border-stone-200"/><p className={muted}>浏览器不支持内嵌 PDF 时，可下载原始资料查看。</p></>:['image/png','image/jpeg','image/webp'].includes(file.type)?<img src={file.url} alt={title} className="max-h-[55dvh] w-full rounded-xl object-contain"/>:<p className={muted}>此文件类型仅支持下载。</p>}<a className={iconButton} href={file.url} download={title+(FILE_EXTENSIONS[file.type]??'')}><Download className="size-4"/>下载原始资料</a></div>;
-}
 function Documents({spaceId,personId,timezone,writable,schema}:{spaceId:string;personId:string;timezone:string;writable:boolean;schema:HealthRuntimeModel}) {
   const [filter,setFilter]=useState('');
   const list=useHealthList<HealthDocument>(spaceId,'health_document',personId,undefined,timezone,{documentType:filter||undefined});
@@ -330,7 +320,7 @@ function Documents({spaceId,personId,timezone,writable,schema}:{spaceId:string;p
     <div className="flex flex-wrap gap-2">{['',...types].map(t=><button key={t} aria-pressed={t===filter} className={'rounded-full px-3 py-1.5 text-xs '+(t===filter?'bg-emerald-100 font-semibold text-emerald-800':'bg-stone-100 text-stone-600 hover:bg-stone-200')} onClick={()=>setFilter(t)}>{documentLabels[t]??'全部'}</button>)}</div>
     {list.items.map(r=><button key={r.id} className="flex w-full items-center gap-3 border-b border-stone-100 py-3 text-left hover:bg-stone-50" onClick={()=>{setPreview(false);setDetail(r);}}><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><FileText className="size-5"/></span><div className="min-w-0 flex-1"><p className="truncate font-medium">{r.title}</p><p className={muted}>{r.issuedDate||'日期未记录'} · {documentLabels[r.documentType]??r.documentType}{r.issuerName?' · '+r.issuerName:''}</p></div><ChevronRight className="size-4 shrink-0 text-stone-400"/></button>)}
     {error?<p role="alert" className="text-sm text-red-700">{error}</p>:null}<ListStatus {...list} empty={!list.items.length} retry={list.reload}/>
-    {detail?<Dialog title={detail.title} close={()=>{setDetail(null);setPreview(false);}} busy={busy}><div className="space-y-3"><p className="text-sm text-stone-500">{detail.issuedDate||'日期未记录'} · {documentLabels[detail.documentType]??detail.documentType}{detail.issuerName?' · '+detail.issuerName:''}</p>{detail.notes?<p className="whitespace-pre-wrap break-words text-sm">{detail.notes}</p>:null}{detail.eventId?<p className={muted}>已关联健康事件</p>:null}{detail.artifactRef?(preview?<DocumentPreview url={documentPath(spaceId,personId)+'/'+encodeURIComponent(detail.id)+'/file'} title={detail.title}/>:<button className={primary+' w-full'} onClick={()=>setPreview(true)}>查看原始资料</button>):<Empty>暂无附件</Empty>}{writable?<div className="flex justify-end gap-2"><button className={button} onClick={()=>{setEditing(detail);setDetail(null);setPreview(false);}}>编辑</button><button className={button+' text-red-700'} disabled={busy} onClick={()=>void remove(detail)}>删除</button></div>:null}</div></Dialog>:null}
+    {detail?<Dialog title={detail.title} close={()=>{setDetail(null);setPreview(false);}} busy={busy}><div className="space-y-3"><p className="text-sm text-stone-500">{detail.issuedDate||'日期未记录'} · {documentLabels[detail.documentType]??detail.documentType}{detail.issuerName?' · '+detail.issuerName:''}</p>{detail.notes?<p className="whitespace-pre-wrap break-words text-sm">{detail.notes}</p>:null}{detail.eventId?<p className={muted}>已关联健康事件</p>:null}{detail.artifactRef?(preview?<DocumentPreview url={documentPath(spaceId,personId)+'/'+encodeURIComponent(detail.id)+'/file'} title={detail.title} close={()=>setPreview(false)}/>:<button className={primary+' w-full'} onClick={()=>setPreview(true)}>查看原始资料</button>):<Empty>暂无附件</Empty>}{writable?<div className="flex justify-end gap-2"><button className={button} onClick={()=>{setEditing(detail);setDetail(null);setPreview(false);}}>编辑</button><button className={button+' text-red-700'} disabled={busy} onClick={()=>void remove(detail)}>删除</button></div>:null}</div></Dialog>:null}
     {editing?<DocumentDialog spaceId={spaceId} personId={personId} timezone={timezone} schema={schema} record={editing==='new'?undefined:editing} close={()=>setEditing(null)} saved={()=>{setEditing(null);void list.reload();}}/>:null}
   </section>;
 }

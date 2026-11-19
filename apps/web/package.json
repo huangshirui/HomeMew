@@ -4,16 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node prepare-pdf-assets.mjs && vite",
     "typecheck": "tsc --noEmit",
-    "build": "vite build",
+    "build": "node prepare-pdf-assets.mjs && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "lucide-react": "^1.33.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.2"
+    "react-router-dom": "^7.18.2",
+    "pdfjs-dist": "5.4.624"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.69.1",
