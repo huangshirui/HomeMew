@@ -71,7 +71,13 @@ export class ActivityAwarePoll {
   private lastAttemptAt: number | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly poll: () => void, private readonly clock: PollClock = systemPollClock) {}
+  private readonly poll: () => void;
+  private readonly clock: PollClock;
+
+  constructor(poll: () => void, clock: PollClock = systemPollClock) {
+    this.poll = poll;
+    this.clock = clock;
+  }
 
   private readonly onForeground = (foreground: boolean): void => {
     this.clear();
