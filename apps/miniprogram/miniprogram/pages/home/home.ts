@@ -1,3 +1,4 @@
+import { ActivityAwarePoll } from '../../services/refresh-policy';
 /**
  * 首页 —— 今天的家庭工作台
  *
@@ -139,7 +140,7 @@ const HOME_TASK_LIMIT = 10;
 const HOME_TASK_DUE_DAYS = 3;
 
 /**
- * 后台轮询间隔（毫秒）：页面可见期间每 60 秒重新拉取一次后台数据，
+ * 后台轮询间隔（毫秒）：页面与应用均可见、用户活跃时每 60 秒重新拉取一次后台数据，
  * 让其他家庭成员的新增 / 修改 / 删除在无需用户操作时也能自动出现。
  * 页面隐藏（切 tab / 进入子页 / 退到后台）时停止，不消耗流量。
  */
@@ -225,7 +226,7 @@ Page({
   /** 每分钟本地重算定时器（只重算展示态，不重新拉后台） */
   _tickTimer: null as ReturnType<typeof setInterval> | null,
   /** 后台轮询定时器（页面可见期间才运行，拉取其他成员的变更） */
-  _pollTimer: null as ReturnType<typeof setInterval> | null,
+  _pollController: null as ActivityAwarePoll | null,
   /** 上次真正发起后台拉取的时间戳，用于轮询节流，避免与 onShow / 下拉刷新叠加 */
   _lastFetchAt: 0,
   /** 上次重算得到的「已结束 / 进行中」指纹，用于跳过无变化的 setData */
@@ -335,26 +336,27 @@ Page({
   },
 
   /**
-   * 启动后台轮询：页面可见期间每 60 秒重新拉取一次首页三个模块，
+   * 启动后台轮询：页面与应用均可见、用户活跃时每 60 秒重新拉取一次首页三个模块，
    * 使其他家庭成员的变更在用户不做任何操作时也能自动出现。
    *
    * 注意：
-   * - 只在 onShow 启动、onHide / onUnload 停止，隐藏期间不产生请求；
+   * - 页面 onShow 启动，页面或 App 隐藏停止；空闲 5 分钟降频、15 分钟暂停，隐藏期间不产生请求；
    * - 与本地展示态 tick 分开，互不干扰；
    * - 通过 _lastFetchAt 节流，刚刚（onShow / 下拉刷新 / 脏标记）拉过就跳过本轮；
    * - 每次轮询都重新读取 currentFamilyStore，家庭切换后自然指向新家庭；
    *   各 load* 内部还会用 familyId 校验丢弃过期响应，不会串数据。
    */
   _startPoll(): void {
-    if (this._pollTimer) return;
-    this._pollTimer = setInterval(() => this._poll(), POLL_INTERVAL_MS);
+    if (!this._pollController) this._pollController = new ActivityAwarePoll(() => this._poll());
+    this._pollController.show();
   },
 
   _stopPoll(): void {
-    if (this._pollTimer) {
-      clearInterval(this._pollTimer);
-      this._pollTimer = null;
-    }
+    this._pollController?.hide();
+  },
+
+  onPollActivity(): void {
+    this._pollController?.activity();
   },
 
   /** 轮询一次：带节流与家庭校验，复用已有的加载函数 */

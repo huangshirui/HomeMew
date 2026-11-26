@@ -42,7 +42,7 @@ Page({
   _logoTapCount:0,
   _lastLogoTapAt:0,
   data: {
-    version: '2.0.0',
+    version: '2.1.1',
     testing: false,
     diagnosticsVisible:false,
     errorText: '',

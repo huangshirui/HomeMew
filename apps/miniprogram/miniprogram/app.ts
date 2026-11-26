@@ -1,3 +1,4 @@
+import { setMiniAppForeground } from './services/refresh-policy';
 import { FamilyListItem } from './types/index';
 import { ensureProductionRuntimeStorage, getApplicationBaseUrl } from './services/config';
 import { reportMiniProgramActivityOncePerDay } from './services/activity';
@@ -12,6 +13,7 @@ App<IAppOption>({
   },
 
   onShow(options: AppEntryOptions) {
+    setMiniAppForeground(true);
     // Normal startup never routes through an application-level splash page.
     // Prepare runtime/onboarding in parallel with the requested entry page.
     void coordinateAppEntry(options).catch((error) => {
@@ -21,5 +23,9 @@ App<IAppOption>({
     void reportMiniProgramActivityOncePerDay().catch((error) => {
       console.warn('[HomeMew Activity] miniprogram report failed', error instanceof Error ? error.message : 'unknown');
     });
+  },
+
+  onHide() {
+    setMiniAppForeground(false);
   },
 });
