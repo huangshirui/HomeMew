@@ -1,6 +1,6 @@
 <!-- 首页：今天的家庭工作台 -->
 <import src="home.skeleton.wxml" />
-<view class="container home-root">
+<view class="container home-root" capture-bind:touchstart="onPollActivity" capture-bind:tap="onPollActivity">
 
   <!-- 骨架屏：首屏数据就绪前覆盖展示，避免白屏 -->
   <template is="skeleton" wx:if="{{loading}}" />

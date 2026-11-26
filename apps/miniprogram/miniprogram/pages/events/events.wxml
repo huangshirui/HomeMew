@@ -1,5 +1,5 @@
 <!-- 日程页：成员范围 + 折叠月历 + 双向时间线 -->
-<view class="page">
+<view class="page" capture-bind:touchstart="onPollActivity" capture-bind:tap="onPollActivity">
   <nav-bar title="家庭日程" topInset="0" />
 
   <!-- 无家庭引导 -->

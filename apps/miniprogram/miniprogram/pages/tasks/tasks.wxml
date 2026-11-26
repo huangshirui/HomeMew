@@ -1,5 +1,5 @@
 <!-- 待办任务列表页（进行中） -->
-<view class="container tasks-root">
+<view class="container tasks-root" capture-bind:touchstart="onPollActivity" capture-bind:tap="onPollActivity">
   <nav-bar title="待办任务" topInset="{{0}}" />
 
   <!-- 无家庭引导 -->
